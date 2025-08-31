@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import AuthForms from "@/components/auth/AuthForms";
@@ -22,11 +22,11 @@ export default function Home() {
   const authParam = urlParams.get('auth');
   
   // Open auth dialog if URL param exists
-  useState(() => {
+  useEffect(() => {
     if (authParam === 'login' || authParam === 'register') {
       setAuthMode(authParam);
     }
-  });
+  }, [authParam]);
 
   const handleAuthSuccess = () => {
     setAuthMode(null);
@@ -214,6 +214,9 @@ export default function Home() {
       {/* Auth Dialog */}
       <Dialog open={authMode !== null} onOpenChange={() => setAuthMode(null)}>
         <DialogContent className="sm:max-w-md">
+          <DialogTitle className="sr-only">
+            {authMode === 'login' ? 'Zaloguj się' : 'Zarejestruj się'}
+          </DialogTitle>
           {authMode && (
             <AuthForms 
               mode={authMode} 
