@@ -115,11 +115,18 @@ export default function Header() {
               </DropdownMenu>
             ) : (
               <>
-                <Button variant="ghost" asChild data-testid="login-button">
-                  <Link href="/?auth=login">{t("auth.login")}</Link>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => window.location.href = "/?auth=login"}
+                  data-testid="login-button"
+                >
+                  {t("auth.login")}
                 </Button>
-                <Button asChild data-testid="register-button">
-                  <Link href="/?auth=register">{t("auth.register")}</Link>
+                <Button 
+                  onClick={() => window.location.href = "/?auth=register"}
+                  data-testid="register-button"
+                >
+                  {t("auth.register")}
                 </Button>
               </>
             )}
