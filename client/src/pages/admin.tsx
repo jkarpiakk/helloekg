@@ -11,7 +11,7 @@ export default function Admin() {
     return null;
   }
 
-  if (!canReviewContent()) {
+  if (!canReviewContent) {
     setLocation("/dashboard");
     return null;
   }
