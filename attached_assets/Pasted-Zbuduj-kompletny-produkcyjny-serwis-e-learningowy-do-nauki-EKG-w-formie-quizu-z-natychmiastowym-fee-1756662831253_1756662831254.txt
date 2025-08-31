@@ -1,0 +1,165 @@
+Zbuduj kompletny, produkcyjny serwis e-learningowy do nauki EKG w formie quizu z natychmiastowym feedbackiem. Język interfejsu na start: polski (PL). Architektura i UI muszą być gotowe na i18n (EN, ES w przyszłości). Serwis ma działać responsywnie (mobile-first), szybko i bezpiecznie. Poniżej pełne wymagania.
+1) Cel i odbiorcy
+Produkt: kurs EKG dla studentów medycyny, pielęgniarstwa, ratowników medycznych oraz osób zainteresowanych.
+Forma nauki: quiz jednokrotnego wyboru (4 opcje), po kliknięciu natychmiastowe wyjaśnienie (prosty język, styl „Feynman”), z możliwością wstawienia ilustracji EKG do pytania.
+Efekt: śledzenie postępów, powtórki błędów, certyfikat ukończenia z unikalnym ID i publiczną weryfikacją.
+2) Informacja architektoniczna (wysoki poziom)
+SPA + SSR/SSG dla SEO (np. Next.js/Nuxt – do wyboru generatora).
+API (REST lub GraphQL) + warstwa autoryzacji (JWT/Session + httpOnly cookies).
+Baza danych SQL (np. Postgres) lub dokumentowa (np. MongoDB) – dobierz pod quizy i raportowanie.
+Pliki/obrazy (EKG) w storage (np. S3 kompatybilny) + CDN.
+i18n (klucze, pliki tłumaczeń, funkcje t()).
+Webhooks płatności.
+Logowanie zdarzeń (audit log), analityka (eventy).
+WCAG 2.1 AA, RODO, bezpieczeństwo (CSP, rate limiting, 2FA opcjonalnie).
+3) Role użytkowników i uprawnienia
+Owner (właściciel): pełna administracja (płatności, treści, użytkownicy, konfiguracja).
+Reviewer (weryfikator merytoryczny): przegląd/akceptacja pytań i wyjaśnień (workflow DRAFT → REVIEW → PUBLISHED).
+DeveloperAdmin: dostęp techniczny (logi, integracje), bez edycji treści.
+Support: wgląd w konta, reset dostępu, weryfikacja certyfikatów; brak edycji pytań.
+Student (użytkownik końcowy): dostęp do quizów wg planu, wgląd w postępy, certyfikat.
+4) Moduły funkcjonalne
+4.1 Rejestracja i logowanie
+Rejestracja e-mail + hasło (weryfikacja e-mail).
+Logowanie, wylogowanie, reset hasła (link e-mail).
+Profil: imię, nazwisko, zawód (opcjonalnie), język UI, zgody marketingowe.
+Zgody RODO: regulamin, polityka prywatności (checkboxy, timestampy).
+4.2 Płatności i paywall
+Plany jednorazowe z czasem dostępu:
+60 zł – 1 miesiąc
+100 zł – 3 miesiące
+169 zł – 12 miesięcy
+Integracja: Stripe (karty, Apple/Google Pay) + alternatywa lokalna (PayU/Przelewy24) – do wyboru.
+Webhooki: aktywacja dostępu po „payment_succeeded”, automatyczne wygaszenie po okresie.
+Panel płatności: wybór planu, koszyk, podsumowanie, faktura (PDF), historia płatności.
+Strony: „Oferta”, „Cennik”, „FAQ płatności”.
+Paywall: blokada treści po przekroczeniu czasu; CTA do odnowienia.
+4.3 Silnik quizów
+Pytanie: treść (Markdown), 4 odpowiedzi (A–D), flaga poprawnej, wyjaśnienie (Markdown), pole „potrzebna ilustracja” + upload obrazu (EKG).
+Kategorie/sekcje/rozdziały → progresywny poziom trudności.
+Tryby:
+Nauka: po wyborze odpowiedzi natychmiastowy feedback z wyjaśnieniem i obrazkiem.
+Powtórka błędów: system rozłożonych powtórek (successive relearning/active recall).
+Egzamin próbny: limit czasu, wynik końcowy, raport błędów.
+Nawigacja: poprzednie/następne, „oznacz do powtórki”.
+Stany odpowiedzi: poprawna/niepoprawna, licznik prób.
+Dane telemetryczne: czas na pytanie, pierwsza odpowiedź, zmiana wyboru.
+4.4 Postępy i profil nauki
+Dashboard: % ukończenia per moduł, statystyki skuteczności, „słabe obszary”.
+Historia odpowiedzi, filtr po rozdziale/typie problemu (np. ST, QRS, osie).
+System powtórek: kolejka pytań wg trudności i historii błędów.
+Odznaki/mikronagrody (opcjonalnie: można wyłączyć w konfiguracji).
+4.5 Certyfikacja
+Warunki wydania: np. ≥80% poprawnych w „egzaminie końcowym” + ukończone moduły.
+Certyfikat PDF: imię, nazwisko, data, unikalny ID, QR z linkiem weryfikacyjnym.
+Publiczna strona weryfikacji: /verify/{certificateId} → status, dane kursu, data ważności.
+4.6 CMS treści (Owner/Reviewer)
+CRUD pytań, wyjaśnień, ilustracji (wersjonowanie!).
+Workflow: Draft → Review → Published (Reviewer zatwierdza).
+Podgląd jako student (preview).
+Import/eksport pytań (CSV/JSON/Markdown).
+Szablony pytaniowe (np. „EKG z obrazem”, „oś serca”, „QTc z obliczeniem”).
+Masowa edycja tagów/kategorii (np. STEMI, RBBB, AF, QT).
+4.7 i18n (przygotowanie)
+Klucze tekstów UI, struktur kursu i pytań z polami na EN/ES.
+Przełącznik języka w headerze (PL aktywny, EN/ES z etykietą „wkrótce”).
+Daty/waluty lokalizowane (na start PLN).
+4.8 Wsparcie i administracja
+Ticket/contact form (Support widzi, odpowiada).
+Panel użytkownika: zmiana planu, przedłużenie, aktualizacja danych.
+Panel admin: lista użytkowników, status dostępu, ręczna aktywacja/dezaktywacja, zwroty.
+Audit log: kto co edytował (treści, statusy pytań, płatności, certyfikaty).
+4.9 SEO / treści publiczne
+Strony: Home, O kursie, Jak to działa (metoda Feynmanna i active recall), Cennik, FAQ, Kontakt, Polityka prywatności, Regulamin, Weryfikacja certyfikatu.
+SSR meta tags (title, description, OpenGraph), sitemap.xml, robots.txt.
+Blog (opcjonalnie, wyłączalne): krótkie artykuły EKG (dla SEO).
+5) UX/UI i styl
+Styl: nowoczesny, med-ed; jasny motyw, duża czytelność, kontrast WCAG.
+Komponenty: karty pytań, toasty (feedback), progres bar, breadcrumbs.
+Quiz na mobile: duże hit-area, „sticky” pasek nawigacji, klarowne CTA.
+Ilustracje EKG: lightbox z powiększeniem, zoom/pan.
+Ikonografia subtelna (np. statusy: poprawna/niepoprawna).
+Dark mode (opcjonalnie), preferencje zapisywane w profilu.
+6) Wydajność i bezpieczeństwo
+Core Web Vitals: LCP < 2,5 s; CLS < 0,1; INP < 200 ms na 4G-mid.
+Lazy-load obrazów EKG, optymalizacja (WebP/AVIF), CDN.
+Rate limiting logowania i API; ochrona CSRF (httpOnly cookies), CSP, HTTPS.
+Hasła: salted hash (argon2/bcrypt), 2FA (opcjonalnie).
+Backup DB + storage (dzienny), rotacja kluczy, .env w secret store.
+Zgodność RODO: rejestr czynności, polityka „privacy by design”.
+7) Analityka i zdarzenia (eventy)
+Zaimplementuj eventy (do dataLayer / analytics):
+signup_completed, email_verified, login_success.
+plan_viewed, checkout_started, payment_succeeded, payment_failed.
+quiz_question_viewed, answer_selected (z poprawność TRUE/FALSE), explanation_viewed, module_completed.
+certificate_issued, certificate_verified.
+support_ticket_created.
+Dashboard (Owner): sprzedaż per plan/okres, konwersja, aktywność quizowa, najtrudniejsze pytania.
+8) Modele danych (propozycja)
+Users: id, email, hash, name, role, locale, consents, createdAt.
+Subscriptions/Access: id, userId, planId, startDate, endDate, status, paymentProvider, invoiceUrl.
+Plans: id, name, price, durationDays, currency.
+Question: id, sectionId, title, bodyMD, imageUrl, answers[4]{text,isCorrect}, explanationMD, tags[], status(DRAFT/REVIEW/PUBLISHED), createdBy, reviewedBy, version, createdAt, updatedAt.
+Section/Module: id, title, order, i18n.
+Attempt: id, userId, questionId, selectedIndex, isCorrect, timeMs, createdAt.
+Progress: id, userId, sectionId, completion%, lastActivity.
+Certificate: id, userId, issuedAt, score, hash, pdfUrl, publicVerifyUrl, expiresAt?
+SupportTicket: id, userId, subject, message, status, createdAt, updatedAt.
+AuditLog: id, actorId, action, entityType, entityId, diff, createdAt.
+9) API (przykładowe endpointy)
+Auth: POST /api/auth/register, POST /api/auth/login, POST /api/auth/forgot, POST /api/auth/reset.
+Plans: GET /api/plans.
+Checkout: POST /api/checkout/session, webhooks /api/webhooks/stripe|payu.
+Content:
+Student: GET /api/sections, GET /api/questions?section=...&mode=learn|review, POST /api/attempts.
+Admin/Reviewer: POST /api/questions, PUT /api/questions/:id, POST /api/questions/:id/submit-review, POST /api/questions/:id/publish.
+Progress: GET /api/progress, GET /api/review-queue.
+Certificate: POST /api/certificates/issue, GET /verify/:id.
+Users (admin): GET /api/users, PATCH /api/users/:id/access.
+10) Treści i copy (PL, z i18n kluczami)
+Home (pitch): „Ucz się EKG jak z dobrym mentorem – pytanie po pytaniu, z natychmiastowym, prostym wyjaśnieniem. Metoda Feynmanna + active recall.”
+Cennik: trzy kafle planów (1/3/12 miesięcy), CTA „Rozpocznij naukę”.
+„Jak to działa”: 3 kroki: Zarejestruj → Rozwiązuj quiz → Odbierz certyfikat (ID + weryfikacja online).
+Certyfikat: „Unikalny numer, publiczna weryfikacja – idealny do CV/portfolio”.
+11) E-maile transakcyjne (szablony)
+Potwierdzenie rejestracji / weryfikacja e-mail.
+Potwierdzenie płatności i aktywacja dostępu (z datą wygaśnięcia).
+Przypomnienie o zbliżającym się wygaśnięciu (7/3/1 dni).
+Reset hasła.
+Wydanie certyfikatu (z linkiem do weryfikacji i pobrania PDF).
+Wysyłka przez SMTP/Transactional API (np. SendGrid/Mailgun).
+12) Legal/Compliance
+Strony: Regulamin, Polityka prywatności, Cookies. Checkboxy zgód przy rejestracji.
+Polityka zwrotów (14 dni, jeśli dotyczy – konfiguracja).
+Baner cookies (zgoda, preferencje).
+13) Testy i akceptacja (Definition of Done)
+Rejestracja/login/reset – działa na desktop/mobile, e-maile docierają.
+Płatność: happy path dla każdego planu + webhook → dostęp aktywny; wygaśnięcie → blokada treści.
+Quiz: pytania 4-opcyjne, obrazki, feedback natychmiast; zapis prób i statystyk.
+Powtórka błędów: działa algorytm kolejki; widok „Słabe obszary”.
+Certyfikat: generuje PDF z QR/ID, publiczna weryfikacja działa.
+CMS: workflow DRAFT→REVIEW→PUBLISHED; wersjonowanie; import/eksport.
+i18n: przełącznik, klucze oddzielone (PL w pełni, EN/ES placeholders).
+SEO: sitemap, meta, og:image; strony polityk.
+Wydajność: Lighthouse ≥ 90 (mobile), LCP < 2,5 s.
+Bezpieczeństwo: CSP włączone, cookies httpOnly/secure, rate limit auth.
+A11y: kontrast, focus states, aria-labels; nawigacja klawiaturą.
+14) Wypełniacze treści (seed)
+Utwórz 5 sekcji (Moduł 1–5) z po 10 przykładowych pytań (PL), każde z wyjaśnieniem i 1 obrazkiem placeholder (np. /images/ekg-placeholder-01.png).
+Strony publiczne z krótkim copy (PL).
+Jedno demo-konto Reviewer do zatwierdzania treści.
+15) Deployment i monitoring
+Środowiska: dev, staging, prod.
+CI/CD (lint, testy, build, deploy).
+Monitoring uptime i błędów (np. Sentry), logi serwera, dzienne backupy DB.
+Konfiguracja CDN dla statycznych obrazów EKG.
+16) Styl techniczny (opcjonalne preferencje – jeśli generator pozwala)
+Frontend: React/Next.js, Tailwind; formularze z walidacją (Zod/Yup).
+Backend: Node.js (Nest/Fastify) lub Python (Django/FastAPI) – wybór generatora.
+Auth: session cookies (httpOnly) + CSRF; ewentualnie JWT z rotacją.
+DB: Postgres + Prisma/TypeORM; migracje.
+Storage: S3-compatible, presigned URLs do uploadu ilustracji.
+17) Ekspansja (ready-to-scale)
+Wielojęzyczność: pliki tłumaczeń dla UI i treści; możliwość klonowania kursu na EN/ES.
+Wielowalutowość: cennik per region (PLN start, później EUR/USD).
+Moduł licencji grupowych (B2B) – placeholder do włączenia w przyszłości.
