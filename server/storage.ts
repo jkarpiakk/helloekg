@@ -146,6 +146,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(questions.createdAt));
   }
 
+  async getAllQuestions(status?: string): Promise<Question[]> {
+    if (status) {
+      return db.select().from(questions)
+        .where(eq(questions.status, status))
+        .orderBy(asc(questions.createdAt));
+    }
+    
+    return db.select().from(questions)
+      .orderBy(asc(questions.createdAt));
+  }
+
   async getQuestionById(id: string): Promise<Question | undefined> {
     const [question] = await db.select().from(questions).where(eq(questions.id, id));
     return question || undefined;

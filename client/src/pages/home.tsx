@@ -8,7 +8,7 @@ import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import AuthForms from "@/components/auth/AuthForms";
 import PricingSection from "@/components/payment/PricingSection";
-import { Play, Info, Users, Award, Star, GraduationCap, Check } from "lucide-react";
+import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Home() {
@@ -54,11 +54,11 @@ export default function Home() {
                   {t("hero.badge")}
                 </Badge>
                 <h1 className="text-4xl lg:text-6xl font-bold text-foreground leading-tight">
-                  <span>{t("hero.title.line1")}</span><br />
-                  <span className="text-primary">{t("hero.title.line2")}</span>
+                  <span>Odkryj Sekrety EKG</span><br />
+                  <span className="text-primary">Kurs, który Zmienia Nauczanie</span>
                 </h1>
                 <p className="text-xl text-muted-foreground leading-relaxed">
-                  {t("hero.subtitle")}
+                  Czy kiedykolwiek patrzyłeś na zapis EKG i widziałeś tylko tajemnicze fale? W tym kursie odmienimy Twoje spojrzenie na elektrokardiografię. Dzięki metodzie Feynmanowskiej, opowieści o sercu przestają być skomplikowanymi schematami – staną się historiami, które naprawdę zrozumiesz.
                 </p>
               </div>
 
@@ -158,10 +158,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              {t("how.title")}
+              Dlaczego ten kurs jest inny?
             </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              {t("how.subtitle")}
+              Tradycyjne podejście do EKG często opiera się na wkuwaniu definicji i schematów. My zastosowaliśmy sprawdzone metody naukowe, które sprawiają, że nauka jest skuteczniejsza i trwała.
             </p>
           </div>
 
@@ -172,10 +172,10 @@ export default function Home() {
                 <GraduationCap className="h-8 w-8 text-primary-foreground" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-4">
-                {t("how.step1.title")}
+                Metoda Feynmanowska
               </h3>
               <p className="text-muted-foreground">
-                {t("how.step1.description")}
+                Skomplikowane mechanizmy zostają przełożone na proste, codzienne obrazy. Impuls w węźle zatokowym działa jak dyrygent orkiestry, a zespół QRS to potężny silnik komór serca.
               </p>
             </div>
 
@@ -185,10 +185,10 @@ export default function Home() {
                 <Play className="h-8 w-8 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-4">
-                {t("how.step2.title")}
+                Active Recall
               </h3>
               <p className="text-muted-foreground">
-                {t("how.step2.description")}
+                Każda sekcja kończy się pytaniami, które zmuszają Cię do przywołania wiedzy z pamięci. To sprawdzona metoda, która znacznie poprawia zdolność do trwałego zapamiętania informacji.
               </p>
             </div>
 
@@ -198,11 +198,106 @@ export default function Home() {
                 <Award className="h-8 w-8 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-4">
-                {t("how.step3.title")}
+                Powtarzanie sukcesywne
               </h3>
               <p className="text-muted-foreground">
-                {t("how.step3.description")}
+                Regularnie wracamy do kluczowych informacji w różnym kontekście, zgodnie z krzywą zapominania. Każdy nowy element wiedzy buduje się na solidnych fundamentach.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Course Content Section */}
+      <section className="py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+              Co zawiera kurs?
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              Kompleksowy program oparty na badaniach naukowych, zaprojektowany dla trwałej nauki
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* 500+ Questions */}
+            <div className="bg-card border border-border rounded-lg p-6 text-center hover:shadow-lg transition-shadow">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-primary">500+</span>
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-3">
+                Pytań w formie quizu
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Z natychmiastowym feedbackiem i szczegółowymi wyjaśnieniami każdej odpowiedzi
+              </p>
+            </div>
+
+            {/* Structured Chapters */}
+            <div className="bg-card border border-border rounded-lg p-6 text-center hover:shadow-lg transition-shadow">
+              <div className="w-16 h-16 bg-chart-2/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="h-8 w-8 text-chart-2" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-3">
+                Strukturalne rozdziały
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Od podstaw do zaawansowanych zagadnień: rytm, oś serca, arytmie i zawały
+              </p>
+            </div>
+
+            {/* Clinical Cases */}
+            <div className="bg-card border border-border rounded-lg p-6 text-center hover:shadow-lg transition-shadow">
+              <div className="w-16 h-16 bg-chart-3/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Heart className="h-8 w-8 text-chart-3" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-3">
+                Przypadki kliniczne
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Prawdziwe zapisy EKG analizowane krok po kroku w praktycznym kontekście
+              </p>
+            </div>
+
+            {/* Scientific Methods */}
+            <div className="bg-card border border-border rounded-lg p-6 text-center hover:shadow-lg transition-shadow">
+              <div className="w-16 h-16 bg-chart-4/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Star className="h-8 w-8 text-chart-4" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-3">
+                Metody oparte na badaniach
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Successive relearning i aktywne przywoływanie dla trwałości wiedzy
+              </p>
+            </div>
+          </div>
+
+          {/* Target Audience */}
+          <div className="mt-16 bg-secondary/20 rounded-2xl p-8">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold text-foreground mb-4">
+                Dla kogo jest ten kurs?
+              </h3>
+              <p className="text-lg text-muted-foreground max-w-4xl mx-auto">
+                Stworzony dla wszystkich, którzy chcą zrozumieć EKG – od studentów medycyny, przez pielęgniarki i ratowników medycznych, 
+                aż po każdego, kto chce poszerzyć swoje horyzonty. Nie musisz mieć wcześniejszego doświadczenia – zaczynamy od podstaw.
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-4">
+              {[
+                "Studenci medycyny",
+                "Pielęgniarki", 
+                "Ratownicy medyczni",
+                "Lekarze",
+                "Osoby zainteresowane medycyną"
+              ].map((audience, index) => (
+                <div key={index} className="bg-background border border-border rounded-full px-4 py-2">
+                  <span className="text-sm font-medium text-foreground">{audience}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

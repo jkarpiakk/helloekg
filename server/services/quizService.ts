@@ -176,7 +176,7 @@ export class QuizService {
 
   async getUserWeakAreas(userId: string): Promise<Array<{ tag: string; successRate: number; questionCount: number }>> {
     const userAttempts = await storage.getUserAttempts(userId);
-    const questions = await storage.getQuestionsBySection("", "published"); // Get all questions
+    const questions = await storage.getAllQuestions("published"); // Get all questions
     
     const tagStats = new Map<string, { correct: number; total: number }>();
     
