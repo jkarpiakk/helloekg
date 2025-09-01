@@ -83,6 +83,7 @@ export const lectureChapters = pgTable("lecture_chapters", {
   analogy: text("analogy"),
   keyPoints: json("key_points").$type<string[]>().default([]),
   visual: varchar("visual", { length: 100 }),
+  visualContent: json("visual_content").$type<VisualElement[]>().default([]),
   order: integer("order").notNull(),
   isPublished: boolean("is_published").notNull().default(false),
   createdBy: uuid("created_by").notNull().references(() => users.id),
@@ -339,6 +340,21 @@ export type SupportTicket = typeof supportTickets.$inferSelect;
 export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+// Visual Editor Types
+export interface VisualElement {
+  id: string;
+  type: 'text' | 'image' | 'heading';
+  content: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  style: {
+    fontSize?: number;
+    fontWeight?: string;
+    color?: string;
+    textAlign?: 'left' | 'center' | 'right';
+  };
+}
+
 export type LectureChapter = typeof lectureChapters.$inferSelect;
 export type InsertLectureChapter = z.infer<typeof insertLectureChapterSchema>;
 

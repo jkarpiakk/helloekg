@@ -1241,6 +1241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           analogy: lectureChapters.analogy,
           keyPoints: lectureChapters.keyPoints,
           visual: lectureChapters.visual,
+          visualContent: lectureChapters.visualContent,
           order: lectureChapters.order,
           isPublished: lectureChapters.isPublished,
           createdAt: lectureChapters.createdAt,
@@ -1260,7 +1261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/sections/:sectionId/chapters", requireReviewer, async (req, res) => {
     try {
       const { sectionId } = req.params;
-      const { title, contentMd, analogy, keyPoints, visual, order } = req.body;
+      const { title, contentMd, analogy, keyPoints, visual, visualContent, order } = req.body;
 
       const [chapter] = await db
         .insert(lectureChapters)
@@ -1271,6 +1272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           analogy: analogy || null,
           keyPoints: keyPoints || [],
           visual: visual || null,
+          visualContent: visualContent || [],
           order,
           isPublished: false,
           createdBy: req.user!.id,
@@ -1297,7 +1299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/chapters/:id", requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
-      const { title, contentMd, analogy, keyPoints, visual, order, isPublished } = req.body;
+      const { title, contentMd, analogy, keyPoints, visual, visualContent, order, isPublished } = req.body;
 
       const [updatedChapter] = await db
         .update(lectureChapters)
@@ -1307,6 +1309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           analogy: analogy || null,
           keyPoints: keyPoints || [],
           visual: visual || null,
+          visualContent: visualContent || [],
           order,
           isPublished: isPublished || false,
           updatedAt: new Date(),
@@ -1363,6 +1366,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error deleting lecture chapter:", error);
       res.status(500).json({ error: "Błąd podczas usuwania rozdziału wykładu" });
+    }
+  });
+
+  // Lecture image upload endpoints
+  app.post("/api/objects/upload", requireAuth, async (req, res) => {
+    try {
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error: any) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Błąd podczas generowania URL do przesłania" });
+    }
+  });
+
+  app.put("/api/lecture-images", requireAuth, async (req, res) => {
+    if (!req.body.imageURL) {
+      return res.status(400).json({ error: "imageURL jest wymagane" });
+    }
+
+    const userId = req.user!.id;
+
+    try {
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.imageURL,
+        {
+          owner: userId,
+          visibility: "public", // Lecture images are public
+        }
+      );
+
+      res.status(200).json({
+        objectPath: objectPath,
+      });
+    } catch (error: any) {
+      console.error("Error setting lecture image ACL:", error);
+      res.status(500).json({ error: "Błąd podczas konfiguracji obrazu" });
     }
   });
 

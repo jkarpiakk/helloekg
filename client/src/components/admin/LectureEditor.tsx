@@ -8,9 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Plus, Edit, Trash, Save, X } from "lucide-react";
+import { Plus, Edit, Trash, Save, X, Presentation } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { VisualLectureEditor } from "./VisualLectureEditor";
+import type { VisualElement } from "@shared/schema";
 
 interface LectureChapter {
   id: string;
@@ -19,6 +21,7 @@ interface LectureChapter {
   analogy?: string;
   keyPoints: string[];
   visual?: string;
+  visualContent: VisualElement[];
   order: number;
   isPublished: boolean;
   createdAt: string;
@@ -41,9 +44,12 @@ export function LectureEditor({ sectionId, sectionTitle }: LectureEditorProps) {
     analogy: "",
     keyPoints: [""],
     visual: "",
+    visualContent: [] as VisualElement[],
     order: 1,
     isPublished: false,
   });
+  const [showVisualEditor, setShowVisualEditor] = useState(false);
+  const [visualEditingChapter, setVisualEditingChapter] = useState<LectureChapter | null>(null);
 
   const { data: chapters, isLoading } = useQuery({
     queryKey: ["/api/admin/sections", sectionId, "chapters"],
@@ -352,6 +358,18 @@ export function LectureEditor({ sectionId, sectionTitle }: LectureEditorProps) {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => {
+                      setVisualEditingChapter(chapter);
+                      setShowVisualEditor(true);
+                    }}
+                    title="Edytor wizualny"
+                    data-testid={`button-visual-editor-${chapter.id}`}
+                  >
+                    <Presentation className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() => handleEdit(chapter)}
                     disabled={editingChapter !== null || isCreating}
                     data-testid={`button-edit-chapter-${chapter.id}`}
@@ -384,6 +402,38 @@ export function LectureEditor({ sectionId, sectionTitle }: LectureEditorProps) {
           </Card>
         )}
       </div>
+
+      {/* Visual Lecture Editor Modal */}
+      {showVisualEditor && visualEditingChapter && (
+        <div className="fixed inset-0 z-50 bg-background">
+          <VisualLectureEditor
+            sectionId={sectionId}
+            sectionTitle={sectionTitle}
+            chapter={visualEditingChapter}
+            onSave={async (data) => {
+              await updateChapterMutation.mutateAsync({
+                id: visualEditingChapter.id,
+                data: {
+                  title: data.title,
+                  contentMd: visualEditingChapter.contentMd,
+                  visualContent: data.visualContent,
+                  analogy: visualEditingChapter.analogy,
+                  keyPoints: visualEditingChapter.keyPoints,
+                  visual: visualEditingChapter.visual,
+                  order: visualEditingChapter.order,
+                  isPublished: visualEditingChapter.isPublished,
+                }
+              });
+              setShowVisualEditor(false);
+              setVisualEditingChapter(null);
+            }}
+            onCancel={() => {
+              setShowVisualEditor(false);
+              setVisualEditingChapter(null);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
