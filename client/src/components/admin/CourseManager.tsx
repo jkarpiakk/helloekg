@@ -54,13 +54,14 @@ interface SectionFormData {
   prerequisiteSectionId?: string;
 }
 
-function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSection, onAddSection }: {
+function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSection, onAddSection, onEditLecture }: {
   module: ModuleWithSections;
   onEdit: (module: Module) => void;
   onDelete: (id: string) => void;
   onEditSection: (section: Section) => void;
   onDeleteSection: (id: string) => void;
   onAddSection: (moduleId: string) => void;
+  onEditLecture: (sectionId: string, sectionTitle: string) => void;
 }) {
   const {
     attributes,
@@ -131,7 +132,7 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => setEditingLecture({ sectionId: section.id, sectionTitle: section.title })}
+                      onClick={() => onEditLecture(section.id, section.title)}
                       title="Edytuj wykład"
                     >
                       <Presentation className="h-3 w-3" />
@@ -442,6 +443,7 @@ export default function CourseManager() {
                   setEditingSection(null);
                   setShowSectionDialog(true);
                 }}
+                onEditLecture={(sectionId, sectionTitle) => setEditingLecture({ sectionId, sectionTitle })}
               />
             ))}
           </div>
