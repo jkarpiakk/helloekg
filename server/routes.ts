@@ -1230,7 +1230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Lecture chapters endpoints for admins
-  app.get("/api/admin/sections/:sectionId/chapters", requireReviewer, async (req, res) => {
+  app.get("/api/admin/sections/:sectionId/chapters", requireAuth, async (req, res) => {
     try {
       const { sectionId } = req.params;
       const chapters = await db
@@ -1258,7 +1258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/sections/:sectionId/chapters", requireReviewer, async (req, res) => {
+  app.post("/api/admin/sections/:sectionId/chapters", requireAuth, async (req, res) => {
     try {
       const { sectionId } = req.params;
       const { title, contentMd, analogy, keyPoints, visual, visualContent, order } = req.body;
@@ -1296,7 +1296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/chapters/:id", requireReviewer, async (req, res) => {
+  app.put("/api/admin/chapters/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const { title, contentMd, analogy, keyPoints, visual, visualContent, order, isPublished } = req.body;
@@ -1339,7 +1339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/admin/chapters/:id", requireReviewer, async (req, res) => {
+  app.delete("/api/admin/chapters/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
 

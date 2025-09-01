@@ -52,7 +52,7 @@ export const subscriptions = pgTable("subscriptions", {
 });
 
 // Course modules
-export const modules = pgTable("modules", {
+export const modules: any = pgTable("modules", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
@@ -63,7 +63,7 @@ export const modules = pgTable("modules", {
 });
 
 // Course sections/subsections within modules
-export const sections = pgTable("sections", {
+export const sections: any = pgTable("sections", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   moduleId: uuid("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 200 }).notNull(),

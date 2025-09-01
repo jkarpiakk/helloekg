@@ -11,8 +11,16 @@ import { apiRequest } from "@/lib/queryClient";
 import { Plus, Edit, Trash, Save, X, Presentation } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { VisualLectureEditor } from "./VisualLectureEditor";
 import type { VisualElement } from "@shared/schema";
+
+// Temporary disabled visual editor
+const VisualLectureEditor = ({ sectionId, sectionTitle, chapter, onSave, onCancel }: any) => (
+  <div className="p-8 text-center">
+    <h2 className="text-xl font-bold mb-4">Wizualny Edytor Wykładu</h2>
+    <p className="mb-4">Funkcja w przygotowaniu...</p>
+    <Button onClick={onCancel}>Powrót</Button>
+  </div>
+);
 
 interface LectureChapter {
   id: string;
