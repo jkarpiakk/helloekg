@@ -27,15 +27,25 @@ export interface IStorage {
   
   // Course content
   getModules(): Promise<Module[]>;
+  getModulesWithSections(): Promise<(Module & { sections: Section[] })[]>;
   getModuleById(id: string): Promise<Module | undefined>;
+  createModule(module: InsertModule): Promise<Module>;
+  updateModule(id: string, updates: Partial<InsertModule>): Promise<Module>;
+  deleteModule(id: string): Promise<void>;
+  reorderModules(moduleIds: string[]): Promise<void>;
   getSections(): Promise<Section[]>;
   getSectionsByModule(moduleId: string): Promise<Section[]>;
   getSectionById(id: string): Promise<Section | undefined>;
+  createSection(section: InsertSection): Promise<Section>;
+  updateSection(id: string, updates: Partial<InsertSection>): Promise<Section>;
+  deleteSection(id: string): Promise<void>;
+  reorderSections(sectionIds: string[], moduleId: string): Promise<void>;
   getQuestionsBySection(sectionId: string, status?: string): Promise<Question[]>;
   getQuestionById(id: string): Promise<Question | undefined>;
   createQuestion(question: InsertQuestion): Promise<Question>;
   updateQuestion(id: string, updates: Partial<InsertQuestion>): Promise<Question>;
   updateQuestionStatus(id: string, status: string, reviewedBy?: string): Promise<Question>;
+  deleteQuestion(id: string): Promise<void>;
   
   // Quiz and progress
   createAttempt(attempt: InsertAttempt): Promise<Attempt>;
@@ -153,6 +163,71 @@ export class DatabaseStorage implements IStorage {
     return section || undefined;
   }
 
+  async getModulesWithSections(): Promise<(Module & { sections: Section[] })[]> {
+    const allModules = await this.getModules();
+    const modulesWithSections = await Promise.all(
+      allModules.map(async (module) => {
+        const moduleSections = await this.getSectionsByModule(module.id);
+        return { ...module, sections: moduleSections };
+      })
+    );
+    return modulesWithSections;
+  }
+
+  async createModule(module: InsertModule): Promise<Module> {
+    const [newModule] = await db.insert(modules).values(module).returning();
+    return newModule;
+  }
+
+  async updateModule(id: string, updates: Partial<InsertModule>): Promise<Module> {
+    const [module] = await db
+      .update(modules)
+      .set({ ...updates, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(modules.id, id))
+      .returning();
+    return module;
+  }
+
+  async deleteModule(id: string): Promise<void> {
+    await db.delete(modules).where(eq(modules.id, id));
+  }
+
+  async reorderModules(moduleIds: string[]): Promise<void> {
+    for (let i = 0; i < moduleIds.length; i++) {
+      await db
+        .update(modules)
+        .set({ order: i + 1, updatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(eq(modules.id, moduleIds[i]));
+    }
+  }
+
+  async createSection(section: InsertSection): Promise<Section> {
+    const [newSection] = await db.insert(sections).values(section).returning();
+    return newSection;
+  }
+
+  async updateSection(id: string, updates: Partial<InsertSection>): Promise<Section> {
+    const [section] = await db
+      .update(sections)
+      .set({ ...updates, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(sections.id, id))
+      .returning();
+    return section;
+  }
+
+  async deleteSection(id: string): Promise<void> {
+    await db.delete(sections).where(eq(sections.id, id));
+  }
+
+  async reorderSections(sectionIds: string[], moduleId: string): Promise<void> {
+    for (let i = 0; i < sectionIds.length; i++) {
+      await db
+        .update(sections)
+        .set({ order: i + 1, updatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(eq(sections.id, sectionIds[i]));
+    }
+  }
+
   async getQuestionsBySection(sectionId: string, status?: string): Promise<Question[]> {
     if (status) {
       return db.select().from(questions)
@@ -208,6 +283,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(questions.id, id))
       .returning();
     return question;
+  }
+
+  async deleteQuestion(id: string): Promise<void> {
+    await db.delete(questions).where(eq(questions.id, id));
   }
 
   // Quiz and progress

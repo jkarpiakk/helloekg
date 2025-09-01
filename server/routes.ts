@@ -550,6 +550,351 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete question endpoint
+  app.delete("/api/admin/questions/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const question = await storage.getQuestionById(id);
+      if (!question) {
+        return res.status(404).json({ error: "Pytanie nie znalezione" });
+      }
+
+      await storage.deleteQuestion(id);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "question_deleted",
+        entityType: "question",
+        entityId: id,
+        diff: { question },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Question delete error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas usuwania pytania" });
+    }
+  });
+
+  // Admin modules management
+  app.get("/api/admin/modules", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const modules = await storage.getModulesWithSections();
+      res.json(modules);
+    } catch (error) {
+      console.error("Admin modules fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania modułów" });
+    }
+  });
+
+  app.post("/api/admin/modules", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { title, description, order, isLocked, prerequisiteModuleId } = req.body;
+      
+      const module = await storage.createModule({
+        title,
+        description,
+        order,
+        isLocked: isLocked || false,
+        prerequisiteModuleId
+      });
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "module_created",
+        entityType: "module",
+        entityId: module.id,
+        diff: { module },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(201).json(module);
+    } catch (error: any) {
+      console.error("Module creation error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas tworzenia modułu" });
+    }
+  });
+
+  app.put("/api/admin/modules/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const oldModule = await storage.getModuleById(id);
+      if (!oldModule) {
+        return res.status(404).json({ error: "Moduł nie znaleziony" });
+      }
+
+      const updatedModule = await storage.updateModule(id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "module_updated",
+        entityType: "module",
+        entityId: id,
+        diff: { old: oldModule, new: updates },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedModule);
+    } catch (error: any) {
+      console.error("Module update error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas aktualizacji modułu" });
+    }
+  });
+
+  app.delete("/api/admin/modules/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const module = await storage.getModuleById(id);
+      if (!module) {
+        return res.status(404).json({ error: "Moduł nie znaleziony" });
+      }
+
+      await storage.deleteModule(id);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "module_deleted",
+        entityType: "module",
+        entityId: id,
+        diff: { module },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Module delete error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas usuwania modułu" });
+    }
+  });
+
+  // Admin sections management
+  app.post("/api/admin/sections", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { moduleId, title, description, order, isLocked, prerequisiteSectionId } = req.body;
+      
+      const section = await storage.createSection({
+        moduleId,
+        title,
+        description,
+        order,
+        isLocked: isLocked || false,
+        prerequisiteSectionId
+      });
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "section_created",
+        entityType: "section",
+        entityId: section.id,
+        diff: { section },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(201).json(section);
+    } catch (error: any) {
+      console.error("Section creation error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas tworzenia sekcji" });
+    }
+  });
+
+  app.put("/api/admin/sections/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const oldSection = await storage.getSectionById(id);
+      if (!oldSection) {
+        return res.status(404).json({ error: "Sekcja nie znaleziona" });
+      }
+
+      const updatedSection = await storage.updateSection(id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "section_updated",
+        entityType: "section",
+        entityId: id,
+        diff: { old: oldSection, new: updates },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedSection);
+    } catch (error: any) {
+      console.error("Section update error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas aktualizacji sekcji" });
+    }
+  });
+
+  app.delete("/api/admin/sections/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const section = await storage.getSectionById(id);
+      if (!section) {
+        return res.status(404).json({ error: "Sekcja nie znaleziona" });
+      }
+
+      await storage.deleteSection(id);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "section_deleted",
+        entityType: "section",
+        entityId: id,
+        diff: { section },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Section delete error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas usuwania sekcji" });
+    }
+  });
+
+  // Reorder modules
+  app.put("/api/admin/modules/reorder", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { moduleIds } = req.body; // Array of module IDs in new order
+      
+      await storage.reorderModules(moduleIds);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "modules_reordered",
+        entityType: "module",
+        entityId: "",
+        diff: { newOrder: moduleIds },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Module reorder error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas zmiany kolejności modułów" });
+    }
+  });
+
+  // Reorder sections within a module
+  app.put("/api/admin/sections/reorder", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { sectionIds, moduleId } = req.body; // Array of section IDs in new order for specific module
+      
+      await storage.reorderSections(sectionIds, moduleId);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "sections_reordered",
+        entityType: "section",
+        entityId: "",
+        diff: { moduleId, newOrder: sectionIds },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Section reorder error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas zmiany kolejności sekcji" });
+    }
+  });
+
+  // Object storage endpoints for admin uploads
+  app.post("/api/admin/upload", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error: any) {
+      console.error("Upload URL generation error:", error);
+      res.status(500).json({ error: error.message || "Błąd podczas generowania URL uploadu" });
+    }
+  });
+
+  app.put("/api/admin/images", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { imageURL } = req.body;
+      
+      if (!imageURL) {
+        return res.status(400).json({ error: "imageURL jest wymagane" });
+      }
+
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        imageURL,
+        {
+          owner: req.user!.id,
+          visibility: "public", // Images for questions should be public
+        }
+      );
+
+      res.status(200).json({
+        objectPath: objectPath,
+      });
+    } catch (error: any) {
+      console.error("Error setting image ACL:", error);
+      res.status(500).json({ error: "Błąd podczas zapisywania obrazu" });
+    }
+  });
+
+  // Public file serving endpoint
+  app.get("/public-objects/:filePath(*)", async (req, res) => {
+    const filePath = req.params.filePath;
+    try {
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const file = await objectStorageService.searchPublicObject(filePath);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      objectStorageService.downloadObject(file, res);
+    } catch (error: any) {
+      console.error("Error searching for public object:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Object entity serving endpoint  
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const { ObjectStorageService, ObjectNotFoundError } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error: any) {
+      console.error("Error checking object access:", error);
+      if (error.name === "ObjectNotFoundError") {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // Support endpoints
   app.post("/api/support/tickets", async (req, res) => {
     try {

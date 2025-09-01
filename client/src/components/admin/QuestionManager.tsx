@@ -11,11 +11,15 @@ import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Plus, Upload, Edit, Eye, Trash2, Check, X } from "lucide-react";
 import type { QuestionWithStats } from "@/types";
+import QuestionEditor from "./QuestionEditor";
+import type { Module, Section } from "@shared/schema";
 
 export default function QuestionManager() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<QuestionWithStats | null>(null);
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -30,6 +34,88 @@ export default function QuestionManager() {
       
       const response = await apiRequest("GET", `/api/admin/questions?${params}`);
       return response.json() as Promise<QuestionWithStats[]>;
+    },
+  });
+
+  // Fetch modules with sections for the editor
+  const { data: modules } = useQuery({
+    queryKey: ["/api/admin/modules"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/admin/modules");
+      return response.json() as Promise<(Module & { sections: Section[] })[]>;
+    },
+  });
+
+  // Flatten sections for filter dropdown
+  const allSections = modules?.flatMap(m => m.sections) || [];
+
+  // Create question mutation
+  const createQuestionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/admin/questions", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sukces",
+        description: "Pytanie zostało utworzone",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/questions"] });
+      setShowEditor(false);
+      setEditingQuestion(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się utworzyć pytania",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update question mutation
+  const updateQuestionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await apiRequest("PUT", `/api/admin/questions/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sukces",
+        description: "Pytanie zostało zaktualizowane",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/questions"] });
+      setShowEditor(false);
+      setEditingQuestion(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zaktualizować pytania",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete question mutation
+  const deleteQuestionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/admin/questions/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sukces",
+        description: "Pytanie zostało usunięte",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/questions"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się usunąć pytania",
+        variant: "destructive",
+      });
     },
   });
 
@@ -81,6 +167,30 @@ export default function QuestionManager() {
     return "text-red-600";
   };
 
+  const handleSaveQuestion = (data: any) => {
+    if (editingQuestion) {
+      updateQuestionMutation.mutate({ id: editingQuestion.id, data });
+    } else {
+      createQuestionMutation.mutate(data);
+    }
+  };
+
+  if (showEditor) {
+    return (
+      <QuestionEditor
+        question={editingQuestion}
+        sections={allSections}
+        modules={modules || []}
+        onSave={handleSaveQuestion}
+        onCancel={() => {
+          setShowEditor(false);
+          setEditingQuestion(null);
+        }}
+        isLoading={createQuestionMutation.isPending || updateQuestionMutation.isPending}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -113,7 +223,13 @@ export default function QuestionManager() {
             <Upload className="h-4 w-4 mr-2" />
             {t("admin.importCsv")}
           </Button>
-          <Button data-testid="new-question-button">
+          <Button 
+            onClick={() => {
+              setEditingQuestion(null);
+              setShowEditor(true);
+            }}
+            data-testid="new-question-button"
+          >
             <Plus className="h-4 w-4 mr-2" />
             {t("admin.newQuestion")}
           </Button>
@@ -248,11 +364,27 @@ export default function QuestionManager() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center space-x-2">
-                        <Button size="sm" variant="ghost" data-testid={`edit-question-${question.id}`}>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => {
+                            setEditingQuestion(question);
+                            setShowEditor(true);
+                          }}
+                          data-testid={`edit-question-${question.id}`}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button size="sm" variant="ghost" data-testid={`view-question-${question.id}`}>
                           <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => deleteQuestionMutation.mutate(question.id)}
+                          data-testid={`delete-question-${question.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                         {question.status === "review" && (
                           <>
