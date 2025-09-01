@@ -412,6 +412,7 @@ export function LectureEditor({ sectionId, sectionTitle }: LectureEditorProps) {
       analogy: "",
       keyPoints: [""],
       visual: "",
+      visualContent: [],
       order: (chapters?.length || 0) + 1,
       isPublished: false,
     });
@@ -424,6 +425,7 @@ export function LectureEditor({ sectionId, sectionTitle }: LectureEditorProps) {
       analogy: chapter.analogy || "",
       keyPoints: chapter.keyPoints.length > 0 ? chapter.keyPoints : [""],
       visual: chapter.visual || "",
+      visualContent: chapter.visualContent || [],
       order: chapter.order,
       isPublished: chapter.isPublished,
     });
@@ -719,7 +721,7 @@ export function LectureEditor({ sectionId, sectionTitle }: LectureEditorProps) {
             sectionId={sectionId}
             sectionTitle={sectionTitle}
             chapter={visualEditingChapter}
-            onSave={async (data) => {
+            onSave={async (data: { title: string; visualContent: VisualElement[] }) => {
               await updateChapterMutation.mutateAsync({
                 id: visualEditingChapter.id,
                 data: {
