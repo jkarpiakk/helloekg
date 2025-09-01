@@ -1,0 +1,268 @@
+# Pytania **Podpunkt 1: Załamek P i ocena przedsionków**
+
+### **Podpunkt 1: Załamek P i ocena przedsionków**
+
+1. **Co oznacza szeroki i dwugarbny załamek P w odprowadzeniu II?**
+    - Przerost lewego przedsionka (prawidłowa odpowiedź)
+    - Przerost prawego przedsionka
+    - Blok AV I stopnia
+    - Zespół preekscytacji
+    
+    **Wyjaśnienie:**
+    
+    Dwugarbny załamek P w odprowadzeniu II to jak widok przedsionków, które są „zmęczone” i powiększone. Lewy przedsionek, przeciążony przez długotrwałe nadciśnienie, wysyła impuls wolniej, co wydłuża załamek i nadaje mu charakterystyczny kształt.
+    
+    ([Ilustracja: zapis EKG z szerokim, dwugarbnym załamkiem P i opisem „przerost lewego przedsionka”])
+    
+
+---
+
+1. **Co oznacza wysoki, wąski załamek P (>2,5 mm) w odprowadzeniu II?**
+    - Przerost prawego przedsionka (prawidłowa odpowiedź)
+    - Przerost lewego przedsionka
+    - Zahamowanie zatokowe
+    - Bradykardia zatokowa
+    
+    **Wyjaśnienie:**
+    
+    Wysoki i spiczasty załamek P przypomina sygnał wysyłany przez przedsionek, który jest przeciążony – najczęściej prawy. Dzieje się tak w chorobach płuc, takich jak przewlekła obturacyjna choroba płuc (POChP), które zwiększają ciśnienie w prawej części serca.
+    
+    ([Ilustracja: wysoki, spiczasty załamek P w odprowadzeniu II])
+    
+
+---
+
+1. **Co sugeruje brak załamków P na zapisie EKG?**
+    - Migotanie przedsionków (prawidłowa odpowiedź)
+    - Rytm zatokowy
+    - Przerost prawego przedsionka
+    - Blok AV I stopnia
+    
+    **Wyjaśnienie:**
+    
+    Brak załamków P na zapisie EKG wskazuje na chaos w przedsionkach – migotanie przedsionków. Impulsy elektryczne powstają w wielu miejscach, ale żaden nie jest wystarczająco silny, aby zainicjować depolaryzację przedsionków w sposób skoordynowany.
+    
+    ([Ilustracja: zapis migotania przedsionków z brakiem załamków P])
+    
+
+---
+
+1. **Jak długo powinien trwać załamek P w prawidłowym rytmie zatokowym?**
+    - 0,08–0,12 sekundy (prawidłowa odpowiedź)
+    - 0,12–0,20 sekundy
+    - Mniej niż 0,08 sekundy
+    - Ponad 0,12 sekundy
+    
+    **Wyjaśnienie:**
+    
+    Prawidłowy załamek P trwa 0,08–0,12 sekundy. To czas, w którym przedsionki depolaryzują się, przygotowując do skurczu. Gdy trwa dłużej, może to sugerować przerost przedsionków lub zaburzenia przewodzenia.
+    
+    ([Ilustracja: zapis prawidłowego załamka P z opisem jego normalnych parametrów])
+    
+
+---
+
+1. **Czym różni się załamek P w rytmie zatokowym od tego w rytmie przedsionkowym?**
+    - W rytmie przedsionkowym załamek P jest często odwrócony (prawidłowa odpowiedź)
+    - W rytmie zatokowym załamek P jest zawsze ujemny
+    - W rytmie przedsionkowym załamek P jest szeroki
+    - W rytmie zatokowym nie występują załamki P
+    
+    **Wyjaśnienie:**
+    
+    W rytmie przedsionkowym impuls nie pochodzi z węzła zatokowego, ale z innego miejsca w przedsionkach. Powoduje to zmianę kierunku przepływu impulsu, co może prowadzić do odwrócenia załamka P w odprowadzeniu II.
+    
+    ([Ilustracja: EKG z odwróconymi załamkami P w rytmie przedsionkowym])
+    
+
+---
+
+1. **Co oznacza niska amplituda załamka P w odprowadzeniu II?**
+    - Hiperkaliemia (prawidłowa odpowiedź)
+    - Przerost prawego przedsionka
+    - Migotanie przedsionków
+    - Zawał przedsionków
+    
+    **Wyjaśnienie:**
+    
+    Niska amplituda załamka P może być skutkiem hiperkaliemii, która zmniejsza różnicę potencjałów w przedsionkach, osłabiając ich depolaryzację. Wyobraź sobie to jak przyciemnienie światła – impuls elektryczny jest obecny, ale mniej wyraźny.
+    
+    ([Ilustracja: zapis z niskimi załamkami P w odprowadzeniu II])
+    
+
+---
+
+1. **Jakie załamki P wskazują na ektopowe pobudzenia przedsionkowe?**
+    - P o zmienionym kształcie i czasie (prawidłowa odpowiedź)
+    - P o zwiększonej amplitudzie
+    - Brak załamków P
+    - Załamki P o dwugarbnym kształcie
+    
+    **Wyjaśnienie:**
+    
+    Ektopowe pobudzenia przedsionkowe to impulsy pochodzące z innych miejsc niż węzeł zatokowy. Powoduje to zmiany w kształcie i czasie trwania załamków P, które różnią się od tych generowanych w rytmie zatokowym.
+    
+    ([Ilustracja: zapis z ektopowymi pobudzeniami przedsionkowymi])
+    
+
+---
+
+1. **Co oznacza wydłużony czas trwania załamka P?**
+    - Przerost przedsionków (prawidłowa odpowiedź)
+    - Tachykardia przedsionkowa
+    - Blok AV III stopnia
+    - Częstoskurcz zatokowy
+    
+    **Wyjaśnienie:**
+    
+    Wydłużony załamek P sugeruje, że przedsionki potrzebują więcej czasu na depolaryzację. Może to być wynikiem ich przerostu spowodowanego zwiększonym obciążeniem, np. nadciśnieniem.
+    
+    ([Ilustracja: EKG z wydłużonym załamkiem P i opisem „przerost przedsionków”])
+    
+
+---
+
+1. **Co sugerują zmienne załamki P w kolejnych cyklach serca?**
+    - Wieloogniskowy częstoskurcz przedsionkowy (prawidłowa odpowiedź)
+    - Migotanie przedsionków
+    - Rytm zatokowy
+    - Blok AV I stopnia
+    
+    **Wyjaśnienie:**
+    
+    W wieloogniskowym częstoskurczu przedsionkowym impulsy powstają w różnych miejscach przedsionków, co powoduje zmiany w kształcie załamków P w kolejnych cyklach. To jak różni muzycy grający różne melodie w tej samej orkiestrze – brak spójności.
+    
+    ([Ilustracja: zapis z wieloogniskowym częstoskurczem przedsionkowym i zmiennymi załamkami P])
+    
+
+---
+
+1. **Co oznacza odwrócony załamek P w odprowadzeniu II?**
+- Pobudzenie z dolnej części przedsionków (prawidłowa odpowiedź)
+- Rytm zatokowy
+- Tachykardia przedsionkowa
+- Blok AV II stopnia
+
+**Wyjaśnienie:**
+
+Odwrócony załamek P wskazuje, że impuls pochodzi z dolnej części przedsionków i rozchodzi się w kierunku przeciwnym do normalnego. To jak cofanie się impulsu w kierunku węzła zatokowego, zamiast jego naturalnego rozchodzenia się.
+
+([Ilustracja: zapis z odwróconymi załamkami P w odprowadzeniu II])
+
+### **Pytanie 11: Na poniższym zapisie EKG widzisz brak załamków P oraz niemiarowe odstępy R-R. Co jest najbardziej prawdopodobnym rozpoznaniem?**
+
+1. Migotanie przedsionków (prawidłowa odpowiedź)
+2. Rytm zatokowy
+3. Tachykardia zatokowa
+4. Wieloogniskowy częstoskurcz przedsionkowy
+
+**Wyjaśnienie:**
+
+Na EKG z migotaniem przedsionków załamki P są niewidoczne, ponieważ przedsionki tracą swoją synchronizację – impulsy elektryczne pojawiają się chaotycznie. Niemiarowość odstępów R-R to dodatkowy kluczowy element diagnostyczny. To jak tłum ludzi, którzy wszyscy krzyczą jednocześnie – brak lidera i porządku.
+
+([Ilustracja: zapis EKG z migotaniem przedsionków, brak załamków P i niemiarowość R-R, z wyraźnym opisem tych cech])
+
+---
+
+### **Pytanie 12: Jakie cechy załamka P na poniższym zapisie EKG sugerują przerost lewego przedsionka?**
+
+1. Dwugarbny kształt załamka P w odprowadzeniu II (prawidłowa odpowiedź)
+2. Wysoki, wąski załamek P w odprowadzeniu II
+3. Brak załamków P w odprowadzeniu II
+4. Skrócenie załamka P poniżej 0,08 sekundy
+
+**Wyjaśnienie:**
+
+Dwugarbny kształt załamka P w odprowadzeniu II to charakterystyczny znak przerostu lewego przedsionka. Wynika to z wydłużonego czasu depolaryzacji obu przedsionków, gdzie lewy „opóźnia” impuls elektryczny. Wyobraź sobie to jak dwa pociągi jadące tą samą trasą, ale jeden z nich jedzie wolniej.
+
+([Ilustracja: zapis EKG z zaznaczonym dwugarbnym załamkiem P w odprowadzeniu II i opisem cech przerostu lewego przedsionka])
+
+---
+
+### **Pytanie 13: Na zapisie EKG widzisz wysoki, wąski załamek P w odprowadzeniu II oraz dodatni załamek w odprowadzeniu aVR. Co sugeruje ten obraz?**
+
+1. Przerost prawego przedsionka (prawidłowa odpowiedź)
+2. Przerost lewej komory
+3. Migotanie przedsionków
+4. Blok AV II stopnia
+
+**Wyjaśnienie:**
+
+Wysoki i spiczasty załamek P wskazuje na przerost prawego przedsionka, który może wynikać z przewlekłego przeciążenia, np. w nadciśnieniu płucnym. To jak balon, który staje się coraz bardziej napięty, gdy ciśnienie rośnie. Dodanie do tego dodatniego załamka P w aVR dodatkowo potwierdza tę diagnozę.
+
+([Ilustracja: zapis EKG z wysokim, spiczastym załamkiem P w odprowadzeniu II i dodatnim załamkiem P w aVR])
+
+---
+
+### **Pytanie 14: Na poniższym zapisie widzisz zmienne kształty załamków P w kolejnych cyklach serca. Co to sugeruje?**
+
+1. Wieloogniskowy częstoskurcz przedsionkowy (prawidłowa odpowiedź)
+2. Migotanie przedsionków
+3. Przerost lewego przedsionka
+4. Zahamowanie zatokowe
+
+**Wyjaśnienie:**
+
+Zmienne kształty załamków P w wieloogniskowym częstoskurczu przedsionkowym wynikają z tego, że impulsy powstają w różnych miejscach przedsionków. To jak różne osoby próbujące przejąć rolę lidera w grupie – każdy ma swój własny pomysł, co powoduje brak spójności.
+
+([Ilustracja: zapis EKG z różnymi kształtami załamków P w kolejnych cyklach serca, oznaczonymi różnokolorowo dla lepszego zrozumienia])
+
+---
+
+### **Pytanie 15: Dlaczego załamki P w rytmie zatokowym są dodatnie w odprowadzeniu II?**
+
+1. Impuls rozchodzi się od węzła zatokowego w dół i w lewo (prawidłowa odpowiedź)
+2. Węzeł AV przejmuje kontrolę nad rytmem
+3. Oś elektryczna serca jest przesunięta w prawo
+4. Rytm zatokowy jest nieregularny
+
+**Wyjaśnienie:**
+
+W rytmie zatokowym impuls płynie z węzła zatokowego w prawym przedsionku w dół i w lewo, co jest zgodne z kierunkiem odprowadzenia II. To jak rzeka płynąca wzdłuż wyznaczonego koryta – widzimy wyraźny, dodatni załamek P w tym odprowadzeniu.
+
+([Ilustracja: schemat serca z zaznaczeniem kierunku impulsu w rytmie zatokowym oraz dodatniego załamka P w odprowadzeniu II])
+
+---
+
+### **Pytanie 16: Na poniższym zapisie widzisz odwrócone załamki P w odprowadzeniu II. Co sugeruje ten obraz?**
+
+1. Pobudzenia pochodzą z dolnej części przedsionków (prawidłowa odpowiedź)
+2. Rytm zatokowy
+3. Wieloogniskowy częstoskurcz przedsionkowy
+4. Blok AV III stopnia
+
+**Wyjaśnienie:**
+
+Odwrócone załamki P w odprowadzeniu II wskazują, że impuls elektryczny pochodzi z miejsca w dolnej części przedsionków. To tak, jakby lider zespołu próbował dyrygować od tyłu – impuls rozchodzi się w kierunku przeciwnym do normalnego.
+
+([Ilustracja: zapis EKG z odwróconymi załamkami P w odprowadzeniu II, z objaśnieniem ich pochodzenia])
+
+---
+
+### **Pytanie 17: Co oznacza obecność załamka P przed każdym zespołem QRS i jego prawidłowy kształt w odprowadzeniu II?**
+
+1. Rytm zatokowy (prawidłowa odpowiedź)
+2. Tachykardia przedsionkowa
+3. Migotanie przedsionków
+4. Blok AV II stopnia
+
+**Wyjaśnienie:**
+
+Załamek P poprzedzający każdy QRS o prawidłowym kształcie to znak rytmu zatokowego, co oznacza, że serce działa zgodnie z naturalnym rytmem generowanym przez węzeł zatokowy. To jak idealnie zgrana orkiestra, gdzie każdy instrument gra zgodnie z zaplanowaną partyturą.
+
+([Ilustracja: zapis rytmu zatokowego z prawidłowym załamkiem P przed każdym QRS w odprowadzeniu II])
+
+---
+
+### **Pytanie 18: Na poniższym zapisie w odprowadzeniu V1 załamki P mają dwufazowy kształt. Co sugeruje ten obraz?**
+
+1. Przerost lewego przedsionka (prawidłowa odpowiedź)
+2. Przerost prawego przedsionka
+3. Migotanie przedsionków
+4. Blok AV II stopnia
+
+**Wyjaśnienie:**
+
+Dwufazowy załamek P w odprowadzeniu V1 jest charakterystyczny dla przerostu lewego przedsionka. Pierwsza faza załamka odzwierciedla depolaryzację prawego przedsionka, a druga faza (negatywna) – opóźnioną depolaryzację lewego przedsionka. To jak dwa kroki w tańcu – pierwszy jest szybki, drugi opóźniony.
+
+([Ilustracja: zapis EKG z dwufazowym załamkiem P w odprowadzeniu V1 i opisem jego cech])
