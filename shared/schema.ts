@@ -74,6 +74,22 @@ export const sections = pgTable("sections", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+// Lecture chapters for each section
+export const lectureChapters = pgTable("lecture_chapters", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  sectionId: uuid("section_id").notNull().references(() => sections.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 300 }).notNull(),
+  contentMd: text("content_md").notNull(),
+  analogy: text("analogy"),
+  keyPoints: json("key_points").$type<string[]>().default([]),
+  visual: varchar("visual", { length: 100 }),
+  order: integer("order").notNull(),
+  isPublished: boolean("is_published").notNull().default(false),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 // Questions
 export const questions = pgTable("questions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -190,6 +206,12 @@ export const sectionsRelations = relations(sections, ({ many, one }) => ({
   questions: many(questions),
   progress: many(progress),
   prerequisiteSection: one(sections, { fields: [sections.prerequisiteSectionId], references: [sections.id] }),
+  lectureChapters: many(lectureChapters),
+}));
+
+export const lectureChaptersRelations = relations(lectureChapters, ({ one }) => ({
+  section: one(sections, { fields: [lectureChapters.sectionId], references: [sections.id] }),
+  creator: one(users, { fields: [lectureChapters.createdBy], references: [users.id] }),
 }));
 
 export const questionsRelations = relations(questions, ({ one, many }) => ({
@@ -288,6 +310,12 @@ export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
   createdAt: true 
 });
 
+export const insertLectureChapterSchema = createInsertSchema(lectureChapters).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -311,6 +339,8 @@ export type SupportTicket = typeof supportTickets.$inferSelect;
 export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type LectureChapter = typeof lectureChapters.$inferSelect;
+export type InsertLectureChapter = z.infer<typeof insertLectureChapterSchema>;
 
 // Additional schemas for API endpoints
 export const loginSchema = z.object({

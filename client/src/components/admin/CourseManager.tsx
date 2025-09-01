@@ -12,7 +12,8 @@ import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Plus, Edit, Trash2, BookOpen, FileText, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Edit, Trash2, BookOpen, FileText, GripVertical, ArrowUp, ArrowDown, Presentation } from "lucide-react";
+import { LectureEditor } from "./LectureEditor";
 import {
   DndContext,
   closestCenter,
@@ -127,6 +128,14 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
                     {section.isLocked && <Badge variant="outline" className="text-xs">Zablokowany</Badge>}
                   </div>
                   <div className="flex items-center space-x-1">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setEditingLecture({ sectionId: section.id, sectionTitle: section.title })}
+                      title="Edytuj wykład"
+                    >
+                      <Presentation className="h-3 w-3" />
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => onEditSection(section)}>
                       <Edit className="h-3 w-3" />
                     </Button>
@@ -147,6 +156,7 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
 export default function CourseManager() {
   const [editingModule, setEditingModule] = useState<Module | null>(null);
   const [editingSection, setEditingSection] = useState<Section | null>(null);
+  const [editingLecture, setEditingLecture] = useState<{ sectionId: string; sectionTitle: string } | null>(null);
   const [showModuleDialog, setShowModuleDialog] = useState(false);
   const [showSectionDialog, setShowSectionDialog] = useState(false);
   const [addingSectionToModule, setAddingSectionToModule] = useState<string | null>(null);
@@ -606,6 +616,21 @@ export default function CourseManager() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Lecture Editor Modal */}
+      {editingLecture && (
+        <Dialog open={true} onOpenChange={() => setEditingLecture(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edycja wykładu</DialogTitle>
+            </DialogHeader>
+            <LectureEditor 
+              sectionId={editingLecture.sectionId}
+              sectionTitle={editingLecture.sectionTitle}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

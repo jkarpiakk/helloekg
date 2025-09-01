@@ -18,7 +18,7 @@ import {
   insertQuestionSchema
 } from "@shared/schema";
 import { db } from "./db";
-import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets } from "@shared/schema";
+import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters } from "@shared/schema";
 import { eq, or, and, gte, desc, count, ilike, avg, sql } from "drizzle-orm";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -1226,6 +1226,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching performance metrics:", error);
       res.status(500).json({ error: "Błąd podczas pobierania metryk wydajności" });
+    }
+  });
+
+  // Lecture chapters endpoints for admins
+  app.get("/api/admin/sections/:sectionId/chapters", requireReviewer, async (req, res) => {
+    try {
+      const { sectionId } = req.params;
+      const chapters = await db
+        .select({
+          id: lectureChapters.id,
+          title: lectureChapters.title,
+          contentMd: lectureChapters.contentMd,
+          analogy: lectureChapters.analogy,
+          keyPoints: lectureChapters.keyPoints,
+          visual: lectureChapters.visual,
+          order: lectureChapters.order,
+          isPublished: lectureChapters.isPublished,
+          createdAt: lectureChapters.createdAt,
+          updatedAt: lectureChapters.updatedAt,
+        })
+        .from(lectureChapters)
+        .where(eq(lectureChapters.sectionId, sectionId))
+        .orderBy(lectureChapters.order);
+
+      res.json(chapters);
+    } catch (error: any) {
+      console.error("Error fetching lecture chapters:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania rozdziałów wykładu" });
+    }
+  });
+
+  app.post("/api/admin/sections/:sectionId/chapters", requireReviewer, async (req, res) => {
+    try {
+      const { sectionId } = req.params;
+      const { title, contentMd, analogy, keyPoints, visual, order } = req.body;
+
+      const [chapter] = await db
+        .insert(lectureChapters)
+        .values({
+          sectionId,
+          title,
+          contentMd,
+          analogy: analogy || null,
+          keyPoints: keyPoints || [],
+          visual: visual || null,
+          order,
+          isPublished: false,
+          createdBy: req.user!.id,
+        })
+        .returning();
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "lecture_chapter_created",
+        entityType: "lecture_chapter",
+        entityId: chapter.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(201).json(chapter);
+    } catch (error: any) {
+      console.error("Error creating lecture chapter:", error);
+      res.status(500).json({ error: "Błąd podczas tworzenia rozdziału wykładu" });
+    }
+  });
+
+  app.put("/api/admin/chapters/:id", requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { title, contentMd, analogy, keyPoints, visual, order, isPublished } = req.body;
+
+      const [updatedChapter] = await db
+        .update(lectureChapters)
+        .set({
+          title,
+          contentMd,
+          analogy: analogy || null,
+          keyPoints: keyPoints || [],
+          visual: visual || null,
+          order,
+          isPublished: isPublished || false,
+          updatedAt: new Date(),
+        })
+        .where(eq(lectureChapters.id, id))
+        .returning();
+
+      if (!updatedChapter) {
+        return res.status(404).json({ error: "Rozdział wykładu nie znaleziony" });
+      }
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "lecture_chapter_updated",
+        entityType: "lecture_chapter",
+        entityId: id,
+        diff: { title, contentMd, analogy, keyPoints, visual, order, isPublished },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedChapter);
+    } catch (error: any) {
+      console.error("Error updating lecture chapter:", error);
+      res.status(500).json({ error: "Błąd podczas aktualizacji rozdziału wykładu" });
+    }
+  });
+
+  app.delete("/api/admin/chapters/:id", requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [deletedChapter] = await db
+        .delete(lectureChapters)
+        .where(eq(lectureChapters.id, id))
+        .returning();
+
+      if (!deletedChapter) {
+        return res.status(404).json({ error: "Rozdział wykładu nie znaleziony" });
+      }
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "lecture_chapter_deleted",
+        entityType: "lecture_chapter",
+        entityId: id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error deleting lecture chapter:", error);
+      res.status(500).json({ error: "Błąd podczas usuwania rozdziału wykładu" });
+    }
+  });
+
+  // Public endpoints for lecture chapters
+  app.get("/api/sections/:sectionId/chapters", requireActiveSubscription, async (req, res) => {
+    try {
+      const { sectionId } = req.params;
+      
+      const chapters = await db
+        .select({
+          id: lectureChapters.id,
+          title: lectureChapters.title,
+          contentMd: lectureChapters.contentMd,
+          analogy: lectureChapters.analogy,
+          keyPoints: lectureChapters.keyPoints,
+          visual: lectureChapters.visual,
+          order: lectureChapters.order,
+        })
+        .from(lectureChapters)
+        .where(and(
+          eq(lectureChapters.sectionId, sectionId),
+          eq(lectureChapters.isPublished, true)
+        ))
+        .orderBy(lectureChapters.order);
+
+      res.json(chapters);
+    } catch (error: any) {
+      console.error("Error fetching lecture chapters:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania rozdziałów wykładu" });
     }
   });
 
