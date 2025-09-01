@@ -52,6 +52,9 @@ export default function Header() {
                 <Link href="/dashboard" className={`transition-colors ${location === '/dashboard' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-dashboard">
                   {t("nav.dashboard")}
                 </Link>
+                <Link href="/modules" className={`transition-colors ${location === '/modules' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-modules">
+                  Moduły
+                </Link>
                 <Link href="/quiz" className={`transition-colors ${location === '/quiz' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-quiz">
                   {t("nav.quiz")}
                 </Link>
@@ -169,6 +172,14 @@ export default function Header() {
                   data-testid="mobile-nav-dashboard"
                 >
                   {t("nav.dashboard")}
+                </Link>
+                <Link
+                  href="/modules"
+                  className="block text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  data-testid="mobile-nav-modules"
+                >
+                  Moduły
                 </Link>
                 <Link
                   href="/quiz"

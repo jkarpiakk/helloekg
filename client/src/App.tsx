@@ -11,6 +11,7 @@ import { LoadingSpinner } from "./components/ui/loading-spinner";
 import Home from "@/pages/home";
 import Quiz from "@/pages/quiz";
 import Dashboard from "@/pages/dashboard";
+import Modules from "@/pages/modules";
 import Lecture from "@/pages/lecture";
 import Admin from "@/pages/admin";
 import Pricing from "@/pages/pricing";
@@ -46,6 +47,7 @@ function AppContent() {
           <Route path="/" component={Home} />
           <Route path="/quiz" component={Quiz} />
           <Route path="/dashboard" component={Dashboard} />
+          <Route path="/modules" component={Modules} />
           <Route path="/lecture" component={Lecture} />
           <Route path="/admin" component={Admin} />
           <Route path="/pricing" component={Pricing} />

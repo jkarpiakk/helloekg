@@ -1,0 +1,58 @@
+1. **Wprowadzenie do EKG**
+    - Podstawy układu bodźcoprzewodzącego serca
+    - Odprowadzenia kończynowe i przedsercowe
+    - Określanie rytmu serca i częstości akcji serca
+    - Ocena osi elektrycznej serca
+
+[Pytania testowe](https://www.notion.so/Pytania-testowe-d2639e186bc94abc9048d8ede9498c85?pvs=21)
+
+1. **Załamki, odcinki i odstępy**
+    - Załamek P i ocena przedsionków
+        
+        [Pytania **Podpunkt 1: Załamek P i ocena przedsionków**](https://www.notion.so/Pytania-Podpunkt-1-Za-amek-P-i-ocena-przedsionk-w-1564e5a0aa074e078fa17ec41fe897f3?pvs=21)
+        
+    - Odstęp PQ i funkcja węzła AV
+        
+        [Pytania podpunkt 2: Odstęp PQ i funkcja węzła AV](https://www.notion.so/Pytania-podpunkt-2-Odst-p-PQ-i-funkcja-w-z-a-AV-c04bc2531f3848859bd29f8c5a416394?pvs=21)
+        
+    - Zespół QRS i depolaryzacja komór
+        
+        [Zespół QRS – depolaryzacja komór](https://www.notion.so/Zesp-QRS-depolaryzacja-kom-r-307263781887481ab42da44c21473ddd?pvs=21)
+        
+    - Odcinek ST i załamek T – rozpoznawanie niedokrwienia
+        
+        [Testy podpunkt 4: Odcinek ST i repolaryzacja komór](https://www.notion.so/Testy-podpunkt-4-Odcinek-ST-i-repolaryzacja-kom-r-e5d7676bbcf04514861c867c77b36d2a?pvs=21)
+        
+    - Ocena odstępu QT
+        
+        [Testy Podpunkt 5: Ocena odstępu QT](https://www.notion.so/Testy-Podpunkt-5-Ocena-odst-pu-QT-0069e94d63614f22bda2b4b5a910f8ab?pvs=21)
+        
+2. **Przerosty i niedokrwienie**
+    - Przerost lewej komory – kryteria i analiza EKG
+    - Przerost prawej komory – kluczowe cechy
+    - Niedokrwienie mięśnia sercowego – obniżenie i uniesienie ST
+    - Rozpoznawanie zawałów – STEMI i NSTEMI
+    - Topografia zawałów serca na EKG
+3. **Arytmie i zaburzenia rytmu serca**
+    - Tachyarytmie nadkomorowe: AVNRT, AVRT, migotanie i trzepotanie przedsionków
+    - Bradyarytmie: zaburzenia węzła zatokowego, bloki AV
+    - Częstoskurcze komorowe i migotanie komór
+    - Mechanizmy powstawania arytmii – re-entry, automatyzm, bloki przewodzenia
+    - Rozpoznawanie i różnicowanie arytmii na EKG
+4. **Bloki przewodzenia**
+    - Blok przedsionkowo-komorowy I stopnia
+    - Blok AV II stopnia typu Mobitz I (Wenckebach)
+    - Blok AV II stopnia typu Mobitz II
+    - Blok AV III stopnia
+    - Zaburzenia przewodzenia śródkomorowego (RBBB, LBBB, bloki wiązek lewej odnogi)
+5. **Stymulatory serca i urządzenia wszczepialne**
+    - Zasady działania stymulatorów serca
+    - EKG ze stymulatorem przedsionkowym, komorowym i dwukomorowym
+    - Rozpoznawanie i diagnostyka problemów ze stymulatorem
+    - ICD (kardiowertery-defibrylatory wszczepialne) – zapis na EKG
+6. **Analiza przypadków klinicznych**
+    - Interpretacja 10 przykładowych zapisów EKG
+    - Podejście do pacjenta z bólem w klatce piersiowej
+    - Pacjent z kołataniem serca – różnicowanie arytmii
+    - Pacjent z omdleniami – ocena bloku przewodzenia
+    - Rozpoznawanie groźnych stanów – migotanie komór, STEMI

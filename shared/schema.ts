@@ -51,9 +51,21 @@ export const subscriptions = pgTable("subscriptions", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
-// Course sections/modules
+// Course modules
+export const modules = pgTable("modules", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  order: integer("order").notNull(),
+  isLocked: boolean("is_locked").notNull().default(false),
+  prerequisiteModuleId: uuid("prerequisite_module_id").references(() => modules.id),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Course sections/subsections within modules
 export const sections = pgTable("sections", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  moduleId: uuid("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
   order: integer("order").notNull(),
@@ -164,7 +176,13 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   plan: one(plans, { fields: [subscriptions.planId], references: [plans.id] }),
 }));
 
+export const modulesRelations = relations(modules, ({ many, one }) => ({
+  sections: many(sections),
+  prerequisiteModule: one(modules, { fields: [modules.prerequisiteModuleId], references: [modules.id] }),
+}));
+
 export const sectionsRelations = relations(sections, ({ many, one }) => ({
+  module: one(modules, { fields: [sections.moduleId], references: [modules.id] }),
   questions: many(questions),
   progress: many(progress),
   prerequisiteSection: one(sections, { fields: [sections.prerequisiteSectionId], references: [sections.id] }),
@@ -220,6 +238,11 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
   createdAt: true 
 });
 
+export const insertModuleSchema = createInsertSchema(modules).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
 export const insertSectionSchema = createInsertSchema(sections).omit({ 
   id: true, 
   createdAt: true 
@@ -268,6 +291,8 @@ export type Plan = typeof plans.$inferSelect;
 export type InsertPlan = z.infer<typeof insertPlanSchema>;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+export type Module = typeof modules.$inferSelect;
+export type InsertModule = z.infer<typeof insertModuleSchema>;
 export type Section = typeof sections.$inferSelect;
 export type InsertSection = z.infer<typeof insertSectionSchema>;
 export type Question = typeof questions.$inferSelect;

@@ -1,11 +1,12 @@
 import { 
-  users, plans, subscriptions, sections, questions, attempts, 
+  users, plans, subscriptions, modules, sections, questions, attempts, 
   progress, certificates, supportTickets, auditLog,
   type User, type InsertUser, type Plan, type InsertPlan,
-  type Subscription, type InsertSubscription, type Section, type InsertSection,
-  type Question, type InsertQuestion, type Attempt, type InsertAttempt,
-  type Progress, type InsertProgress, type Certificate, type InsertCertificate,
-  type SupportTicket, type InsertSupportTicket, type AuditLog, type InsertAuditLog
+  type Subscription, type InsertSubscription, type Module, type InsertModule,
+  type Section, type InsertSection, type Question, type InsertQuestion, 
+  type Attempt, type InsertAttempt, type Progress, type InsertProgress, 
+  type Certificate, type InsertCertificate, type SupportTicket, type InsertSupportTicket, 
+  type AuditLog, type InsertAuditLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, count, avg, sql } from "drizzle-orm";
@@ -25,7 +26,10 @@ export interface IStorage {
   updateSubscriptionStatus(id: string, status: string): Promise<Subscription>;
   
   // Course content
+  getModules(): Promise<Module[]>;
+  getModuleById(id: string): Promise<Module | undefined>;
   getSections(): Promise<Section[]>;
+  getSectionsByModule(moduleId: string): Promise<Section[]>;
   getSectionById(id: string): Promise<Section | undefined>;
   getQuestionsBySection(sectionId: string, status?: string): Promise<Question[]>;
   getQuestionById(id: string): Promise<Question | undefined>;
@@ -125,8 +129,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Course content
+  async getModules(): Promise<Module[]> {
+    return db.select().from(modules).orderBy(asc(modules.order));
+  }
+
+  async getModuleById(id: string): Promise<Module | undefined> {
+    const [module] = await db.select().from(modules).where(eq(modules.id, id));
+    return module || undefined;
+  }
+
   async getSections(): Promise<Section[]> {
     return db.select().from(sections).orderBy(asc(sections.order));
+  }
+
+  async getSectionsByModule(moduleId: string): Promise<Section[]> {
+    return db.select().from(sections)
+      .where(eq(sections.moduleId, moduleId))
+      .orderBy(asc(sections.order));
   }
 
   async getSectionById(id: string): Promise<Section | undefined> {

@@ -268,6 +268,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Quiz endpoints
+  // Get modules with sections and user progress
+  app.get("/api/modules", requireAuth, requireActiveSubscription, async (req, res) => {
+    try {
+      const modules = await storage.getModules();
+      const userProgress = await storage.getUserProgress(req.user!.id);
+      
+      // Build modules with sections and progress
+      const modulesWithSections = await Promise.all(
+        modules.map(async (module) => {
+          const sections = await storage.getSectionsByModule(module.id);
+          
+          // Add progress to each section
+          const sectionsWithProgress = sections.map(section => {
+            const progress = userProgress.find(p => p.sectionId === section.id);
+            return {
+              ...section,
+              completionPercentage: progress ? parseFloat(progress.completionPercentage) : 0,
+              lastActivity: progress?.lastActivity
+            };
+          });
+          
+          // Calculate module completion percentage
+          const moduleCompletion = sectionsWithProgress.length > 0
+            ? sectionsWithProgress.reduce((acc, section) => acc + (section.completionPercentage || 0), 0) / sectionsWithProgress.length
+            : 0;
+          
+          return {
+            ...module,
+            sections: sectionsWithProgress,
+            completionPercentage: moduleCompletion
+          };
+        })
+      );
+      
+      res.json(modulesWithSections);
+    } catch (error) {
+      console.error("Modules fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania modułów" });
+    }
+  });
+
+  // Get sections with user progress (legacy endpoint)
   app.get("/api/sections", requireAuth, requireActiveSubscription, async (req, res) => {
     try {
       const sections = await storage.getSections();
