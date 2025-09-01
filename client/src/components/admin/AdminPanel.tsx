@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { Shield, Users, BarChart3, Settings, BookOpen } from "lucide-react";
+import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle } from "lucide-react";
 import QuestionManager from "./QuestionManager";
 import CourseManager from "./CourseManager";
+import UserManager from "./UserManager";
+import SupportManager from "./SupportManager";
+import AnalyticsManager from "./AnalyticsManager";
 
 export default function AdminPanel() {
   const { t } = useTranslation();
@@ -34,22 +37,26 @@ export default function AdminPanel() {
       {/* Admin Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs defaultValue="course" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="course" className="flex items-center space-x-2">
               <BookOpen className="h-4 w-4" />
               <span>Kurs</span>
             </TabsTrigger>
             <TabsTrigger value="questions" className="flex items-center space-x-2">
               <Shield className="h-4 w-4" />
-              <span>{t("admin.questions")}</span>
+              <span>Pytania</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span>Użytkownicy</span>
+            </TabsTrigger>
+            <TabsTrigger value="support" className="flex items-center space-x-2">
+              <MessageCircle className="h-4 w-4" />
+              <span>Wiadomości</span>
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center space-x-2">
               <BarChart3 className="h-4 w-4" />
-              <span>{t("admin.analytics")}</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center space-x-2">
-              <Settings className="h-4 w-4" />
-              <span>{t("admin.settings")}</span>
+              <span>Statystyki</span>
             </TabsTrigger>
           </TabsList>
 
@@ -62,36 +69,15 @@ export default function AdminPanel() {
           </TabsContent>
 
           <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <CardTitle>Zarządzanie użytkownikami</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Funkcjonalność zarządzania użytkownikami będzie dostępna wkrótce.</p>
-              </CardContent>
-            </Card>
+            <UserManager />
+          </TabsContent>
+
+          <TabsContent value="support">
+            <SupportManager />
           </TabsContent>
 
           <TabsContent value="analytics">
-            <Card>
-              <CardHeader>
-                <CardTitle>Analityka</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Panel analityczny będzie dostępny wkrótce.</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>Ustawienia systemu</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Ustawienia systemu będą dostępne wkrótce.</p>
-              </CardContent>
-            </Card>
+            <AnalyticsManager />
           </TabsContent>
         </Tabs>
       </div>

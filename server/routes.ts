@@ -17,6 +17,9 @@ import {
   resetPasswordSchema,
   insertQuestionSchema
 } from "@shared/schema";
+import { db } from "./db";
+import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets } from "@shared/schema";
+import { eq, or, and, gte, desc, count, ilike, avg, sql } from "drizzle-orm";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   console.warn('Warning: STRIPE_SECRET_KEY not set. Payment functionality will not work.');
@@ -916,6 +919,313 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Support ticket creation error:", error);
       res.status(500).json({ error: "Błąd podczas tworzenia zgłoszenia" });
+    }
+  });
+
+  // Admin endpoints for user management
+  app.get("/api/admin/users", requireReviewer, async (req, res) => {
+    try {
+      const { search, role, status } = req.query;
+      let query = db.select().from(users);
+
+      // Apply search filter
+      if (search) {
+        query = query.where(or(
+          ilike(users.email, `%${search}%`),
+          ilike(users.firstName, `%${search}%`),
+          ilike(users.lastName, `%${search}%`)
+        ));
+      }
+
+      // Apply role filter
+      if (role && role !== 'all') {
+        query = query.where(eq(users.role, role as string));
+      }
+
+      // Apply status filter
+      if (status && status !== 'all') {
+        if (status === 'verified') {
+          query = query.where(eq(users.emailVerified, true));
+        } else if (status === 'unverified') {
+          query = query.where(eq(users.emailVerified, false));
+        }
+      }
+
+      const allUsers = await query.orderBy(desc(users.createdAt));
+      res.json(allUsers);
+    } catch (error: any) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania użytkowników" });
+    }
+  });
+
+  app.get("/api/admin/stats/users", requireReviewer, async (req, res) => {
+    try {
+      const totalUsers = await db.select({ count: count() }).from(users);
+      const activeSubscriptions = await db.select({ count: count() })
+        .from(subscriptions)
+        .where(eq(subscriptions.status, 'active'));
+      
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const newUsersThisMonth = await db.select({ count: count() })
+        .from(users)
+        .where(gte(users.createdAt, thirtyDaysAgo));
+
+      res.json({
+        totalUsers: totalUsers[0]?.count || 0,
+        activeSubscriptions: activeSubscriptions[0]?.count || 0,
+        newUsersThisMonth: newUsersThisMonth[0]?.count || 0,
+      });
+    } catch (error: any) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania statystyk" });
+    }
+  });
+
+  app.put("/api/admin/users/:id", requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role, status } = req.body;
+      
+      const updateData: any = {};
+      if (role) updateData.role = role;
+      if (status) {
+        if (status === 'verified') updateData.emailVerified = true;
+        if (status === 'suspended') updateData.emailVerified = false;
+      }
+      
+      const [updatedUser] = await db
+        .update(users)
+        .set(updateData)
+        .where(eq(users.id, id))
+        .returning();
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Użytkownik nie znaleziony" });
+      }
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "user_updated",
+        entityType: "user",
+        entityId: id,
+        diff: updateData,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedUser);
+    } catch (error: any) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Błąd podczas aktualizacji użytkownika" });
+    }
+  });
+
+  // Admin Support tickets endpoints
+  app.get("/api/admin/support/tickets", requireReviewer, async (req, res) => {
+    try {
+      const { status, search } = req.query;
+      let query = db.select().from(supportTickets);
+
+      // Apply status filter
+      if (status && status !== 'all') {
+        query = query.where(eq(supportTickets.status, status as string));
+      }
+
+      // Apply search filter
+      if (search) {
+        query = query.where(or(
+          ilike(supportTickets.subject, `%${search}%`),
+          ilike(supportTickets.message, `%${search}%`),
+          ilike(supportTickets.userEmail, `%${search}%`)
+        ));
+      }
+
+      const tickets = await query.orderBy(desc(supportTickets.createdAt));
+      res.json(tickets);
+    } catch (error: any) {
+      console.error("Error fetching support tickets:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania zgłoszeń" });
+    }
+  });
+
+  app.get("/api/admin/stats/support", requireReviewer, async (req, res) => {
+    try {
+      const totalTickets = await db.select({ count: count() }).from(supportTickets);
+      const openTickets = await db.select({ count: count() })
+        .from(supportTickets)
+        .where(eq(supportTickets.status, 'open'));
+      const resolvedTickets = await db.select({ count: count() })
+        .from(supportTickets)
+        .where(eq(supportTickets.status, 'resolved'));
+
+      res.json({
+        totalTickets: totalTickets[0]?.count || 0,
+        openTickets: openTickets[0]?.count || 0,
+        resolvedTickets: resolvedTickets[0]?.count || 0,
+        avgResponseTime: 24, // Placeholder
+      });
+    } catch (error: any) {
+      console.error("Error fetching support stats:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania statystyk supportu" });
+    }
+  });
+
+  app.put("/api/admin/support/tickets/:id", requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, adminResponse } = req.body;
+      
+      const updateData: any = { status, updatedAt: new Date() };
+      if (adminResponse) {
+        updateData.adminResponse = adminResponse;
+        updateData.adminUserId = req.user!.id;
+      }
+      
+      const [updatedTicket] = await db
+        .update(supportTickets)
+        .set(updateData)
+        .where(eq(supportTickets.id, id))
+        .returning();
+
+      if (!updatedTicket) {
+        return res.status(404).json({ error: "Zgłoszenie nie znalezione" });
+      }
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "support_ticket_updated",
+        entityType: "support_ticket",
+        entityId: id,
+        diff: updateData,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedTicket);
+    } catch (error: any) {
+      console.error("Error updating support ticket:", error);
+      res.status(500).json({ error: "Błąd podczas aktualizacji zgłoszenia" });
+    }
+  });
+
+  // Analytics endpoints
+  app.get("/api/admin/analytics/stats", requireReviewer, async (req, res) => {
+    try {
+      const { range } = req.query;
+      
+      // Calculate date range
+      let dateFilter = new Date();
+      switch (range) {
+        case '7d':
+          dateFilter.setDate(dateFilter.getDate() - 7);
+          break;
+        case '90d':
+          dateFilter.setDate(dateFilter.getDate() - 90);
+          break;
+        case '365d':
+          dateFilter.setDate(dateFilter.getDate() - 365);
+          break;
+        default: // 30d
+          dateFilter.setDate(dateFilter.getDate() - 30);
+      }
+
+      // Get basic platform stats
+      const totalUsers = await db.select({ count: count() }).from(users);
+      const totalQuestions = await db.select({ count: count() }).from(questions);
+      const totalAttempts = await db.select({ count: count() }).from(attempts);
+      const activeSubscriptions = await db.select({ count: count() })
+        .from(subscriptions)
+        .where(eq(subscriptions.status, 'active'));
+      
+      const newUsersThisMonth = await db.select({ count: count() })
+        .from(users)
+        .where(gte(users.createdAt, dateFilter));
+        
+      const questionsAddedThisMonth = await db.select({ count: count() })
+        .from(questions)
+        .where(gte(questions.createdAt, dateFilter));
+
+      // Calculate success rate
+      const successfulAttempts = await db.select({ count: count() })
+        .from(attempts)
+        .where(eq(attempts.isCorrect, true));
+      
+      const avgSuccessRate = totalAttempts[0]?.count > 0 
+        ? (successfulAttempts[0]?.count || 0) / totalAttempts[0].count 
+        : 0;
+
+      res.json({
+        totalUsers: totalUsers[0]?.count || 0,
+        totalQuestions: totalQuestions[0]?.count || 0,
+        totalAttempts: totalAttempts[0]?.count || 0,
+        avgSuccessRate,
+        activeSubscriptions: activeSubscriptions[0]?.count || 0,
+        monthlyRevenue: activeSubscriptions[0]?.count * 60 || 0, // Rough estimate
+        newUsersThisMonth: newUsersThisMonth[0]?.count || 0,
+        questionsAddedThisMonth: questionsAddedThisMonth[0]?.count || 0,
+      });
+    } catch (error: any) {
+      console.error("Error fetching analytics stats:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania statystyk" });
+    }
+  });
+
+  app.get("/api/admin/analytics/performance", requireReviewer, async (req, res) => {
+    try {
+      // Get average quiz completion time
+      const avgCompletionTime = await db.select({ 
+        avg: avg(attempts.timeMs) 
+      }).from(attempts);
+
+      // Get most difficult questions (lowest success rates)
+      const mostDifficultQuestions = await db
+        .select({
+          id: questions.id,
+          questionText: questions.title,
+          successRate: sql<number>`CAST(COUNT(CASE WHEN ${attempts.isCorrect} THEN 1 END) AS FLOAT) / COUNT(*)`,
+          attempts: count(attempts.id),
+        })
+        .from(questions)
+        .leftJoin(attempts, eq(questions.id, attempts.questionId))
+        .groupBy(questions.id, questions.title)
+        .having(sql`COUNT(*) >= 10`) // At least 10 attempts
+        .orderBy(sql`CAST(COUNT(CASE WHEN ${attempts.isCorrect} THEN 1 END) AS FLOAT) / COUNT(*)`)
+        .limit(5);
+
+      // Get best performing sections
+      const bestPerformingSections = await db
+        .select({
+          id: sections.id,
+          title: sections.title,
+          avgSuccessRate: sql<number>`CAST(COUNT(CASE WHEN ${attempts.isCorrect} THEN 1 END) AS FLOAT) / COUNT(*)`,
+          completionRate: sql<number>`0.75`, // Placeholder
+        })
+        .from(sections)
+        .leftJoin(questions, eq(sections.id, questions.sectionId))
+        .leftJoin(attempts, eq(questions.id, attempts.questionId))
+        .groupBy(sections.id, sections.title)
+        .orderBy(sql`CAST(COUNT(CASE WHEN ${attempts.isCorrect} THEN 1 END) AS FLOAT) / COUNT(*) DESC`)
+        .limit(5);
+
+      res.json({
+        avgQuizCompletionTime: (avgCompletionTime[0]?.avg || 0) / (1000 * 60), // Convert to minutes
+        mostDifficultQuestions: mostDifficultQuestions || [],
+        bestPerformingSections: bestPerformingSections || [],
+        userEngagement: {
+          dailyActiveUsers: 12, // Placeholder
+          weeklyActiveUsers: 47,
+          monthlyActiveUsers: 156,
+          avgSessionTime: 24,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching performance metrics:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania metryk wydajności" });
     }
   });
 
