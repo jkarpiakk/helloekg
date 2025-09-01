@@ -1,0 +1,291 @@
+### **Pytanie 1: Co jest głównym źródłem impulsów elektrycznych w zdrowym sercu?**
+
+1. Węzeł zatokowy (prawidłowa odpowiedź)
+2. Węzeł przedsionkowo-komorowy
+3. Pęczek Hisa
+4. Włókna Purkinjego
+
+**Wyjaśnienie:**
+
+Wyobraź sobie serce jako orkiestrę, a węzeł zatokowy jako dyrygenta. To on nadaje rytm, generując impulsy elektryczne, które rozchodzą się po przedsionkach. Dzięki temu każdy skurcz zaczyna się we właściwym momencie. Węzeł przedsionkowo-komorowy to bardziej stacja przekaźnikowa, która chwilowo zatrzymuje impulsy, zanim dotrą do komór. Pęczek Hisa i włókna Purkinjego to "linie przesyłowe", które przewodzą sygnały do mięśni komór. Jeśli węzeł zatokowy zawodzi, inne części mogą przejąć jego rolę, ale wtedy serce traci swój naturalny, rytmiczny puls.
+
+([Ilustracja: schemat układu bodźcoprzewodzącego serca, z zaznaczeniem węzła zatokowego, węzła AV, pęczka Hisa i włókien Purkinjego])
+
+---
+
+### **Pytanie 2: Jakie odprowadzenie kończynowe rejestruje aktywność elektryczną z lewej strony serca?**
+
+1. I (prawidłowa odpowiedź)
+2. II
+3. III
+4. aVR
+
+**Wyjaśnienie:**
+
+Odprowadzenie I działa jak kamera patrząca z lewej strony serca. Wyobraź sobie, że masz elektrody na lewej i prawej ręce – prąd płynący w kierunku lewej ręki powoduje dodatnie załamki. To odprowadzenie świetnie pokazuje aktywność lewej ściany bocznej serca. Dla porównania, odprowadzenie II patrzy bardziej od dołu, a III od kąta między lewą ręką a nogą. aVR z kolei obserwuje serce z przeciwnej strony – zazwyczaj wszystko w nim wygląda odwrotnie niż w innych odprowadzeniach.
+
+([Ilustracja: schemat pokazujący lokalizację elektrod dla odprowadzeń kończynowych i kierunki ich rejestracji])
+
+---
+
+### **Pytanie 3: Jak obliczyć częstość akcji serca na podstawie EKG?**
+
+1. Podziel 300 przez liczbę dużych kratek między załamkami R (prawidłowa odpowiedź)
+2. Policz liczbę małych kratek między załamkami P i podziel przez 100
+3. Pomnóż liczbę załamków QRS w 6 sekundach przez 5
+4. Zsumuj załamki P i R w jednym cyklu
+
+**Wyjaśnienie:**
+
+Każda duża kratka na EKG odpowiada 0,20 sekundy. Jeśli policzymy, ile dużych kratek mieści się między załamkami R, możemy szybko obliczyć, ile razy serce bije na minutę. Na przykład: jeśli między załamkami R są 4 kratki, to 300/4 = 75 uderzeń na minutę. To proste, jak podzielenie ciasta na równe kawałki – im więcej kratek, tym wolniejsze bicie serca. Inne metody są możliwe, ale ta jest najszybsza i najczęściej stosowana w praktyce.
+
+([Ilustracja: zapis EKG z zaznaczonymi dużymi kratkami między załamkami R oraz obliczeniami częstości akcji serca])
+
+---
+
+### **Pytanie 4: Jak rozpoznać rytm zatokowy na EKG?**
+
+1. Załamek P poprzedza każdy zespół QRS (prawidłowa odpowiedź)
+2. Odstępy R-R są nieregularne
+3. Załamki T są zawsze odwrócone
+4. W odprowadzeniu II widoczne są fale F
+
+**Wyjaśnienie:**
+
+Rytm zatokowy to złoty standard – serce bije regularnie pod kontrolą węzła zatokowego. Aby upewnić się, że mamy do czynienia z rytmem zatokowym, sprawdź, czy załamek P pojawia się przed każdym QRS i czy odstępy R-R są równe. To jak dobrze zorganizowany ruch uliczny, gdzie każdy samochód (P) jedzie w odpowiedniej kolejności przed ciężarówką (QRS). Fale F w odprowadzeniu II to znak migotania przedsionków, a odwrócone załamki T mogą wskazywać na inne problemy, ale nie mają nic wspólnego z rytmem zatokowym.
+
+([Ilustracja: typowy zapis rytmu zatokowego w odprowadzeniu II, z zaznaczeniem załamków P i QRS])
+
+---
+
+### **Pytanie 5: Jak określić oś elektryczną serca na podstawie odprowadzeń I i aVF?**
+
+1. Jeśli oba są dodatnie, oś jest normalna (prawidłowa odpowiedź)
+2. Jeśli oba są ujemne, oś jest w lewo
+3. Jeśli I jest dodatnie, a aVF ujemne, oś jest w prawo
+4. Jeśli aVF jest dodatnie, a I ujemne, oś jest nie do określenia
+
+**Wyjaśnienie:**
+
+Wyobraź sobie, że oś serca to kompas, a odprowadzenia I i aVF to dwie wskazówki, które pokazują, gdzie jest „północ”. Jeśli oba są dodatnie, oznacza to, że oś mieści się w normalnym zakresie (od -30° do +90°). Jeśli I jest dodatnie, a aVF ujemne, mamy odchylenie w lewo. Jeśli odwrotnie – odchylenie w prawo. Oba ujemne wskazują na oś ekstremalną, co może oznaczać poważne problemy. To jak patrzenie na mapę i próba ustalenia kierunku – kiedy znasz dwie główne osie, możesz łatwo określić położenie.
+
+([Ilustracja: diagram z odprowadzeniami I i aVF oraz różnymi zakresami osi elektrycznej serca])
+
+### **Pytanie 6: Dlaczego węzeł zatokowy nazywany jest „naturalnym rozrusznikiem” serca?**
+
+1. Generuje impulsy o najwyższej częstotliwości (prawidłowa odpowiedź)
+2. Znajduje się najbliżej komór
+3. Zawsze działa szybciej niż węzeł AV
+4. Jest jedynym źródłem impulsów elektrycznych w sercu
+
+**Wyjaśnienie:**
+
+Węzeł zatokowy jest jak lider zespołu – generuje impulsy najszybciej, zwykle z częstością 60–100 razy na minutę, co narzuca rytm pozostałym częściom układu bodźcoprzewodzącego. Choć inne struktury, jak węzeł AV czy włókna Purkinjego, też mogą generować impulsy, robią to znacznie wolniej i wchodzą do akcji tylko wtedy, gdy węzeł zatokowy zawiedzie. To jak główny aktor w przedstawieniu – dopóki jest obecny, inni czekają w kolejce.
+
+([Ilustracja: schemat układu bodźcoprzewodzącego z zaznaczonym węzłem zatokowym jako głównym źródłem impulsów])
+
+---
+
+### **Pytanie 7: Które odprowadzenie przedsercowe najlepiej pokazuje przednią ścianę serca?**
+
+1. V3 i V4 (prawidłowa odpowiedź)
+2. V1 i V2
+3. V5 i V6
+4. V1 i aVL
+
+**Wyjaśnienie:**
+
+V3 i V4 to jak dwie kamery ustawione na przodzie serca, obserwujące jego przednią ścianę. V1 i V2 patrzą bardziej na prawą stronę serca i przegrodę międzykomorową, a V5 i V6 rejestrują lewą ścianę boczną serca. Wyobraź sobie to jak widok na budynek – każda kamera pokazuje inny fragment, a razem tworzą pełny obraz.
+
+([Ilustracja: schemat rozmieszczenia elektrod przedsercowych z opisem obszarów serca, które „widzi” każde odprowadzenie])
+
+---
+
+### **Pytanie 8: Co oznacza rytm miarowy na EKG?**
+
+1. Odstępy między załamkami R są równe (prawidłowa odpowiedź)
+2. Załamki P występują przed każdym QRS
+3. QRS mają taki sam kształt w każdym cyklu
+4. Oś elektryczna mieści się w zakresie od -30° do +90°
+
+**Wyjaśnienie:**
+
+Rytm miarowy oznacza, że odstępy między załamkami R (czyli odstępy R-R) są identyczne – serce bije w równym tempie. To jak metronom, który wyznacza stały rytm muzyki. Obecność załamków P czy normalna oś elektryczna są ważne, ale nie mają bezpośredniego wpływu na miarowość rytmu.
+
+([Ilustracja: zapis EKG z regularnymi odstępami R-R w rytmie zatokowym])
+
+---
+
+### **Pytanie 9: Jakie odprowadzenie kończynowe najlepiej pokazuje aktywność elektryczną prawej strony serca?**
+
+1. aVR (prawidłowa odpowiedź)
+2. I
+3. II
+4. III
+
+**Wyjaśnienie:**
+
+Odprowadzenie aVR jest jak „okno” na prawą stronę serca. Często widzimy w nim odwrotne załamki, ponieważ prąd płynie przeciwnie do tego odprowadzenia. To jak patrzenie na serce z „tyłu” – nie pokazuje szczegółów przedsionków ani komór, ale daje ogólny obraz aktywności prawej strony serca.
+
+([Ilustracja: schemat z odprowadzeniem aVR i jego zasięgiem widzenia serca])
+
+---
+
+### **Pytanie 10: Co oznacza, jeśli w odprowadzeniu I załamki są ujemne?**
+
+1. Oś elektryczna jest przesunięta w prawo (prawidłowa odpowiedź)
+2. Oś elektryczna jest przesunięta w lewo
+3. Serce jest w normalnej osi elektrycznej
+4. Węzeł AV przejął funkcję węzła zatokowego
+
+**Wyjaśnienie:**
+
+Jeśli załamki w odprowadzeniu I są ujemne, oznacza to, że prąd elektryczny płynie w kierunku przeciwnym do lewej ręki – w prawo. To typowe dla odchylenia osi elektrycznej serca w prawo. Wyobraź sobie, że serce jest jak kompas, który wskazuje na południe zamiast na wschód – coś zmieniło jego naturalne ustawienie.
+
+([Ilustracja: diagram przedstawiający odchylenie osi elektrycznej w prawo oraz zapis EKG z ujemnymi załamkami w I])
+
+---
+
+### **Pytanie 11: Jakie znaczenie ma aVF w ocenie osi elektrycznej serca?**
+
+1. Wskazuje, czy prąd płynie w dół czy w górę (prawidłowa odpowiedź)
+2. Jest kluczowe w diagnozie zawału przedniej ściany
+3. Obserwuje lewą ścianę boczną serca
+4. Rejestruje aktywność elektryczną przedsionków
+
+**Wyjaśnienie:**
+
+aVF patrzy na serce od dołu, niczym kamera skierowana na „podstawę” organu. Jeśli załamki w aVF są dodatnie, oznacza to, że główny prąd elektryczny płynie w dół. Ujemne załamki sugerują, że prąd skierowany jest w górę. To jak kompas, który mówi nam, czy „wiatr” płynie w dół w stronę nóg, czy w stronę głowy.
+
+([Ilustracja: schemat odprowadzenia aVF i jego roli w ocenie osi elektrycznej serca])
+
+### **Pytanie 12: Co oznacza, jeśli w odprowadzeniu I załamki R są niskie, a w odprowadzeniu aVF dodatnie?**
+
+1. Niska amplituda załamków spowodowana otyłością lub płynem w osierdziu (prawidłowa odpowiedź)
+2. Oś elektryczna przesunięta w prawo
+3. Blok AV I stopnia
+4. Migotanie przedsionków
+
+**Wyjaśnienie:**
+
+Niska amplituda załamków R w odprowadzeniach to jak przyciemnione światło – impulsy elektryczne nadal płyną, ale ich sygnał jest osłabiony. Może to wynikać z tłumienia sygnału przez tkankę tłuszczową, płyn w osierdziu, rozedmę płuc lub zwiększoną odległość między elektrodami a sercem. Dodatni załamek w aVF wskazuje, że prąd płynie w dół (w stronę nóg), co oznacza, że oś elektryczna jest w normalnym zakresie.
+
+([Ilustracja: zapis EKG z niskimi załamkami R w odprowadzeniu I oraz normalnym załamkiem w aVF wraz z opisem możliwych przyczyn niskiej amplitudy])
+
+### **Pytanie 13: Co oznacza załamek P widoczny w odprowadzeniu II?**
+
+1. Depolaryzację przedsionków (prawidłowa odpowiedź)
+2. Depolaryzację komór
+3. Repolaryzację przedsionków
+4. Repolaryzację komór
+
+**Wyjaśnienie:**
+
+Załamek P to pierwsza „nutka” cyklu serca – reprezentuje depolaryzację przedsionków, czyli ich pobudzenie elektryczne, które prowadzi do skurczu. To jak włączanie światła w dwóch pokojach (przedsionkach), aby przygotować je na przyjęcie impulsu. Repolaryzacja przedsionków nie jest widoczna, bo jest zasłonięta przez większe zespoły QRS.
+
+([Ilustracja: zapis EKG z zaznaczonym załamkiem P i opisem „depolaryzacja przedsionków”])
+
+---
+
+### **Pytanie 14: Jaki jest prawidłowy czas trwania odstępu PQ?**
+
+1. 0,12–0,20 sekundy (prawidłowa odpowiedź)
+2. 0,08–0,12 sekundy
+3. 0,20–0,30 sekundy
+4. 0,30–0,40 sekundy
+
+**Wyjaśnienie:**
+
+Odstęp PQ to czas potrzebny na przejście impulsu z przedsionków do komór przez węzeł AV. Wyobraź sobie ten odstęp jak chwilowy postój na stacji kolejowej, gdzie pasażerowie (impulsy) przesiadają się do innego pociągu. Jeśli trwa zbyt długo (>0,20 s), oznacza to, że coś opóźnia przejście sygnału, co jest typowe dla bloku AV I stopnia.
+
+([Ilustracja: zapis EKG z zaznaczonym odstępem PQ i czasem trwania w granicach normy])
+
+---
+
+### **Pytanie 15: Dlaczego zespoły QRS są wąskie w rytmie zatokowym?**
+
+1. Impuls przechodzi przez normalne drogi przewodzenia (prawidłowa odpowiedź)
+2. Komory są powiększone
+3. Węzeł AV nie działa prawidłowo
+4. Impuls pochodzi z komór
+
+**Wyjaśnienie:**
+
+Wąskie QRS (trwające <0,12 sekundy) oznaczają, że impuls elektryczny przechodzi przez normalne drogi przewodzenia – pęczek Hisa i włókna Purkinjego – bez przeszkód. To jak jazda autostradą bez korków. Jeśli QRS jest szeroki, to znak, że impuls musiał znaleźć „objazd”, co zwykle wskazuje na problem z przewodzeniem, jak blok odnogi pęczka Hisa.
+
+([Ilustracja: zapis EKG z wąskimi QRS w rytmie zatokowym])
+
+---
+
+### **Pytanie 16: Jakie odprowadzenie przedsercowe najlepiej rejestruje aktywność przegrody międzykomorowej?**
+
+1. V1 i V2 (prawidłowa odpowiedź)
+2. V3 i V4
+3. V5 i V6
+4. aVR
+
+**Wyjaśnienie:**
+
+V1 i V2 to jak detektywi stojący po obu stronach przegrody międzykomorowej – obserwują impulsy elektryczne w tej okolicy z największą precyzją. Dlatego są kluczowe w diagnozie bloków odnogi pęczka Hisa. V3 i V4 patrzą bardziej na przednią ścianę, a V5 i V6 na lewą ścianę boczną.
+
+([Ilustracja: schemat przedstawiający lokalizację elektrod przedsercowych i ich zasięg „wzroku” w przegrodzie międzykomorowej])
+
+---
+
+### **Pytanie 17: Co oznacza uniesienie odcinka ST w odprowadzeniach II, III i aVF?**
+
+1. Zawał ściany dolnej serca (prawidłowa odpowiedź)
+2. Zawał ściany przedniej serca
+3. Przerost lewej komory
+4. Zatorowość płucna
+
+**Wyjaśnienie:**
+
+Odprowadzenia II, III i aVF patrzą na serce od dołu, jak kamery skierowane na podstawę serca. Uniesienie ST w tych odprowadzeniach to jak sygnał SOS wysyłany przez dolną ścianę serca, która cierpi z powodu niedokrwienia spowodowanego zawałem.
+
+([Ilustracja: zapis EKG z uniesieniem ST w II, III i aVF oraz schemat topografii ścian serca])
+
+---
+
+### **Pytanie 18: Co jest cechą charakterystyczną rytmu zatokowego?**
+
+1. Załamek P jest dodatni w odprowadzeniu II (prawidłowa odpowiedź)
+2. Załamek T jest zawsze ujemny w odprowadzeniu I
+3. Odstępy PQ są nieregularne
+4. Oś elektryczna serca jest zawsze dodatnia
+
+**Wyjaśnienie:**
+
+Dodatni załamek P w odprowadzeniu II to znak rozpoznawczy rytmu zatokowego, ponieważ impuls płynie z węzła zatokowego w kierunku przedsionków i komór, co pokrywa się z kierunkiem rejestracji w odprowadzeniu II. Inne odpowiedzi dotyczą parametrów, które mogą być zmienne nawet w rytmie zatokowym.
+
+([Ilustracja: zapis rytmu zatokowego w odprowadzeniu II z zaznaczeniem dodatnich załamków P])
+
+---
+
+### **Pytanie 19: Jakie znaczenie mają odprowadzenia aVL i aVF w ocenie osi elektrycznej?**
+
+1. aVL patrzy na serce z lewej strony, a aVF z dołu (prawidłowa odpowiedź)
+2. Oba odprowadzenia rejestrują aktywność przedsionków
+3. Są kluczowe w diagnozie bloków przewodzenia
+4. Używane są wyłącznie do oceny załamków Q
+
+**Wyjaśnienie:**
+
+aVL to „kamera” na lewej stronie serca, a aVF patrzy od dołu. Razem z odprowadzeniem I tworzą trójwymiarowy obraz osi elektrycznej serca, co pomaga zrozumieć, w którą stronę płynie główny prąd. To jak użycie GPS-u, aby zlokalizować dokładne ustawienie serca w klatce piersiowej.
+
+([Ilustracja: schemat przedstawiający orientację odprowadzeń aVL, aVF i ich rolę w ocenie osi elektrycznej])
+
+---
+
+### **Pytanie 20: Co sugeruje brak załamków P w odprowadzeniu II?**
+
+1. Migotanie przedsionków (prawidłowa odpowiedź)
+2. Rytm zatokowy
+3. Blok AV I stopnia
+4. Częstoskurcz nadkomorowy
+
+**Wyjaśnienie:**
+
+Brak załamków P w odprowadzeniu II to znak migotania przedsionków – sytuacji, w której przedsionki tracą swój regularny rytm, a impulsy elektryczne powstają chaotycznie. Wyobraź sobie przedsionki jako tłum ludzi, którzy wszyscy próbują mówić jednocześnie – nie ma tu żadnej harmonii.
+
+([Ilustracja: zapis migotania przedsionków w odprowadzeniu II z opisem „brak załamków P, niemiarowe odstępy R-R”])
