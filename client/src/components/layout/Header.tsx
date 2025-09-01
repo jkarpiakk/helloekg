@@ -55,6 +55,9 @@ export default function Header() {
                 <Link href="/quiz" className={`transition-colors ${location === '/quiz' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-quiz">
                   {t("nav.quiz")}
                 </Link>
+                <Link href="/lecture" className={`transition-colors ${location === '/lecture' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-lecture">
+                  Wykłady
+                </Link>
               </>
             )}
             <Link href="/pricing" className={`transition-colors ${location === '/pricing' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-pricing">

@@ -11,6 +11,7 @@ import { LoadingSpinner } from "./components/ui/loading-spinner";
 import Home from "@/pages/home";
 import Quiz from "@/pages/quiz";
 import Dashboard from "@/pages/dashboard";
+import Lecture from "@/pages/lecture";
 import Admin from "@/pages/admin";
 import Pricing from "@/pages/pricing";
 import VerifyCertificate from "@/pages/verify-certificate";
@@ -45,6 +46,7 @@ function AppContent() {
           <Route path="/" component={Home} />
           <Route path="/quiz" component={Quiz} />
           <Route path="/dashboard" component={Dashboard} />
+          <Route path="/lecture" component={Lecture} />
           <Route path="/admin" component={Admin} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/verify/:certificateId" component={VerifyCertificate} />

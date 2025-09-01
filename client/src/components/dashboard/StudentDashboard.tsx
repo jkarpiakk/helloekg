@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import ProgressCard from "./ProgressCard";
-import { Play, RotateCcw, Crown, Target, Flame, Award } from "lucide-react";
+import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock
+} from "lucide-react";
 import { Link } from "wouter";
 import type { SectionWithProgress, UserProgress, WeakArea } from "@/types";
 
@@ -103,6 +104,28 @@ export default function StudentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-2 gap-6">
+                  {/* Interactive Lecture */}
+                  <div className="p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5">
+                    <Link href="/lecture" className="block">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Heart className="h-6 w-6 text-primary animate-pulse" />
+                        </div>
+                        <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20">NOWE!</Badge>
+                      </div>
+                      <h3 className="font-semibold text-foreground mb-2">Interaktywny wykład EKG</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Zapoznaj się z podstawami EKG przez wizualne analogie i interaktywne prezentacje
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>45 min</span>
+                        <span>•</span>
+                        <span>9 sekcji</span>
+                      </div>
+                    </Link>
+                  </div>
+
                   {/* Continue where left off */}
                   <div className="p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group">
                     <Link href="/quiz" className="block">
