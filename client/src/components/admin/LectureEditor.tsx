@@ -13,14 +13,315 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { VisualElement } from "@shared/schema";
 
-// Temporary disabled visual editor
-const VisualLectureEditor = ({ sectionId, sectionTitle, chapter, onSave, onCancel }: any) => (
-  <div className="p-8 text-center">
-    <h2 className="text-xl font-bold mb-4">Wizualny Edytor Wykładu</h2>
-    <p className="mb-4">Funkcja w przygotowaniu...</p>
-    <Button onClick={onCancel}>Powrót</Button>
-  </div>
-);
+// Full Visual Lecture Editor Implementation
+const VisualLectureEditor = ({ sectionId, sectionTitle, chapter, onSave, onCancel }: any) => {
+  const { toast } = useToast();
+  const [title, setTitle] = useState(chapter?.title || "");
+  const [elements, setElements] = useState<VisualElement[]>(chapter?.visualContent || []);
+  const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const generateId = () => Math.random().toString(36).substring(7);
+
+  const addElement = (type: VisualElement['type']) => {
+    const newElement: VisualElement = {
+      id: generateId(),
+      type,
+      content: type === 'text' ? 'Nowy tekst' : type === 'heading' ? 'Nowy nagłówek' : '',
+      position: { x: Math.random() * 400 + 50, y: Math.random() * 300 + 50 },
+      size: { width: type === 'image' ? 200 : 300, height: type === 'image' ? 150 : type === 'heading' ? 60 : 40 },
+      style: {
+        fontSize: type === 'heading' ? 24 : 16,
+        fontWeight: type === 'heading' ? 'bold' : 'normal',
+        color: '#000000',
+        textAlign: 'left'
+      }
+    };
+    setElements(prev => [...prev, newElement]);
+    setSelectedElement(newElement.id);
+  };
+
+  const updateElement = (id: string, updates: Partial<VisualElement>) => {
+    setElements(prev => prev.map(el => el.id === id ? { ...el, ...updates } : el));
+  };
+
+  const deleteElement = (id: string) => {
+    setElements(prev => prev.filter(el => el.id !== id));
+    if (selectedElement === id) setSelectedElement(null);
+  };
+
+  const handleSave = async () => {
+    if (!title.trim()) {
+      toast({ title: "Błąd", description: "Tytuł rozdziału jest wymagany", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({ title: title.trim(), visualContent: elements });
+      toast({ title: "Sukces", description: "Rozdział zapisany pomyślnie" });
+    } catch (error) {
+      toast({ title: "Błąd", description: "Nie udało się zapisać rozdziału", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedEl = selectedElement ? elements.find(el => el.id === selectedElement) : null;
+
+  return (
+    <div className="flex h-screen bg-background">
+      {/* Toolbar */}
+      <div className="w-80 border-r border-border bg-muted/30 p-4 space-y-4">
+        <div className="space-y-2">
+          <Label>Tytuł rozdziału</Label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Wprowadź tytuł..."
+            data-testid="input-chapter-title"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="font-medium">Dodaj elementy</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={() => addElement('heading')} data-testid="button-add-heading">
+              <Plus className="w-4 h-4 mr-2" />
+              Nagłówek
+            </Button>
+            <Button variant="outline" onClick={() => addElement('text')} data-testid="button-add-text">
+              <Plus className="w-4 h-4 mr-2" />
+              Tekst
+            </Button>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => document.getElementById('image-upload')?.click()}
+            data-testid="button-add-image"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Dodaj obrazek
+          </Button>
+          <input
+            id="image-upload"
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              
+              if (!file.type.startsWith('image/')) {
+                toast({ title: "Błąd", description: "Proszę wybrać plik obrazu", variant: "destructive" });
+                return;
+              }
+              
+              if (file.size > 10 * 1024 * 1024) {
+                toast({ title: "Błąd", description: "Plik jest za duży. Maksymalny rozmiar to 10MB", variant: "destructive" });
+                return;
+              }
+              
+              try {
+                const uploadResponse = await apiRequest("POST", "/api/objects/upload");
+                const { uploadURL } = await uploadResponse.json();
+                
+                const uploadResult = await fetch(uploadURL, {
+                  method: 'PUT',
+                  body: file,
+                  headers: { 'Content-Type': file.type },
+                });
+                
+                if (!uploadResult.ok) throw new Error('Upload failed');
+                
+                const imageUrl = uploadURL.split('?')[0];
+                await apiRequest("PUT", "/api/lecture-images", { imageURL: imageUrl });
+                
+                const newElement: VisualElement = {
+                  id: generateId(),
+                  type: 'image',
+                  content: imageUrl,
+                  position: { x: 100, y: 100 },
+                  size: { width: 200, height: 150 },
+                  style: {}
+                };
+                
+                setElements(prev => [...prev, newElement]);
+                setSelectedElement(newElement.id);
+                
+                toast({ title: "Sukces", description: "Obrazek został dodany" });
+              } catch (error) {
+                toast({ title: "Błąd", description: "Nie udało się przesłać obrazka", variant: "destructive" });
+              }
+              e.target.value = '';
+            }}
+            className="hidden"
+          />
+        </div>
+
+        {selectedEl && (
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Edycja elementu</h3>
+              <Button variant="destructive" size="sm" onClick={() => deleteElement(selectedEl.id)} data-testid="button-delete-element">
+                <Trash className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {selectedEl.type !== 'image' && (
+              <div className="space-y-2">
+                <Label>Treść</Label>
+                <Textarea
+                  value={selectedEl.content}
+                  onChange={(e) => updateElement(selectedEl.id, { content: e.target.value })}
+                  rows={3}
+                  data-testid="textarea-element-content"
+                />
+              </div>
+            )}
+
+            {selectedEl.type === 'image' && (
+              <div className="space-y-3">
+                <Label>Szerokość: {selectedEl.size.width}px</Label>
+                <input
+                  type="range"
+                  min="50"
+                  max="800"
+                  value={selectedEl.size.width}
+                  onChange={(e) => updateElement(selectedEl.id, { 
+                    size: { ...selectedEl.size, width: parseInt(e.target.value) }
+                  })}
+                  className="w-full"
+                  data-testid="slider-image-width"
+                />
+                
+                <Label>Wysokość: {selectedEl.size.height}px</Label>
+                <input
+                  type="range"
+                  min="50"
+                  max="600"
+                  value={selectedEl.size.height}
+                  onChange={(e) => updateElement(selectedEl.id, { 
+                    size: { ...selectedEl.size, height: parseInt(e.target.value) }
+                  })}
+                  className="w-full"
+                  data-testid="slider-image-height"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Rozmiar czcionki: {selectedEl.style.fontSize}px</Label>
+              <input
+                type="range"
+                min="10"
+                max="72"
+                value={selectedEl.style.fontSize || 16}
+                onChange={(e) => updateElement(selectedEl.id, { 
+                  style: { ...selectedEl.style, fontSize: parseInt(e.target.value) }
+                })}
+                className="w-full"
+                data-testid="slider-font-size"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Kolor tekstu</Label>
+              <Input
+                type="color"
+                value={selectedEl.style.color || '#000000'}
+                onChange={(e) => updateElement(selectedEl.id, {
+                  style: { ...selectedEl.style, color: e.target.value }
+                })}
+                data-testid="input-text-color"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex space-x-2 pt-4 border-t">
+          <Button onClick={handleSave} disabled={saving} className="flex-1" data-testid="button-save-chapter">
+            <Save className="w-4 h-4 mr-2" />
+            {saving ? 'Zapisywanie...' : 'Zapisz'}
+          </Button>
+          <Button variant="outline" onClick={onCancel} data-testid="button-cancel-edit">
+            Anuluj
+          </Button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div className="flex-1 relative overflow-hidden bg-white">
+        <div className="absolute inset-0 p-4">
+          {elements.map((element) => (
+            <div
+              key={element.id}
+              style={{
+                position: 'absolute',
+                left: element.position.x,
+                top: element.position.y,
+                width: element.size.width,
+                fontSize: element.style.fontSize || 16,
+                fontWeight: element.style.fontWeight || 'normal',
+                color: element.style.color || '#000000',
+                textAlign: element.style.textAlign || 'left',
+                cursor: 'move',
+                outline: selectedElement === element.id ? '2px solid #3b82f6' : 'none',
+                background: selectedElement === element.id ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                padding: '8px',
+                borderRadius: '4px'
+              }}
+              onClick={() => setSelectedElement(element.id)}
+              onMouseDown={(e) => {
+                if (selectedElement !== element.id) return;
+                const startX = e.clientX - element.position.x;
+                const startY = e.clientY - element.position.y;
+                
+                const handleMouseMove = (e: MouseEvent) => {
+                  updateElement(element.id, {
+                    position: {
+                      x: Math.max(0, e.clientX - startX),
+                      y: Math.max(0, e.clientY - startY)
+                    }
+                  });
+                };
+                
+                const handleMouseUp = () => {
+                  document.removeEventListener('mousemove', handleMouseMove);
+                  document.removeEventListener('mouseup', handleMouseUp);
+                };
+                
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+              }}
+              data-testid={`element-${element.id}`}
+            >
+              {element.type === 'image' ? (
+                <img
+                  src={element.content}
+                  alt="Uploaded content"
+                  style={{
+                    width: element.size.width,
+                    height: element.size.height,
+                    objectFit: 'contain',
+                    borderRadius: '4px',
+                  }}
+                />
+              ) : element.type === 'heading' ? (
+                <h2>{element.content}</h2>
+              ) : (
+                <p>{element.content}</p>
+              )}
+            </div>
+          ))}
+        </div>
+        
+        <div className="absolute bottom-4 left-4 text-sm text-muted-foreground bg-background/80 backdrop-blur px-2 py-1 rounded">
+          Elementy: {elements.length} | Kliknij element, aby go edytować i przeciągnąć
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface LectureChapter {
   id: string;
