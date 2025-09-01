@@ -64,12 +64,12 @@ export default function QuestionEditor({
 }: QuestionEditorProps) {
   const [formData, setFormData] = useState<QuestionFormData>({
     sectionId: question?.sectionId || "",
-    questionText: question?.questionText || "",
-    explanation: question?.explanation || "",
-    answerOptions: question?.answerOptions || ["", "", "", ""],
-    correctAnswerIndex: question?.correctAnswerIndex || 0,
+    questionText: question?.bodyMd || "",
+    explanation: question?.explanationMd || "",
+    answerOptions: question?.answers?.map((a: any) => a.text) || ["", "", "", ""],
+    correctAnswerIndex: question?.answers?.findIndex((a: any) => a.isCorrect) || 0,
     imageUrl: question?.imageUrl || "",
-    difficultyLevel: question?.difficultyLevel as "easy" | "medium" | "hard" || "medium",
+    difficultyLevel: question?.difficulty as "easy" | "medium" | "hard" || "medium",
     tags: question?.tags || [],
     order: question?.order || 1,
     status: question?.status as "draft" | "review" | "published" || "draft",

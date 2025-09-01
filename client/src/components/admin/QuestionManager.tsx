@@ -168,10 +168,26 @@ export default function QuestionManager() {
   };
 
   const handleSaveQuestion = (data: any) => {
+    // Transform data from QuestionFormData format to database format
+    const transformedData = {
+      sectionId: data.sectionId,
+      title: data.questionText.substring(0, 100) || "Pytanie", // Extract title from question text
+      bodyMd: data.questionText,
+      explanationMd: data.explanation,
+      answers: data.answerOptions.map((option: string, index: number) => ({
+        text: option,
+        isCorrect: index === data.correctAnswerIndex
+      })),
+      imageUrl: data.imageUrl,
+      difficulty: data.difficultyLevel,
+      tags: data.tags,
+      status: data.status,
+    };
+
     if (editingQuestion) {
-      updateQuestionMutation.mutate({ id: editingQuestion.id, data });
+      updateQuestionMutation.mutate({ id: editingQuestion.id, data: transformedData });
     } else {
-      createQuestionMutation.mutate(data);
+      createQuestionMutation.mutate(transformedData);
     }
   };
 
