@@ -23,79 +23,167 @@ import EKGSimulator from "@/components/lecture/EKGSimulator";
 // Dane wykładu podzielone na sekcje
 const lectureData = {
   title: "Moduł 1: Wprowadzenie do EKG - Rytm i Oś",
-  duration: "45 min",
+  duration: "75 min",
   sections: [
     {
       id: 1,
       title: "Serce jako zorganizowany zespół",
-      content: "Wyobraź sobie swoje serce jako świetnie zorganizowany zespół. Każdy członek ma swoje zadanie, a całość działa jak idealnie zsynchronizowana maszyna.",
+      content: "Wyobraź sobie swoje serce jako świetnie zorganizowany zespół muzyczny. Każdy członek ma swoje zadanie, a całość działa jak idealnie zsynchronizowana maszyna. Ale czy zastanawiałeś się, kto tym wszystkim zarządza? Kto mówi sercu, kiedy ma się skurczyć, a kiedy rozluźnić? Odpowiedź leży w układzie bodźcoprzewodzącym - niewidzialnym elektrycznym mózgu serca.",
       analogy: "Serce = Orkiestra muzyczna",
-      keyPoints: ["Każda część ma swoją rolę", "Synchronizacja jest kluczowa", "Jeden dyrygent zarządza wszystkim"],
+      keyPoints: ["Każda część ma swoją rolę", "Synchronizacja jest kluczowa", "Układ bodźcoprzewodzący to dyrygent", "Niewidzialny elektryczny mózg serca"],
       visual: "orchestra"
     },
     {
       id: 2,
       title: "Węzeł zatokowy - Dyrygent serca",
-      content: "Cała magia zaczyna się w węźle zatokowym, który znajduje się w prawym przedsionku. To właśnie on nadaje rytm – dosłownie.",
+      content: "Cała magia zaczyna się w węźle zatokowym, który znajduje się w prawym przedsionku. To właśnie on nadaje rytm - dosłownie. Możesz go sobie wyobrazić jako dyrygenta orkiestry. Węzeł zatokowy wysyła impulsy elektryczne, które rozchodzą się po przedsionkach, powodując ich skurcz. To pierwszy krok - przedsionki ściskają krew i przesyłają ją do komór.",
       analogy: "Węzeł zatokowy = Dyrygent orkiestry",
-      keyPoints: ["Znajduje się w prawym przedsionku", "Wysyła impulsy elektryczne", "Kontroluje rytm serca"],
+      keyPoints: ["Znajduje się w prawym przedsionku", "Wysyła impulsy elektryczne", "Kontroluje rytm serca", "Pierwszy krok w cyklu serca"],
       visual: "conductor"
     },
     {
       id: 3,
-      title: "Węzeł AV - Światła na skrzyżowaniu",
-      content: "Gdy impuls dociera do węzła AV, zatrzymuje się tam na chwilę. To jak kontrolowane światło na skrzyżowaniu - daje czas przedsionkom na zakończenie pracy.",
-      analogy: "Węzeł AV = Światła na skrzyżowaniu",
-      keyPoints: ["Kontroluje przepływ impulsów", "Daje czas przedsionkom", "Zapobiega chaosowi"],
+      title: "Węzeł AV - Mądre światła na skrzyżowaniu",
+      content: "Gdy impuls dociera do węzła AV, zatrzymuje się tam na chwilę. To bardzo mądre rozwiązanie! Węzeł AV działa jak kontrolowane światło na skrzyżowaniu - daje czas przedsionkom na zakończenie swojej pracy i zapobiega przedostawaniu się zbyt szybkich impulsów do komór. W dobrze zarządzanym systemie nic nie dzieje się za szybko.",
+      analogy: "Węzeł AV = Inteligentne światła na skrzyżowaniu",
+      keyPoints: ["Kontroluje przepływ impulsów", "Daje czas przedsionkom", "Zapobiega chaosowi", "Opóźnienie to mądre rozwiązanie"],
       visual: "traffic"
     },
     {
       id: 4,
       title: "Pęczek Hisa - Rozwidlenie autostrady",
-      content: "Pęczek Hisa rozdziela impuls na dwie ścieżki - jedną do prawej, drugą do lewej komory. To jak rozwidlenie autostrady.",
-      analogy: "Pęczek Hisa = Rozwidlenie autostrady", 
-      keyPoints: ["Dzieli impuls na dwie drogi", "Jedna ścieżka do każdej komory", "Równomierne rozprowadzenie sygnału"],
+      content: "Po chwili impuls rusza dalej. Dociera do pęczka Hisa, który rozdziela go na dwie ścieżki - jedną prowadzącą do prawej, a drugą do lewej komory. Wyobraź sobie to jako rozwidlenie autostrady. Każda komora otrzymuje swój własny sygnał w tym samym czasie.",
+      analogy: "Pęczek Hisa = Rozwidlenie autostrady",
+      keyPoints: ["Dzieli impuls na dwie drogi", "Jedna ścieżka do każdej komory", "Równomierne rozprowadzenie sygnału", "Synchronizacja komór"],
       visual: "highway"
     },
     {
       id: 5,
       title: "Włókna Purkinjego - Superszybkie przewody",
-      content: "Włókna Purkinjego to jak superszybkie przewody elektryczne, które błyskawicznie rozprowadzają sygnał po komorach.",
+      content: "Następnie włókna Purkinjego, które są jak superszybkie przewody elektryczne, błyskawicznie rozprowadzają sygnał po komorach, powodując ich skurcz. I wtedy dzieje się najważniejsze - krew jest wypompowywana z serca do całego ciała. Ten proces powtarza się raz za razem - rytmicznie, nieprzerwanie.",
       analogy: "Włókna Purkinjego = Światłowody internetowe",
-      keyPoints: ["Najszybsze przewodzenie", "Docierają do całych komór", "Powodują równomierny skurcz"],
+      keyPoints: ["Najszybsze przewodzenie", "Docierają do całych komór", "Powodują równomierny skurcz", "Końcowy etap przewodzenia"],
       visual: "cables"
     },
     {
       id: 6,
-      title: "Zapis EKG - 12 kamer wokół serca",
-      content: "EKG to jak 12 kamer ustawionych wokół serca. Każda patrzy z innej perspektywy i pokazuje nam różne aspekty pracy serca.",
-      analogy: "Odprowadzenia EKG = Kamery bezpieczeństwa",
-      keyPoints: ["12 różnych perspektyw", "V1-V6 na klatce piersiowej", "I,II,III,aVR,aVL,aVF na kończynach"],
-      visual: "cameras"
-    },
-    {
-      id: 7,
-      title: "Załamki EKG - Nuty w partyturze",
-      content: "Każdy załamek na EKG to jak nuta w partyturze. P = przedsionki, QRS = komory, T = odpoczynek.",
-      analogy: "Załamki EKG = Nuty muzyczne",
-      keyPoints: ["P = depolaryzacja przedsionków", "QRS = depolaryzacja komór", "T = repolaryzacja komór"],
-      visual: "ekg-simulator"
-    },
-    {
-      id: 8,
-      title: "Częstość serca - Metoda 300",
-      content: "Obliczanie częstości to prosta matematyka: liczymy kratki między załamkami R i dzielimy 300 przez tę liczbę.",
-      analogy: "Częstość serca = Tempo metronomu",
-      keyPoints: ["Metoda 300", "Liczymy duże kratki", "Rytm regularny vs nieregularny"],
+      title: "Rytm zatokowy - Złoty standard",
+      content: "Kiedy wszystko działa prawidłowo, mówimy o rytmie zatokowym. To właśnie rytm serca w jego najlepszej formie. Kiedy chcemy zarejestrować tę elektryczną aktywność, używamy EKG, które pozwala zajrzeć do serca i zobaczyć te impulsy w formie wykresu.",
+      analogy: "Rytm zatokowy = Idealny zegar",
+      keyPoints: ["Normalny rytm serca", "Regularny i miarowy", "Pochodzi z węzła zatokowego", "Złoty standard pracy serca"],
       visual: "metronome"
     },
     {
+      id: 7,
+      title: "Odprowadzenia EKG - 12 kamer wokół serca",
+      content: "Aby dobrze odczytywać EKG, trzeba wiedzieć, że każdy zapis to coś w rodzaju widoku serca z innej perspektywy. Wyobraź sobie, że masz dwanaście kamer ustawionych wokół serca. Sześć z nich znajduje się na klatce piersiowej - to odprowadzenia przedsercowe (V1-V6), które patrzą na serce z przodu i z boku.",
+      analogy: "Odprowadzenia EKG = System kamer bezpieczeństwa",
+      keyPoints: ["12 różnych perspektyw", "V1-V6 na klatce piersiowej", "6 odprowadzeń kończynowych", "Każde pokazuje inny aspekt"],
+      visual: "cameras"
+    },
+    {
+      id: 8,
+      title: "Odprowadzenia przedsercowe - Widok z przodu",
+      content: "V1 i V2 obserwują prawą stronę serca i przegrodę między komorami, V3 i V4 patrzą na przednią ścianę serca, a V5 i V6 na lewą ścianę. Pozostałe sześć to odprowadzenia kończynowe, które dają nam informacje o sercu z innych płaszczyzn.",
+      analogy: "Odprowadzenia przedsercowe = Kamery na klatce piersiowej",
+      keyPoints: ["V1-V2: prawa strona i przegroda", "V3-V4: przednia ściana", "V5-V6: lewa ściana", "Widok anatomiczny serca"],
+      visual: "precordial-leads"
+    },
+    {
       id: 9,
-      title: "Oś serca - Kompas elektryczny",
-      content: "Oś serca to jak kompas pokazujący główny kierunek przepływu elektryczności. Normalna oś: -30° do +90°.",
+      title: "Załamki EKG - Nuty w partyturze życia",
+      content: "Teraz wyobraź sobie, że każdy załamek na wykresie EKG to jak nuty w partyturze. Załamek P reprezentuje pracę przedsionków, a zespół QRS - pracę komór. To jest język, którym serce z nami rozmawia, opowiadając swoją historię elektryczną.",
+      analogy: "Załamki EKG = Nuty w partyturze",
+      keyPoints: ["P = depolaryzacja przedsionków", "QRS = depolaryzacja komór", "T = repolaryzacja komór", "Każdy załamek ma znaczenie"],
+      visual: "ekg-simulator"
+    },
+    {
+      id: 10,
+      title: "Załamek P - Początek każdej podróży",
+      content: "Załamek P to historia przedsionków - tych niewielkich, ale niezwykle ważnych komór serca, które przepychają krew do komór. Załamek P jest jak początek każdej podróży - to tutaj wszystko się zaczyna. Jeśli jest obecny, wiemy, że impuls pochodzi z węzła zatokowego.",
+      analogy: "Załamek P = Sygnał startu",
+      keyPoints: ["Depolaryzacja przedsionków", "Znak naturalnego rytmu", "Mały ale ważny", "Początek cyklu sercowego"],
+      visual: "p-wave"
+    },
+    {
+      id: 11,
+      title: "Odstęp PQ - Chwila spowolnienia",
+      content: "Za załamkiem P następuje odstęp PQ, który odzwierciedla czas potrzebny na przejście impulsu przez węzeł przedsionkowo-komorowy. Wyobraź sobie ten odstęp jak znak na drodze informujący o lekkim spowolnieniu - chwilowym postoju, zanim samochody ruszą dalej. Normalnie odstęp PQ trwa od 0,12 do 0,20 sekundy.",
+      analogy: "Odstęp PQ = Znak spowolnienia na drodze",
+      keyPoints: ["Czas przejścia przez węzeł AV", "Norma: 0,12-0,20 s", "Dłuższy = blok AV", "Krótszy = omijanie węzła AV"],
+      visual: "pq-interval"
+    },
+    {
+      id: 12,
+      title: "Zespół QRS - Dzieło sztuki serca",
+      content: "Następnie przechodzimy do zespołu QRS - prawdziwego dzieła sztuki serca. To tutaj komory, czyli główne pompy serca, pokazują swoją siłę. Zespół QRS odpowiada za depolaryzację komór i jest zwykle wąski, trwający mniej niż 0,12 sekundy. Jeśli jednak QRS jest szeroki, to znak, że impuls elektryczny ma problem z przejściem przez normalny układ przewodzący.",
+      analogy: "Zespół QRS = Silnik samochodu",
+      keyPoints: ["Depolaryzacja komór", "Normalnie < 0,12 s", "Szeroki QRS = problemy przewodzenia", "Główna siła napędowa"],
+      visual: "qrs-complex"
+    },
+    {
+      id: 13,
+      title: "Odcinek ST - Czas odpoczynku",
+      content: "Odcinek ST, który pojawia się po zespole QRS, to czas odpoczynku serca. Można to porównać do chwili relaksu po intensywnym wysiłku. W zdrowym sercu ST jest izoelektryczny, czyli znajduje się na tej samej linii co odcinek PR. Jeśli jednak ST jest uniesiony lub obniżony, serce wysyła sygnał alarmowy.",
+      analogy: "Odcinek ST = Chwila odpoczynku po wysiłku",
+      keyPoints: ["Plateau repolaryzacji", "Normalnie izoelektryczny", "Uniesienie ST = zawał STEMI", "Obniżenie ST = niedokrwienie"],
+      visual: "st-segment"
+    },
+    {
+      id: 14,
+      title: "Załamek T - Uspokajające fale",
+      content: "Załamki T, które kończą każdy cykl, to znak, że serce wraca do swojego pierwotnego stanu. Wyobraź sobie je jak uspokajające fale na plaży po burzy. Prawidłowe T są symetryczne i lekko zaokrąglone. Jeśli jednak są odwrócone lub zbyt wysokie, mogą wskazywać na problemy.",
+      analogy: "Załamek T = Uspokajające fale po burzy",
+      keyPoints: ["Repolaryzacja komór", "Symetryczne i zaokrąglone", "Odwrócone = niedokrwienie", "Wysokie = hiperkaliemia"],
+      visual: "t-wave"
+    },
+    {
+      id: 15,
+      title: "Częstość serca - Metoda 300",
+      content: "Odstęp między załamkami R pozwala nam sprawdzić, czy rytm jest regularny. A co z częstością akcji serca? Tutaj wchodzi prosta matematyka: liczymy, ile dużych kratek na wykresie mieści się między dwoma załamkami R i dzielimy 300 przez tę liczbę. Na przykład jeśli są cztery kratki, mamy 300/4, czyli 75 uderzeń na minutę.",
+      analogy: "Częstość serca = Tempo metronomu",
+      keyPoints: ["Metoda 300", "Liczymy duże kratki między R-R", "300 ÷ liczba kratek = częstość", "Sprawdzenie regularności rytmu"],
+      visual: "heart-rate"
+    },
+    {
+      id: 16,
+      title: "Oś serca - Elektryczny kompas",
+      content: "A co z osią serca? To trochę jak kompas, który pokazuje główny kierunek przepływu elektryczności w komorach. Jeśli wszystko jest w porządku, oś mieści się w zakresie od -30° do +90°. Szybki sposób na ocenę osi to spojrzenie na QRS w odprowadzeniach I i aVF.",
       analogy: "Oś serca = Kompas nawigacyjny",
-      keyPoints: ["Kierunek przepływu elektryczności", "Norma: -30° do +90°", "Odchylenia wskazują na problemy"],
+      keyPoints: ["Kierunek przepływu elektryczności", "Norma: -30° do +90°", "Sprawdzamy QRS w I i aVF", "Wskazuje na przerosty"],
       visual: "compass"
+    },
+    {
+      id: 17,
+      title: "Odchylenia osi - Reakcja na obciążenie",
+      content: "Jeśli oś odchyla się w lewo, może to oznaczać na przykład przerost lewej komory. Z kolei odchylenie w prawo może wskazywać na problemy z prawą stroną serca, takie jak przerost prawej komory lub zatorowość płucną. Każda zmiana w kierunku przepływu impulsu elektrycznego to reakcja serca na jego obciążenie lub problem.",
+      analogy: "Odchylenie osi = Reakcja na trudne warunki",
+      keyPoints: ["Odchylenie w lewo = przerost LV", "Odchylenie w prawo = problemy RV", "Reakcja na obciążenie", "Wskazówka diagnostyczna"],
+      visual: "axis-deviation"
+    },
+    {
+      id: 18,
+      title: "Przerost komór - Większy silnik",
+      content: "Na przykład w nadciśnieniu tętniczym lewa komora, która musi pracować ciężej, zaczyna się przerastać. Wyobraź sobie to jak rozbudowywanie silnika w samochodzie, który ma przewozić coraz cięższe ładunki. Taki większy silnik wymaga więcej przestrzeni, co przekłada się na odchylenie osi elektrycznej w lewo.",
+      analogy: "Przerost komory = Rozbudowa silnika",
+      keyPoints: ["Komora pracuje ciężej", "Przerost jako adaptacja", "Zmiana osi elektrycznej", "Widoczne w EKG"],
+      visual: "ventricular-hypertrophy"
+    },
+    {
+      id: 19,
+      title: "Znaczenie kliniczne EKG",
+      content: "EKG ma ogromne znaczenie kliniczne. Pozwala ocenić rytm serca, diagnozować arytmie, rozpoznać stany zagrażające życiu jak zawał mięśnia sercowego, dostarczyć informacji o przerostach i zaburzeniach elektrolitowych. To okno do wnętrza serca.",
+      analogy: "EKG = Okno do wnętrza serca",
+      keyPoints: ["Ocena rytmu serca", "Diagnoza arytmii", "Rozpoznanie zawału", "Wykrywanie przerostów"],
+      visual: "clinical-significance"
+    },
+    {
+      id: 20,
+      title: "EKG jako historia serca",
+      content: "Zrozumienie podstaw EKG to pierwszy krok na drodze do odczytywania zapisów i dostrzegania subtelnych sygnałów, które wysyła serce. Kiedy patrzymy na linie załamków i odstępów, widzimy nie tylko liczby, ale i opowieść - o rytmie życia, o tym, jak serce radzi sobie z codziennymi wyzwaniami.",
+      analogy: "EKG = Biografia serca",
+      keyPoints: ["Każda linia opowiada historię", "Rytm życia w liczbach", "Subtelne sygnały", "Klucz do diagnostyki"],
+      visual: "ecg-story"
     }
   ],
   quiz: [
