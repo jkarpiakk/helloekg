@@ -214,7 +214,12 @@ export default function Modules() {
                           }`}
                           onClick={() => {
                             if (isAccessible) {
-                              setLocation(`/quiz?section=${section.id}`);
+                              // Special handling for Module 3 - go to lecture instead of quiz
+                              if (module.order === 3) {
+                                setLocation(`/module3-lecture`);
+                              } else {
+                                setLocation(`/quiz?section=${section.id}`);
+                              }
                             }
                           }}
                         >
@@ -258,7 +263,14 @@ export default function Modules() {
                     <div className="flex items-center gap-3 mt-6 pt-4 border-t border-border">
                       <Button 
                         size="sm" 
-                        onClick={() => setLocation(`/module/${module.id}`)}
+                        onClick={() => {
+                          // Special handling for Module 3 - go to lecture instead of quiz
+                          if (module.order === 3) {
+                            setLocation(`/module3-lecture`);
+                          } else {
+                            setLocation(`/module/${module.id}`);
+                          }
+                        }}
                         className="flex-1"
                       >
                         <Play className="h-4 w-4 mr-2" />
