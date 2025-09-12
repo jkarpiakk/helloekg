@@ -9,7 +9,9 @@ export type {
   Progress,
   Certificate,
   SupportTicket,
-  AuditLog
+  AuditLog,
+  BlogPost,
+  InsertBlogPost
 } from "@shared/schema";
 
 // Additional frontend-specific types

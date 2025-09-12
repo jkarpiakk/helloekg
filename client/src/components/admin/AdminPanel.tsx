@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle } from "lucide-react";
+import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle, FileText } from "lucide-react";
 import QuestionManager from "./QuestionManager";
 import CourseManager from "./CourseManager";
 import UserManager from "./UserManager";
 import SupportManager from "./SupportManager";
 import AnalyticsManager from "./AnalyticsManager";
+import BlogManager from "./BlogManager";
 
 export default function AdminPanel() {
   const { t } = useTranslation();
@@ -37,7 +38,7 @@ export default function AdminPanel() {
       {/* Admin Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs defaultValue="course" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="course" className="flex items-center space-x-2">
               <BookOpen className="h-4 w-4" />
               <span>Kurs</span>
@@ -45,6 +46,10 @@ export default function AdminPanel() {
             <TabsTrigger value="questions" className="flex items-center space-x-2">
               <Shield className="h-4 w-4" />
               <span>Pytania</span>
+            </TabsTrigger>
+            <TabsTrigger value="blog" className="flex items-center space-x-2">
+              <FileText className="h-4 w-4" />
+              <span>Blog</span>
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center space-x-2">
               <Users className="h-4 w-4" />
@@ -66,6 +71,10 @@ export default function AdminPanel() {
 
           <TabsContent value="questions">
             <QuestionManager />
+          </TabsContent>
+
+          <TabsContent value="blog">
+            <BlogManager />
           </TabsContent>
 
           <TabsContent value="users">
