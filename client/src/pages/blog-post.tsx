@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
-import { marked } from "marked";
+import { sanitizeMarkdown } from "@/lib/sanitize";
 import SEO from "@/components/SEO";
 import type { BlogPost } from "@shared/schema";
 
@@ -78,7 +78,7 @@ export default function BlogPostPage() {
   };
 
   const renderMarkdown = (markdown: string) => {
-    return { __html: marked(markdown) };
+    return sanitizeMarkdown(markdown);
   };
 
   if (isLoading) {

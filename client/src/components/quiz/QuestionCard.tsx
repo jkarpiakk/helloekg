@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
+import { sanitizeMarkdown, sanitizeHtml } from "@/lib/sanitize";
 import { Check, X, ZoomIn } from "lucide-react";
 import type { QuizQuestion, QuizResult } from "@/types";
 
@@ -81,7 +82,7 @@ export default function QuestionCard({
             {question.bodyMd && (
               <div 
                 className="prose prose-slate max-w-none mb-6"
-                dangerouslySetInnerHTML={{ __html: question.bodyMd }}
+                dangerouslySetInnerHTML={sanitizeMarkdown(question.bodyMd)}
                 data-testid="question-body"
               />
             )}
@@ -130,7 +131,7 @@ export default function QuestionCard({
                 </h4>
                 <div 
                   className="prose prose-slate max-w-none"
-                  dangerouslySetInnerHTML={{ __html: quizResult.explanation }}
+                  dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
                   data-testid="explanation-content"
                 />
                 <div className="mt-4 flex items-center space-x-4 text-sm text-muted-foreground">

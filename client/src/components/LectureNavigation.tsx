@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { apiRequest } from "@/lib/queryClient";
 import { BookOpen, ChevronLeft, ChevronRight, Check, Clock, FileText } from "lucide-react";
-import { marked } from "marked";
+import { sanitizeMarkdown } from "@/lib/sanitize";
 
 interface LectureChapter {
   id: string;
@@ -62,12 +62,7 @@ export function LectureNavigation({ sectionId, sectionTitle, onComplete }: Lectu
   };
 
   const renderContent = (contentMd: string) => {
-    try {
-      return { __html: marked.parse(contentMd) };
-    } catch (error) {
-      console.error("Error parsing markdown:", error);
-      return { __html: contentMd };
-    }
+    return sanitizeMarkdown(contentMd);
   };
 
   if (isLoading) {
