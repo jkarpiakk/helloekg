@@ -15,10 +15,13 @@ import {
   registerSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-  insertQuestionSchema
+  insertQuestionSchema,
+  insertBlogPostSchema,
+  BlogPost,
+  InsertBlogPost
 } from "@shared/schema";
 import { db } from "./db";
-import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters } from "@shared/schema";
+import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters, blogPosts } from "@shared/schema";
 import { eq, or, and, gte, desc, count, ilike, avg, sql } from "drizzle-orm";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -26,8 +29,21 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-06-20",
+  apiVersion: "2025-08-27.basil",
 }) : null;
+
+// Blog validation schemas
+const blogQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  pageSize: z.coerce.number().min(1).max(100).default(10),
+  tag: z.string().optional(),
+  q: z.string().optional(),
+  status: z.enum(['draft', 'published']).optional()
+});
+
+const statusUpdateSchema = z.object({
+  status: z.enum(['draft', 'published'])
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Session configuration
@@ -50,7 +66,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userData = registerSchema.parse(req.body);
       
-      const { user, verificationToken } = await authService.registerUser(userData);
+      const userDataFixed = {
+        ...userData,
+        profession: userData.profession || undefined,
+        marketingConsent: userData.marketingConsent ?? false,
+        termsAccepted: userData.termsAccepted ?? false,
+        privacyAccepted: userData.privacyAccepted ?? false
+      };
+      const { user, verificationToken } = await authService.registerUser(userDataFixed);
       
       // Send verification email
       const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/verify-email?token=${verificationToken}`;
@@ -1005,8 +1028,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Temat i wiadomość są wymagane" });
       }
 
+      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
+      
       const ticket = await storage.createSupportTicket({
         userId: req.session?.userId || undefined,
+        userEmail: user?.email || 'anonymous@unknown.com',
+        userName: user ? `${user.firstName} ${user.lastName}` : 'Anonymous User',
         subject,
         message,
         status: "open",
@@ -1026,9 +1053,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { search, role, status } = req.query;
       let query = db.select().from(users);
 
+      const conditions: any[] = [];
+      
       // Apply search filter
       if (search) {
-        query = query.where(or(
+        conditions.push(or(
           ilike(users.email, `%${search}%`),
           ilike(users.firstName, `%${search}%`),
           ilike(users.lastName, `%${search}%`)
@@ -1037,16 +1066,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply role filter
       if (role && role !== 'all') {
-        query = query.where(eq(users.role, role as string));
+        conditions.push(eq(users.role, role as string));
       }
 
       // Apply status filter
       if (status && status !== 'all') {
         if (status === 'verified') {
-          query = query.where(eq(users.emailVerified, true));
+          conditions.push(eq(users.emailVerified, true));
         } else if (status === 'unverified') {
-          query = query.where(eq(users.emailVerified, false));
+          conditions.push(eq(users.emailVerified, false));
         }
+      }
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
       }
 
       const allUsers = await query.orderBy(desc(users.createdAt));
@@ -1128,18 +1161,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, search } = req.query;
       let query = db.select().from(supportTickets);
 
+      const ticketConditions: any[] = [];
+      
       // Apply status filter
       if (status && status !== 'all') {
-        query = query.where(eq(supportTickets.status, status as string));
+        ticketConditions.push(eq(supportTickets.status, status as string));
       }
 
       // Apply search filter
       if (search) {
-        query = query.where(or(
+        ticketConditions.push(or(
           ilike(supportTickets.subject, `%${search}%`),
           ilike(supportTickets.message, `%${search}%`),
           ilike(supportTickets.userEmail, `%${search}%`)
         ));
+      }
+      
+      if (ticketConditions.length > 0) {
+        query = query.where(and(...ticketConditions)) as any;
       }
 
       const tickets = await query.orderBy(desc(supportTickets.createdAt));
@@ -1311,7 +1350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(5);
 
       res.json({
-        avgQuizCompletionTime: (avgCompletionTime[0]?.avg || 0) / (1000 * 60), // Convert to minutes
+        avgQuizCompletionTime: (Number(avgCompletionTime[0]?.avg) || 0) / (1000 * 60), // Convert to minutes
         mostDifficultQuestions: mostDifficultQuestions || [],
         bestPerformingSections: bestPerformingSections || [],
         userEngagement: {
@@ -1533,6 +1572,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching lecture chapters:", error);
       res.status(500).json({ error: "Błąd podczas pobierania rozdziałów wykładu" });
+    }
+  });
+
+  // ============== BLOG ROUTES ==============
+  
+  // Public Blog Routes (accessible to all)
+  app.get("/api/blog", async (req, res) => {
+    try {
+      const queryData = blogQuerySchema.parse(req.query);
+      
+      const filters = {
+        status: 'published' as const,
+        page: queryData.page,
+        pageSize: queryData.pageSize,
+        tag: queryData.tag,
+        q: queryData.q
+      };
+
+      const result = await storage.getBlogPosts(filters);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Blog posts fetch error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowe parametry zapytania" });
+      }
+      res.status(500).json({ error: "Błąd podczas pobierania artykułów" });
+    }
+  });
+
+  app.get("/api/blog/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      
+      if (!slug || typeof slug !== 'string') {
+        return res.status(400).json({ error: "Nieprawidłowy slug artykułu" });
+      }
+
+      const blogPost = await storage.getBlogPostBySlug(slug, 'published');
+      
+      if (!blogPost) {
+        return res.status(404).json({ error: "Artykuł nie znaleziony" });
+      }
+
+      res.json(blogPost);
+    } catch (error: any) {
+      console.error("Blog post fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania artykułu" });
+    }
+  });
+
+  // Admin Blog Routes (require reviewer+ permissions)
+  app.get("/api/admin/blog-posts", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const queryData = blogQuerySchema.parse(req.query);
+      
+      const filters = {
+        status: queryData.status,
+        page: queryData.page,
+        pageSize: queryData.pageSize,
+        tag: queryData.tag,
+        q: queryData.q
+      };
+
+      const result = await storage.getBlogPosts(filters);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Admin blog posts fetch error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowe parametry zapytania" });
+      }
+      res.status(500).json({ error: "Błąd podczas pobierania artykułów" });
+    }
+  });
+
+  app.post("/api/admin/blog-posts", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const blogPostData = insertBlogPostSchema.parse({
+        ...req.body,
+        authorId: req.user!.id,
+        status: req.body.status || 'draft'
+      });
+      
+      const blogPost = await storage.createBlogPost(blogPostData);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "blog_post_created",
+        entityType: "blog_post",
+        entityId: blogPost.id,
+        diff: { blogPost: blogPostData },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(201).json(blogPost);
+    } catch (error: any) {
+      console.error("Blog post creation error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowe dane artykułu" });
+      }
+      res.status(500).json({ error: "Błąd podczas tworzenia artykułu" });
+    }
+  });
+
+  app.patch("/api/admin/blog-posts/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: "Nieprawidłowe ID artykułu" });
+      }
+
+      // Validate partial update data
+      const updates = insertBlogPostSchema.partial().parse(req.body);
+      
+      const updatedBlogPost = await storage.updateBlogPost(id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "blog_post_updated",
+        entityType: "blog_post",
+        entityId: id,
+        diff: { updates },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedBlogPost);
+    } catch (error: any) {
+      console.error("Blog post update error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowe dane aktualizacji" });
+      }
+      res.status(500).json({ error: "Błąd podczas aktualizacji artykułu" });
+    }
+  });
+
+  app.patch("/api/admin/blog-posts/:id/status", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: "Nieprawidłowe ID artykułu" });
+      }
+
+      const { status } = statusUpdateSchema.parse(req.body);
+      
+      const updatedBlogPost = await storage.updateBlogPostStatus(id, status);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: `blog_post_${status === 'published' ? 'published' : 'drafted'}`,
+        entityType: "blog_post",
+        entityId: id,
+        diff: { status },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedBlogPost);
+    } catch (error: any) {
+      console.error("Blog post status update error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowy status artykułu" });
+      }
+      res.status(500).json({ error: "Błąd podczas zmiany statusu artykułu" });
+    }
+  });
+
+  app.delete("/api/admin/blog-posts/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: "Nieprawidłowe ID artykułu" });
+      }
+
+      await storage.deleteBlogPost(id);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "blog_post_deleted",
+        entityType: "blog_post",
+        entityId: id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Blog post deletion error:", error);
+      res.status(500).json({ error: "Błąd podczas usuwania artykułu" });
     }
   });
 
