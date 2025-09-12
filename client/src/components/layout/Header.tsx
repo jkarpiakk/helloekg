@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Heart, Menu, X, User, LogOut, Settings, BookOpen } from "lucide-react";
+import { Menu, X, User, LogOut, Settings, BookOpen } from "lucide-react";
+import logoImage from "@assets/ChatGPT Image 12 wrz 2025 o 19_29_40_1757698246521.png";
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -36,9 +37,11 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3" data-testid="logo-link">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Heart className="h-6 w-6 text-primary-foreground" />
-            </div>
+            <img 
+              src={logoImage} 
+              alt="EKG Academy" 
+              className="h-12 w-12"
+            />
             <span className="text-xl font-bold text-foreground">EKG Academy</span>
           </Link>
 
