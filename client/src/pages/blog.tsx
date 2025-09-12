@@ -46,11 +46,11 @@ export default function Blog() {
     enabled: true,
   });
 
-  // Get unique tags for filtering
+  // Get unique tags for filtering  
   const { data: allTagsData } = useQuery<string[]>({
-    queryKey: ['/api/blog', { pageSize: 1000, status: 'published' }],
+    queryKey: ['/api/blog', { pageSize: 100, status: 'published' }],
     queryFn: async () => {
-      const response = await fetch('/api/blog?pageSize=1000&status=published');
+      const response = await fetch('/api/blog?pageSize=100&status=published');
       if (!response.ok) {
         throw new Error('Failed to fetch blog posts');
       }
