@@ -52,26 +52,28 @@ export const subscriptions = pgTable("subscriptions", {
 });
 
 // Course modules
-export const modules: any = pgTable("modules", {
+export const modules = pgTable("modules", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
   order: integer("order").notNull(),
   isLocked: boolean("is_locked").notNull().default(false),
-  prerequisiteModuleId: uuid("prerequisite_module_id").references(() => modules.id),
+  prerequisiteModuleId: uuid("prerequisite_module_id"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Course sections/subsections within modules
-export const sections: any = pgTable("sections", {
+export const sections = pgTable("sections", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   moduleId: uuid("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
   order: integer("order").notNull(),
   isLocked: boolean("is_locked").notNull().default(false),
-  prerequisiteSectionId: uuid("prerequisite_section_id").references(() => sections.id),
+  prerequisiteSectionId: uuid("prerequisite_section_id"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 // Lecture chapters for each section
@@ -104,6 +106,7 @@ export const questions = pgTable("questions", {
   difficulty: varchar("difficulty", { length: 20 }).notNull().default("medium"),
   status: varchar("status", { length: 20 }).notNull().default("draft"),
   version: integer("version").notNull().default(1),
+  order: integer("order").notNull().default(1),
   createdBy: uuid("created_by").notNull().references(() => users.id),
   reviewedBy: uuid("reviewed_by").references(() => users.id),
   reviewedAt: timestamp("reviewed_at"),
@@ -272,7 +275,6 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true, 
   createdAt: true, 
   updatedAt: true,
-  emailVerificationToken: true,
   stripeCustomerId: true,
   stripeSubscriptionId: true,
 });

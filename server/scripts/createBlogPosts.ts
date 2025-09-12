@@ -1160,7 +1160,7 @@ async function createBlogPosts() {
     });
 
     console.log(`\n📊 Total published posts: ${allPosts.total}`);
-    allPosts.posts.forEach(post => {
+    allPosts.items.forEach((post: any) => {
       console.log(`- ${post.title} (${post.slug})`);
     });
 

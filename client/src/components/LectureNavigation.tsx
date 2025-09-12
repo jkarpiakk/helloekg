@@ -41,7 +41,7 @@ export function LectureNavigation({ sectionId, sectionTitle, onComplete }: Lectu
 
   const handleNext = () => {
     if (currentChapter) {
-      setCompletedChapters(prev => new Set([...prev, currentChapter.id]));
+      setCompletedChapters(prev => new Set(Array.from(prev).concat(currentChapter.id)));
     }
     
     if (currentChapterIndex < totalChapters - 1) {
@@ -194,7 +194,7 @@ export function LectureNavigation({ sectionId, sectionTitle, onComplete }: Lectu
                     Kluczowe punkty
                   </h4>
                   <ul className="space-y-2">
-                    {currentChapter.keyPoints.map((point, index) => (
+                    {currentChapter.keyPoints.map((point: string, index: number) => (
                       <li 
                         key={index} 
                         className="text-green-800 dark:text-green-200 flex items-start"

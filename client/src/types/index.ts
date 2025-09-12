@@ -1,5 +1,5 @@
-// Re-export types from shared schema
-export type {
+// Import and re-export types from shared schema
+import type {
   User,
   Plan,
   Subscription,
@@ -13,6 +13,21 @@ export type {
   BlogPost,
   InsertBlogPost
 } from "@shared/schema";
+
+export type {
+  User,
+  Plan,
+  Subscription,
+  Section,
+  Question,
+  Attempt,
+  Progress,
+  Certificate,
+  SupportTicket,
+  AuditLog,
+  BlogPost,
+  InsertBlogPost
+};
 
 // Additional frontend-specific types
 export interface AuthUser {
