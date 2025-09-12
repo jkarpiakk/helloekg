@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Menu, X, User, LogOut, Settings, BookOpen } from "lucide-react";
-import logoImage from "@assets/ChatGPT Image 12 wrz 2025 o 19_29_40_1757698246521.png";
+import logoImage from "@assets/logo ekg 2_1757715460574.png";
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
