@@ -43,7 +43,7 @@ export default function Home() {
     question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
     options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
     correct: 1,
-    explanation: "Wyobraź sobie orkiestrę bez dyrygenta! W normalnym rytmie węzeł zatokowy jest jak dyrygent - daje równomierne sygnały. Ale w migotaniu przedsionków dyrygent zaczął szaleć - wysyła setki chaotycznych sygnałów na sekundę. Przedsionki 'migocą' jak oszalałe, a komory próbują nadążyć, ale nie potrafią - stąd ten nieregularny, nieprzewidywalny rytm, jakby serce 'potykało się' przy każdym uderzeniu."
+    explanation: "Wyobraź sobie orkiestrę bez dyrygenta! W normalnym rytmie wszyscy muzycy słuchają jednego dyrygenta i grają w takcie. Ale w migotaniu przedsionków nagle dziesiątki muzyków zaczyna grać swoje własne melodie jednocześnie - jeden gra walca, drugi tango, trzeci rock. Powstaje kompletny chaos! Przedsionki 'migocą' od tych wszystkich sprzecznych sygnałów, a komory próbują nadążyć za tym chaosem - stąd ten nieregularny, nieprzewidywalny rytm, jakby serce 'potykało się' przy każdym uderzeniu."
   };
 
   const handleAnswerSelect = (index: number) => {
