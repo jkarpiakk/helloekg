@@ -27,6 +27,7 @@ const plTranslations: I18nKeys = {
   },
   nav: {
     home: "Strona główna",
+    blog: "Blog",
     courses: "Kursy", 
     pricing: "Cennik",
     about: "O nas",

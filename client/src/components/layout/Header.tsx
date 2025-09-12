@@ -50,6 +50,9 @@ export default function Header() {
             <Link href="/" className={`transition-colors ${location === '/' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-home">
               {t("nav.home")}
             </Link>
+            <Link href="/blog" className={`transition-colors ${location.startsWith('/blog') ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-blog">
+              {t("nav.blog")}
+            </Link>
             {isAuthenticated && (
               <>
                 <Link href="/dashboard" className={`transition-colors ${location === '/dashboard' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} data-testid="nav-dashboard">
@@ -165,6 +168,14 @@ export default function Header() {
               data-testid="mobile-nav-home"
             >
               {t("nav.home")}
+            </Link>
+            <Link
+              href="/blog"
+              className="block text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setIsMobileMenuOpen(false)}
+              data-testid="mobile-nav-blog"
+            >
+              {t("nav.blog")}
             </Link>
             {isAuthenticated && (
               <>
