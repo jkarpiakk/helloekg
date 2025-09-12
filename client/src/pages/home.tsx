@@ -43,7 +43,7 @@ export default function Home() {
     question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
     options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
     correct: 1,
-    explanation: "Migotanie przedsionków charakteryzuje się nieregularnym rytmem komorowym, brakiem wyraźnych załamków P oraz nieregularnymi odstępami RR. Zamiast załamków P widoczne są drobne, nieregularne fale migotania przedsionków."
+    explanation: "Wyobraź sobie orkiestrę bez dyrygenta! W normalnym rytmie węzeł zatokowy jest jak dyrygent - daje równomierne sygnały. Ale w migotaniu przedsionków dyrygent zaczął szaleć - wysyła setki chaotycznych sygnałów na sekundę. Przedsionki 'migocą' jak oszalałe, a komory próbują nadążyć, ale nie potrafią - stąd ten nieregularny, nieprzewidywalny rytm, jakby serce 'potykało się' przy każdym uderzeniu."
   };
 
   const handleAnswerSelect = (index: number) => {
