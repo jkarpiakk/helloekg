@@ -1,15 +1,15 @@
 import { 
   users, plans, subscriptions, modules, sections, questions, attempts, 
-  progress, certificates, supportTickets, auditLog,
+  progress, certificates, supportTickets, auditLog, blogPosts,
   type User, type InsertUser, type Plan, type InsertPlan,
   type Subscription, type InsertSubscription, type Module, type InsertModule,
   type Section, type InsertSection, type Question, type InsertQuestion, 
   type Attempt, type InsertAttempt, type Progress, type InsertProgress, 
   type Certificate, type InsertCertificate, type SupportTicket, type InsertSupportTicket, 
-  type AuditLog, type InsertAuditLog
+  type AuditLog, type InsertAuditLog, type BlogPost, type InsertBlogPost
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, count, avg, sql } from "drizzle-orm";
+import { eq, and, desc, asc, count, avg, sql, or, ilike, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // User management
@@ -70,6 +70,26 @@ export interface IStorage {
   
   // Audit logging
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  
+  // Blog methods
+  createBlogPost(data: InsertBlogPost): Promise<BlogPost>;
+  getBlogPosts(filters?: {
+    status?: 'draft' | 'published';
+    authorId?: string;
+    tag?: string;
+    q?: string;  // search query
+    page?: number;
+    pageSize?: number;
+  }): Promise<{
+    items: BlogPost[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }>;
+  getBlogPostBySlug(slug: string, status?: 'draft' | 'published'): Promise<BlogPost | undefined>;
+  updateBlogPost(id: string, updates: Partial<InsertBlogPost>): Promise<BlogPost>;
+  updateBlogPostStatus(id: string, status: 'draft' | 'published'): Promise<BlogPost>;
+  deleteBlogPost(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -176,7 +196,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createModule(module: InsertModule): Promise<Module> {
-    const [newModule] = await db.insert(modules).values(module).returning();
+    const [newModule] = await db.insert(modules).values(module as any).returning() as any;
     return newModule;
   }
 
@@ -203,7 +223,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSection(section: InsertSection): Promise<Section> {
-    const [newSection] = await db.insert(sections).values(section).returning();
+    const [newSection] = await db.insert(sections).values(section as any).returning() as any;
     return newSection;
   }
 
@@ -258,7 +278,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createQuestion(question: InsertQuestion): Promise<Question> {
-    const [newQuestion] = await db.insert(questions).values(question).returning();
+    // Serialize JSON fields properly
+    const questionData = {
+      ...question,
+      answers: JSON.stringify(question.answers) as any,
+      tags: question.tags ? JSON.stringify(question.tags) as any : JSON.stringify([]) as any
+    };
+    const [newQuestion] = await db.insert(questions).values(questionData as any).returning();
     return newQuestion;
   }
 
@@ -271,7 +297,13 @@ export class DatabaseStorage implements IStorage {
     for (let i = 0; i < questionList.length; i++) {
       try {
         const question = questionList[i];
-        const [newQuestion] = await db.insert(questions).values(question).returning();
+        // Serialize JSON fields properly
+        const questionData = {
+          ...question,
+          answers: JSON.stringify(question.answers) as any,
+          tags: question.tags ? JSON.stringify(question.tags) as any : JSON.stringify([]) as any
+        };
+        const [newQuestion] = await db.insert(questions).values(questionData as any).returning();
         
         results.push({
           index: i,
@@ -302,9 +334,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateQuestion(id: string, updates: Partial<InsertQuestion>): Promise<Question> {
+    // Serialize JSON fields properly
+    const updateData: any = { 
+      ...updates, 
+      updatedAt: sql`CURRENT_TIMESTAMP` 
+    };
+    
+    if (updates.answers) {
+      updateData.answers = JSON.stringify(updates.answers) as any;
+    }
+    if (updates.tags) {
+      updateData.tags = JSON.stringify(updates.tags) as any;
+    }
+    
     const [question] = await db
       .update(questions)
-      .set({ ...updates, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .set(updateData)
       .where(eq(questions.id, id))
       .returning();
     return question;
@@ -481,6 +526,157 @@ export class DatabaseStorage implements IStorage {
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
     const [newLog] = await db.insert(auditLog).values(log).returning();
     return newLog;
+  }
+
+  // Blog methods
+  async createBlogPost(data: InsertBlogPost): Promise<BlogPost> {
+    // Serialize JSON fields properly
+    const blogData = {
+      ...data,
+      tags: data.tags ? JSON.stringify(data.tags) as any : JSON.stringify([]) as any,
+      seoMeta: data.seoMeta ? JSON.stringify(data.seoMeta) as any : JSON.stringify({}) as any
+    };
+    const [newBlogPost] = await db.insert(blogPosts).values(blogData as any).returning();
+    return newBlogPost;
+  }
+
+  async getBlogPosts(filters?: {
+    status?: 'draft' | 'published';
+    authorId?: string;
+    tag?: string;
+    q?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{
+    items: BlogPost[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const page = filters?.page || 1;
+    const pageSize = filters?.pageSize || 10;
+    const offset = (page - 1) * pageSize;
+
+    // Build where conditions
+    const conditions = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(blogPosts.status, filters.status));
+    }
+    
+    if (filters?.authorId) {
+      conditions.push(eq(blogPosts.authorId, filters.authorId));
+    }
+    
+    if (filters?.tag) {
+      conditions.push(sql`${blogPosts.tags} @> ${JSON.stringify([filters.tag])}`);
+    }
+    
+    if (filters?.q) {
+      const searchQuery = `%${filters.q}%`;
+      conditions.push(
+        or(
+          ilike(blogPosts.title, searchQuery),
+          ilike(blogPosts.excerpt, searchQuery)
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get total count
+    const [countResult] = await db
+      .select({ count: count() })
+      .from(blogPosts)
+      .where(whereClause);
+
+    // Get items with pagination
+    const items = await db
+      .select()
+      .from(blogPosts)
+      .where(whereClause)
+      .orderBy(
+        sql`CASE WHEN ${blogPosts.publishedAt} IS NOT NULL THEN ${blogPosts.publishedAt} ELSE ${blogPosts.createdAt} END DESC`
+      )
+      .limit(pageSize)
+      .offset(offset);
+
+    return {
+      items,
+      total: countResult.count,
+      page,
+      pageSize
+    };
+  }
+
+  async getBlogPostBySlug(slug: string, status?: 'draft' | 'published'): Promise<BlogPost | undefined> {
+    const conditions = [eq(blogPosts.slug, slug)];
+    
+    if (status) {
+      conditions.push(eq(blogPosts.status, status));
+    }
+
+    const [blogPost] = await db
+      .select()
+      .from(blogPosts)
+      .where(and(...conditions));
+      
+    return blogPost || undefined;
+  }
+
+  async updateBlogPost(id: string, updates: Partial<InsertBlogPost>): Promise<BlogPost> {
+    // Serialize JSON fields properly
+    const updateData: any = { 
+      ...updates, 
+      updatedAt: sql`CURRENT_TIMESTAMP` 
+    };
+    
+    if (updates.tags) {
+      updateData.tags = JSON.stringify(updates.tags) as any;
+    }
+    if (updates.seoMeta) {
+      updateData.seoMeta = JSON.stringify(updates.seoMeta) as any;
+    }
+    
+    const [blogPost] = await db
+      .update(blogPosts)
+      .set(updateData)
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return blogPost;
+  }
+
+  async updateBlogPostStatus(id: string, status: 'draft' | 'published'): Promise<BlogPost> {
+    const updateData: any = {
+      status,
+      updatedAt: sql`CURRENT_TIMESTAMP`
+    };
+
+    // If publishing and publishedAt is null, set it to current timestamp
+    if (status === 'published') {
+      const [existingPost] = await db
+        .select({ publishedAt: blogPosts.publishedAt })
+        .from(blogPosts)
+        .where(eq(blogPosts.id, id));
+        
+      if (existingPost && !existingPost.publishedAt) {
+        updateData.publishedAt = sql`CURRENT_TIMESTAMP`;
+      }
+    } else if (status === 'draft') {
+      // If setting to draft, clear publishedAt
+      updateData.publishedAt = null;
+    }
+
+    const [blogPost] = await db
+      .update(blogPosts)
+      .set(updateData)
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return blogPost;
+  }
+
+  async deleteBlogPost(id: string): Promise<void> {
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
   }
 }
 
