@@ -10,6 +10,7 @@ import AuthForms from "@/components/auth/AuthForms";
 import PricingSection from "@/components/payment/PricingSection";
 import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart, X } from "lucide-react";
 import { Link } from "wouter";
+import afEcgImage from "@assets/af ecg_1757697444254.jpg";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -41,8 +42,8 @@ export default function Home() {
   const demoQuestion = {
     question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
     options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
-    correct: 0,
-    explanation: "Rytm zatokowy prawidłowy charakteryzuje się regularną częstotliwością około 60-100/min, widocznymi załamkami P przed każdym zespołem QRS oraz stałymi odstępami PR."
+    correct: 1,
+    explanation: "Migotanie przedsionków charakteryzuje się nieregularnym rytmem komorowym, brakiem wyraźnych załamków P oraz nieregularnymi odstępami RR. Zamiast załamków P widoczne są drobne, nieregularne fale migotania przedsionków."
   };
 
   const handleAnswerSelect = (index: number) => {
@@ -156,11 +157,14 @@ export default function Home() {
                       )}
                     </div>
                     
-                    {/* Sample EKG image placeholder */}
-                    <div className="bg-muted rounded-lg p-4 relative">
-                      <div className="w-full h-32 bg-gradient-to-r from-primary/20 to-chart-2/20 rounded flex items-center justify-center">
-                        <span className="text-muted-foreground">Przykładowy zapis EKG</span>
-                      </div>
+                    {/* Real EKG image - Atrial Fibrillation */}
+                    <div className="bg-white rounded-lg p-4 border border-border">
+                      <img 
+                        src={afEcgImage} 
+                        alt="Zapis EKG pokazujący migotanie przedsionków" 
+                        className="w-full h-auto rounded"
+                        data-testid="demo-ecg-image"
+                      />
                     </div>
 
                     {/* Interactive quiz options */}
