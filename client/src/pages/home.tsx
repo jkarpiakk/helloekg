@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import AuthForms from "@/components/auth/AuthForms";
 import PricingSection from "@/components/payment/PricingSection";
-import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart } from "lucide-react";
+import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart, X } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [showResult, setShowResult] = useState(false);
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
@@ -34,6 +36,24 @@ export default function Home() {
     const url = new URL(window.location.href);
     url.searchParams.delete('auth');
     window.history.replaceState({}, '', url.pathname);
+  };
+
+  const demoQuestion = {
+    question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
+    options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
+    correct: 0,
+    explanation: "Rytm zatokowy prawidłowy charakteryzuje się regularną częstotliwością około 60-100/min, widocznymi załamkami P przed każdym zespołem QRS oraz stałymi odstępami PR."
+  };
+
+  const handleAnswerSelect = (index: number) => {
+    if (showResult) return;
+    setSelectedAnswer(index);
+    setShowResult(true);
+  };
+
+  const resetDemo = () => {
+    setSelectedAnswer(null);
+    setShowResult(false);
   };
 
   return (
@@ -120,9 +140,21 @@ export default function Home() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-foreground">
-                      Jaki rytm widoczny jest na poniższym zapisie EKG?
-                    </h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-foreground">
+                        {demoQuestion.question}
+                      </h3>
+                      {showResult && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={resetDemo}
+                          data-testid="reset-demo-button"
+                        >
+                          Spróbuj ponownie
+                        </Button>
+                      )}
+                    </div>
                     
                     {/* Sample EKG image placeholder */}
                     <div className="bg-muted rounded-lg p-4 relative">
@@ -131,15 +163,78 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Sample quiz options */}
+                    {/* Interactive quiz options */}
                     <div className="space-y-3">
-                      {["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"].map((option, index) => (
-                        <div key={index} className="p-4 border border-border rounded-lg cursor-pointer hover:bg-secondary/50 transition-colors">
-                          <span className="font-semibold mr-3">{String.fromCharCode(65 + index)}.</span>
-                          {option}
-                        </div>
-                      ))}
+                      {demoQuestion.options.map((option, index) => {
+                        const isSelected = selectedAnswer === index;
+                        const isCorrect = index === demoQuestion.correct;
+                        
+                        let buttonClass = "p-4 border border-border rounded-lg cursor-pointer transition-all duration-200 text-left";
+                        
+                        if (showResult) {
+                          if (isCorrect) {
+                            buttonClass += " bg-green-100 border-green-500 text-green-800 dark:bg-green-900/30 dark:border-green-600 dark:text-green-300";
+                          } else if (isSelected) {
+                            buttonClass += " bg-red-100 border-red-500 text-red-800 dark:bg-red-900/30 dark:border-red-600 dark:text-red-300";
+                          }
+                        } else {
+                          buttonClass += " hover:bg-secondary/50 hover:border-primary/50";
+                        }
+                        
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => handleAnswerSelect(index)}
+                            className={buttonClass}
+                            disabled={showResult}
+                            data-testid={`demo-option-${index}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-semibold mr-3">{String.fromCharCode(65 + index)}.</span>
+                                {option}
+                              </div>
+                              {showResult && isCorrect && (
+                                <Check className="h-5 w-5 text-green-600" />
+                              )}
+                              {showResult && isSelected && !isCorrect && (
+                                <X className="h-5 w-5 text-red-600" />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
+
+                    {/* Result explanation */}
+                    {showResult && (
+                      <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg" data-testid="demo-result-panel">
+                        <div className="flex items-start space-x-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            selectedAnswer === demoQuestion.correct 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-red-500 text-white'
+                          }`}>
+                            {selectedAnswer === demoQuestion.correct ? (
+                              <Check className="h-4 w-4" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-foreground mb-1" data-testid="demo-result-status">
+                              {selectedAnswer === demoQuestion.correct 
+                                ? "Brawo! Poprawna odpowiedź!" 
+                                : "Niepoprawnie. Prawidłowa odpowiedź to: " + demoQuestion.options[demoQuestion.correct]
+                              }
+                            </p>
+                            <p className="text-sm text-muted-foreground" data-testid="demo-result-explanation">
+                              {demoQuestion.explanation}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
