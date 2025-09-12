@@ -12,6 +12,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Plus, Upload, Edit, Eye, Trash2, Check, X } from "lucide-react";
 import type { QuestionWithStats } from "@/types";
 import QuestionEditor from "./QuestionEditor";
+import ImportModal from "./ImportModal";
 import type { Module, Section } from "@shared/schema";
 
 export default function QuestionManager() {
@@ -20,6 +21,7 @@ export default function QuestionManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showEditor, setShowEditor] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuestionWithStats | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -235,9 +237,13 @@ export default function QuestionManager() {
         </div>
         
         <div className="flex items-center space-x-4">
-          <Button variant="outline" data-testid="import-csv-button">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowImportModal(true)}
+            data-testid="import-bulk-button"
+          >
             <Upload className="h-4 w-4 mr-2" />
-            {t("admin.importCsv")}
+            Import hurtowy
           </Button>
           <Button 
             onClick={() => {
@@ -454,6 +460,14 @@ export default function QuestionManager() {
           </Button>
         </div>
       </div>
+      
+      {/* Import Modal */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        sections={allSections}
+        modules={modules || []}
+      />
     </div>
   );
 }

@@ -43,6 +43,7 @@ export interface IStorage {
   getQuestionsBySection(sectionId: string, status?: string): Promise<Question[]>;
   getQuestionById(id: string): Promise<Question | undefined>;
   createQuestion(question: InsertQuestion): Promise<Question>;
+  createQuestionsBulk(questions: InsertQuestion[]): Promise<{ summary: { total: number; created: number; failed: number }; results: Array<{ index: number; status: 'created' | 'failed'; id?: string; errors?: string[] }> }>;
   updateQuestion(id: string, updates: Partial<InsertQuestion>): Promise<Question>;
   updateQuestionStatus(id: string, status: string, reviewedBy?: string): Promise<Question>;
   deleteQuestion(id: string): Promise<void>;
@@ -259,6 +260,45 @@ export class DatabaseStorage implements IStorage {
   async createQuestion(question: InsertQuestion): Promise<Question> {
     const [newQuestion] = await db.insert(questions).values(question).returning();
     return newQuestion;
+  }
+
+  async createQuestionsBulk(questionList: InsertQuestion[]): Promise<{ summary: { total: number; created: number; failed: number }; results: Array<{ index: number; status: 'created' | 'failed'; id?: string; errors?: string[] }> }> {
+    const results: Array<{ index: number; status: 'created' | 'failed'; id?: string; errors?: string[] }> = [];
+    let created = 0;
+    let failed = 0;
+
+    // Process each question individually to allow partial failures
+    for (let i = 0; i < questionList.length; i++) {
+      try {
+        const question = questionList[i];
+        const [newQuestion] = await db.insert(questions).values(question).returning();
+        
+        results.push({
+          index: i,
+          status: 'created',
+          id: newQuestion.id
+        });
+        created++;
+      } catch (error: any) {
+        console.error(`Failed to create question at index ${i}:`, error);
+        
+        results.push({
+          index: i,
+          status: 'failed',
+          errors: [error.message || 'Unknown error occurred']
+        });
+        failed++;
+      }
+    }
+
+    return {
+      summary: {
+        total: questionList.length,
+        created,
+        failed
+      },
+      results
+    };
   }
 
   async updateQuestion(id: string, updates: Partial<InsertQuestion>): Promise<Question> {

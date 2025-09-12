@@ -583,6 +583,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk import questions endpoint
+  app.post("/api/admin/questions/bulk", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { items, dryRun = false } = req.body;
+      
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Items array is required and cannot be empty" });
+      }
+
+      // Limit batch size to prevent abuse
+      if (items.length > 500) {
+        return res.status(400).json({ error: "Maximum 500 questions allowed per batch" });
+      }
+
+      const validatedQuestions: any[] = [];
+      const validationErrors: Array<{ index: number; errors: string[] }> = [];
+
+      // Validate each question individually
+      for (let i = 0; i < items.length; i++) {
+        try {
+          // Transform aliases to database format if needed
+          const item = items[i];
+          const questionData = {
+            sectionId: item.sectionId,
+            title: item.title || item.questionText?.substring(0, 100) || `Pytanie ${i + 1}`,
+            bodyMd: item.bodyMd || item.questionText || "",
+            explanationMd: item.explanationMd || item.explanation || "",
+            answers: item.answers || (item.answerOptions ? item.answerOptions.map((option: string, idx: number) => ({
+              text: option,
+              isCorrect: idx === (item.correctAnswerIndex || 0)
+            })) : []),
+            imageUrl: item.imageUrl,
+            difficulty: item.difficulty || item.difficultyLevel || "medium",
+            tags: item.tags || [],
+            status: item.status || "draft",
+            createdBy: req.user!.id
+          };
+
+          const validatedQuestion = insertQuestionSchema.parse(questionData);
+          validatedQuestions.push(validatedQuestion);
+        } catch (error: any) {
+          console.error(`Validation error for question ${i}:`, error);
+          validationErrors.push({
+            index: i,
+            errors: error.issues ? error.issues.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`) : [error.message]
+          });
+        }
+      }
+
+      // If this is a dry run, return validation results without persisting
+      if (dryRun) {
+        return res.json({
+          summary: {
+            total: items.length,
+            valid: validatedQuestions.length,
+            invalid: validationErrors.length
+          },
+          validationErrors,
+          preview: validatedQuestions.slice(0, 5) // Show first 5 for preview
+        });
+      }
+
+      // Only proceed with valid questions
+      if (validatedQuestions.length === 0) {
+        return res.status(400).json({ 
+          error: "No valid questions to import",
+          validationErrors
+        });
+      }
+
+      // Create questions in bulk
+      const result = await storage.createQuestionsBulk(validatedQuestions);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "questions_bulk_imported",
+        entityType: "question",
+        entityId: "bulk",
+        diff: { 
+          summary: result.summary,
+          totalQuestions: validatedQuestions.length,
+          validationErrors: validationErrors.length
+        },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json({
+        ...result,
+        validationErrors: validationErrors.length > 0 ? validationErrors : undefined
+      });
+    } catch (error: any) {
+      console.error("Bulk question import error:", error);
+      res.status(500).json({ error: error.message || "Błąd podczas importu pytań" });
+    }
+  });
+
   // Admin modules management
   app.get("/api/admin/modules", requireAuth, requireReviewer, async (req, res) => {
     try {
