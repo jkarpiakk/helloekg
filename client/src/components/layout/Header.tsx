@@ -40,7 +40,7 @@ export default function Header() {
             <img 
               src={logoImage} 
               alt="EKG Academy" 
-              className="h-12 w-12"
+              className="h-24 w-24"
             />
             <span className="text-xl font-bold text-foreground">EKG Academy</span>
           </Link>
