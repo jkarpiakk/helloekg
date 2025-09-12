@@ -176,6 +176,23 @@ export const auditLog = pgTable("audit_log", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+// Blog posts
+export const blogPosts = pgTable("blog_posts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 200 }).notNull().unique(),
+  title: varchar("title", { length: 300 }).notNull(),
+  excerpt: text("excerpt").notNull(),
+  contentMd: text("content_md").notNull(),
+  featuredImage: text("featured_image"),
+  tags: json("tags").$type<string[]>().default([]),
+  seoMeta: json("seo_meta").$type<{title?: string, description?: string, keywords?: string[]}>().default({}),
+  status: varchar("status", { length: 20 }).notNull().default("draft"),
+  authorId: uuid("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   subscriptions: many(subscriptions),
@@ -186,6 +203,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   createdQuestions: many(questions, { relationName: "createdBy" }),
   reviewedQuestions: many(questions, { relationName: "reviewedBy" }),
   auditLogs: many(auditLog),
+  createdBlogPosts: many(blogPosts),
 }));
 
 export const plansRelations = relations(plans, ({ many }) => ({
@@ -243,6 +261,10 @@ export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
 
 export const auditLogRelations = relations(auditLog, ({ one }) => ({
   actor: one(users, { fields: [auditLog.actorId], references: [users.id] }),
+}));
+
+export const blogPostsRelations = relations(blogPosts, ({ one }) => ({
+  author: one(users, { fields: [blogPosts.authorId], references: [users.id] }),
 }));
 
 // Zod schemas
@@ -317,6 +339,12 @@ export const insertLectureChapterSchema = createInsertSchema(lectureChapters).om
   updatedAt: true 
 });
 
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -357,6 +385,8 @@ export interface VisualElement {
 
 export type LectureChapter = typeof lectureChapters.$inferSelect;
 export type InsertLectureChapter = z.infer<typeof insertLectureChapterSchema>;
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
 
 // Additional schemas for API endpoints
 export const loginSchema = z.object({
