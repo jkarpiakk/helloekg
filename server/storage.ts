@@ -186,7 +186,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSections(): Promise<Section[]> {
-    return db.select().from(sections).orderBy(asc(sections.order));
+    const result = await db
+      .select({
+        section: sections,
+        moduleOrder: modules.order
+      })
+      .from(sections)
+      .leftJoin(modules, eq(sections.moduleId, modules.id))
+      .orderBy(asc(modules.order), asc(sections.order));
+    
+    return result.map(r => r.section);
   }
 
   async getSectionsByModule(moduleId: string): Promise<Section[]> {
