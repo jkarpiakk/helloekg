@@ -281,7 +281,7 @@ export default function Home() {
                                 data-testid="demo-register-cta"
                               >
                                 <GraduationCap className="h-4 w-4 mr-2" />
-                                Rozpocznij naukę za darmo
+                                Rozpocznij naukę
                               </Button>
                               <p className="text-xs text-muted-foreground">
                                 Rejestracja zajmuje mniej niż minutę
