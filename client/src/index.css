@@ -178,3 +178,17 @@
     display: block !important;
   }
 }
+
+/* 3D Heart rotation animation */
+@keyframes heart-rotate {
+  0% {
+    transform: rotateX(-10deg) rotateY(20deg);
+  }
+  100% {
+    transform: rotateX(-10deg) rotateY(380deg);
+  }
+}
+
+.animate-heart-rotate {
+  animation: heart-rotate 20s linear infinite;
+}

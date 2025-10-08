@@ -10,9 +10,6 @@ import {
   Volume2, VolumeX, ArrowLeft, Sparkles 
 } from "lucide-react";
 import { Link } from "wouter";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera, Html } from "@react-three/drei";
-import * as THREE from "three";
 
 interface EKGPreset {
   name: string;
@@ -30,99 +27,105 @@ const PRESETS: EKGPreset[] = [
   { name: 'VTach', bpm: 180, rhythm: 'vtach', description: 'Częstoskurcz komorowy', color: 'bg-red-500' },
 ];
 
-// Anatomical 3D Heart Component - simplified approach
-function AnatomicalHeart({ bpm, rhythm }: { bpm: number; rhythm: string }) {
-  const leftVentricleRef = useRef<THREE.Mesh>(null);
-  const rightVentricleRef = useRef<THREE.Mesh>(null);
-  const leftAtriumRef = useRef<THREE.Mesh>(null);
-  const rightAtriumRef = useRef<THREE.Mesh>(null);
-  const groupRef = useRef<THREE.Group>(null);
-  const phaseRef = useRef(0);
-  const afibVarRef = useRef(1.0);
-  
-  useFrame((state, delta) => {
-    const beatInterval = 60 / bpm;
-    phaseRef.current = (phaseRef.current + delta / beatInterval) % 1;
-    const phase = phaseRef.current;
-    
-    // AFib variation
-    if (rhythm === 'afib' && phase < 0.01) {
-      afibVarRef.current = 0.8 + Math.random() * 0.4;
-    }
-    const variation = rhythm === 'afib' ? afibVarRef.current : 1.0;
-    
-    // Systole/diastole
-    const systolePhase = Math.min(phase / 0.4, 1);
-    const systoleScale = 0.85 + Math.sin(systolePhase * Math.PI) * 0.15 * variation;
-    const diastolePhase = phase > 0.4 ? (phase - 0.4) / 0.6 : 0;
-    const ventricleScale = phase < 0.4 ? systoleScale : 1.0 - Math.sin(diastolePhase * Math.PI) * 0.15 * variation;
-    
-    // Atria
-    const atriaPhase = (phase + 0.8) % 1;
-    const atriaScale = atriaPhase < 0.3 ? 0.92 + Math.sin((atriaPhase / 0.3) * Math.PI) * 0.08 * variation : 1.0;
-    
-    if (leftVentricleRef.current) leftVentricleRef.current.scale.set(ventricleScale, ventricleScale * 1.2, ventricleScale);
-    if (rightVentricleRef.current) rightVentricleRef.current.scale.set(ventricleScale * 0.9, ventricleScale * 1.1, ventricleScale * 0.9);
-    if (leftAtriumRef.current) leftAtriumRef.current.scale.setScalar(atriaScale);
-    if (rightAtriumRef.current) rightAtriumRef.current.scale.setScalar(atriaScale);
-    if (groupRef.current) groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.2;
-  });
-
+// CSS 3D Anatomical Heart Component
+function CSS3DHeart({ heartBeat, rhythm }: { heartBeat: boolean; rhythm: string }) {
   return (
-    <group ref={groupRef}>
-      <mesh ref={leftVentricleRef} position={[-0.5, -0.3, 0]}>
-        <coneGeometry args={[0.7, 1.6, 32]} />
-        <meshStandardMaterial color="#c41e3a" roughness={0.3} metalness={0.2} />
-      </mesh>
-      <mesh ref={rightVentricleRef} position={[0.55, -0.2, 0.15]} rotation={[0, 0, -0.3]}>
-        <coneGeometry args={[0.6, 1.4, 32]} />
-        <meshStandardMaterial color="#d73447" roughness={0.3} metalness={0.2} />
-      </mesh>
-      <mesh ref={leftAtriumRef} position={[-0.5, 1.1, 0]}>
-        <sphereGeometry args={[0.45, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.8]} />
-        <meshStandardMaterial color="#e74c3c" roughness={0.25} metalness={0.25} />
-      </mesh>
-      <mesh ref={rightAtriumRef} position={[0.5, 1.15, 0.1]}>
-        <sphereGeometry args={[0.45, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.8]} />
-        <meshStandardMaterial color="#ec7063" roughness={0.25} metalness={0.25} />
-      </mesh>
-      <mesh position={[-0.4, 1.6, -0.1]} rotation={[0.2, 0, 0.4]}>
-        <cylinderGeometry args={[0.22, 0.28, 1.0, 16]} />
-        <meshStandardMaterial color="#b71c1c" roughness={0.4} metalness={0.2} />
-      </mesh>
-      <mesh position={[0.45, 1.7, 0.15]} rotation={[0.1, 0, -0.2]}>
-        <cylinderGeometry args={[0.14, 0.18, 0.8, 16]} />
-        <meshStandardMaterial color="#3949ab" roughness={0.4} metalness={0.2} />
-      </mesh>
-      <mesh position={[0.15, 1.45, 0.35]} rotation={[0.5, 0.3, -0.3]}>
-        <cylinderGeometry args={[0.16, 0.20, 0.7, 16]} />
-        <meshStandardMaterial color="#5e35b1" roughness={0.4} metalness={0.2} />
-      </mesh>
-      <mesh position={[0, 0, 0.05]} rotation={[0, 0, -0.15]}>
-        <boxGeometry args={[0.15, 1.8, 0.8]} />
-        <meshStandardMaterial color="#8b0000" roughness={0.5} metalness={0.1} />
-      </mesh>
-      <Html position={[-0.5, -0.8, 0]} center>
-        <div className="bg-red-900/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
-          Lewa komora
+    <div className="relative w-full h-full flex items-center justify-center" style={{ perspective: '1000px' }}>
+      <div 
+        className="relative transition-transform duration-500 animate-heart-rotate"
+        style={{ 
+          transform: 'rotateX(-10deg) rotateY(20deg)',
+          transformStyle: 'preserve-3d',
+        }}
+      >
+        {/* Left Ventricle */}
+        <div 
+          className={`absolute left-[-40px] top-[60px] w-[80px] h-[120px] rounded-b-full transition-all duration-200`}
+          style={{
+            background: 'linear-gradient(135deg, #c41e3a 0%, #8b0000 100%)',
+            transform: heartBeat ? 'scale(0.9)' : 'scale(1)',
+            boxShadow: '0 10px 30px rgba(196, 30, 58, 0.5)',
+            transformStyle: 'preserve-3d',
+          }}
+        >
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-950/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
+            Lewa komora
+          </div>
         </div>
-      </Html>
-      <Html position={[0.55, -0.7, 0.15]} center>
-        <div className="bg-red-800/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
-          Prawa komora
+
+        {/* Right Ventricle */}
+        <div 
+          className={`absolute left-[30px] top-[70px] w-[70px] h-[110px] rounded-b-full transition-all duration-200`}
+          style={{
+            background: 'linear-gradient(135deg, #d73447 0%, #a52a2a 100%)',
+            transform: heartBeat ? 'scale(0.9) translateZ(-20px)' : 'scale(1) translateZ(-20px)',
+            boxShadow: '0 10px 25px rgba(215, 52, 71, 0.4)',
+          }}
+        >
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-900/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
+            Prawa komora
+          </div>
         </div>
-      </Html>
-      <Html position={[-0.5, 1.5, 0]} center>
-        <div className="bg-red-700/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
-          Lewy przedsionek
+
+        {/* Left Atrium */}
+        <div 
+          className={`absolute left-[-35px] top-[20px] w-[70px] h-[60px] rounded-t-full transition-all duration-150`}
+          style={{
+            background: 'linear-gradient(135deg, #e74c3c 0%, #c41e3a 100%)',
+            transform: heartBeat ? 'scale(0.95)' : 'scale(1)',
+            boxShadow: '0 -5px 20px rgba(231, 76, 60, 0.4)',
+          }}
+        >
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-red-800/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
+            Lewy przedsionek
+          </div>
         </div>
-      </Html>
-      <Html position={[0.5, 1.55, 0.1]} center>
-        <div className="bg-red-600/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
-          Prawy przedsionek
+
+        {/* Right Atrium */}
+        <div 
+          className={`absolute left-[35px] top-[25px] w-[65px] h-[58px] rounded-t-full transition-all duration-150`}
+          style={{
+            background: 'linear-gradient(135deg, #ec7063 0%, #d73447 100%)',
+            transform: heartBeat ? 'scale(0.95) translateZ(-15px)' : 'scale(1) translateZ(-15px)',
+            boxShadow: '0 -5px 15px rgba(236, 112, 99, 0.4)',
+          }}
+        >
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-red-700/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10">
+            Prawy przedsionek
+          </div>
         </div>
-      </Html>
-    </group>
+
+        {/* Aorta */}
+        <div 
+          className="absolute left-[-50px] top-[-20px] w-[15px] h-[50px] rounded-t-lg"
+          style={{
+            background: 'linear-gradient(180deg, #b71c1c 0%, #8b0000 100%)',
+            transform: 'rotate(15deg)',
+            boxShadow: '0 5px 15px rgba(183, 28, 28, 0.4)',
+          }}
+        />
+
+        {/* Superior Vena Cava */}
+        <div 
+          className="absolute left-[80px] top-[-10px] w-[12px] h-[40px] rounded-t-lg"
+          style={{
+            background: 'linear-gradient(180deg, #3949ab 0%, #283593 100%)',
+            transform: 'rotate(-10deg) translateZ(-10px)',
+            boxShadow: '0 5px 12px rgba(57, 73, 171, 0.4)',
+          }}
+        />
+
+        {/* Pulmonary Artery */}
+        <div 
+          className="absolute left-[20px] top-[-5px] w-[14px] h-[35px] rounded-t-lg"
+          style={{
+            background: 'linear-gradient(180deg, #5e35b1 0%, #4527a0 100%)',
+            transform: 'rotate(-25deg)',
+            boxShadow: '0 5px 12px rgba(94, 53, 177, 0.4)',
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -428,21 +431,13 @@ export default function EKGSimulator() {
                 <CardTitle className="flex items-center justify-between">
                   <span>Anatomiczny Model Serca 3D</span>
                   <Badge variant="outline" className="bg-primary/10 text-primary">
-                    Interaktywny
+                    Obrotowy
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[400px] bg-gradient-to-b from-slate-950 to-slate-900 rounded-lg overflow-hidden border border-border">
-                  <Canvas>
-                    <PerspectiveCamera makeDefault position={[0, 0, 6]} />
-                    <OrbitControls enableZoom={true} enablePan={true} minDistance={3} maxDistance={10} />
-                    <ambientLight intensity={0.5} />
-                    <directionalLight position={[10, 10, 5]} intensity={1} />
-                    <directionalLight position={[-10, -10, -5]} intensity={0.5} />
-                    <pointLight position={[0, 5, 0]} intensity={0.8} />
-                    <AnatomicalHeart bpm={bpm} rhythm={rhythm} />
-                  </Canvas>
+                  <CSS3DHeart heartBeat={heartBeat} rhythm={rhythm} />
                 </div>
                 <div className="mt-4 space-y-2">
                   <div className="text-center">
