@@ -4,11 +4,15 @@ import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { Check, CreditCard, Smartphone } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { Plan } from "@/types";
+
+interface PricingSectionProps {
+  onOpenAuth?: () => void;
+}
 
 interface PlanExtras {
   savings?: string;
@@ -49,10 +53,9 @@ const planFeatures: Record<number, PlanExtras> = {
   }
 };
 
-export default function PricingSection() {
+export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
 
   const { data: plans, isLoading } = useQuery({
     queryKey: ["/api/plans"],
@@ -165,7 +168,7 @@ export default function PricingSection() {
                           : ''
                       }`}
                       variant={extras.isPopular ? "default" : "outline"}
-                      onClick={() => setLocation("/?auth=register")}
+                      onClick={onOpenAuth}
                       data-testid={`select-plan-${plan.durationDays}`}
                     >
                       {t("pricing.cta")}

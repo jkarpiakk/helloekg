@@ -455,7 +455,7 @@ export default function Home() {
       </section>
 
       {/* Pricing Section */}
-      <PricingSection />
+      <PricingSection onOpenAuth={() => setAuthMode("register")} />
 
       {/* Auth Dialog */}
       <Dialog open={authMode !== null} onOpenChange={() => setAuthMode(null)}>
