@@ -437,6 +437,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Certificate endpoints
+  app.get("/api/certificates/eligibility", requireAuth, async (req, res) => {
+    try {
+      const isEligible = await certificateService.isEligibleForCertificate(req.user!.id);
+      const userStats = await storage.getUserStatistics(req.user!.id);
+      const progress = await storage.getUserProgress(req.user!.id);
+      const sections = await storage.getSections();
+      
+      const completedModules = progress.filter(p => parseFloat(p.completionPercentage) >= 100).length;
+      const totalModules = sections.length;
+      
+      res.json({
+        isEligible,
+        successRate: userStats.successRate,
+        completedModules,
+        totalModules,
+        requiredSuccessRate: 0.8,
+        requiredModules: totalModules
+      });
+    } catch (error) {
+      console.error("Certificate eligibility error:", error);
+      res.status(500).json({ error: "Błąd podczas sprawdzania uprawnień" });
+    }
+  });
+
+  app.get("/api/certificates/my", requireAuth, async (req, res) => {
+    try {
+      const certificates = await storage.getUserCertificates(req.user!.id);
+      res.json(certificates);
+    } catch (error) {
+      console.error("My certificates error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania certyfikatów" });
+    }
+  });
+
   app.post("/api/certificates/generate", requireAuth, async (req, res) => {
     try {
       const result = await certificateService.generateCertificate(req.user!.id);

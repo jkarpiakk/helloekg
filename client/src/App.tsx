@@ -19,6 +19,7 @@ import Admin from "@/pages/admin";
 import Pricing from "@/pages/pricing";
 import Checkout from "@/pages/checkout";
 import VerifyCertificate from "@/pages/verify-certificate";
+import CertificatePage from "@/pages/certificate";
 import Blog from "@/pages/blog";
 import BlogPost from "@/pages/blog-post";
 import NotFound from "@/pages/not-found";
@@ -61,6 +62,7 @@ function AppContent() {
           <Route path="/admin" component={Admin} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/checkout" component={Checkout} />
+          <Route path="/certificate/:certificateId" component={CertificatePage} />
           <Route path="/verify/:certificateId" component={VerifyCertificate} />
           <Route component={NotFound} />
         </Switch>

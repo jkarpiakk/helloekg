@@ -1,21 +1,23 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import ProgressCard from "./ProgressCard";
-import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock
+import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle
 } from "lucide-react";
 import { Link } from "wouter";
-import type { SectionWithProgress, UserProgress, WeakArea } from "@/types";
+import { useToast } from "@/hooks/use-toast";
+import type { SectionWithProgress, UserProgress, WeakArea, Certificate } from "@/types";
 
 export default function StudentDashboard() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Fetch sections with progress
   const { data: sections, isLoading: sectionsLoading } = useQuery({
@@ -47,6 +49,47 @@ export default function StudentDashboard() {
       return response.json();
     },
     retry: false,
+  });
+
+  // Fetch certificate eligibility
+  const { data: certificateEligibility } = useQuery({
+    queryKey: ["/api/certificates/eligibility"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/certificates/eligibility");
+      return response.json();
+    },
+  });
+
+  // Fetch user certificates
+  const { data: myCertificates } = useQuery<Certificate[]>({
+    queryKey: ["/api/certificates/my"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/certificates/my");
+      return response.json();
+    },
+  });
+
+  // Generate certificate mutation
+  const generateCertificateMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/certificates/generate");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/certificates/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/certificates/eligibility"] });
+      toast({
+        title: "Certyfikat wygenerowany!",
+        description: "Twój certyfikat ukończenia kursu został wygenerowany.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się wygenerować certyfikatu",
+        variant: "destructive",
+      });
+    },
   });
 
   if (sectionsLoading || progressLoading) {
@@ -209,6 +252,89 @@ export default function StudentDashboard() {
 
           {/* Sidebar */}
           <div className="space-y-8">
+            {/* Certificate Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="h-5 w-5 text-chart-2" />
+                  Certyfikat ukończenia
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {myCertificates && myCertificates.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="p-4 bg-chart-2/10 border border-chart-2/20 rounded-lg">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 className="font-semibold text-foreground">Certyfikat EKG Academy</h4>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(myCertificates[0].issuedAt).toLocaleDateString('pl-PL')}
+                          </p>
+                        </div>
+                        <CheckCircle className="h-5 w-5 text-chart-2" />
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        ID: {myCertificates[0].certificateId}
+                      </p>
+                      <Link href={`/certificate/${myCertificates[0].certificateId}`}>
+                        <Button size="sm" className="w-full" data-testid="button-view-certificate">
+                          Zobacz certyfikat
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ) : certificateEligibility?.isEligible ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-chart-2/10 border border-chart-2/20 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-chart-2" />
+                      <p className="text-sm text-chart-2 font-medium">
+                        Gratulacje! Możesz otrzymać certyfikat
+                      </p>
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => generateCertificateMutation.mutate()}
+                      disabled={generateCertificateMutation.isPending}
+                      data-testid="button-generate-certificate"
+                    >
+                      {generateCertificateMutation.isPending ? (
+                        <>Generowanie...</>
+                      ) : (
+                        <>
+                          <Award className="h-4 w-4 mr-2" />
+                          Generuj certyfikat
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Ukończ wymagania kursu
+                      </p>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Ukończone moduły</span>
+                        <span className={certificateEligibility?.completedModules === certificateEligibility?.totalModules ? "text-chart-2 font-semibold" : "text-foreground"}>
+                          {certificateEligibility?.completedModules || 0}/{certificateEligibility?.totalModules || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Skuteczność</span>
+                        <span className={certificateEligibility?.successRate >= 0.8 ? "text-chart-2 font-semibold" : "text-foreground"}>
+                          {Math.round((certificateEligibility?.successRate || 0) * 100)}%
+                          <span className="text-muted-foreground text-xs ml-1">(min. 80%)</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Weak areas */}
             <Card>
               <CardHeader>
