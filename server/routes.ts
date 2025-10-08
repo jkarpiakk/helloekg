@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import Stripe from "stripe";
+import bcrypt from "bcrypt";
 import { z } from "zod";
 import { storage } from "./storage";
 import { authService } from "./auth";
@@ -1114,6 +1115,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching user stats:", error);
       res.status(500).json({ error: "Błąd podczas pobierania statystyk" });
+    }
+  });
+
+  app.post("/api/admin/users", requireReviewer, async (req, res) => {
+    try {
+      const { email, password, firstName, lastName, role = 'student' } = req.body;
+      
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ error: "Email, hasło, imię i nazwisko są wymagane" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Użytkownik o tym adresie email już istnieje" });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          email,
+          password: hashedPassword,
+          firstName,
+          lastName,
+          role,
+          emailVerified: true, // Admin-created users are pre-verified
+        })
+        .returning();
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "user_created",
+        entityType: "user",
+        entityId: newUser.id,
+        diff: { email, firstName, lastName, role },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = newUser;
+      res.status(201).json(userWithoutPassword);
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Błąd podczas tworzenia użytkownika" });
     }
   });
 

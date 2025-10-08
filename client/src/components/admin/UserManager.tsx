@@ -6,11 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Search, Shield, Eye, Ban, CheckCircle, UserX, Mail, Edit } from "lucide-react";
+import { Search, Shield, Eye, Ban, CheckCircle, UserX, Mail, Edit, UserPlus } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import type { User } from "@shared/schema";
 
 interface UserStats {
@@ -19,14 +23,36 @@ interface UserStats {
   newUsersThisMonth: number;
 }
 
+const createUserSchema = z.object({
+  email: z.string().email("Nieprawidłowy adres e-mail"),
+  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
+  firstName: z.string().min(2, "Imię musi mieć co najmniej 2 znaki"),
+  lastName: z.string().min(2, "Nazwisko musi mieć co najmniej 2 znaki"),
+  role: z.enum(["student", "reviewer", "admin", "owner"]).default("student"),
+});
+
+type CreateUserForm = z.infer<typeof createUserSchema>;
+
 export default function UserManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { t } = useTranslation();
   const { toast } = useToast();
+
+  const createUserForm = useForm<CreateUserForm>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      role: "student",
+    },
+  });
 
   // Fetch users with filters
   const { data: users, isLoading } = useQuery({
@@ -96,6 +122,35 @@ export default function UserManager() {
     },
   });
 
+  // Create user mutation
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: CreateUserForm) => {
+      const response = await apiRequest("POST", "/api/admin/users", userData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Sukces",
+        description: "Użytkownik został utworzony pomyślnie",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats/users"] });
+      setShowCreateDialog(false);
+      createUserForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się utworzyć użytkownika",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onCreateSubmit = (data: CreateUserForm) => {
+    createUserMutation.mutate(data);
+  };
+
   const getRoleBadge = (role: string) => {
     const colors = {
       student: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -138,6 +193,108 @@ export default function UserManager() {
             Moderacja użytkowników, zarządzanie rolami i subskrypcjami
           </p>
         </div>
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogTrigger asChild>
+            <Button data-testid="add-user-button">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Dodaj użytkownika
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Utwórz nowego użytkownika</DialogTitle>
+            </DialogHeader>
+            <Form {...createUserForm}>
+              <form onSubmit={createUserForm.handleSubmit(onCreateSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createUserForm.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Imię</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Jan" {...field} data-testid="create-user-firstName" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createUserForm.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nazwisko</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Kowalski" {...field} data-testid="create-user-lastName" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={createUserForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="email@example.com" {...field} data-testid="create-user-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createUserForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hasło</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} data-testid="create-user-password" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createUserForm.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rola</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="create-user-role">
+                            <SelectValue placeholder="Wybierz rolę" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="student">Student</SelectItem>
+                          <SelectItem value="reviewer">Recenzent</SelectItem>
+                          <SelectItem value="admin">Administrator</SelectItem>
+                          <SelectItem value="owner">Właściciel</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                    Anuluj
+                  </Button>
+                  <Button type="submit" disabled={createUserMutation.isPending} data-testid="create-user-submit">
+                    {createUserMutation.isPending ? "Tworzenie..." : "Utwórz użytkownika"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Statistics */}
