@@ -20,29 +20,14 @@ export default function Quiz() {
   const { isAuthenticated } = useAuth();
   const { t } = useTranslation();
 
-  // Debug state changes
-  console.log('🎯 Quiz Component Render:', { 
-    selectedSection, 
-    quizMode,
-    timestamp: new Date().toISOString()
-  });
-
   // Set initial values from URL on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const sectionParam = urlParams.get('section');
     const modeParam = urlParams.get('mode') as "learn" | "review" | "exam" | null;
     
-    console.log('⚙️ useEffect running - URL params:', { sectionParam, modeParam });
-    
-    if (sectionParam) {
-      console.log('⚙️ Setting section from URL:', sectionParam);
-      setSelectedSection(sectionParam);
-    }
-    if (modeParam) {
-      console.log('⚙️ Setting mode from URL:', modeParam);
-      setQuizMode(modeParam);
-    }
+    if (sectionParam) setSelectedSection(sectionParam);
+    if (modeParam) setQuizMode(modeParam);
   }, []); // Run only once on mount
 
   // Fetch sections with progress
@@ -173,10 +158,7 @@ export default function Quiz() {
             className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 ${
               quizMode === "exam" ? "border-chart-4 bg-chart-4/5" : ""
             }`}
-            onClick={() => {
-              console.log('🎲 Exam mode clicked');
-              setQuizMode("exam");
-            }}
+            onClick={() => setQuizMode("exam")}
             data-testid="quiz-mode-exam"
           >
             <CardHeader className="text-center">
@@ -230,18 +212,7 @@ export default function Quiz() {
                       ? "opacity-50 cursor-not-allowed" 
                       : "cursor-pointer hover:-translate-y-1"
                   }`}
-                  onClick={() => {
-                    console.log('📚 Section clicked:', { 
-                      id: section.id, 
-                      title: section.title, 
-                      isLocked,
-                      currentMode: quizMode 
-                    });
-                    if (!isLocked) {
-                      setSelectedSection(section.id);
-                      console.log('✅ Section set to:', section.id);
-                    }
-                  }}
+                  onClick={() => !isLocked && setSelectedSection(section.id)}
                   data-testid={`section-${section.id}`}
                 >
                   <CardHeader>
