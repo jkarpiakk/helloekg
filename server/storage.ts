@@ -1,13 +1,13 @@
 import { 
   users, plans, subscriptions, modules, sections, questions, attempts, 
-  progress, certificates, supportTickets, auditLog, blogPosts, demoQuestions,
+  progress, certificates, supportTickets, auditLog, blogPosts, demoQuestions, homePageContent,
   type User, type InsertUser, type Plan, type InsertPlan,
   type Subscription, type InsertSubscription, type Module, type InsertModule,
   type Section, type InsertSection, type Question, type InsertQuestion, 
   type Attempt, type InsertAttempt, type Progress, type InsertProgress, 
   type Certificate, type InsertCertificate, type SupportTicket, type InsertSupportTicket, 
   type AuditLog, type InsertAuditLog, type BlogPost, type InsertBlogPost,
-  type DemoQuestion, type InsertDemoQuestion
+  type DemoQuestion, type InsertDemoQuestion, type HomePageContent, type InsertHomePageContent
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, count, avg, sql, or, ilike, isNull } from "drizzle-orm";
@@ -98,6 +98,14 @@ export interface IStorage {
   createDemoQuestion(data: InsertDemoQuestion): Promise<DemoQuestion>;
   updateDemoQuestion(id: string, updates: Partial<InsertDemoQuestion>): Promise<DemoQuestion>;
   deleteDemoQuestion(id: string): Promise<void>;
+  
+  // Home page content methods
+  getAllHomePageContent(): Promise<HomePageContent[]>;
+  getHomePageContentByKey(key: string): Promise<HomePageContent | undefined>;
+  getHomePageContentBySection(section: string): Promise<HomePageContent[]>;
+  createHomePageContent(data: InsertHomePageContent): Promise<HomePageContent>;
+  updateHomePageContent(id: string, updates: Partial<InsertHomePageContent>): Promise<HomePageContent>;
+  deleteHomePageContent(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -718,6 +726,38 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDemoQuestion(id: string): Promise<void> {
     await db.delete(demoQuestions).where(eq(demoQuestions.id, id));
+  }
+
+  // Home page content methods
+  async getAllHomePageContent(): Promise<HomePageContent[]> {
+    return db.select().from(homePageContent).orderBy(homePageContent.section, homePageContent.key);
+  }
+
+  async getHomePageContentByKey(key: string): Promise<HomePageContent | undefined> {
+    const [content] = await db.select().from(homePageContent).where(eq(homePageContent.key, key));
+    return content;
+  }
+
+  async getHomePageContentBySection(section: string): Promise<HomePageContent[]> {
+    return db.select().from(homePageContent).where(eq(homePageContent.section, section));
+  }
+
+  async createHomePageContent(data: InsertHomePageContent): Promise<HomePageContent> {
+    const [content] = await db.insert(homePageContent).values(data as any).returning();
+    return content;
+  }
+
+  async updateHomePageContent(id: string, updates: Partial<InsertHomePageContent>): Promise<HomePageContent> {
+    const [content] = await db
+      .update(homePageContent)
+      .set({ ...updates as any, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(homePageContent.id, id))
+      .returning();
+    return content;
+  }
+
+  async deleteHomePageContent(id: string): Promise<void> {
+    await db.delete(homePageContent).where(eq(homePageContent.id, id));
   }
 }
 
