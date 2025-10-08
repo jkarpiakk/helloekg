@@ -10,9 +10,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import type { LoginForm, RegisterForm } from "@/types";
+import logoImage from "@assets/logo ekg 2_1757715460574.png";
 
 interface AuthFormsProps {
   mode: "login" | "register";
@@ -118,9 +119,11 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       <Card className="w-full max-w-md mx-auto">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-              <Heart className="h-6 w-6 text-primary-foreground" />
-            </div>
+            <img 
+              src={logoImage} 
+              alt="EKG Academy" 
+              className="h-20 w-20"
+            />
           </div>
           <CardTitle className="text-2xl text-center">{t("auth.loginTitle")}</CardTitle>
           <CardDescription className="text-center">
@@ -197,9 +200,11 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-center mb-4">
-          <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-            <Heart className="h-6 w-6 text-primary-foreground" />
-          </div>
+          <img 
+            src={logoImage} 
+            alt="EKG Academy" 
+            className="h-20 w-20"
+          />
         </div>
         <CardTitle className="text-2xl text-center">{t("auth.registerTitle")}</CardTitle>
         <CardDescription className="text-center">
