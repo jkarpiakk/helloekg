@@ -1,0 +1,23 @@
+[Info] Successfully preconnected to https://fonts.googleapis.com/
+[Info] Successfully preconnected to https://fonts.gstatic.com/
+[Debug] [vite] connecting... (client, line 495)
+[Debug] [vite] connected. (client, line 618)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "learn", timestamp: "2025-10-08T19:30:07.723Z"} (quiz.tsx, line 38)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "learn", timestamp: "2025-10-08T19:30:08.091Z"} (quiz.tsx, line 38)
+[Log] 🎲 Exam mode clicked (quiz.tsx, line 274)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "exam", timestamp: "2025-10-08T19:30:16.782Z"} (quiz.tsx, line 38)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "review", timestamp: "2025-10-08T19:30:18.748Z"} (quiz.tsx, line 38)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "review", timestamp: "2025-10-08T19:30:19.348Z"} (quiz.tsx, line 38)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "learn", timestamp: "2025-10-08T19:30:28.245Z"} (quiz.tsx, line 38)
+[Log] 🎲 Exam mode clicked (quiz.tsx, line 274)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "exam", timestamp: "2025-10-08T19:30:29.631Z"} (quiz.tsx, line 38)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "learn", timestamp: "2025-10-08T19:30:42.381Z"} (quiz.tsx, line 38)
+[Log] 📚 Section clicked: – {id: "191f154d-36e7-4e07-a37d-6edd3d1dfe1c", title: "Podstawy układu bodźcoprzewodzącego serca", isLocked: false, …} (quiz.tsx, line 375)
+{id: "191f154d-36e7-4e07-a37d-6edd3d1dfe1c", title: "Podstawy układu bodźcoprzewodzącego serca", isLocked: false, currentMode: "learn"}Object
+[Log] ✅ Section set to: – "191f154d-36e7-4e07-a37d-6edd3d1dfe1c" (quiz.tsx, line 383)
+[Log] 🎯 Quiz Component Render: – {selectedSection: "191f154d-36e7-4e07-a37d-6edd3d1dfe1c", quizMode: "learn", timestamp: "2025-10-08T19:30:43.998Z"} (quiz.tsx, line 38)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "learn", timestamp: "2025-10-08T19:30:51.931Z"} (quiz.tsx, line 38)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "review", timestamp: "2025-10-08T19:30:53.031Z"} (quiz.tsx, line 38)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "learn", timestamp: "2025-10-08T19:30:57.601Z"} (quiz.tsx, line 38)
+[Log] 🎲 Exam mode clicked (quiz.tsx, line 274)
+[Log] 🎯 Quiz Component Render: – {selectedSection: null, quizMode: "exam", timestamp: "2025-10-08T19:30:58.384Z"} (quiz.tsx, line 38)

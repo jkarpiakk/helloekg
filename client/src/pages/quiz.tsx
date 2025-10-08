@@ -33,8 +33,16 @@ export default function Quiz() {
     const sectionParam = urlParams.get('section');
     const modeParam = urlParams.get('mode') as "learn" | "review" | "exam" | null;
     
-    if (sectionParam) setSelectedSection(sectionParam);
-    if (modeParam) setQuizMode(modeParam);
+    console.log('⚙️ useEffect running - URL params:', { sectionParam, modeParam });
+    
+    if (sectionParam) {
+      console.log('⚙️ Setting section from URL:', sectionParam);
+      setSelectedSection(sectionParam);
+    }
+    if (modeParam) {
+      console.log('⚙️ Setting mode from URL:', modeParam);
+      setQuizMode(modeParam);
+    }
   }, []); // Run only once on mount
 
   // Fetch sections with progress
@@ -55,6 +63,7 @@ export default function Quiz() {
       return response.json();
     },
     enabled: isAuthenticated && quizMode === "review",
+    staleTime: Infinity, // Prevent automatic refetch
   });
 
   // Redirect if not authenticated
