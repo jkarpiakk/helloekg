@@ -10,6 +10,9 @@ import {
   Volume2, VolumeX, ArrowLeft, Sparkles 
 } from "lucide-react";
 import { Link } from "wouter";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, PerspectiveCamera, Html } from "@react-three/drei";
+import * as THREE from "three";
 
 interface EKGPreset {
   name: string;
@@ -27,6 +30,241 @@ const PRESETS: EKGPreset[] = [
   { name: 'VTach', bpm: 180, rhythm: 'vtach', description: 'Częstoskurcz komorowy', color: 'bg-red-500' },
 ];
 
+// 3D Anatomical Heart Component with smooth beat animation
+function AnatomicalHeart({ 
+  isBeating, 
+  rhythm, 
+  bpm,
+  timeRef,
+  lastBeatRef,
+  beatIntervalRef,
+  isPlaying
+}: { 
+  isBeating: boolean; 
+  rhythm: string; 
+  bpm: number;
+  timeRef: React.MutableRefObject<number>;
+  lastBeatRef: React.MutableRefObject<number>;
+  beatIntervalRef: React.MutableRefObject<number | undefined>;
+  isPlaying: boolean;
+}) {
+  const leftVentricleRef = useRef<THREE.Mesh>(null);
+  const rightVentricleRef = useRef<THREE.Mesh>(null);
+  const leftAtriumRef = useRef<THREE.Mesh>(null);
+  const rightAtriumRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  
+  // Store AFib variation per beat to avoid per-frame jitter
+  const afibVariationRef = useRef(1.0);
+  const lastBeatTimeRecordedRef = useRef(0);
+  
+  useFrame((state) => {
+    if (!isPlaying) return; // Pause animation when playback is stopped
+    
+    const t = state.clock.getElapsedTime();
+    
+    // Use the actual beat interval from EKG generator (includes AFib randomness)
+    const currentBeatInterval = beatIntervalRef.current || (60 / bpm) * 1000;
+    
+    // Calculate phase from actual EKG timing using live refs
+    const timeSinceLastBeat = timeRef.current - lastBeatRef.current;
+    const phase = Math.min(timeSinceLastBeat / currentBeatInterval, 1);
+    
+    // Update AFib variation only on new beat
+    if (lastBeatRef.current !== lastBeatTimeRecordedRef.current) {
+      lastBeatTimeRecordedRef.current = lastBeatRef.current;
+      if (rhythm === 'afib') {
+        afibVariationRef.current = 0.8 + Math.random() * 0.4; // 80-120% variation
+      } else {
+        afibVariationRef.current = 1.0;
+      }
+    }
+    
+    // Smooth systole/diastole curve using sine
+    // Systole (contraction) happens in first 40% of cycle
+    const systolePhase = Math.min(phase / 0.4, 1);
+    const systoleScale = 0.85 + Math.sin(systolePhase * Math.PI) * 0.15 * afibVariationRef.current;
+    
+    // Diastole (relaxation) in remaining 60%
+    const diastolePhase = phase > 0.4 ? (phase - 0.4) / 0.6 : 0;
+    const ventricleScale = phase < 0.4 
+      ? systoleScale 
+      : 1.0 - Math.sin(diastolePhase * Math.PI) * 0.15 * afibVariationRef.current;
+    
+    // Atria contract before ventricles (P wave)
+    const atriaPhase = (phase + 0.8) % 1; // Offset by 80% of cycle
+    const atriaScale = atriaPhase < 0.3 
+      ? 0.92 + Math.sin((atriaPhase / 0.3) * Math.PI) * 0.08 * afibVariationRef.current
+      : 1.0;
+    
+    // Apply smooth scaling to ventricles
+    if (leftVentricleRef.current) {
+      leftVentricleRef.current.scale.set(
+        ventricleScale,
+        ventricleScale * 1.2, // Elongate vertically
+        ventricleScale
+      );
+    }
+    if (rightVentricleRef.current) {
+      rightVentricleRef.current.scale.set(
+        ventricleScale * 0.9,
+        ventricleScale * 1.1,
+        ventricleScale * 0.9
+      );
+    }
+    
+    // Apply smooth scaling to atria
+    if (leftAtriumRef.current) {
+      leftAtriumRef.current.scale.setScalar(atriaScale);
+    }
+    if (rightAtriumRef.current) {
+      rightAtriumRef.current.scale.setScalar(atriaScale);
+    }
+    
+    // Gentle rotation for better view
+    if (groupRef.current) {
+      groupRef.current.rotation.y = Math.sin(t * 0.3) * 0.2;
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      {/* Left Ventricle - largest chamber, elongated cone shape */}
+      <mesh ref={leftVentricleRef} position={[-0.5, -0.3, 0]}>
+        <coneGeometry args={[0.7, 1.6, 32, 1, false, 0, Math.PI * 2]} />
+        <meshStandardMaterial 
+          color="#c41e3a" 
+          roughness={0.3} 
+          metalness={0.2}
+        />
+      </mesh>
+
+      {/* Right Ventricle - smaller, crescent shape */}
+      <mesh ref={rightVentricleRef} position={[0.55, -0.2, 0.15]} rotation={[0, 0, -0.3]}>
+        <coneGeometry args={[0.6, 1.4, 32, 1]} />
+        <meshStandardMaterial 
+          color="#d73447" 
+          roughness={0.3} 
+          metalness={0.2}
+        />
+      </mesh>
+
+      {/* Left Atrium - rounded top */}
+      <mesh ref={leftAtriumRef} position={[-0.5, 1.1, 0]}>
+        <sphereGeometry args={[0.45, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.8]} />
+        <meshStandardMaterial 
+          color="#e74c3c" 
+          roughness={0.25} 
+          metalness={0.25}
+        />
+      </mesh>
+
+      {/* Right Atrium */}
+      <mesh ref={rightAtriumRef} position={[0.5, 1.15, 0.1]}>
+        <sphereGeometry args={[0.45, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.8]} />
+        <meshStandardMaterial 
+          color="#ec7063" 
+          roughness={0.25} 
+          metalness={0.25}
+        />
+      </mesh>
+
+      {/* Aorta - main artery */}
+      <mesh position={[-0.4, 1.6, -0.1]} rotation={[0.2, 0, 0.4]}>
+        <cylinderGeometry args={[0.22, 0.28, 1.0, 16]} />
+        <meshStandardMaterial 
+          color="#b71c1c" 
+          roughness={0.4} 
+          metalness={0.2}
+        />
+      </mesh>
+
+      {/* Superior Vena Cava - blue vein */}
+      <mesh position={[0.45, 1.7, 0.15]} rotation={[0.1, 0, -0.2]}>
+        <cylinderGeometry args={[0.14, 0.18, 0.8, 16]} />
+        <meshStandardMaterial 
+          color="#3949ab" 
+          roughness={0.4} 
+          metalness={0.2}
+        />
+      </mesh>
+
+      {/* Pulmonary Artery - purple */}
+      <mesh position={[0.15, 1.45, 0.35]} rotation={[0.5, 0.3, -0.3]}>
+        <cylinderGeometry args={[0.16, 0.20, 0.7, 16]} />
+        <meshStandardMaterial 
+          color="#5e35b1" 
+          roughness={0.4} 
+          metalness={0.2}
+        />
+      </mesh>
+
+      {/* Interventricular septum - wall between ventricles */}
+      <mesh position={[0, 0, 0.05]} rotation={[0, 0, -0.15]}>
+        <boxGeometry args={[0.15, 1.8, 0.8]} />
+        <meshStandardMaterial 
+          color="#8b0000" 
+          roughness={0.5} 
+          metalness={0.1}
+        />
+      </mesh>
+      
+      {/* Pulmonary veins */}
+      <mesh position={[-0.8, 1.3, -0.2]} rotation={[0, 0.8, 0.3]}>
+        <cylinderGeometry args={[0.10, 0.12, 0.5, 12]} />
+        <meshStandardMaterial color="#3949ab" roughness={0.4} />
+      </mesh>
+      <mesh position={[-0.7, 1.2, 0.3]} rotation={[0, -0.6, 0.2]}>
+        <cylinderGeometry args={[0.10, 0.12, 0.5, 12]} />
+        <meshStandardMaterial color="#3949ab" roughness={0.4} />
+      </mesh>
+      
+      {/* Interactive Labels */}
+      <Html position={[-0.5, -0.8, 0]} center>
+        <div className="bg-red-900/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+          Lewa komora
+        </div>
+      </Html>
+      
+      <Html position={[0.55, -0.7, 0.15]} center>
+        <div className="bg-red-800/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+          Prawa komora
+        </div>
+      </Html>
+      
+      <Html position={[-0.5, 1.5, 0]} center>
+        <div className="bg-red-700/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+          Lewy przedsionek
+        </div>
+      </Html>
+      
+      <Html position={[0.5, 1.55, 0.1]} center>
+        <div className="bg-red-600/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+          Prawy przedsionek
+        </div>
+      </Html>
+      
+      <Html position={[-0.6, 2.2, -0.1]} center>
+        <div className="bg-red-950/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+          Aorta
+        </div>
+      </Html>
+      
+      <Html position={[0.45, 2.2, 0.15]} center>
+        <div className="bg-blue-800/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+          Żyła główna górna
+        </div>
+      </Html>
+      
+      <Html position={[0.15, 1.9, 0.5]} center>
+        <div className="bg-purple-700/90 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+          Tętnica płucna
+        </div>
+      </Html>
+    </group>
+  );
+}
+
 export default function EKGSimulator() {
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
@@ -43,6 +281,20 @@ export default function EKGSimulator() {
   const timeRef = useRef(0);
   const lastBeatRef = useRef(0);
   const heartBeatRef = useRef(false);
+  const pauseTimeOffsetRef = useRef(0);
+  const lastPauseTimeRef = useRef(0);
+
+  // Handle pause/resume timing
+  useEffect(() => {
+    if (!isPlaying) {
+      lastPauseTimeRef.current = performance.now();
+    } else if (lastPauseTimeRef.current > 0) {
+      // Resume: add time that passed during pause to offset
+      const pauseDuration = performance.now() - lastPauseTimeRef.current;
+      pauseTimeOffsetRef.current += pauseDuration;
+      lastPauseTimeRef.current = 0;
+    }
+  }, [isPlaying]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -63,6 +315,7 @@ export default function EKGSimulator() {
     
     if (timeSinceBeat > beatInterval) {
       lastBeatRef.current = t;
+      beatIntervalRef.current = beatInterval; // Store actual interval for 3D sync
       heartBeatRef.current = true;
       setHeartBeat(true);
       setTimeout(() => {
@@ -301,24 +554,77 @@ export default function EKGSimulator() {
               </CardContent>
             </Card>
 
-            {/* Animated Heart */}
+            {/* 3D Anatomical Heart */}
             <Card className="mt-6">
               <CardHeader>
-                <CardTitle>Wizualizacja</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Anatomiczny Model Serca 3D</span>
+                  <Badge variant="outline" className="bg-primary/10 text-primary">
+                    Interaktywny
+                  </Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-center py-8">
-                  <div className={`transition-transform duration-200 ${heartBeat ? 'scale-110' : 'scale-100'}`}>
-                    <Heart className={`h-32 w-32 ${heartBeat ? 'text-red-500' : 'text-red-500/50'} transition-colors`} />
-                  </div>
+                <div className="h-[400px] bg-gradient-to-b from-slate-950 to-slate-900 rounded-lg overflow-hidden border border-border">
+                  <Canvas>
+                    <PerspectiveCamera makeDefault position={[0, 0, 6]} />
+                    <OrbitControls 
+                      enableZoom={true} 
+                      enablePan={true}
+                      minDistance={3}
+                      maxDistance={10}
+                    />
+                    
+                    {/* Lighting */}
+                    <ambientLight intensity={0.5} />
+                    <directionalLight position={[10, 10, 5]} intensity={1} />
+                    <directionalLight position={[-10, -10, -5]} intensity={0.5} />
+                    <pointLight position={[0, 5, 0]} intensity={0.8} color="#ffffff" />
+                    <spotLight 
+                      position={[5, 5, 5]} 
+                      angle={0.3} 
+                      penumbra={1} 
+                      intensity={1}
+                      castShadow 
+                    />
+                    
+                    <AnatomicalHeart 
+                      isBeating={heartBeat} 
+                      rhythm={rhythm} 
+                      bpm={bpm}
+                      timeRef={timeRef}
+                      lastBeatRef={lastBeatRef}
+                      beatIntervalRef={beatIntervalRef}
+                      isPlaying={isPlaying}
+                    />
+                  </Canvas>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {rhythm === 'normal' && 'Prawidłowy rytm zatokowy'}
-                    {rhythm === 'afib' && 'Migotanie przedsionków - nieregularny rytm'}
-                    {rhythm === 'vtach' && 'Częstoskurcz komorowy - niebezpieczna arytmia'}
-                    {rhythm === 'bradycardia' && 'Bradykardia - zwolniona akcja serca'}
-                    {rhythm === 'svt' && 'Tachykardia nadkomorowa'}
+                <div className="mt-4 space-y-2">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">
+                      {rhythm === 'normal' && 'Prawidłowy rytm zatokowy - skoordynowany skurcz komór i przedsionków'}
+                      {rhythm === 'afib' && 'Migotanie przedsionków - nieregularny rytm, przedsionki drżą'}
+                      {rhythm === 'vtach' && 'Częstoskurcz komorowy - niebezpieczna arytmia'}
+                      {rhythm === 'bradycardia' && 'Bradykardia - zwolniona akcja serca'}
+                      {rhythm === 'svt' && 'Tachykardia nadkomorowa - przyspieszona akcja'}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-red-600" />
+                      <span>Lewy przedsionek</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-red-400" />
+                      <span>Prawy przedsionek</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-blue-600" />
+                      <span>Żyły</span>
+                    </div>
+                  </div>
+                  <p className="text-center text-xs text-muted-foreground mt-2">
+                    💡 Obracaj model myszą, przybliżaj kółkiem
                   </p>
                 </div>
               </CardContent>
