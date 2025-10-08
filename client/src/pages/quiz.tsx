@@ -66,11 +66,13 @@ export default function Quiz() {
     );
   }
 
-  // Show quiz interface if section is selected OR in review mode
-  if (selectedSection || quizMode === "review") {
+  // Show quiz interface if section is selected (for learn/exam) OR in review mode
+  const shouldShowQuiz = (selectedSection && (quizMode === "learn" || quizMode === "exam")) || quizMode === "review";
+  
+  if (shouldShowQuiz) {
     return (
       <QuizInterface
-        sectionId={quizMode === "review" ? undefined : selectedSection}
+        sectionId={quizMode === "review" ? undefined : (selectedSection || undefined)}
         mode={quizMode}
         onExit={() => {
           setSelectedSection(null);
