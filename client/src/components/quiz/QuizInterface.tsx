@@ -194,51 +194,52 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     const passed = successRate >= 70;
 
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="max-w-2xl w-full mx-4">
-          <div className="bg-card rounded-lg border border-border p-8 text-center">
-            <div className={`w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center ${
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full">
+          <div className="bg-card rounded-lg border border-border p-4 sm:p-6 lg:p-8 text-center">
+            <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full mx-auto mb-6 flex items-center justify-center ${
               passed ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
             }`}>
-              <span className="text-5xl font-bold">{Math.round(successRate)}%</span>
+              <span className="text-4xl sm:text-5xl font-bold">{Math.round(successRate)}%</span>
             </div>
             
-            <h2 className="text-3xl font-bold text-foreground mb-2">
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
               {passed ? "Gratulacje!" : "Egzamin niezaliczony"}
             </h2>
-            <p className="text-muted-foreground mb-8">
+            <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
               {passed 
                 ? "Udało Ci się zaliczyć egzamin próbny!" 
                 : "Niestety nie udało się osiągnąć wymaganego progu 70%."}
             </p>
 
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="bg-background p-4 rounded-lg border border-border">
-                <div className="text-3xl font-bold text-foreground mb-1">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6 sm:mb-8">
+              <div className="bg-background p-3 sm:p-4 rounded-lg border border-border">
+                <div className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
                   {examSummary.totalQuestions}
                 </div>
-                <div className="text-sm text-muted-foreground">Pytań</div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Pytań</div>
               </div>
-              <div className="bg-background p-4 rounded-lg border border-border">
-                <div className="text-3xl font-bold text-green-500 mb-1">
+              <div className="bg-background p-3 sm:p-4 rounded-lg border border-border">
+                <div className="text-2xl sm:text-3xl font-bold text-green-500 mb-1">
                   {examSummary.correctAnswers}
                 </div>
-                <div className="text-sm text-muted-foreground">Poprawnych</div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Poprawnych</div>
               </div>
-              <div className="bg-background p-4 rounded-lg border border-border">
-                <div className="text-3xl font-bold text-red-500 mb-1">
+              <div className="bg-background p-3 sm:p-4 rounded-lg border border-border">
+                <div className="text-2xl sm:text-3xl font-bold text-red-500 mb-1">
                   {examSummary.totalQuestions - examSummary.correctAnswers}
                 </div>
-                <div className="text-sm text-muted-foreground">Błędnych</div>
+                <div className="text-xs sm:text-sm text-muted-foreground">Błędnych</div>
               </div>
             </div>
 
-            <div className="flex gap-4 justify-center">
-              <Button onClick={onExit} variant="outline" data-testid="exit-exam">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+              <Button onClick={onExit} variant="outline" className="w-full sm:w-auto" data-testid="exit-exam">
                 Wróć do panelu
               </Button>
               <Button 
-                onClick={() => window.location.reload()} 
+                onClick={() => window.location.reload()}
+                className="w-full sm:w-auto"
                 data-testid="retry-exam"
               >
                 Spróbuj ponownie
@@ -276,9 +277,9 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     <div className="min-h-screen bg-background">
       {/* Quiz Header */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <Button
                 variant="ghost"
                 size="sm"
@@ -288,15 +289,15 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div>
-                <h2 className="font-semibold text-foreground">Moduł EKG</h2>
-                <p className="text-sm text-muted-foreground">
+                <h2 className="text-sm sm:text-base font-semibold text-foreground">Moduł EKG</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   {t("quiz.question")} {currentQuestionIndex + 1}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <div className="w-48 h-2 bg-secondary rounded-full overflow-hidden">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="w-24 sm:w-32 lg:w-48 h-2 bg-secondary rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-primary rounded-full transition-all duration-300"
                   style={{ 
@@ -306,7 +307,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                   }}
                 />
               </div>
-              <span className="text-sm text-muted-foreground font-mono">
+              <span className="text-xs sm:text-sm text-muted-foreground font-mono">
                 {mode === "exam" && examTotalQuestions > 0 
                   ? `${currentQuestionIndex + 1}/${examTotalQuestions}`
                   : `${Math.round(((currentQuestionIndex + 1) / 10) * 100)}%`}
@@ -317,7 +318,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       </div>
 
       {/* Quiz Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         <QuestionCard
           question={question}
           selectedAnswer={selectedAnswer}

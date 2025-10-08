@@ -28,7 +28,7 @@ export default function QuestionCard({
   const { t } = useTranslation();
 
   const getOptionClassName = (index: number): string => {
-    const baseClass = "quiz-option p-6 border-2 rounded-xl cursor-pointer transition-all";
+    const baseClass = "quiz-option p-3 sm:p-4 lg:p-6 border-2 rounded-xl cursor-pointer transition-all";
     
     if (!showExplanation) {
       return `${baseClass} border-border hover:shadow-lg hover:-translate-y-1`;
@@ -48,29 +48,29 @@ export default function QuestionCard({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {/* Question Card */}
       <Card className="shadow-lg">
-        <CardContent className="p-8">
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-foreground mb-6" data-testid="question-title">
+        <CardContent className="p-4 sm:p-6 lg:p-8">
+          <div className="mb-4 sm:mb-6 lg:mb-8">
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-4 sm:mb-6" data-testid="question-title">
               {question.title}
             </h3>
             
             {/* EKG Image */}
             {question.imageUrl && (
               <div 
-                className="relative group cursor-pointer mb-6"
+                className="relative group cursor-pointer mb-4 sm:mb-6"
                 onClick={() => onImageClick(question.imageUrl!)}
                 data-testid="question-image"
               >
                 <img
                   src={question.imageUrl}
                   alt="Zapis EKG"
-                  className="w-full h-64 object-cover rounded-lg border border-border"
+                  className="w-full h-48 sm:h-56 lg:h-64 object-cover rounded-lg border border-border"
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white px-4 py-2 rounded-lg">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base">
                     <ZoomIn className="h-4 w-4 mr-2 inline" />
                     {t("quiz.enlargeImage")}
                   </div>
@@ -81,7 +81,7 @@ export default function QuestionCard({
             {/* Question Body */}
             {question.bodyMd && (
               <div 
-                className="prose prose-slate max-w-none mb-6"
+                className="prose prose-sm sm:prose prose-slate max-w-none mb-4 sm:mb-6"
                 dangerouslySetInnerHTML={sanitizeMarkdown(question.bodyMd)}
                 data-testid="question-body"
               />
@@ -98,10 +98,10 @@ export default function QuestionCard({
                 data-testid={`answer-option-${index}`}
               >
                 <div className="flex items-center">
-                  <span className="font-bold text-lg mr-4 w-8">
+                  <span className="font-bold text-base sm:text-lg mr-2 sm:mr-4 w-6 sm:w-8">
                     {String.fromCharCode(65 + index)}.
                   </span>
-                  <span>{answer.text}</span>
+                  <span className="text-sm sm:text-base">{answer.text}</span>
                 </div>
               </div>
             ))}
@@ -112,30 +112,30 @@ export default function QuestionCard({
       {/* Explanation Panel */}
       {showExplanation && quizResult && (
         <Card className="shadow-lg" data-testid="explanation-panel">
-          <CardContent className="p-8">
-            <div className="flex items-start space-x-4">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+          <CardContent className="p-4 sm:p-6 lg:p-8">
+            <div className="flex items-start space-x-3 sm:space-x-4">
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
                 quizResult.isCorrect 
                   ? 'bg-green-100 dark:bg-green-900' 
                   : 'bg-red-100 dark:bg-red-900'
               }`}>
                 {quizResult.isCorrect ? (
-                  <Check className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <Check className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 dark:text-green-400" />
                 ) : (
-                  <X className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  <X className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 dark:text-red-400" />
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="text-xl font-semibold mb-4" data-testid="result-title">
+                <h4 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4" data-testid="result-title">
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="prose prose-slate max-w-none"
+                  className="prose prose-sm sm:prose prose-slate max-w-none"
                   dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
                   data-testid="explanation-content"
                 />
-                <div className="mt-4 flex items-center space-x-4 text-sm text-muted-foreground">
-                  <Badge variant="outline">
+                <div className="mt-3 sm:mt-4 flex items-center space-x-4 text-xs sm:text-sm text-muted-foreground">
+                  <Badge variant="outline" className="text-xs sm:text-sm">
                     {t("quiz.timeSpent")} {Math.round(quizResult.timeMs / 1000)}s
                   </Badge>
                 </div>

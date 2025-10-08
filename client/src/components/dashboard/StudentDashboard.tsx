@@ -109,19 +109,20 @@ export default function StudentDashboard() {
     <div className="min-h-screen bg-background">
       {/* Dashboard Header */}
       <div className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="welcome-message">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground" data-testid="welcome-message">
                 {t("dashboard.welcome")}, {user?.firstName}!
               </h1>
-              <p className="text-muted-foreground">{t("dashboard.continueWhere")}</p>
+              <p className="text-sm sm:text-base text-muted-foreground">{t("dashboard.continueWhere")}</p>
             </div>
             <div className="flex items-center space-x-4">
               {subscription && (
-                <div className="bg-chart-2/10 text-chart-2 px-4 py-2 rounded-lg border border-chart-2/20">
-                  <Crown className="h-4 w-4 mr-2 inline" />
-                  Plan aktywny do {new Date(subscription.endDate).toLocaleDateString('pl-PL')}
+                <div className="bg-chart-2/10 text-chart-2 px-3 sm:px-4 py-2 rounded-lg border border-chart-2/20 text-xs sm:text-sm">
+                  <Crown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 inline" />
+                  <span className="hidden sm:inline">Plan aktywny do </span>
+                  {new Date(subscription.endDate).toLocaleDateString('pl-PL')}
                 </div>
               )}
             </div>
@@ -129,10 +130,10 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Main content */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6 lg:space-y-8">
             {/* Progress Overview */}
             <ProgressCard
               overallProgress={overallProgress}
@@ -146,9 +147,9 @@ export default function StudentDashboard() {
                 <CardTitle>{t("dashboard.continue")}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                   {/* EKG Simulator - NEW! */}
-                  <div className="p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-purple-500/10 to-pink-500/10 relative overflow-hidden">
+                  <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-purple-500/10 to-pink-500/10 relative overflow-hidden">
                     <Link href="/simulator" className="block">
                       <div className="absolute top-2 right-2">
                         <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">NOWOŚĆ!</Badge>
@@ -158,8 +159,8 @@ export default function StudentDashboard() {
                           <Activity className="h-6 w-6 text-purple-400 animate-pulse" />
                         </div>
                       </div>
-                      <h3 className="font-semibold text-foreground mb-2">🎮 Symulator EKG Live</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
+                      <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">🎮 Symulator EKG Live</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                         Interaktywny symulator rytmu serca w czasie rzeczywistym z wizualizacją arytmii
                       </p>
                       <div className="flex items-center gap-2 text-xs text-purple-400">
@@ -172,7 +173,7 @@ export default function StudentDashboard() {
                   </div>
 
                   {/* Interactive Lecture */}
-                  <div className="p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5">
+                  <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5">
                     <Link href="/lecture" className="block">
                       <div className="flex items-center justify-between mb-4">
                         <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -180,8 +181,8 @@ export default function StudentDashboard() {
                         </div>
                         <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20">NOWE!</Badge>
                       </div>
-                      <h3 className="font-semibold text-foreground mb-2">Interaktywny wykład EKG</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
+                      <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">Interaktywny wykład EKG</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                         Zapoznaj się z podstawami EKG przez wizualne analogie i interaktywne prezentacje
                       </p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -194,7 +195,7 @@ export default function StudentDashboard() {
                   </div>
 
                   {/* Continue where left off */}
-                  <div className="p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group">
+                  <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group">
                     <Link href="/quiz" className="block">
                       <div className="flex items-center justify-between mb-4">
                         <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -202,13 +203,13 @@ export default function StudentDashboard() {
                         </div>
                         <span className="text-sm text-muted-foreground">Moduł 1</span>
                       </div>
-                      <h3 className="font-semibold text-foreground mb-2">Kontynuuj naukę</h3>
-                      <p className="text-sm text-muted-foreground">{t("dashboard.lastActivity")} 2 {t("dashboard.hoursAgo")}</p>
+                      <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">Kontynuuj naukę</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{t("dashboard.lastActivity")} 2 {t("dashboard.hoursAgo")}</p>
                     </Link>
                   </div>
 
                   {/* Review mistakes */}
-                  <div className="p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group">
+                  <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group">
                     <Link href="/quiz?mode=review" className="block">
                       <div className="flex items-center justify-between mb-4">
                         <div className="w-12 h-12 bg-chart-3/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -216,8 +217,8 @@ export default function StudentDashboard() {
                         </div>
                         <span className="text-sm text-muted-foreground">5 pytań</span>
                       </div>
-                      <h3 className="font-semibold text-foreground mb-2">{t("dashboard.review")}</h3>
-                      <p className="text-sm text-muted-foreground">{t("dashboard.strengthenKnowledge")}</p>
+                      <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">{t("dashboard.review")}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{t("dashboard.strengthenKnowledge")}</p>
                     </Link>
                   </div>
                 </div>
@@ -230,18 +231,18 @@ export default function StudentDashboard() {
                 <CardTitle>{t("dashboard.moduleProgress")}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {sections?.map((section, index) => (
-                    <div key={section.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                    <div key={section.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-border rounded-lg">
+                      <div className="flex items-center space-x-3 sm:space-x-4">
+                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
                           section.completionPercentage >= 100 
                             ? 'bg-chart-2/10' 
                             : section.completionPercentage > 0 
                               ? 'bg-primary/10' 
                               : 'bg-muted'
                         }`}>
-                          <Play className={`h-6 w-6 ${
+                          <Play className={`h-5 w-5 sm:h-6 sm:w-6 ${
                             section.completionPercentage >= 100 
                               ? 'text-chart-2' 
                               : section.completionPercentage > 0 
@@ -249,21 +250,21 @@ export default function StudentDashboard() {
                                 : 'text-muted-foreground'
                           }`} />
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-foreground">{section.title}</h4>
-                          <p className="text-sm text-muted-foreground">
+                        <div className="min-w-0">
+                          <h4 className="text-sm sm:text-base font-semibold text-foreground truncate">{section.title}</h4>
+                          <p className="text-xs sm:text-sm text-muted-foreground">
                             15 {t("dashboard.questions")} • {Math.round(section.completionPercentage)}% {t("dashboard.completed")}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="w-32 h-2 bg-secondary rounded-full overflow-hidden">
+                      <div className="flex items-center space-x-3 sm:space-x-4">
+                        <div className="flex-1 sm:w-32 h-2 bg-secondary rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-primary rounded-full transition-all"
                             style={{ width: `${section.completionPercentage}%` }}
                           />
                         </div>
-                        <span className="text-sm text-muted-foreground font-mono w-12">
+                        <span className="text-xs sm:text-sm text-muted-foreground font-mono w-12">
                           {Math.round(section.completionPercentage)}%
                         </span>
                       </div>
@@ -275,7 +276,7 @@ export default function StudentDashboard() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-8">
+          <div className="space-y-4 sm:space-y-6 lg:space-y-8">
             {/* Certificate Section */}
             <Card>
               <CardHeader>
