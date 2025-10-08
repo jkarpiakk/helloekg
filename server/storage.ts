@@ -193,7 +193,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(sections)
       .leftJoin(modules, eq(sections.moduleId, modules.id))
-      .orderBy(asc(modules.order), asc(sections.order));
+      .orderBy(sql`${modules.order} ASC NULLS LAST`, sql`${sections.order} ASC`);
     
     return result.map(r => r.section);
   }
