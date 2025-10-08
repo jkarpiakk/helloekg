@@ -69,6 +69,8 @@ export default function Quiz() {
   // Show quiz interface if section is selected (for learn/exam) OR in review mode
   const shouldShowQuiz = (selectedSection && (quizMode === "learn" || quizMode === "exam")) || quizMode === "review";
   
+  console.log('Quiz Debug:', { selectedSection, quizMode, shouldShowQuiz });
+  
   if (shouldShowQuiz) {
     return (
       <QuizInterface
