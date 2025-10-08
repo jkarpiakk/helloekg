@@ -35,17 +35,17 @@ function AnatomicalHeart({
   isBeating, 
   rhythm, 
   bpm,
-  timeRef,
-  lastBeatRef,
-  beatIntervalRef,
+  currentSimTime,
+  lastBeatSimTime,
+  beatInterval,
   isPlaying
 }: { 
   isBeating: boolean; 
   rhythm: string; 
   bpm: number;
-  timeRef: React.MutableRefObject<number>;
-  lastBeatRef: React.MutableRefObject<number>;
-  beatIntervalRef: React.MutableRefObject<number | undefined>;
+  currentSimTime: number;
+  lastBeatSimTime: number;
+  beatInterval: number;
   isPlaying: boolean;
 }) {
   const leftVentricleRef = useRef<THREE.Mesh>(null);
@@ -63,16 +63,13 @@ function AnatomicalHeart({
     
     const t = state.clock.getElapsedTime();
     
-    // Use the actual beat interval from EKG generator (includes AFib randomness)
-    const currentBeatInterval = beatIntervalRef.current || (60 / bpm) * 1000;
-    
-    // Calculate phase from actual EKG timing using live refs
-    const timeSinceLastBeat = timeRef.current - lastBeatRef.current;
-    const phase = Math.min(timeSinceLastBeat / currentBeatInterval, 1);
+    // Calculate phase from actual EKG timing
+    const timeSinceLastBeat = currentSimTime - lastBeatSimTime;
+    const phase = Math.min(timeSinceLastBeat / beatInterval, 1);
     
     // Update AFib variation only on new beat
-    if (lastBeatRef.current !== lastBeatTimeRecordedRef.current) {
-      lastBeatTimeRecordedRef.current = lastBeatRef.current;
+    if (lastBeatSimTime !== lastBeatTimeRecordedRef.current) {
+      lastBeatTimeRecordedRef.current = lastBeatSimTime;
       if (rhythm === 'afib') {
         afibVariationRef.current = 0.8 + Math.random() * 0.4; // 80-120% variation
       } else {
@@ -276,6 +273,9 @@ export default function EKGSimulator() {
   const [rhythm, setRhythm] = useState<'normal' | 'afib' | 'vtach' | 'bradycardia' | 'svt'>('normal');
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [heartBeat, setHeartBeat] = useState(false);
+  const [currentSimTime, setCurrentSimTime] = useState(0);
+  const [lastBeatSimTime, setLastBeatSimTime] = useState(0);
+  const [currentBeatInterval, setCurrentBeatInterval] = useState((60/75) * 1000);
   
   const beatIntervalRef = useRef<number>();
   const timeRef = useRef(0);
@@ -315,7 +315,10 @@ export default function EKGSimulator() {
     
     if (timeSinceBeat > beatInterval) {
       lastBeatRef.current = t;
-      beatIntervalRef.current = beatInterval; // Store actual interval for 3D sync
+      beatIntervalRef.current = beatInterval;
+      // Update state for 3D heart sync
+      setLastBeatSimTime(t);
+      setCurrentBeatInterval(beatInterval);
       heartBeatRef.current = true;
       setHeartBeat(true);
       setTimeout(() => {
@@ -398,6 +401,7 @@ export default function EKGSimulator() {
 
       // Generate new point
       timeRef.current += 16; // ~60fps
+      setCurrentSimTime(timeRef.current);
       const newPoint = generateEKGPoint(timeRef.current, rhythm);
       points.push(newPoint);
 
@@ -592,9 +596,9 @@ export default function EKGSimulator() {
                       isBeating={heartBeat} 
                       rhythm={rhythm} 
                       bpm={bpm}
-                      timeRef={timeRef}
-                      lastBeatRef={lastBeatRef}
-                      beatIntervalRef={beatIntervalRef}
+                      currentSimTime={currentSimTime}
+                      lastBeatSimTime={lastBeatSimTime}
+                      beatInterval={currentBeatInterval}
                       isPlaying={isPlaying}
                     />
                   </Canvas>
