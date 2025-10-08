@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { Check, CreditCard, Smartphone } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 interface Plan {
   id: string;
@@ -64,6 +64,7 @@ const plans: Plan[] = [
 export default function PricingSection() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
 
   return (
     <section className="py-20" id="pricing">
@@ -119,26 +120,35 @@ export default function PricingSection() {
                   ))}
                 </ul>
                 
-                <Button 
-                  className={`w-full ${
-                    plan.isPopular 
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                      : ''
-                  }`}
-                  variant={plan.isPopular ? "default" : "outline"}
-                  asChild
-                  data-testid={`select-plan-${plan.id}`}
-                >
-                  {isAuthenticated ? (
+                {isAuthenticated ? (
+                  <Button 
+                    className={`w-full ${
+                      plan.isPopular 
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                        : ''
+                    }`}
+                    variant={plan.isPopular ? "default" : "outline"}
+                    asChild
+                    data-testid={`select-plan-${plan.id}`}
+                  >
                     <Link href={`/checkout?plan=${plan.id}`}>
                       {t("pricing.cta")}
                     </Link>
-                  ) : (
-                    <Link href="/?auth=register">
-                      {t("pricing.cta")}
-                    </Link>
-                  )}
-                </Button>
+                  </Button>
+                ) : (
+                  <Button 
+                    className={`w-full ${
+                      plan.isPopular 
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                        : ''
+                    }`}
+                    variant={plan.isPopular ? "default" : "outline"}
+                    onClick={() => setLocation("/?auth=register")}
+                    data-testid={`select-plan-${plan.id}`}
+                  >
+                    {t("pricing.cta")}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
