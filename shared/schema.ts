@@ -159,6 +159,7 @@ export const supportTickets = pgTable("support_tickets", {
   message: text("message").notNull(),
   status: varchar("status", { length: 20 }).notNull().default("open"),
   priority: varchar("priority", { length: 20 }).notNull().default("medium"),
+  questionId: uuid("question_id").references(() => questions.id, { onDelete: "set null" }),
   adminResponse: text("admin_response"),
   adminUserId: uuid("admin_user_id").references(() => users.id),
   assignedTo: uuid("assigned_to").references(() => users.id),
@@ -260,6 +261,7 @@ export const certificatesRelations = relations(certificates, ({ one }) => ({
 export const supportTicketsRelations = relations(supportTickets, ({ one }) => ({
   user: one(users, { fields: [supportTickets.userId], references: [users.id] }),
   assignee: one(users, { fields: [supportTickets.assignedTo], references: [users.id] }),
+  question: one(questions, { fields: [supportTickets.questionId], references: [questions.id] }),
 }));
 
 export const auditLogRelations = relations(auditLog, ({ one }) => ({

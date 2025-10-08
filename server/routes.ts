@@ -2043,6 +2043,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Report error/bug endpoint
+  app.post("/api/report-error", requireAuth, async (req, res) => {
+    try {
+      const { questionId, message } = req.body;
+      
+      if (!questionId || !message) {
+        return res.status(400).json({ error: "Pytanie i wiadomość są wymagane" });
+      }
+
+      // Create support ticket
+      const ticket = await storage.createSupportTicket({
+        userId: req.user!.id,
+        userEmail: req.user!.email,
+        userName: `${req.user!.firstName} ${req.user!.lastName}`,
+        subject: `Zgłoszenie błędu w pytaniu`,
+        message: message,
+        questionId: questionId,
+        status: "open",
+        priority: "medium"
+      });
+
+      res.status(201).json({ 
+        success: true, 
+        message: "Zgłoszenie zostało wysłane. Dziękujemy za pomoc!",
+        ticketId: ticket.id 
+      });
+    } catch (error: any) {
+      console.error("Error report creation error:", error);
+      res.status(500).json({ error: "Błąd podczas wysyłania zgłoszenia" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

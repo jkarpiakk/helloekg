@@ -5,9 +5,10 @@ import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Bookmark, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bookmark, X, AlertTriangle } from "lucide-react";
 import QuestionCard from "./QuestionCard";
 import ImageLightbox from "./ImageLightbox";
+import ReportErrorDialog from "./ReportErrorDialog";
 import type { QuizQuestion, QuizResult } from "@/types";
 
 interface QuizInterfaceProps {
@@ -22,6 +23,7 @@ export default function QuizInterface({ sectionId, mode = "learn", onExit }: Qui
   const [showExplanation, setShowExplanation] = useState(false);
   const [startTime, setStartTime] = useState(Date.now());
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [showReportDialog, setShowReportDialog] = useState(false);
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -210,6 +212,15 @@ export default function QuizInterface({ sectionId, mode = "learn", onExit }: Qui
               {t("quiz.markForReview")}
             </Button>
 
+            <Button
+              variant="outline"
+              onClick={() => setShowReportDialog(true)}
+              data-testid="report-error-button"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Zgłoś błąd
+            </Button>
+
             {showExplanation && (
               <Button
                 onClick={handleNextQuestion}
@@ -228,6 +239,15 @@ export default function QuizInterface({ sectionId, mode = "learn", onExit }: Qui
         <ImageLightbox
           imageUrl={lightboxImage}
           onClose={() => setLightboxImage(null)}
+        />
+      )}
+
+      {/* Report Error Dialog */}
+      {question && (
+        <ReportErrorDialog
+          questionId={question.id}
+          open={showReportDialog}
+          onOpenChange={setShowReportDialog}
         />
       )}
     </div>
