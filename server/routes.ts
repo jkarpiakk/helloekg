@@ -18,6 +18,7 @@ import {
   insertQuestionSchema,
   insertBlogPostSchema,
   insertDemoQuestionSchema,
+  insertHomePageContentSchema,
   BlogPost,
   InsertBlogPost
 } from "@shared/schema";
@@ -1877,6 +1878,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Demo question deletion error:", error);
       res.status(500).json({ error: "Błąd podczas usuwania pytania demo" });
+    }
+  });
+
+  // ============================================================================
+  // HOME PAGE CONTENT ROUTES
+  // ============================================================================
+
+  // Public endpoint to get all home page content
+  app.get("/api/home-page-content", async (req, res) => {
+    try {
+      const content = await storage.getAllHomePageContent();
+      res.json(content);
+    } catch (error: any) {
+      console.error("Home page content fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania treści strony głównej" });
+    }
+  });
+
+  // Admin endpoints for managing home page content
+  app.get("/api/admin/home-page-content", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const content = await storage.getAllHomePageContent();
+      res.json(content);
+    } catch (error: any) {
+      console.error("Home page content fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania treści strony głównej" });
+    }
+  });
+
+  app.post("/api/admin/home-page-content", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const contentData = insertHomePageContentSchema.parse(req.body);
+      const newContent = await storage.createHomePageContent(contentData);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "home_page_content_created",
+        entityType: "home_page_content",
+        entityId: newContent.id,
+        diff: { data: contentData },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(201).json(newContent);
+    } catch (error: any) {
+      console.error("Home page content creation error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowe dane treści" });
+      }
+      res.status(500).json({ error: "Błąd podczas tworzenia treści strony głównej" });
+    }
+  });
+
+  app.patch("/api/admin/home-page-content/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: "Nieprawidłowe ID treści" });
+      }
+
+      const updates = insertHomePageContentSchema.partial().parse(req.body);
+      const updatedContent = await storage.updateHomePageContent(id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "home_page_content_updated",
+        entityType: "home_page_content",
+        entityId: id,
+        diff: { updates },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedContent);
+    } catch (error: any) {
+      console.error("Home page content update error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowe dane aktualizacji" });
+      }
+      res.status(500).json({ error: "Błąd podczas aktualizacji treści strony głównej" });
+    }
+  });
+
+  app.delete("/api/admin/home-page-content/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: "Nieprawidłowe ID treści" });
+      }
+
+      await storage.deleteHomePageContent(id);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "home_page_content_deleted",
+        entityType: "home_page_content",
+        entityId: id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Home page content deletion error:", error);
+      res.status(500).json({ error: "Błąd podczas usuwania treści strony głównej" });
     }
   });
 
