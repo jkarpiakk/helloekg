@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import ProgressCard from "./ProgressCard";
-import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle
+import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle, Activity, Sparkles
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -147,6 +147,30 @@ export default function StudentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-2 gap-6">
+                  {/* EKG Simulator - NEW! */}
+                  <div className="p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-purple-500/10 to-pink-500/10 relative overflow-hidden">
+                    <Link href="/simulator" className="block">
+                      <div className="absolute top-2 right-2">
+                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">NOWOŚĆ!</Badge>
+                      </div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Activity className="h-6 w-6 text-purple-400 animate-pulse" />
+                        </div>
+                      </div>
+                      <h3 className="font-semibold text-foreground mb-2">🎮 Symulator EKG Live</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Interaktywny symulator rytmu serca w czasie rzeczywistym z wizualizacją arytmii
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-purple-400">
+                        <Sparkles className="h-3 w-3" />
+                        <span>Animacja 3D</span>
+                        <span>•</span>
+                        <span>5 rytmów</span>
+                      </div>
+                    </Link>
+                  </div>
+
                   {/* Interactive Lecture */}
                   <div className="p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5">
                     <Link href="/lecture" className="block">
