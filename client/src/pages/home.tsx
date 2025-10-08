@@ -241,31 +241,55 @@ export default function Home() {
 
                     {/* Result explanation */}
                     {showResult && (
-                      <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg" data-testid="demo-result-panel">
-                        <div className="flex items-start space-x-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            selectedAnswer === demoQuestion.correct 
-                              ? 'bg-green-500 text-white' 
-                              : 'bg-red-500 text-white'
-                          }`}>
-                            {selectedAnswer === demoQuestion.correct ? (
-                              <Check className="h-4 w-4" />
-                            ) : (
-                              <X className="h-4 w-4" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-foreground mb-1" data-testid="demo-result-status">
-                              {selectedAnswer === demoQuestion.correct 
-                                ? "Brawo! Poprawna odpowiedź!" 
-                                : "Niepoprawnie. Prawidłowa odpowiedź to: " + demoQuestion.options[demoQuestion.correct]
-                              }
-                            </p>
-                            <p className="text-sm text-muted-foreground" data-testid="demo-result-explanation">
-                              {demoQuestion.explanation}
-                            </p>
+                      <div className="mt-6 space-y-4">
+                        <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg" data-testid="demo-result-panel">
+                          <div className="flex items-start space-x-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              selectedAnswer === demoQuestion.correct 
+                                ? 'bg-green-500 text-white' 
+                                : 'bg-red-500 text-white'
+                            }`}>
+                              {selectedAnswer === demoQuestion.correct ? (
+                                <Check className="h-4 w-4" />
+                              ) : (
+                                <X className="h-4 w-4" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-foreground mb-1" data-testid="demo-result-status">
+                                {selectedAnswer === demoQuestion.correct 
+                                  ? "Brawo! Poprawna odpowiedź!" 
+                                  : "Niepoprawnie. Prawidłowa odpowiedź to: " + demoQuestion.options[demoQuestion.correct]
+                                }
+                              </p>
+                              <p className="text-sm text-muted-foreground" data-testid="demo-result-explanation">
+                                {demoQuestion.explanation}
+                              </p>
+                            </div>
                           </div>
                         </div>
+                        
+                        {/* Quick registration CTA for non-authenticated users */}
+                        {!isAuthenticated && (
+                          <div className="bg-gradient-to-r from-primary/10 to-chart-2/10 border border-primary/30 rounded-lg p-4">
+                            <div className="text-center space-y-3">
+                              <p className="text-sm font-semibold text-foreground">
+                                Chcesz nauczyć się więcej? 500+ podobnych pytań czeka!
+                              </p>
+                              <Button 
+                                onClick={() => setAuthMode("register")}
+                                className="w-full bg-primary hover:bg-primary/90"
+                                data-testid="demo-register-cta"
+                              >
+                                <GraduationCap className="h-4 w-4 mr-2" />
+                                Rozpocznij naukę za darmo
+                              </Button>
+                              <p className="text-xs text-muted-foreground">
+                                Rejestracja zajmuje mniej niż minutę
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
