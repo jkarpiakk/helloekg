@@ -17,6 +17,7 @@ import Module3Lecture from "@/pages/module3-lecture";
 // import DynamicLecture from "@/pages/dynamic-lecture";
 import Admin from "@/pages/admin";
 import Pricing from "@/pages/pricing";
+import Checkout from "@/pages/checkout";
 import VerifyCertificate from "@/pages/verify-certificate";
 import Blog from "@/pages/blog";
 import BlogPost from "@/pages/blog-post";
@@ -59,6 +60,7 @@ function AppContent() {
           <Route path="/blog/:slug" component={BlogPost} />
           <Route path="/admin" component={Admin} />
           <Route path="/pricing" component={Pricing} />
+          <Route path="/checkout" component={Checkout} />
           <Route path="/verify/:certificateId" component={VerifyCertificate} />
           <Route component={NotFound} />
         </Switch>
