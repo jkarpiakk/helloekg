@@ -412,6 +412,24 @@ export const insertDemoQuestionSchema = createInsertSchema(demoQuestions).omit({
 export type DemoQuestion = typeof demoQuestions.$inferSelect;
 export type InsertDemoQuestion = z.infer<typeof insertDemoQuestionSchema>;
 
+// Home page content - editable texts
+export const homePageContent = pgTable("home_page_content", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value").notNull(),
+  section: varchar("section", { length: 100 }).notNull(), // hero, how-it-works, course-content, etc.
+  description: text("description"), // helper text for admins
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertHomePageContentSchema = createInsertSchema(homePageContent).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type HomePageContent = typeof homePageContent.$inferSelect;
+export type InsertHomePageContent = z.infer<typeof insertHomePageContentSchema>;
+
 // Additional schemas for API endpoints
 export const loginSchema = z.object({
   email: z.string().email(),
