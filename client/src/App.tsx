@@ -20,6 +20,7 @@ import Pricing from "@/pages/pricing";
 import Checkout from "@/pages/checkout";
 import VerifyCertificate from "@/pages/verify-certificate";
 import CertificatePage from "@/pages/certificate";
+import CertificatePreviewPage from "@/pages/certificate-preview";
 import EKGSimulator from "@/pages/ekg-simulator";
 import Blog from "@/pages/blog";
 import BlogPost from "@/pages/blog-post";
@@ -64,6 +65,7 @@ function AppContent() {
           <Route path="/pricing" component={Pricing} />
           <Route path="/checkout" component={Checkout} />
           <Route path="/simulator" component={EKGSimulator} />
+          <Route path="/certificate/preview" component={CertificatePreviewPage} />
           <Route path="/certificate/:certificateId" component={CertificatePage} />
           <Route path="/verify/:certificateId" component={VerifyCertificate} />
           <Route component={NotFound} />
