@@ -386,6 +386,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Exam endpoints
+  app.post("/api/exam/initialize", requireAuth, requireActiveSubscription, async (req, res) => {
+    try {
+      const { count } = req.body;
+      
+      if (typeof count !== 'number' || count <= 0) {
+        return res.status(400).json({ error: "Nieprawidłowa liczba pytań" });
+      }
+
+      const session = await quizService.initializeExam(req.user!.id, count);
+      res.json(session);
+    } catch (error: any) {
+      console.error("Exam initialization error:", error);
+      res.status(500).json({ error: error.message || "Błąd podczas inicjalizacji egzaminu" });
+    }
+  });
+
+  app.get("/api/exam/question", requireAuth, requireActiveSubscription, async (req, res) => {
+    try {
+      const { sessionId, index } = req.query;
+      
+      if (!sessionId || typeof index !== 'string') {
+        return res.status(400).json({ error: "sessionId i index są wymagane" });
+      }
+
+      const questionIndex = parseInt(index);
+      const question = await quizService.getExamQuestion(sessionId as string, questionIndex);
+
+      if (!question) {
+        return res.status(404).json({ error: "Brak dostępnych pytań" });
+      }
+
+      res.json(question);
+    } catch (error: any) {
+      console.error("Exam question fetch error:", error);
+      res.status(500).json({ error: error.message || "Błąd podczas pobierania pytania" });
+    }
+  });
+
+  app.post("/api/exam/answer", requireAuth, requireActiveSubscription, async (req, res) => {
+    try {
+      const { sessionId, questionId, selectedIndex, timeMs } = req.body;
+
+      if (!sessionId || typeof questionId !== 'string' || typeof selectedIndex !== 'number' || typeof timeMs !== 'number') {
+        return res.status(400).json({ error: "Nieprawidłowe dane" });
+      }
+
+      const result = await quizService.submitExamAnswer(
+        sessionId,
+        questionId,
+        selectedIndex,
+        timeMs,
+        req.user!.id
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Exam answer submission error:", error);
+      res.status(400).json({ error: error.message || "Błąd podczas zapisywania odpowiedzi" });
+    }
+  });
+
+  app.get("/api/exam/summary", requireAuth, requireActiveSubscription, async (req, res) => {
+    try {
+      const { sessionId } = req.query;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "sessionId jest wymagane" });
+      }
+
+      const summary = quizService.getExamSummary(sessionId as string);
+
+      if (!summary) {
+        return res.status(404).json({ error: "Sesja egzaminu nie znaleziona" });
+      }
+
+      res.json(summary);
+    } catch (error: any) {
+      console.error("Exam summary error:", error);
+      res.status(500).json({ error: error.message || "Błąd podczas pobierania podsumowania" });
+    }
+  });
+
   app.post("/api/quiz/answer", requireAuth, requireActiveSubscription, async (req, res) => {
     try {
       const { questionId, selectedIndex, timeMs, mode = "learn" } = req.body;

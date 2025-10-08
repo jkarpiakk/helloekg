@@ -24,8 +24,156 @@ export interface ReviewQueue {
   nextReviewDate: Date;
 }
 
+export interface ExamSession {
+  questionIds: string[];
+  currentIndex: number;
+  startedAt: Date;
+  answers: Array<{
+    questionId: string;
+    selectedIndex: number;
+    isCorrect: boolean;
+    timeMs: number;
+  }>;
+}
+
 export class QuizService {
-  async getQuestionForUser(userId: string, sectionId: string | null, mode: "learn" | "review" | "exam" = "learn"): Promise<QuizQuestion | null> {
+  // Store exam sessions in memory (in production, use Redis or database)
+  private examSessions: Map<string, ExamSession> = new Map();
+
+  async initializeExam(userId: string, count: number): Promise<{ sessionId: string; totalQuestions: number }> {
+    // Get all published questions from all sections
+    const sections = await storage.getSections();
+    let allQuestions: Question[] = [];
+    
+    for (const section of sections) {
+      const sectionQuestions = await storage.getQuestionsBySection(section.id, "published");
+      allQuestions.push(...sectionQuestions);
+    }
+    
+    if (allQuestions.length === 0) {
+      throw new Error("Brak dostępnych pytań");
+    }
+    
+    // Shuffle and select questions
+    const shuffled = this.shuffleArray(allQuestions);
+    const selectedQuestions = shuffled.slice(0, Math.min(count, allQuestions.length));
+    
+    // Create session
+    const sessionId = `${userId}_${Date.now()}`;
+    const session: ExamSession = {
+      questionIds: selectedQuestions.map(q => q.id),
+      currentIndex: 0,
+      startedAt: new Date(),
+      answers: []
+    };
+    
+    this.examSessions.set(sessionId, session);
+    
+    return {
+      sessionId,
+      totalQuestions: selectedQuestions.length
+    };
+  }
+
+  async getExamQuestion(sessionId: string, questionIndex: number): Promise<QuizQuestion | null> {
+    const session = this.examSessions.get(sessionId);
+    
+    if (!session) {
+      throw new Error("Sesja egzaminu nie znaleziona");
+    }
+    
+    if (questionIndex >= session.questionIds.length) {
+      return null; // Exam finished
+    }
+    
+    const questionId = session.questionIds[questionIndex];
+    const question = await storage.getQuestionById(questionId);
+    
+    if (!question) {
+      return null;
+    }
+    
+    return this.formatQuestionForQuiz(question);
+  }
+
+  async submitExamAnswer(sessionId: string, questionId: string, selectedIndex: number, timeMs: number, userId: string): Promise<QuizResult> {
+    const session = this.examSessions.get(sessionId);
+    
+    if (!session) {
+      throw new Error("Sesja egzaminu nie znaleziona");
+    }
+    
+    const question = await storage.getQuestionById(questionId);
+    if (!question) {
+      throw new Error("Pytanie nie znalezione");
+    }
+    
+    const correctIndex = question.answers.findIndex(answer => answer.isCorrect);
+    const isCorrect = selectedIndex === correctIndex;
+    
+    // Save answer to session
+    session.answers.push({
+      questionId,
+      selectedIndex,
+      isCorrect,
+      timeMs
+    });
+    
+    session.currentIndex++;
+    
+    // Save attempt to database (for statistics)
+    await storage.createAttempt({
+      userId,
+      questionId,
+      selectedIndex,
+      isCorrect,
+      timeMs,
+      mode: "exam"
+    });
+    
+    return {
+      isCorrect,
+      correctIndex,
+      explanation: question.explanationMd,
+      timeMs
+    };
+  }
+
+  getExamSummary(sessionId: string): { totalQuestions: number; correctAnswers: number; totalTime: number } | null {
+    const session = this.examSessions.get(sessionId);
+    
+    if (!session) {
+      return null;
+    }
+    
+    const correctAnswers = session.answers.filter(a => a.isCorrect).length;
+    const totalTime = session.answers.reduce((sum, a) => sum + a.timeMs, 0);
+    
+    return {
+      totalQuestions: session.questionIds.length,
+      correctAnswers,
+      totalTime
+    };
+  }
+
+  clearExamSession(sessionId: string): void {
+    this.examSessions.delete(sessionId);
+  }
+
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+  async getQuestionForUser(userId: string, sectionId: string | null, mode: "learn" | "review" | "exam" = "learn", examQuestionCount?: number): Promise<QuizQuestion | null> {
+    // Exam mode should use initializeExam and getExamQuestion instead
+    if (mode === "exam") {
+      throw new Error("Use initializeExam and getExamQuestion for exam mode");
+    }
+    
     // For review mode without section, get questions from review queue
     if (mode === "review" && !sectionId) {
       const reviewQuestionIds = await this.getReviewQueue(userId);
@@ -102,7 +250,7 @@ export class QuizService {
       id: question.id,
       title: question.title,
       bodyMd: question.bodyMd,
-      imageUrl: question.imageUrl,
+      imageUrl: question.imageUrl || undefined,
       answers,
       sectionId: question.sectionId
     };

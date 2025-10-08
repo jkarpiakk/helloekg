@@ -5,9 +5,10 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import QuizInterface from "@/components/quiz/QuizInterface";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useTranslation } from "@/lib/i18n";
 import { ArrowLeft, BookOpen, Clock, Target } from "lucide-react";
 import { Link } from "wouter";
@@ -17,6 +18,8 @@ export default function Quiz() {
   const [, setLocation] = useLocation();
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [quizMode, setQuizMode] = useState<"learn" | "review" | "exam">("learn");
+  const [showExamDialog, setShowExamDialog] = useState(false);
+  const [examQuestionCount, setExamQuestionCount] = useState<10 | 20 | 40>(20);
   const { isAuthenticated } = useAuth();
   const { t } = useTranslation();
 
@@ -66,17 +69,26 @@ export default function Quiz() {
     );
   }
 
-  // Show quiz interface if section is selected (for learn/exam) OR in review mode
-  const shouldShowQuiz = (selectedSection && (quizMode === "learn" || quizMode === "exam")) || quizMode === "review";
+  // Show quiz interface if:
+  // - section is selected for learn mode
+  // - review mode is active
+  // - exam mode with question count selected
+  const shouldShowQuiz = 
+    (selectedSection && quizMode === "learn") || 
+    quizMode === "review" ||
+    (quizMode === "exam" && examQuestionCount && !showExamDialog);
   
   if (shouldShowQuiz) {
     return (
       <QuizInterface
-        sectionId={quizMode === "review" ? undefined : (selectedSection || undefined)}
+        sectionId={quizMode === "review" || quizMode === "exam" ? undefined : (selectedSection || undefined)}
         mode={quizMode}
+        examQuestionCount={quizMode === "exam" ? examQuestionCount : undefined}
         onExit={() => {
           setSelectedSection(null);
           setQuizMode("learn");
+          setExamQuestionCount(20);
+          setShowExamDialog(false);
           setLocation("/quiz");
         }}
       />
@@ -158,7 +170,10 @@ export default function Quiz() {
             className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 ${
               quizMode === "exam" ? "border-chart-4 bg-chart-4/5" : ""
             }`}
-            onClick={() => setQuizMode("exam")}
+            onClick={() => {
+              setQuizMode("exam");
+              setShowExamDialog(true);
+            }}
             data-testid="quiz-mode-exam"
           >
             <CardHeader className="text-center">
@@ -194,8 +209,59 @@ export default function Quiz() {
           </Card>
         )}
 
-        {/* Section Selection - only show for learn/exam mode */}
-        {quizMode !== "review" && (
+        {/* Exam Question Count Dialog */}
+        <Dialog open={showExamDialog} onOpenChange={setShowExamDialog}>
+          <DialogContent data-testid="exam-dialog">
+            <DialogHeader>
+              <DialogTitle>Egzamin próbny</DialogTitle>
+              <DialogDescription>
+                Wybierz liczbę pytań dla egzaminu próbnego. Pytania zostaną wylosowane z całej bazy.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-3 gap-4 my-6">
+              {[10, 20, 40].map((count) => (
+                <Card
+                  key={count}
+                  className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 ${
+                    examQuestionCount === count ? "border-primary bg-primary/5" : ""
+                  }`}
+                  onClick={() => setExamQuestionCount(count as 10 | 20 | 40)}
+                  data-testid={`exam-count-${count}`}
+                >
+                  <CardContent className="p-6 text-center">
+                    <div className="text-3xl font-bold text-foreground mb-2">{count}</div>
+                    <div className="text-sm text-muted-foreground">pytań</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowExamDialog(false);
+                  setQuizMode("learn");
+                }}
+                data-testid="exam-cancel"
+              >
+                Anuluj
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => setShowExamDialog(false)}
+                data-testid="exam-start"
+              >
+                Rozpocznij egzamin
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Section Selection - only show for learn mode */}
+        {quizMode === "learn" && (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-foreground">Wybierz moduł</h2>
           

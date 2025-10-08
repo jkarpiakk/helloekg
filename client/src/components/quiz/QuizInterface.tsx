@@ -14,49 +14,98 @@ import type { QuizQuestion, QuizResult } from "@/types";
 interface QuizInterfaceProps {
   sectionId?: string;
   mode?: "learn" | "review" | "exam";
+  examQuestionCount?: number;
   onExit?: () => void;
 }
 
-export default function QuizInterface({ sectionId, mode = "learn", onExit }: QuizInterfaceProps) {
+export default function QuizInterface({ sectionId, mode = "learn", examQuestionCount, onExit }: QuizInterfaceProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [startTime, setStartTime] = useState(Date.now());
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [examSessionId, setExamSessionId] = useState<string | null>(null);
+  const [examTotalQuestions, setExamTotalQuestions] = useState<number>(0);
+  const [examFinished, setExamFinished] = useState(false);
   const { t } = useTranslation();
   const { toast } = useToast();
 
+  // Initialize exam session
+  useEffect(() => {
+    if (mode === "exam" && examQuestionCount && !examSessionId) {
+      const initExam = async () => {
+        try {
+          const response = await apiRequest("POST", "/api/exam/initialize", { count: examQuestionCount });
+          const data = await response.json() as { sessionId: string; totalQuestions: number };
+          setExamSessionId(data.sessionId);
+          setExamTotalQuestions(data.totalQuestions);
+        } catch (error: any) {
+          toast({
+            title: "Błąd",
+            description: error.message || "Nie udało się zainicjalizować egzaminu",
+            variant: "destructive",
+          });
+        }
+      };
+      initExam();
+    }
+  }, [mode, examQuestionCount, examSessionId, toast]);
+
   // Fetch current question
   const { data: question, isLoading: questionLoading } = useQuery({
-    queryKey: ["/api/quiz/question", sectionId, mode, currentQuestionIndex],
+    queryKey: mode === "exam" 
+      ? ["/api/exam/question", examSessionId, currentQuestionIndex]
+      : ["/api/quiz/question", sectionId, mode, currentQuestionIndex],
     queryFn: async () => {
-      const url = mode === "review" 
-        ? `/api/quiz/question?mode=${mode}`
-        : `/api/quiz/question?sectionId=${sectionId}&mode=${mode}`;
+      let url = "";
+      if (mode === "exam" && examSessionId) {
+        url = `/api/exam/question?sessionId=${examSessionId}&index=${currentQuestionIndex}`;
+      } else if (mode === "review") {
+        url = `/api/quiz/question?mode=${mode}`;
+      } else {
+        url = `/api/quiz/question?sectionId=${sectionId}&mode=${mode}`;
+      }
       const response = await apiRequest("GET", url);
       return response.json() as Promise<QuizQuestion>;
     },
-    enabled: mode === "review" || !!sectionId,
+    enabled: mode === "exam" ? !!examSessionId : (mode === "review" || !!sectionId),
   });
 
   // Submit answer mutation
   const submitAnswerMutation = useMutation({
-    mutationFn: async (data: { questionId: string; selectedIndex: number; timeMs: number; mode: string }) => {
-      const response = await apiRequest("POST", "/api/quiz/answer", data);
-      return response.json() as Promise<QuizResult>;
+    mutationFn: async (data: { questionId: string; selectedIndex: number; timeMs: number; sessionId?: string }) => {
+      if (mode === "exam" && examSessionId) {
+        const response = await apiRequest("POST", "/api/exam/answer", {
+          sessionId: examSessionId,
+          questionId: data.questionId,
+          selectedIndex: data.selectedIndex,
+          timeMs: data.timeMs
+        });
+        return response.json() as Promise<QuizResult>;
+      } else {
+        const response = await apiRequest("POST", "/api/quiz/answer", {
+          questionId: data.questionId,
+          selectedIndex: data.selectedIndex,
+          timeMs: data.timeMs,
+          mode
+        });
+        return response.json() as Promise<QuizResult>;
+      }
     },
     onSuccess: (result) => {
       setShowExplanation(true);
-      if (result.isCorrect) {
+      if (mode !== "exam" && result.isCorrect) {
         toast({
           title: t("quiz.correct"),
           description: "Świetna robota!",
           variant: "default",
         });
       }
-      // Invalidate progress queries
-      queryClient.invalidateQueries({ queryKey: ["/api/progress"] });
+      // Invalidate progress queries (not for exam mode)
+      if (mode !== "exam") {
+        queryClient.invalidateQueries({ queryKey: ["/api/progress"] });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -78,13 +127,20 @@ export default function QuizInterface({ sectionId, mode = "learn", onExit }: Qui
         questionId: question.id,
         selectedIndex: answerIndex,
         timeMs,
-        mode,
       });
     }
   };
 
   const handleNextQuestion = () => {
-    setCurrentQuestionIndex(prev => prev + 1);
+    const nextIndex = currentQuestionIndex + 1;
+    
+    // Check if exam is finished
+    if (mode === "exam" && nextIndex >= examTotalQuestions) {
+      setExamFinished(true);
+      return;
+    }
+    
+    setCurrentQuestionIndex(nextIndex);
     setSelectedAnswer(null);
     setShowExplanation(false);
     setStartTime(Date.now());
@@ -120,6 +176,79 @@ export default function QuizInterface({ sectionId, mode = "learn", onExit }: Qui
   useEffect(() => {
     setStartTime(Date.now());
   }, [question]);
+
+  // Exam summary query
+  const { data: examSummary } = useQuery({
+    queryKey: ["/api/exam/summary", examSessionId],
+    queryFn: async () => {
+      if (!examSessionId) return null;
+      const response = await apiRequest("GET", `/api/exam/summary?sessionId=${examSessionId}`);
+      return response.json() as Promise<{ totalQuestions: number; correctAnswers: number; totalTime: number }>;
+    },
+    enabled: examFinished && !!examSessionId,
+  });
+
+  // Show exam summary
+  if (examFinished && examSummary) {
+    const successRate = (examSummary.correctAnswers / examSummary.totalQuestions) * 100;
+    const passed = successRate >= 70;
+
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="max-w-2xl w-full mx-4">
+          <div className="bg-card rounded-lg border border-border p-8 text-center">
+            <div className={`w-24 h-24 rounded-full mx-auto mb-6 flex items-center justify-center ${
+              passed ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+            }`}>
+              <span className="text-5xl font-bold">{Math.round(successRate)}%</span>
+            </div>
+            
+            <h2 className="text-3xl font-bold text-foreground mb-2">
+              {passed ? "Gratulacje!" : "Egzamin niezaliczony"}
+            </h2>
+            <p className="text-muted-foreground mb-8">
+              {passed 
+                ? "Udało Ci się zaliczyć egzamin próbny!" 
+                : "Niestety nie udało się osiągnąć wymaganego progu 70%."}
+            </p>
+
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="bg-background p-4 rounded-lg border border-border">
+                <div className="text-3xl font-bold text-foreground mb-1">
+                  {examSummary.totalQuestions}
+                </div>
+                <div className="text-sm text-muted-foreground">Pytań</div>
+              </div>
+              <div className="bg-background p-4 rounded-lg border border-border">
+                <div className="text-3xl font-bold text-green-500 mb-1">
+                  {examSummary.correctAnswers}
+                </div>
+                <div className="text-sm text-muted-foreground">Poprawnych</div>
+              </div>
+              <div className="bg-background p-4 rounded-lg border border-border">
+                <div className="text-3xl font-bold text-red-500 mb-1">
+                  {examSummary.totalQuestions - examSummary.correctAnswers}
+                </div>
+                <div className="text-sm text-muted-foreground">Błędnych</div>
+              </div>
+            </div>
+
+            <div className="flex gap-4 justify-center">
+              <Button onClick={onExit} variant="outline" data-testid="exit-exam">
+                Wróć do panelu
+              </Button>
+              <Button 
+                onClick={() => window.location.reload()} 
+                data-testid="retry-exam"
+              >
+                Spróbuj ponownie
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (questionLoading) {
     return (
@@ -170,11 +299,17 @@ export default function QuizInterface({ sectionId, mode = "learn", onExit }: Qui
               <div className="w-48 h-2 bg-secondary rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-primary rounded-full transition-all duration-300"
-                  style={{ width: `${((currentQuestionIndex + 1) / 10) * 100}%` }}
+                  style={{ 
+                    width: `${mode === "exam" && examTotalQuestions > 0 
+                      ? ((currentQuestionIndex + 1) / examTotalQuestions) * 100 
+                      : ((currentQuestionIndex + 1) / 10) * 100}%` 
+                  }}
                 />
               </div>
               <span className="text-sm text-muted-foreground font-mono">
-                {Math.round(((currentQuestionIndex + 1) / 10) * 100)}%
+                {mode === "exam" && examTotalQuestions > 0 
+                  ? `${currentQuestionIndex + 1}/${examTotalQuestions}`
+                  : `${Math.round(((currentQuestionIndex + 1) / 10) * 100)}%`}
               </span>
             </div>
           </div>
