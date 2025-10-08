@@ -122,7 +122,17 @@ export default function Home() {
                     {t("hero.cta.start")}
                   </Button>
                 )}
-                <Button variant="outline" size="lg" data-testid="how-it-works-button">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={() => {
+                    document.getElementById('how-it-works')?.scrollIntoView({ 
+                      behavior: 'smooth',
+                      block: 'start'
+                    });
+                  }}
+                  data-testid="how-it-works-button"
+                >
                   <Info className="h-5 w-5 mr-2" />
                   {t("hero.cta.learn")}
                 </Button>
@@ -272,7 +282,7 @@ export default function Home() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 bg-secondary/30">
+      <section id="how-it-works" className="py-20 bg-secondary/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
