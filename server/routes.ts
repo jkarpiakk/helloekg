@@ -17,6 +17,7 @@ import {
   resetPasswordSchema,
   insertQuestionSchema,
   insertBlogPostSchema,
+  insertDemoQuestionSchema,
   BlogPost,
   InsertBlogPost
 } from "@shared/schema";
@@ -1768,6 +1769,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Blog post deletion error:", error);
       res.status(500).json({ error: "Błąd podczas usuwania artykułu" });
+    }
+  });
+
+  // Demo Question Routes
+  // Public route to get active demo question
+  app.get("/api/demo-question", async (req, res) => {
+    try {
+      const demoQuestion = await storage.getActiveDemoQuestion();
+      res.json(demoQuestion);
+    } catch (error: any) {
+      console.error("Demo question fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania pytania demo" });
+    }
+  });
+
+  // Admin routes for demo questions
+  app.get("/api/admin/demo-question", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const demoQuestions = await storage.getAllDemoQuestions();
+      res.json(demoQuestions);
+    } catch (error: any) {
+      console.error("Demo questions fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania pytań demo" });
+    }
+  });
+
+  app.post("/api/admin/demo-question", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const demoQuestionData = insertDemoQuestionSchema.parse(req.body);
+      const demoQuestion = await storage.createDemoQuestion(demoQuestionData);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "demo_question_created",
+        entityType: "demo_question",
+        entityId: demoQuestion.id,
+        diff: { demoQuestion: demoQuestionData },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(201).json(demoQuestion);
+    } catch (error: any) {
+      console.error("Demo question creation error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowe dane pytania demo" });
+      }
+      res.status(500).json({ error: "Błąd podczas tworzenia pytania demo" });
+    }
+  });
+
+  app.patch("/api/admin/demo-question/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: "Nieprawidłowe ID pytania demo" });
+      }
+
+      const updates = insertDemoQuestionSchema.partial().parse(req.body);
+      const updatedDemoQuestion = await storage.updateDemoQuestion(id, updates);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "demo_question_updated",
+        entityType: "demo_question",
+        entityId: id,
+        diff: { updates },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json(updatedDemoQuestion);
+    } catch (error: any) {
+      console.error("Demo question update error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Nieprawidłowe dane aktualizacji" });
+      }
+      res.status(500).json({ error: "Błąd podczas aktualizacji pytania demo" });
+    }
+  });
+
+  app.delete("/api/admin/demo-question/:id", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: "Nieprawidłowe ID pytania demo" });
+      }
+
+      await storage.deleteDemoQuestion(id);
+
+      // Create audit log
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "demo_question_deleted",
+        entityType: "demo_question",
+        entityId: id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Demo question deletion error:", error);
+      res.status(500).json({ error: "Błąd podczas usuwania pytania demo" });
     }
   });
 

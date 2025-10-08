@@ -390,6 +390,28 @@ export type InsertLectureChapter = z.infer<typeof insertLectureChapterSchema>;
 export type BlogPost = typeof blogPosts.$inferSelect;
 export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
 
+// Demo question for homepage
+export const demoQuestions = pgTable("demo_questions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  question: text("question").notNull(),
+  options: json("options").$type<string[]>().notNull(),
+  correctIndex: integer("correct_index").notNull(),
+  explanation: text("explanation").notNull(),
+  imageUrl: text("image_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertDemoQuestionSchema = createInsertSchema(demoQuestions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DemoQuestion = typeof demoQuestions.$inferSelect;
+export type InsertDemoQuestion = z.infer<typeof insertDemoQuestionSchema>;
+
 // Additional schemas for API endpoints
 export const loginSchema = z.object({
   email: z.string().email(),

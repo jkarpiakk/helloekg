@@ -1,12 +1,13 @@
 import { 
   users, plans, subscriptions, modules, sections, questions, attempts, 
-  progress, certificates, supportTickets, auditLog, blogPosts,
+  progress, certificates, supportTickets, auditLog, blogPosts, demoQuestions,
   type User, type InsertUser, type Plan, type InsertPlan,
   type Subscription, type InsertSubscription, type Module, type InsertModule,
   type Section, type InsertSection, type Question, type InsertQuestion, 
   type Attempt, type InsertAttempt, type Progress, type InsertProgress, 
   type Certificate, type InsertCertificate, type SupportTicket, type InsertSupportTicket, 
-  type AuditLog, type InsertAuditLog, type BlogPost, type InsertBlogPost
+  type AuditLog, type InsertAuditLog, type BlogPost, type InsertBlogPost,
+  type DemoQuestion, type InsertDemoQuestion
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, count, avg, sql, or, ilike, isNull } from "drizzle-orm";
@@ -90,6 +91,13 @@ export interface IStorage {
   updateBlogPost(id: string, updates: Partial<InsertBlogPost>): Promise<BlogPost>;
   updateBlogPostStatus(id: string, status: 'draft' | 'published'): Promise<BlogPost>;
   deleteBlogPost(id: string): Promise<void>;
+  
+  // Demo question methods
+  getActiveDemoQuestion(): Promise<DemoQuestion | undefined>;
+  getAllDemoQuestions(): Promise<DemoQuestion[]>;
+  createDemoQuestion(data: InsertDemoQuestion): Promise<DemoQuestion>;
+  updateDemoQuestion(id: string, updates: Partial<InsertDemoQuestion>): Promise<DemoQuestion>;
+  deleteDemoQuestion(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -677,6 +685,39 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBlogPost(id: string): Promise<void> {
     await db.delete(blogPosts).where(eq(blogPosts.id, id));
+  }
+
+  // Demo question methods
+  async getActiveDemoQuestion(): Promise<DemoQuestion | undefined> {
+    const [question] = await db
+      .select()
+      .from(demoQuestions)
+      .where(eq(demoQuestions.isActive, true))
+      .orderBy(desc(demoQuestions.createdAt))
+      .limit(1);
+    return question || undefined;
+  }
+
+  async getAllDemoQuestions(): Promise<DemoQuestion[]> {
+    return db.select().from(demoQuestions).orderBy(desc(demoQuestions.createdAt));
+  }
+
+  async createDemoQuestion(data: InsertDemoQuestion): Promise<DemoQuestion> {
+    const [question] = await db.insert(demoQuestions).values(data as any).returning();
+    return question;
+  }
+
+  async updateDemoQuestion(id: string, updates: Partial<InsertDemoQuestion>): Promise<DemoQuestion> {
+    const [question] = await db
+      .update(demoQuestions)
+      .set({ ...updates as any, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(demoQuestions.id, id))
+      .returning();
+    return question;
+  }
+
+  async deleteDemoQuestion(id: string): Promise<void> {
+    await db.delete(demoQuestions).where(eq(demoQuestions.id, id));
   }
 }
 

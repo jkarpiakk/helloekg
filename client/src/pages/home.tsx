@@ -1,16 +1,19 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 import AuthForms from "@/components/auth/AuthForms";
 import PricingSection from "@/components/payment/PricingSection";
 import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart, X } from "lucide-react";
 import { Link } from "wouter";
 import afEcgImage from "@assets/af ecg_1757697444254.jpg";
+import type { DemoQuestion } from "@shared/schema";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -39,7 +42,23 @@ export default function Home() {
     window.history.replaceState({}, '', url.pathname);
   };
 
-  const demoQuestion = {
+  // Fetch demo question from API
+  const { data: apiDemoQuestion } = useQuery({
+    queryKey: ["/api/demo-question"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/demo-question");
+      return response.json() as Promise<DemoQuestion>;
+    },
+  });
+
+  // Fallback to hardcoded question if API fails
+  const demoQuestion = apiDemoQuestion ? {
+    question: apiDemoQuestion.question,
+    options: apiDemoQuestion.options,
+    correct: apiDemoQuestion.correctIndex,
+    explanation: apiDemoQuestion.explanation,
+    imageUrl: apiDemoQuestion.imageUrl
+  } : {
     question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
     options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
     correct: 1,
@@ -160,8 +179,8 @@ export default function Home() {
                     {/* Real EKG image - Atrial Fibrillation */}
                     <div className="bg-white rounded-lg p-4 border border-border">
                       <img 
-                        src={afEcgImage} 
-                        alt="Zapis EKG pokazujący migotanie przedsionków" 
+                        src={demoQuestion.imageUrl || afEcgImage} 
+                        alt="Zapis EKG" 
                         className="w-full h-auto rounded"
                         data-testid="demo-ecg-image"
                       />
