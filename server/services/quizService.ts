@@ -50,8 +50,10 @@ export class QuizService {
       allQuestions.push(...sectionQuestions);
     }
     
+    console.log(`[Exam Init] Found ${allQuestions.length} published questions across ${sections.length} sections`);
+    
     if (allQuestions.length === 0) {
-      throw new Error("Brak dostępnych pytań");
+      throw new Error("Brak dostępnych pytań w bazie danych");
     }
     
     // Shuffle and select questions
@@ -68,6 +70,7 @@ export class QuizService {
     };
     
     this.examSessions.set(sessionId, session);
+    console.log(`[Exam Init] Created session ${sessionId} with ${selectedQuestions.length} questions`);
     
     return {
       sessionId,
@@ -78,21 +81,29 @@ export class QuizService {
   async getExamQuestion(sessionId: string, questionIndex: number): Promise<QuizQuestion | null> {
     const session = this.examSessions.get(sessionId);
     
+    console.log(`[Exam Question] Fetching question ${questionIndex} for session ${sessionId}`);
+    console.log(`[Exam Question] Session exists: ${!!session}, Active sessions: ${this.examSessions.size}`);
+    
     if (!session) {
+      console.error(`[Exam Question] Session not found: ${sessionId}`);
       throw new Error("Sesja egzaminu nie znaleziona");
     }
     
     if (questionIndex >= session.questionIds.length) {
+      console.log(`[Exam Question] Exam finished: ${questionIndex} >= ${session.questionIds.length}`);
       return null; // Exam finished
     }
     
     const questionId = session.questionIds[questionIndex];
+    console.log(`[Exam Question] Looking for question ID: ${questionId}`);
     const question = await storage.getQuestionById(questionId);
     
     if (!question) {
+      console.error(`[Exam Question] Question not found in database: ${questionId}`);
       return null;
     }
     
+    console.log(`[Exam Question] Returning question: ${question.title}`);
     return this.formatQuestionForQuiz(question);
   }
 
