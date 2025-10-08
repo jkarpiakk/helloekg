@@ -16,23 +16,22 @@ import afEcgImage from "@assets/af ecg_1757697444254.jpg";
 import type { DemoQuestion } from "@shared/schema";
 
 export default function Home() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
-  // Check URL parameters for auth mode
-  const urlParams = new URLSearchParams(window.location.search);
-  const authParam = urlParams.get('auth');
-  
   // Open auth dialog if URL param exists
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const authParam = urlParams.get('auth');
+    
     if (authParam === 'login' || authParam === 'register') {
       setAuthMode(authParam);
     }
-  }, [authParam]);
+  }, [location]);
 
   const handleAuthSuccess = () => {
     setAuthMode(null);
