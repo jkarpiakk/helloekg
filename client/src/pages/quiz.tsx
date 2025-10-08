@@ -214,7 +214,13 @@ export default function Quiz() {
                       ? "opacity-50 cursor-not-allowed" 
                       : "cursor-pointer hover:-translate-y-1"
                   }`}
-                  onClick={() => !isLocked && setSelectedSection(section.id)}
+                  onClick={() => {
+                    console.log('Section clicked:', { sectionId: section.id, isLocked, title: section.title });
+                    if (!isLocked) {
+                      setSelectedSection(section.id);
+                      console.log('Section set to:', section.id);
+                    }
+                  }}
                   data-testid={`section-${section.id}`}
                 >
                   <CardHeader>
