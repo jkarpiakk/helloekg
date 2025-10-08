@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
@@ -20,16 +20,15 @@ export default function Quiz() {
   const { isAuthenticated } = useAuth();
   const { t } = useTranslation();
 
-  // Parse URL parameters
-  const urlParams = new URLSearchParams(window.location.search);
-  const sectionParam = urlParams.get('section');
-  const modeParam = urlParams.get('mode') as "learn" | "review" | "exam" | null;
-
-  // Set initial values from URL
-  useState(() => {
+  // Set initial values from URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sectionParam = urlParams.get('section');
+    const modeParam = urlParams.get('mode') as "learn" | "review" | "exam" | null;
+    
     if (sectionParam) setSelectedSection(sectionParam);
     if (modeParam) setQuizMode(modeParam);
-  });
+  }, []); // Run only once on mount
 
   // Fetch sections with progress
   const { data: sections, isLoading } = useQuery({
@@ -68,8 +67,6 @@ export default function Quiz() {
 
   // Show quiz interface if section is selected (for learn/exam) OR in review mode
   const shouldShowQuiz = (selectedSection && (quizMode === "learn" || quizMode === "exam")) || quizMode === "review";
-  
-  console.log('Quiz Debug:', { selectedSection, quizMode, shouldShowQuiz });
   
   if (shouldShowQuiz) {
     return (
@@ -214,13 +211,7 @@ export default function Quiz() {
                       ? "opacity-50 cursor-not-allowed" 
                       : "cursor-pointer hover:-translate-y-1"
                   }`}
-                  onClick={() => {
-                    console.log('Section clicked:', { sectionId: section.id, isLocked, title: section.title });
-                    if (!isLocked) {
-                      setSelectedSection(section.id);
-                      console.log('Section set to:', section.id);
-                    }
-                  }}
+                  onClick={() => !isLocked && setSelectedSection(section.id)}
                   data-testid={`section-${section.id}`}
                 >
                   <CardHeader>
