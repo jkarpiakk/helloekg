@@ -36,13 +36,13 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3" data-testid="logo-link">
+          <Link href="/" className="flex items-center space-x-2 sm:space-x-3" data-testid="logo-link">
             <img 
               src={logoImage} 
               alt="EKG Academy" 
-              className="h-24 w-24"
+              className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20"
             />
-            <span className="text-xl font-bold text-foreground">EKG Academy</span>
+            <span className="text-base sm:text-lg md:text-xl font-bold text-foreground">EKG Academy</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -75,10 +75,10 @@ export default function Header() {
           </div>
 
           {/* User Actions */}
-          <div className="flex items-center space-x-4">
-            {/* Language Selector */}
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* Language Selector - hidden on mobile */}
             <select 
-              className="bg-background border border-border rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="hidden sm:block bg-background border border-border rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               defaultValue="pl"
               data-testid="language-selector"
             >
@@ -128,13 +128,17 @@ export default function Header() {
             ) : (
               <>
                 <Button 
-                  variant="ghost" 
+                  variant="ghost"
+                  size="sm"
+                  className="hidden sm:inline-flex"
                   onClick={() => window.location.href = "/?auth=login"}
                   data-testid="login-button"
                 >
                   {t("auth.login")}
                 </Button>
                 <Button 
+                  size="sm"
+                  className="hidden sm:inline-flex"
                   onClick={() => window.location.href = "/?auth=register"}
                   data-testid="register-button"
                 >
@@ -213,6 +217,33 @@ export default function Header() {
             >
               {t("nav.pricing")}
             </Link>
+            
+            {/* Mobile Auth Buttons */}
+            {!isAuthenticated && (
+              <div className="pt-3 space-y-2 border-t border-border">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    window.location.href = "/?auth=login";
+                  }}
+                  data-testid="mobile-login-button"
+                >
+                  {t("auth.login")}
+                </Button>
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    window.location.href = "/?auth=register";
+                  }}
+                  data-testid="mobile-register-button"
+                >
+                  {t("auth.register")}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -92,38 +92,37 @@ export default function Home() {
                   <GraduationCap className="h-4 w-4 mr-2" />
                   {t("hero.badge")}
                 </Badge>
-                <h1 className="text-4xl lg:text-6xl font-bold text-foreground leading-tight">
+                <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-foreground leading-tight">
                   <span>Odkryj Sekrety EKG</span><br />
                   <span className="text-primary">Kurs, który Zmienia Nauczanie</span>
                 </h1>
-                <p className="text-xl text-muted-foreground leading-relaxed">
+                <p className="text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed">
                   Czy kiedykolwiek patrzyłeś na zapis EKG i widziałeś tylko tajemnicze fale? W tym kursie odmienimy Twoje spojrzenie na elektrokardiografię. Dzięki metodzie Feynmanowskiej, opowieści o sercu przestają być skomplikowanymi schematami – staną się historiami, które naprawdę zrozumiesz.
                 </p>
               </div>
 
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 {isAuthenticated ? (
-                  <Button size="lg" className="shadow-lg hover:scale-105 transition-transform" asChild data-testid="start-learning-button">
+                  <Button className="shadow-lg hover:scale-105 transition-transform w-full sm:w-auto" asChild data-testid="start-learning-button">
                     <Link href="/dashboard">
-                      <Play className="h-5 w-5 mr-2" />
+                      <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                       {t("hero.cta.start")}
                     </Link>
                   </Button>
                 ) : (
                   <Button 
-                    size="lg" 
-                    className="shadow-lg hover:scale-105 transition-transform"
+                    className="shadow-lg hover:scale-105 transition-transform w-full sm:w-auto"
                     onClick={() => setAuthMode("register")}
                     data-testid="start-learning-button"
                   >
-                    <Play className="h-5 w-5 mr-2" />
+                    <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                     {t("hero.cta.start")}
                   </Button>
                 )}
                 <Button 
-                  variant="outline" 
-                  size="lg" 
+                  variant="outline"
+                  className="w-full sm:w-auto"
                   onClick={() => {
                     document.getElementById('how-it-works')?.scrollIntoView({ 
                       behavior: 'smooth',
@@ -132,7 +131,7 @@ export default function Home() {
                   }}
                   data-testid="how-it-works-button"
                 >
-                  <Info className="h-5 w-5 mr-2" />
+                  <Info className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   {t("hero.cta.learn")}
                 </Button>
               </div>
@@ -156,7 +155,7 @@ export default function Home() {
 
             {/* Hero Demo */}
             <div className="relative">
-              <Card className="shadow-2xl p-8 relative overflow-hidden">
+              <Card className="shadow-2xl p-4 sm:p-6 lg:p-8 relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary to-chart-2"></div>
                 
                 {/* Sample quiz preview */}
@@ -169,14 +168,15 @@ export default function Home() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <h3 className="text-base sm:text-lg font-semibold text-foreground">
                         {demoQuestion.question}
                       </h3>
                       {showResult && (
                         <Button 
                           variant="outline" 
-                          size="sm" 
+                          size="sm"
+                          className="w-full sm:w-auto"
                           onClick={resetDemo}
                           data-testid="reset-demo-button"
                         >
