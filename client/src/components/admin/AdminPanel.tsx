@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle, FileText, HelpCircle } from "lucide-react";
+import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle, FileText, HelpCircle, Home } from "lucide-react";
 import QuestionManager from "./QuestionManager";
 import CourseManager from "./CourseManager";
 import UserManager from "./UserManager";
@@ -12,6 +12,7 @@ import SupportManager from "./SupportManager";
 import AnalyticsManager from "./AnalyticsManager";
 import BlogManager from "./BlogManager";
 import DemoQuestionManager from "./DemoQuestionManager";
+import HomePageContentManager from "./HomePageContentManager";
 
 export default function AdminPanel() {
   const { t } = useTranslation();
@@ -39,7 +40,7 @@ export default function AdminPanel() {
       {/* Admin Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs defaultValue="course" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="course" className="flex items-center space-x-2">
               <BookOpen className="h-4 w-4" />
               <span>Kurs</span>
@@ -55,6 +56,10 @@ export default function AdminPanel() {
             <TabsTrigger value="demo" className="flex items-center space-x-2">
               <HelpCircle className="h-4 w-4" />
               <span>Pytanie Demo</span>
+            </TabsTrigger>
+            <TabsTrigger value="homepage" className="flex items-center space-x-2">
+              <Home className="h-4 w-4" />
+              <span>Strona Główna</span>
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center space-x-2">
               <Users className="h-4 w-4" />
@@ -84,6 +89,10 @@ export default function AdminPanel() {
 
           <TabsContent value="demo">
             <DemoQuestionManager />
+          </TabsContent>
+
+          <TabsContent value="homepage">
+            <HomePageContentManager />
           </TabsContent>
 
           <TabsContent value="users">
