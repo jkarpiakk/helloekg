@@ -66,14 +66,15 @@ export default function Quiz() {
     );
   }
 
-  // Show quiz interface if section is selected
-  if (selectedSection) {
+  // Show quiz interface if section is selected OR in review mode
+  if (selectedSection || quizMode === "review") {
     return (
       <QuizInterface
-        sectionId={selectedSection}
+        sectionId={quizMode === "review" ? undefined : selectedSection}
         mode={quizMode}
         onExit={() => {
           setSelectedSection(null);
+          setQuizMode("learn");
           setLocation("/quiz");
         }}
       />
@@ -172,9 +173,29 @@ export default function Quiz() {
           </Card>
         </div>
 
-        {/* Section Selection */}
-        <div className="space-y-6">
-          <h2 className="text-xl font-semibold text-foreground">Wybierz moduł</h2>
+        {/* Review mode message when no questions available */}
+        {quizMode === "review" && reviewQueue && reviewQueue.questionIds?.length === 0 && (
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle className="text-center">Brak pytań do powtórzenia</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-muted-foreground">
+                Nie masz jeszcze błędnych odpowiedzi do powtórzenia. Kontynuuj naukę w trybie standardowym!
+              </p>
+              <div className="flex justify-center mt-4">
+                <Button onClick={() => setQuizMode("learn")} data-testid="button-switch-to-learn">
+                  Przejdź do trybu nauki
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Section Selection - only show for learn/exam mode */}
+        {quizMode !== "review" && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-semibold text-foreground">Wybierz moduł</h2>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sections?.map((section, index) => {
@@ -259,6 +280,7 @@ export default function Quiz() {
             })}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

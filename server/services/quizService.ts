@@ -25,8 +25,28 @@ export interface ReviewQueue {
 }
 
 export class QuizService {
-  async getQuestionForUser(userId: string, sectionId: string, mode: "learn" | "review" | "exam" = "learn"): Promise<QuizQuestion | null> {
-    const questions = await storage.getQuestionsBySection(sectionId, "published");
+  async getQuestionForUser(userId: string, sectionId: string | null, mode: "learn" | "review" | "exam" = "learn"): Promise<QuizQuestion | null> {
+    // For review mode without section, get questions from review queue
+    if (mode === "review" && !sectionId) {
+      const reviewQuestionIds = await this.getReviewQueue(userId);
+      
+      if (reviewQuestionIds.length === 0) {
+        return null;
+      }
+      
+      // Get random question from review queue
+      const randomQuestionId = reviewQuestionIds[Math.floor(Math.random() * reviewQuestionIds.length)];
+      const question = await storage.getQuestionById(randomQuestionId);
+      
+      if (!question) {
+        return null;
+      }
+      
+      return this.formatQuestionForQuiz(question);
+    }
+    
+    // Regular mode - get questions from specific section
+    const questions = await storage.getQuestionsBySection(sectionId!, "published");
     
     if (questions.length === 0) {
       return null;
@@ -158,18 +178,9 @@ export class QuizService {
       }
     });
 
-    // Apply spaced repetition algorithm (simplified)
-    const reviewQuestions: string[] = [];
-    const now = new Date();
-    
-    questionAttempts.forEach((attempt, questionId) => {
-      const daysSinceAttempt = (now.getTime() - attempt.createdAt.getTime()) / (1000 * 60 * 60 * 24);
-      
-      // Review after 1 day, then 3 days, then 7 days
-      if (daysSinceAttempt >= 1) {
-        reviewQuestions.push(questionId);
-      }
-    });
+    // Return all incorrect questions (immediately available for review)
+    // Note: Spaced repetition can be added later with a more sophisticated algorithm
+    const reviewQuestions: string[] = Array.from(questionAttempts.keys());
 
     return reviewQuestions;
   }

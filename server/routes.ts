@@ -364,13 +364,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { sectionId, mode = "learn" } = req.query;
       
-      if (!sectionId) {
+      // For review mode, sectionId is optional (uses review queue)
+      if (!sectionId && mode !== "review") {
         return res.status(400).json({ error: "sectionId jest wymagane" });
       }
 
       const question = await quizService.getQuestionForUser(
         req.user!.id,
-        sectionId as string,
+        sectionId as string || null,
         mode as any
       );
 

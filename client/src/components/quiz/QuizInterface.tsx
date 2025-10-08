@@ -12,7 +12,7 @@ import ReportErrorDialog from "./ReportErrorDialog";
 import type { QuizQuestion, QuizResult } from "@/types";
 
 interface QuizInterfaceProps {
-  sectionId: string;
+  sectionId?: string;
   mode?: "learn" | "review" | "exam";
   onExit?: () => void;
 }
@@ -31,10 +31,13 @@ export default function QuizInterface({ sectionId, mode = "learn", onExit }: Qui
   const { data: question, isLoading: questionLoading } = useQuery({
     queryKey: ["/api/quiz/question", sectionId, mode, currentQuestionIndex],
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/quiz/question?sectionId=${sectionId}&mode=${mode}`);
+      const url = mode === "review" 
+        ? `/api/quiz/question?mode=${mode}`
+        : `/api/quiz/question?sectionId=${sectionId}&mode=${mode}`;
+      const response = await apiRequest("GET", url);
       return response.json() as Promise<QuizQuestion>;
     },
-    enabled: !!sectionId,
+    enabled: mode === "review" || !!sectionId,
   });
 
   // Submit answer mutation
