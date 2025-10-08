@@ -14,6 +14,7 @@ import type { QuestionWithStats } from "@/types";
 import QuestionEditor from "./QuestionEditor";
 import ImportModal from "./ImportModal";
 import type { Module, Section } from "@shared/schema";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function QuestionManager() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -22,6 +23,7 @@ export default function QuestionManager() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuestionWithStats | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [previewQuestion, setPreviewQuestion] = useState<QuestionWithStats | null>(null);
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -196,7 +198,7 @@ export default function QuestionManager() {
   if (showEditor) {
     return (
       <QuestionEditor
-        question={editingQuestion}
+        question={editingQuestion || undefined}
         sections={allSections}
         modules={modules || []}
         onSave={handleSaveQuestion}
@@ -397,7 +399,12 @@ export default function QuestionManager() {
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" data-testid={`view-question-${question.id}`}>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => setPreviewQuestion(question)}
+                          data-testid={`view-question-${question.id}`}
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button 
@@ -406,7 +413,7 @@ export default function QuestionManager() {
                           onClick={() => deleteQuestionMutation.mutate(question.id)}
                           data-testid={`delete-question-${question.id}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                         {question.status === "review" && (
                           <>
@@ -430,9 +437,6 @@ export default function QuestionManager() {
                             </Button>
                           </>
                         )}
-                        <Button size="sm" variant="ghost" data-testid={`delete-question-${question.id}`}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -468,6 +472,83 @@ export default function QuestionManager() {
         sections={allSections}
         modules={modules || []}
       />
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewQuestion} onOpenChange={(open) => !open && setPreviewQuestion(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Podgląd pytania</DialogTitle>
+          </DialogHeader>
+          {previewQuestion && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-sm text-muted-foreground mb-2">Pytanie:</h3>
+                <div 
+                  className="prose dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: previewQuestion.bodyMd }}
+                />
+              </div>
+
+              {previewQuestion.imageUrl && (
+                <div>
+                  <h3 className="font-semibold text-sm text-muted-foreground mb-2">Obraz:</h3>
+                  <img 
+                    src={previewQuestion.imageUrl} 
+                    alt="Question illustration" 
+                    className="max-w-full h-auto rounded-lg border"
+                  />
+                </div>
+              )}
+
+              <div>
+                <h3 className="font-semibold text-sm text-muted-foreground mb-2">Odpowiedzi:</h3>
+                <div className="space-y-2">
+                  {previewQuestion.answers.map((answer, index) => (
+                    <div 
+                      key={index}
+                      className={`p-3 rounded-lg border ${
+                        answer.isCorrect 
+                          ? 'bg-green-50 dark:bg-green-950/30 border-green-500' 
+                          : 'bg-muted'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium">{String.fromCharCode(65 + index)}.</span>
+                        <span>{answer.text}</span>
+                        {answer.isCorrect && (
+                          <Badge variant="default" className="ml-auto">Poprawna</Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {previewQuestion.explanationMd && (
+                <div>
+                  <h3 className="font-semibold text-sm text-muted-foreground mb-2">Wyjaśnienie:</h3>
+                  <div 
+                    className="prose dark:prose-invert max-w-none p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg"
+                    dangerouslySetInnerHTML={{ __html: previewQuestion.explanationMd }}
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium">Status:</span> {getStatusBadge(previewQuestion.status)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium">Trudność:</span> <Badge variant="outline">{previewQuestion.difficulty}</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium">Statystyki:</span> {Math.round(previewQuestion.stats.successRate * 100)}% ({previewQuestion.stats.attempts} prób)
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
