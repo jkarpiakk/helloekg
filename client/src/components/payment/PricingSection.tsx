@@ -5,23 +5,19 @@ import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { Check, CreditCard, Smartphone } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import type { Plan } from "@/types";
 
-interface Plan {
-  id: string;
-  name: string;
-  price: number;
-  duration: string;
+interface PlanExtras {
   savings?: string;
   isPopular?: boolean;
   features: string[];
 }
 
-const plans: Plan[] = [
-  {
-    id: "monthly",
-    name: "Plan Miesięczny",
-    price: 60,
-    duration: "1 miesiąc dostępu",
+const planFeatures: Record<number, PlanExtras> = {
+  30: {
     features: [
       "Pełny dostęp do quizów",
       "Natychmiastowe wyjaśnienia",
@@ -29,11 +25,7 @@ const plans: Plan[] = [
       "Certyfikat ukończenia"
     ]
   },
-  {
-    id: "quarterly",
-    name: "Plan Kwartalny",
-    price: 100,
-    duration: "3 miesiące dostępu",
+  90: {
     savings: "Oszczędź 80 zł",
     isPopular: true,
     features: [
@@ -44,11 +36,7 @@ const plans: Plan[] = [
       "Priorytetowe wsparcie"
     ]
   },
-  {
-    id: "yearly",
-    name: "Plan Roczny",
-    price: 169,
-    duration: "12 miesięcy dostępu",
+  365: {
     savings: "Oszczędź 551 zł",
     features: [
       "Pełny dostęp do quizów",
@@ -59,12 +47,40 @@ const plans: Plan[] = [
       "Dostęp do nowych treści"
     ]
   }
-];
+};
 
 export default function PricingSection() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
+
+  const { data: plans, isLoading } = useQuery({
+    queryKey: ["/api/plans"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/plans");
+      return response.json() as Promise<Plan[]>;
+    },
+  });
+
+  // Remove duplicates and sort by duration
+  const uniquePlans = plans?.reduce((acc: Plan[], plan) => {
+    if (!acc.find(p => p.durationDays === plan.durationDays)) {
+      acc.push(plan);
+    }
+    return acc;
+  }, []).sort((a, b) => a.durationDays - b.durationDays);
+
+  if (isLoading) {
+    return (
+      <section className="py-20" id="pricing">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-center">
+            <LoadingSpinner size="lg" />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-20" id="pricing">
@@ -79,79 +95,86 @@ export default function PricingSection() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {plans.map((plan) => (
-            <Card 
-              key={plan.id}
-              className={`relative hover:shadow-xl transition-all hover:-translate-y-2 ${
-                plan.isPopular ? 'border-2 border-primary' : ''
-              }`}
-              data-testid={`pricing-plan-${plan.id}`}
-            >
-              {plan.isPopular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-4 py-1">
-                    {t("pricing.popular")}
-                  </Badge>
-                </div>
-              )}
-              
-              <CardHeader className="text-center pb-8">
-                <CardTitle className="text-2xl font-bold text-foreground mb-2">
-                  {plan.name}
-                </CardTitle>
-                <div className="text-4xl font-bold text-primary mb-2">
-                  {plan.price} zł
-                </div>
-                <p className="text-muted-foreground">{plan.duration}</p>
-                {plan.savings && (
-                  <Badge variant="outline" className="bg-chart-2/10 text-chart-2 mt-2">
-                    {plan.savings}
-                  </Badge>
+          {uniquePlans?.map((plan) => {
+            const extras: PlanExtras = planFeatures[plan.durationDays] || { features: [] };
+            const duration = plan.durationDays === 30 ? "1 miesiąc dostępu" 
+              : plan.durationDays === 90 ? "3 miesiące dostępu"
+              : "12 miesięcy dostępu";
+            
+            return (
+              <Card 
+                key={plan.id}
+                className={`relative hover:shadow-xl transition-all hover:-translate-y-2 ${
+                  extras.isPopular ? 'border-2 border-primary' : ''
+                }`}
+                data-testid={`pricing-plan-${plan.durationDays}`}
+              >
+                {extras.isPopular && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <Badge className="bg-primary text-primary-foreground px-4 py-1">
+                      {t("pricing.popular")}
+                    </Badge>
+                  </div>
                 )}
-              </CardHeader>
-              
-              <CardContent className="space-y-6">
-                <ul className="space-y-4">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center text-foreground">
-                      <Check className="h-5 w-5 text-chart-2 mr-3 flex-shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
                 
-                {isAuthenticated ? (
-                  <Button 
-                    className={`w-full ${
-                      plan.isPopular 
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                        : ''
-                    }`}
-                    variant={plan.isPopular ? "default" : "outline"}
-                    asChild
-                    data-testid={`select-plan-${plan.id}`}
-                  >
-                    <Link href={`/checkout?plan=${plan.id}`}>
+                <CardHeader className="text-center pb-8">
+                  <CardTitle className="text-2xl font-bold text-foreground mb-2">
+                    {plan.name}
+                  </CardTitle>
+                  <div className="text-4xl font-bold text-primary mb-2">
+                    {plan.price} zł
+                  </div>
+                  <p className="text-muted-foreground">{duration}</p>
+                  {extras.savings && (
+                    <Badge variant="outline" className="bg-chart-2/10 text-chart-2 mt-2">
+                      {extras.savings}
+                    </Badge>
+                  )}
+                </CardHeader>
+                
+                <CardContent className="space-y-6">
+                  <ul className="space-y-4">
+                    {extras.features.map((feature, index) => (
+                      <li key={index} className="flex items-center text-foreground">
+                        <Check className="h-5 w-5 text-chart-2 mr-3 flex-shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  {isAuthenticated ? (
+                    <Button 
+                      className={`w-full ${
+                        extras.isPopular 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : ''
+                      }`}
+                      variant={extras.isPopular ? "default" : "outline"}
+                      asChild
+                      data-testid={`select-plan-${plan.durationDays}`}
+                    >
+                      <Link href={`/checkout?plan=${plan.id}`}>
+                        {t("pricing.cta")}
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button 
+                      className={`w-full ${
+                        extras.isPopular 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          : ''
+                      }`}
+                      variant={extras.isPopular ? "default" : "outline"}
+                      onClick={() => setLocation("/?auth=register")}
+                      data-testid={`select-plan-${plan.durationDays}`}
+                    >
                       {t("pricing.cta")}
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button 
-                    className={`w-full ${
-                      plan.isPopular 
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                        : ''
-                    }`}
-                    variant={plan.isPopular ? "default" : "outline"}
-                    onClick={() => setLocation("/?auth=register")}
-                    data-testid={`select-plan-${plan.id}`}
-                  >
-                    {t("pricing.cta")}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Payment methods */}
