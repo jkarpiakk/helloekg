@@ -1,4 +1,5 @@
 import { storage } from "../storage";
+import { handleQuestionAnswer } from "./gamificationService";
 import type { Question, Attempt } from "@shared/schema";
 
 export interface QuizQuestion {
@@ -15,6 +16,13 @@ export interface QuizResult {
   correctIndex: number;
   explanation: string;
   timeMs: number;
+  xpEarned?: number;
+  newAchievements?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+  }>;
 }
 
 export interface ReviewQueue {
@@ -287,11 +295,31 @@ export class QuizService {
       await this.updateUserProgress(userId, question.sectionId);
     }
 
+    // Handle gamification (XP, achievements, streak) - only in learn mode
+    let xpEarned: number | undefined;
+    let newAchievements: Array<{ id: string; name: string; description: string; icon: string; }> | undefined;
+
+    if (mode === "learn") {
+      const gamificationResult = await handleQuestionAnswer(userId, isCorrect, timeMs);
+      xpEarned = gamificationResult.xpEarned;
+      
+      if (gamificationResult.unlockedAchievements.length > 0) {
+        newAchievements = gamificationResult.unlockedAchievements.map(achievement => ({
+          id: achievement.id,
+          name: achievement.name,
+          description: achievement.description,
+          icon: achievement.icon,
+        }));
+      }
+    }
+
     return {
       isCorrect,
       correctIndex,
       explanation: question.explanationMd,
-      timeMs
+      timeMs,
+      xpEarned,
+      newAchievements
     };
   }
 

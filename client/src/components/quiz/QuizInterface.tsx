@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useConfetti } from "@/hooks/use-confetti";
 import { ArrowLeft, ArrowRight, Bookmark, X, AlertTriangle } from "lucide-react";
 import QuestionCard from "./QuestionCard";
 import ImageLightbox from "./ImageLightbox";
@@ -30,6 +31,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const [examFinished, setExamFinished] = useState(false);
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { fireAchievementConfetti } = useConfetti();
 
   // Initialize exam session
   useEffect(() => {
@@ -95,16 +97,41 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     },
     onSuccess: (result) => {
       setShowExplanation(true);
-      if (mode !== "exam" && result.isCorrect) {
+      
+      // Show XP earned
+      if (result.xpEarned) {
+        toast({
+          title: result.isCorrect ? t("quiz.correct") : "Spróbuj ponownie!",
+          description: `+${result.xpEarned} XP`,
+          variant: result.isCorrect ? "default" : "destructive",
+        });
+      } else if (mode !== "exam" && result.isCorrect) {
         toast({
           title: t("quiz.correct"),
           description: "Świetna robota!",
           variant: "default",
         });
       }
-      // Invalidate progress queries (not for exam mode)
+
+      // Show confetti and toast for new achievements
+      if (result.newAchievements && result.newAchievements.length > 0) {
+        fireAchievementConfetti();
+        
+        result.newAchievements.forEach((achievement) => {
+          toast({
+            title: "🏆 Nowe osiągnięcie!",
+            description: `${achievement.icon} ${achievement.name}`,
+            duration: 5000,
+          });
+        });
+      }
+
+      // Invalidate progress and gamification queries (not for exam mode)
       if (mode !== "exam") {
         queryClient.invalidateQueries({ queryKey: ["/api/progress"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/gamification/stats"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/gamification/achievements"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/gamification/activity-heatmap"] });
       }
     },
     onError: (error: any) => {

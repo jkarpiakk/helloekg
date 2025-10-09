@@ -53,6 +53,13 @@ export interface QuizResult {
   correctIndex: number;
   explanation: string;
   timeMs: number;
+  xpEarned?: number;
+  newAchievements?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+  }>;
 }
 
 export interface UserProgress {
