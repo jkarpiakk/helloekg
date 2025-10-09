@@ -8,6 +8,10 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import ProgressCard from "./ProgressCard";
+import { StreakDisplay } from "@/components/gamification/StreakDisplay";
+import { XPCard } from "@/components/gamification/XPCard";
+import { ActivityHeatmap } from "@/components/gamification/ActivityHeatmap";
+import { AchievementGallery } from "@/components/gamification/AchievementGallery";
 import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle, Activity, Sparkles
 } from "lucide-react";
 import { Link } from "wouter";
@@ -65,6 +69,33 @@ export default function StudentDashboard() {
     queryKey: ["/api/certificates/my"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/certificates/my");
+      return response.json();
+    },
+  });
+
+  // Fetch gamification stats
+  const { data: gamificationStats } = useQuery({
+    queryKey: ["/api/gamification/stats"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/gamification/stats");
+      return response.json();
+    },
+  });
+
+  // Fetch activity heatmap
+  const { data: activityHeatmap } = useQuery({
+    queryKey: ["/api/gamification/activity-heatmap"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/gamification/activity-heatmap");
+      return response.json();
+    },
+  });
+
+  // Fetch achievements
+  const { data: achievements } = useQuery({
+    queryKey: ["/api/gamification/achievements"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/gamification/achievements");
       return response.json();
     },
   });
@@ -140,6 +171,42 @@ export default function StudentDashboard() {
               successRate={stats.successRate * 100}
               streak={stats.streak}
             />
+
+            {/* Gamification Stats */}
+            {gamificationStats && (
+              <>
+                <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
+                  <StreakDisplay
+                    currentStreak={gamificationStats.currentStreak}
+                    longestStreak={gamificationStats.longestStreak}
+                    streakFreezes={gamificationStats.streakFreezes}
+                  />
+                  <XPCard
+                    xp={gamificationStats.xp}
+                    level={gamificationStats.level}
+                    levelName={gamificationStats.levelName}
+                    currentLevelXp={gamificationStats.levelInfo.currentLevelXp}
+                    nextLevelXp={gamificationStats.levelInfo.nextLevelXp}
+                    xpProgress={gamificationStats.levelInfo.xpProgress}
+                    xpNeeded={gamificationStats.levelInfo.xpNeeded}
+                    progressPercentage={gamificationStats.levelInfo.progressPercentage}
+                  />
+                </div>
+
+                {/* Activity Heatmap */}
+                {activityHeatmap && (
+                  <ActivityHeatmap activities={activityHeatmap} />
+                )}
+
+                {/* Achievements Gallery */}
+                {achievements && (
+                  <AchievementGallery
+                    unlocked={achievements.unlocked}
+                    locked={achievements.locked}
+                  />
+                )}
+              </>
+            )}
 
             {/* Continue Learning */}
             <Card>

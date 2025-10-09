@@ -9,6 +9,7 @@ import { authService } from "./auth";
 import { emailService } from "./services/emailService";
 import { quizService } from "./services/quizService";
 import { certificateService } from "./services/certificateService";
+import * as gamificationService from "./services/gamificationService";
 import { requireAuth, requireAdmin, requireReviewer, requireActiveSubscription } from "./middleware/auth";
 import { authRateLimit, apiRateLimit } from "./middleware/rateLimit";
 import {
@@ -485,7 +486,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mode
       );
 
-      res.json(result);
+      // Przyznaj XP i aktualizuj streak po każdej odpowiedzi
+      const gamificationResult = await gamificationService.handleQuestionAnswer(
+        req.user!.id,
+        result.isCorrect,
+        timeMs
+      );
+
+      res.json({
+        ...result,
+        gamification: gamificationResult
+      });
     } catch (error: any) {
       console.error("Answer submission error:", error);
       res.status(400).json({ error: error.message || "Błąd podczas zapisywania odpowiedzi" });
@@ -577,6 +588,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Certificate verification error:", error);
       res.status(500).json({ error: "Błąd podczas weryfikacji certyfikatu" });
+    }
+  });
+
+  // ====== GAMIFICATION ENDPOINTS ======
+  
+  // Pobierz statystyki użytkownika (XP, poziom, streak)
+  app.get("/api/gamification/stats", requireAuth, async (req, res) => {
+    try {
+      const stats = await gamificationService.getUserStats(req.user!.id);
+      const levelInfo = gamificationService.getXpToNextLevel(stats.xp, stats.level);
+      const levelName = gamificationService.getLevelName(stats.level);
+      
+      res.json({
+        ...stats,
+        levelName,
+        levelInfo
+      });
+    } catch (error) {
+      console.error("Gamification stats error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania statystyk gamifikacji" });
+    }
+  });
+
+  // Pobierz heatmapę aktywności
+  app.get("/api/gamification/activity-heatmap", requireAuth, async (req, res) => {
+    try {
+      const activities = await gamificationService.getUserActivityHeatmap(req.user!.id);
+      res.json(activities);
+    } catch (error) {
+      console.error("Activity heatmap error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania heatmapy aktywności" });
+    }
+  });
+
+  // Pobierz osiągnięcia użytkownika
+  app.get("/api/gamification/achievements", requireAuth, async (req, res) => {
+    try {
+      const achievements = await gamificationService.getUserAchievements(req.user!.id);
+      res.json(achievements);
+    } catch (error) {
+      console.error("Achievements error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania osiągnięć" });
+    }
+  });
+
+  // Użyj streak freeze
+  app.post("/api/gamification/use-freeze", requireAuth, async (req, res) => {
+    try {
+      const stats = await gamificationService.getUserStats(req.user!.id);
+      
+      if (stats.streakFreezes <= 0) {
+        return res.status(400).json({ error: "Brak dostępnych zamrożeń serii" });
+      }
+
+      // Logika użycia streak freeze jest już w updateStreak()
+      res.json({ success: true, remainingFreezes: stats.streakFreezes - 1 });
+    } catch (error) {
+      console.error("Use freeze error:", error);
+      res.status(500).json({ error: "Błąd podczas używania zamrożenia" });
+    }
+  });
+
+  // Pobierz ranking (leaderboard)
+  app.get("/api/gamification/leaderboard", requireAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const leaderboard = await gamificationService.getLeaderboard(limit);
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Leaderboard error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania rankingu" });
     }
   });
 

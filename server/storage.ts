@@ -1,13 +1,16 @@
 import { 
   users, plans, subscriptions, modules, sections, questions, attempts, 
   progress, certificates, supportTickets, auditLog, blogPosts, demoQuestions, homePageContent,
+  userStats, dailyActivities, achievements, userAchievements,
   type User, type InsertUser, type Plan, type InsertPlan,
   type Subscription, type InsertSubscription, type Module, type InsertModule,
   type Section, type InsertSection, type Question, type InsertQuestion, 
   type Attempt, type InsertAttempt, type Progress, type InsertProgress, 
   type Certificate, type InsertCertificate, type SupportTicket, type InsertSupportTicket, 
   type AuditLog, type InsertAuditLog, type BlogPost, type InsertBlogPost,
-  type DemoQuestion, type InsertDemoQuestion, type HomePageContent, type InsertHomePageContent
+  type DemoQuestion, type InsertDemoQuestion, type HomePageContent, type InsertHomePageContent,
+  type UserStats, type InsertUserStats, type DailyActivity, type InsertDailyActivity,
+  type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, count, avg, sql, or, ilike, isNull } from "drizzle-orm";
@@ -106,6 +109,16 @@ export interface IStorage {
   createHomePageContent(data: InsertHomePageContent): Promise<HomePageContent>;
   updateHomePageContent(id: string, updates: Partial<InsertHomePageContent>): Promise<HomePageContent>;
   deleteHomePageContent(id: string): Promise<void>;
+  
+  // Gamification methods
+  getUserStats(userId: string): Promise<UserStats | undefined>;
+  createUserStats(data: InsertUserStats): Promise<UserStats>;
+  updateUserStats(userId: string, updates: Partial<UserStats>): Promise<UserStats>;
+  getAllAchievements(): Promise<Achievement[]>;
+  createAchievement(data: InsertAchievement): Promise<Achievement>;
+  getUserAchievements(userId: string): Promise<UserAchievement[]>;
+  createUserAchievement(data: InsertUserAchievement): Promise<UserAchievement>;
+  getDailyActivities(userId: string, days?: number): Promise<DailyActivity[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -767,6 +780,67 @@ export class DatabaseStorage implements IStorage {
 
   async deleteHomePageContent(id: string): Promise<void> {
     await db.delete(homePageContent).where(eq(homePageContent.id, id));
+  }
+
+  // Gamification methods
+  async getUserStats(userId: string): Promise<UserStats | undefined> {
+    const [stats] = await db
+      .select()
+      .from(userStats)
+      .where(eq(userStats.userId, userId));
+    return stats || undefined;
+  }
+
+  async createUserStats(data: InsertUserStats): Promise<UserStats> {
+    const [stats] = await db.insert(userStats).values(data).returning();
+    return stats;
+  }
+
+  async updateUserStats(userId: string, updates: Partial<UserStats>): Promise<UserStats> {
+    const [stats] = await db
+      .update(userStats)
+      .set({ ...updates, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(userStats.userId, userId))
+      .returning();
+    return stats;
+  }
+
+  async getAllAchievements(): Promise<Achievement[]> {
+    return db.select().from(achievements).orderBy(achievements.category, achievements.name);
+  }
+
+  async createAchievement(data: InsertAchievement): Promise<Achievement> {
+    const [achievement] = await db.insert(achievements).values(data).returning();
+    return achievement;
+  }
+
+  async getUserAchievements(userId: string): Promise<UserAchievement[]> {
+    return db
+      .select()
+      .from(userAchievements)
+      .where(eq(userAchievements.userId, userId))
+      .orderBy(desc(userAchievements.unlockedAt));
+  }
+
+  async createUserAchievement(data: InsertUserAchievement): Promise<UserAchievement> {
+    const [userAchievement] = await db.insert(userAchievements).values(data).returning();
+    return userAchievement;
+  }
+
+  async getDailyActivities(userId: string, days: number = 365): Promise<DailyActivity[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    return db
+      .select()
+      .from(dailyActivities)
+      .where(
+        and(
+          eq(dailyActivities.userId, userId),
+          sql`${dailyActivities.activityDate} >= ${startDate}`
+        )
+      )
+      .orderBy(desc(dailyActivities.activityDate));
   }
 }
 

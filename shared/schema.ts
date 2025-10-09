@@ -198,7 +198,7 @@ export const blogPosts = pgTable("blog_posts", {
 });
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   subscriptions: many(subscriptions),
   attempts: many(attempts),
   progress: many(progress),
@@ -208,6 +208,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   reviewedQuestions: many(questions, { relationName: "reviewedBy" }),
   auditLogs: many(auditLog),
   createdBlogPosts: many(blogPosts),
+  stats: one(userStats),
+  dailyActivities: many(dailyActivities),
+  achievements: many(userAchievements),
+  streakFreezes: many(streakFreezeLog),
 }));
 
 export const plansRelations = relations(plans, ({ many }) => ({
@@ -431,6 +435,132 @@ export const insertHomePageContentSchema = createInsertSchema(homePageContent).o
 
 export type HomePageContent = typeof homePageContent.$inferSelect;
 export type InsertHomePageContent = z.infer<typeof insertHomePageContentSchema>;
+
+// ======= GAMIFICATION TABLES =======
+
+// User statistics for gamification
+export const userStats = pgTable("user_stats", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  xp: integer("xp").notNull().default(0),
+  level: integer("level").notNull().default(1),
+  currentStreak: integer("current_streak").notNull().default(0),
+  longestStreak: integer("longest_streak").notNull().default(0),
+  lastActivityDate: timestamp("last_activity_date"),
+  streakFreezes: integer("streak_freezes").notNull().default(2), // liczba dostępnych "zamrożeń" serii
+  totalQuestionsAnswered: integer("total_questions_answered").notNull().default(0),
+  correctAnswers: integer("correct_answers").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Daily activity tracking for heatmap
+export const dailyActivities = pgTable("daily_activities", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  activityDate: timestamp("activity_date").notNull(), // data aktywności (bez czasu)
+  questionsAnswered: integer("questions_answered").notNull().default(0),
+  xpEarned: integer("xp_earned").notNull().default(0),
+  timeSpentMinutes: integer("time_spent_minutes").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Achievement definitions
+export const achievements = pgTable("achievements", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key", { length: 100 }).notNull().unique(), // np. "streak_7", "perfectionist"
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description").notNull(),
+  category: varchar("category", { length: 50 }).notNull(), // streak, accuracy, speed, volume
+  icon: varchar("icon", { length: 100 }).notNull(), // ikona emoji lub nazwa lucide
+  condition: json("condition").$type<{
+    type: 'streak' | 'accuracy' | 'total_questions' | 'speed' | 'category_mastery';
+    threshold: number;
+    category?: string; // dla category_mastery
+  }>().notNull(),
+  xpReward: integer("xp_reward").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// User unlocked achievements
+export const userAchievements = pgTable("user_achievements", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  achievementId: uuid("achievement_id").notNull().references(() => achievements.id, { onDelete: "cascade" }),
+  unlockedAt: timestamp("unlocked_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Streak freeze usage log
+export const streakFreezeLog = pgTable("streak_freeze_log", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  usedDate: timestamp("used_date").notNull().default(sql`CURRENT_TIMESTAMP`),
+  daysSaved: integer("days_saved").notNull().default(1),
+});
+
+// ======= GAMIFICATION RELATIONS =======
+
+export const userStatsRelations = relations(userStats, ({ one }) => ({
+  user: one(users, { fields: [userStats.userId], references: [users.id] }),
+}));
+
+export const dailyActivitiesRelations = relations(dailyActivities, ({ one }) => ({
+  user: one(users, { fields: [dailyActivities.userId], references: [users.id] }),
+}));
+
+export const achievementsRelations = relations(achievements, ({ many }) => ({
+  userAchievements: many(userAchievements),
+}));
+
+export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
+  user: one(users, { fields: [userAchievements.userId], references: [users.id] }),
+  achievement: one(achievements, { fields: [userAchievements.achievementId], references: [achievements.id] }),
+}));
+
+export const streakFreezeLogRelations = relations(streakFreezeLog, ({ one }) => ({
+  user: one(users, { fields: [streakFreezeLog.userId], references: [users.id] }),
+}));
+
+// ======= GAMIFICATION SCHEMAS =======
+
+export const insertUserStatsSchema = createInsertSchema(userStats).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export const insertDailyActivitySchema = createInsertSchema(dailyActivities).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export const insertAchievementSchema = createInsertSchema(achievements).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ 
+  id: true, 
+  unlockedAt: true 
+});
+
+export const insertStreakFreezeLogSchema = createInsertSchema(streakFreezeLog).omit({ 
+  id: true, 
+  usedDate: true 
+});
+
+// ======= GAMIFICATION TYPES =======
+
+export type UserStats = typeof userStats.$inferSelect;
+export type InsertUserStats = z.infer<typeof insertUserStatsSchema>;
+export type DailyActivity = typeof dailyActivities.$inferSelect;
+export type InsertDailyActivity = z.infer<typeof insertDailyActivitySchema>;
+export type Achievement = typeof achievements.$inferSelect;
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
+export type StreakFreezeLog = typeof streakFreezeLog.$inferSelect;
+export type InsertStreakFreezeLog = z.infer<typeof insertStreakFreezeLogSchema>;
 
 // Additional schemas for API endpoints
 export const loginSchema = z.object({
