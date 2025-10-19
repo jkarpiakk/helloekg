@@ -6,6 +6,16 @@ EKG Academy is a comprehensive e-learning platform designed for teaching electro
 
 The application provides a quiz-based learning experience with immediate feedback, progress tracking, certification system, and multi-language support (currently Polish with internationalization architecture for English and Spanish). Users can access different learning modes including regular learning, review of incorrect answers, and exam simulations.
 
+## Product Focus
+
+**Current MVP Focus**: Core learning platform with quiz system, progress tracking, and certification.
+
+**Future Features** (implemented but disabled for users, available in Admin Panel → Future tab):
+- **Gamification System**: Duolingo-style engagement with XP points, levels, streak tracking, achievements, and activity heatmaps
+- **Live EKG Simulator**: Real-time interactive cardiac rhythm simulator with 3D heart visualization and 5 different arrhythmias
+
+These advanced features are fully developed and tested but temporarily disabled to focus on perfecting the core product experience. Admins can access and test these features in the dedicated "Future" tab within the admin panel.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

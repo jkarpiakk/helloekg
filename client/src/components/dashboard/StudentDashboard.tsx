@@ -8,11 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import ProgressCard from "./ProgressCard";
-import { StreakDisplay } from "@/components/gamification/StreakDisplay";
-import { XPCard } from "@/components/gamification/XPCard";
-import { ActivityHeatmap } from "@/components/gamification/ActivityHeatmap";
-import { AchievementGallery } from "@/components/gamification/AchievementGallery";
-import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle, Activity, Sparkles
+import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -69,33 +65,6 @@ export default function StudentDashboard() {
     queryKey: ["/api/certificates/my"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/certificates/my");
-      return response.json();
-    },
-  });
-
-  // Fetch gamification stats
-  const { data: gamificationStats } = useQuery({
-    queryKey: ["/api/gamification/stats"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/gamification/stats");
-      return response.json();
-    },
-  });
-
-  // Fetch activity heatmap
-  const { data: activityHeatmap } = useQuery({
-    queryKey: ["/api/gamification/activity-heatmap"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/gamification/activity-heatmap");
-      return response.json();
-    },
-  });
-
-  // Fetch achievements
-  const { data: achievements } = useQuery({
-    queryKey: ["/api/gamification/achievements"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/gamification/achievements");
       return response.json();
     },
   });
@@ -172,42 +141,6 @@ export default function StudentDashboard() {
               streak={stats.streak}
             />
 
-            {/* Gamification Stats */}
-            {gamificationStats && (
-              <>
-                <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
-                  <StreakDisplay
-                    currentStreak={gamificationStats.currentStreak}
-                    longestStreak={gamificationStats.longestStreak}
-                    streakFreezes={gamificationStats.streakFreezes}
-                  />
-                  <XPCard
-                    xp={gamificationStats.xp}
-                    level={gamificationStats.level}
-                    levelName={gamificationStats.levelName}
-                    currentLevelXp={gamificationStats.levelInfo.currentLevelXp}
-                    nextLevelXp={gamificationStats.levelInfo.nextLevelXp}
-                    xpProgress={gamificationStats.levelInfo.xpProgress}
-                    xpNeeded={gamificationStats.levelInfo.xpNeeded}
-                    progressPercentage={gamificationStats.levelInfo.progressPercentage}
-                  />
-                </div>
-
-                {/* Activity Heatmap */}
-                {activityHeatmap && (
-                  <ActivityHeatmap activities={activityHeatmap} />
-                )}
-
-                {/* Achievements Gallery */}
-                {achievements && (
-                  <AchievementGallery
-                    unlocked={achievements.unlocked}
-                    locked={achievements.locked}
-                  />
-                )}
-              </>
-            )}
-
             {/* Continue Learning */}
             <Card>
               <CardHeader>
@@ -215,30 +148,6 @@ export default function StudentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
-                  {/* EKG Simulator - NEW! */}
-                  <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-purple-500/10 to-pink-500/10 relative overflow-hidden">
-                    <Link href="/simulator" className="block">
-                      <div className="absolute top-2 right-2">
-                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">NOWOŚĆ!</Badge>
-                      </div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Activity className="h-6 w-6 text-purple-400 animate-pulse" />
-                        </div>
-                      </div>
-                      <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">🎮 Symulator EKG Live</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                        Interaktywny symulator rytmu serca w czasie rzeczywistym z wizualizacją arytmii
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-purple-400">
-                        <Sparkles className="h-3 w-3" />
-                        <span>Animacja 3D</span>
-                        <span>•</span>
-                        <span>5 rytmów</span>
-                      </div>
-                    </Link>
-                  </div>
-
                   {/* Interactive Lecture */}
                   <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5">
                     <Link href="/lecture" className="block">

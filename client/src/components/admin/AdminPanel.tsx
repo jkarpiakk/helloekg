@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle, FileText, HelpCircle, Home } from "lucide-react";
+import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle, FileText, HelpCircle, Home, Sparkles } from "lucide-react";
 import QuestionManager from "./QuestionManager";
 import CourseManager from "./CourseManager";
 import UserManager from "./UserManager";
@@ -13,6 +13,7 @@ import AnalyticsManager from "./AnalyticsManager";
 import BlogManager from "./BlogManager";
 import DemoQuestionManager from "./DemoQuestionManager";
 import HomePageContentManager from "./HomePageContentManager";
+import FutureFeatures from "./FutureFeatures";
 
 export default function AdminPanel() {
   const { t } = useTranslation();
@@ -40,7 +41,7 @@ export default function AdminPanel() {
       {/* Admin Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs defaultValue="course" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="course" className="flex items-center space-x-2">
               <BookOpen className="h-4 w-4" />
               <span>Kurs</span>
@@ -72,6 +73,10 @@ export default function AdminPanel() {
             <TabsTrigger value="analytics" className="flex items-center space-x-2">
               <BarChart3 className="h-4 w-4" />
               <span>Statystyki</span>
+            </TabsTrigger>
+            <TabsTrigger value="future" className="flex items-center space-x-2">
+              <Sparkles className="h-4 w-4" />
+              <span>Future</span>
             </TabsTrigger>
           </TabsList>
 
@@ -105,6 +110,10 @@ export default function AdminPanel() {
 
           <TabsContent value="analytics">
             <AnalyticsManager />
+          </TabsContent>
+
+          <TabsContent value="future">
+            <FutureFeatures />
           </TabsContent>
         </Tabs>
       </div>
