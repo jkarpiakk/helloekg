@@ -146,12 +146,10 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   };
 
   const scrollToTop = () => {
-    if (quizContentRef.current) {
-      quizContentRef.current.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
-      });
-    }
+    window.scrollTo({ 
+      top: 0, 
+      behavior: 'smooth' 
+    });
   };
 
   const handleNextQuestion = () => {
