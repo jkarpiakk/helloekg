@@ -46,6 +46,8 @@ export interface QuizQuestion {
   imageUrl?: string;
   answers: Array<{ text: string; index: number }>;
   sectionId: string;
+  correctIndex: number;
+  explanation: string;
 }
 
 export interface QuizResult {

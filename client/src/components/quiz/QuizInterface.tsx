@@ -22,6 +22,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [startTime, setStartTime] = useState(Date.now());
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -94,7 +95,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       }
     },
     onSuccess: (result) => {
-      setShowExplanation(true);
+      setQuizResult(result);
 
       // Invalidate progress queries (not for exam mode)
       if (mode !== "exam") {
@@ -117,6 +118,24 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     const timeMs = Date.now() - startTime;
 
     if (question) {
+      console.log('[INSTANT EXPLANATION] Question data:', {
+        hasCorrectIndex: 'correctIndex' in question,
+        hasExplanation: 'explanation' in question,
+        correctIndex: question.correctIndex,
+        explanationLength: question.explanation?.length
+      });
+      
+      const optimisticResult: QuizResult = {
+        isCorrect: answerIndex === question.correctIndex,
+        correctIndex: question.correctIndex,
+        explanation: question.explanation,
+        timeMs,
+      };
+      
+      console.log('[INSTANT EXPLANATION] Setting result immediately:', optimisticResult.isCorrect ? 'CORRECT' : 'INCORRECT');
+      setQuizResult(optimisticResult);
+      setShowExplanation(true);
+
       submitAnswerMutation.mutate({
         questionId: question.id,
         selectedIndex: answerIndex,
@@ -137,6 +156,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     setCurrentQuestionIndex(nextIndex);
     setSelectedAnswer(null);
     setShowExplanation(false);
+    setQuizResult(null);
     setStartTime(Date.now());
   };
 
@@ -145,6 +165,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       setCurrentQuestionIndex(prev => prev - 1);
       setSelectedAnswer(null);
       setShowExplanation(false);
+      setQuizResult(null);
       setStartTime(Date.now());
     }
   };
@@ -317,7 +338,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
           question={question}
           selectedAnswer={selectedAnswer}
           showExplanation={showExplanation}
-          quizResult={submitAnswerMutation.data}
+          quizResult={quizResult || undefined}
           onAnswerSelect={handleAnswerSelect}
           onImageClick={openLightbox}
           isSubmitting={submitAnswerMutation.isPending}

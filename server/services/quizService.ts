@@ -9,6 +9,8 @@ export interface QuizQuestion {
   imageUrl?: string;
   answers: Array<{ text: string; index: number }>;
   sectionId: string;
+  correctIndex: number;
+  explanation: string;
 }
 
 export interface QuizResult {
@@ -243,6 +245,8 @@ export class QuizService {
   }
 
   private formatQuestionForQuiz(question: Question): QuizQuestion {
+    const correctIndex = question.answers.findIndex(answer => answer.isCorrect);
+    
     const answers = question.answers.map((answer, index) => ({
       text: answer.text,
       index
@@ -260,7 +264,9 @@ export class QuizService {
       bodyMd: question.bodyMd,
       imageUrl: question.imageUrl || undefined,
       answers,
-      sectionId: question.sectionId
+      sectionId: question.sectionId,
+      correctIndex,
+      explanation: question.explanationMd
     };
   }
 
