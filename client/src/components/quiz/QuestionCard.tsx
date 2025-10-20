@@ -132,13 +132,13 @@ export default function QuestionCard({
               <div className="flex-1">
                 <h4 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-5 ${
                   quizResult.isCorrect 
-                    ? 'text-green-700 dark:text-green-400' 
-                    : 'text-red-700 dark:text-red-400'
+                    ? 'text-green-700 dark:text-green-300' 
+                    : 'text-red-700 dark:text-red-300'
                 }`} data-testid="result-title">
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="prose prose-base sm:prose-lg lg:prose-xl prose-slate dark:prose-invert max-w-none text-foreground leading-relaxed bg-background/50 dark:bg-background/30 p-4 sm:p-5 rounded-lg border border-border"
+                  className="prose prose-base sm:prose-lg prose-slate dark:prose-invert max-w-none leading-relaxed"
                   dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
                   data-testid="explanation-content"
                 />
