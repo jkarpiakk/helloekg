@@ -117,22 +117,22 @@ export default function QuestionCard({
             ? 'border-green-500 bg-gradient-to-br from-green-50 via-white to-green-50/50 dark:from-green-950/20 dark:via-background dark:to-green-950/10' 
             : 'border-red-500 bg-gradient-to-br from-red-50 via-white to-red-50/50 dark:from-red-950/20 dark:via-background dark:to-red-950/10'
         }`} data-testid="explanation-panel">
-          <div className={`h-1.5 sm:h-2 w-full ${quizResult.isCorrect ? 'bg-gradient-to-r from-green-400 to-green-600' : 'bg-gradient-to-r from-red-400 to-red-600'}`} />
-          <CardContent className="p-3 sm:p-5 md:p-7">
-            <div className="flex items-start space-x-2.5 sm:space-x-4 md:space-x-5">
-              <div className={`w-10 h-10 sm:w-14 sm:h-14 md:w-18 md:h-18 rounded-lg sm:rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
+          <div className={`h-1 sm:h-2 w-full ${quizResult.isCorrect ? 'bg-gradient-to-r from-green-400 to-green-600' : 'bg-gradient-to-r from-red-400 to-red-600'}`} />
+          <CardContent className="p-2 sm:p-5 md:p-7">
+            <div className="flex items-start space-x-2 sm:space-x-4 md:space-x-5">
+              <div className={`w-8 h-8 sm:w-14 sm:h-14 md:w-18 md:h-18 rounded-md sm:rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
                 quizResult.isCorrect 
                   ? 'bg-gradient-to-br from-green-400 to-green-600' 
                   : 'bg-gradient-to-br from-red-400 to-red-600'
               }`}>
                 {quizResult.isCorrect ? (
-                  <Check className="h-5 w-5 sm:h-7 sm:w-7 md:h-9 md:w-9 text-white stroke-[3]" />
+                  <Check className="h-4 w-4 sm:h-7 sm:w-7 md:h-9 md:w-9 text-white stroke-[3]" />
                 ) : (
-                  <X className="h-5 w-5 sm:h-7 sm:w-7 md:h-9 md:w-9 text-white stroke-[3]" />
+                  <X className="h-4 w-4 sm:h-7 sm:w-7 md:h-9 md:w-9 text-white stroke-[3]" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className={`text-lg sm:text-xl md:text-2xl font-extrabold mb-2 sm:mb-3 md:mb-4 ${
+                <h4 className={`text-base sm:text-xl md:text-2xl font-extrabold mb-1.5 sm:mb-3 md:mb-4 ${
                   quizResult.isCorrect 
                     ? 'text-green-700 dark:text-green-400' 
                     : 'text-red-700 dark:text-red-400'
@@ -140,16 +140,16 @@ export default function QuestionCard({
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="bg-white dark:bg-slate-900 p-2.5 sm:p-3.5 md:p-4.5 rounded-md sm:rounded-lg md:rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-inner"
+                  className="bg-white dark:bg-slate-900 p-2 sm:p-3.5 md:p-4.5 rounded sm:rounded-lg md:rounded-xl border border-slate-200 dark:border-slate-700 shadow-inner"
                   data-testid="explanation-content"
                 >
                   <div 
-                    className="prose prose-sm sm:prose-base md:prose-lg max-w-none [&>p]:text-slate-900 [&>p]:dark:text-slate-100 [&>p]:text-sm [&>p]:sm:text-base [&>p]:md:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>ul]:text-slate-900 [&>ul]:dark:text-slate-100 [&>ul]:text-sm [&>ul]:sm:text-base [&>ul]:md:text-lg [&>ol]:text-slate-900 [&>ol]:dark:text-slate-100 [&>ol]:text-sm [&>ol]:sm:text-base [&>ol]:md:text-lg [&>h1]:text-slate-900 [&>h1]:dark:text-slate-100 [&>h2]:text-slate-900 [&>h2]:dark:text-slate-100 [&>h3]:text-slate-900 [&>h3]:dark:text-slate-100 [&>strong]:text-slate-900 [&>strong]:dark:text-slate-100"
+                    className="prose prose-sm sm:prose-base md:prose-lg max-w-none [&>p]:text-slate-900 [&>p]:dark:text-slate-100 [&>p]:text-xs [&>p]:sm:text-base [&>p]:md:text-lg [&>p]:leading-snug [&>p]:sm:leading-relaxed [&>p]:font-medium [&>ul]:text-slate-900 [&>ul]:dark:text-slate-100 [&>ul]:text-xs [&>ul]:sm:text-base [&>ul]:md:text-lg [&>ol]:text-slate-900 [&>ol]:dark:text-slate-100 [&>ol]:text-xs [&>ol]:sm:text-base [&>ol]:md:text-lg [&>h1]:text-slate-900 [&>h1]:dark:text-slate-100 [&>h2]:text-slate-900 [&>h2]:dark:text-slate-100 [&>h3]:text-slate-900 [&>h3]:dark:text-slate-100 [&>strong]:text-slate-900 [&>strong]:dark:text-slate-100"
                     dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
                   />
                 </div>
-                <div className="mt-2 sm:mt-3 md:mt-4 flex items-center flex-wrap gap-1.5 sm:gap-2">
-                  <Badge variant="outline" className={`text-xs sm:text-sm md:text-base py-1 sm:py-1.5 px-2 sm:px-3 ${
+                <div className="mt-1.5 sm:mt-3 md:mt-4 flex items-center flex-wrap gap-1 sm:gap-2">
+                  <Badge variant="outline" className={`text-xs sm:text-sm md:text-base py-0.5 sm:py-1.5 px-1.5 sm:px-3 ${
                     quizResult.isCorrect 
                       ? 'border-green-300 dark:border-green-700 text-green-700 dark:text-green-400' 
                       : 'border-red-300 dark:border-red-700 text-red-700 dark:text-red-400'
