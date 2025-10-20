@@ -214,9 +214,9 @@ export default function StudentDashboard() {
                       href={`/quiz?sectionId=${section.id}`}
                       className="block"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-border rounded-lg hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer group">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-4 border border-border rounded-lg hover:shadow-lg hover:border-primary/50 active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
                         <div className="flex items-center space-x-3 sm:space-x-4">
-                          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform ${
+                          <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform ${
                             section.completionPercentage >= 100 
                               ? 'bg-chart-2/10' 
                               : section.completionPercentage > 0 

@@ -324,43 +324,55 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         />
 
         {/* Navigation */}
-        <div className="flex justify-between items-center mt-8">
+        <div className="flex justify-between items-center mt-6 sm:mt-8 gap-2">
           <Button
             variant="outline"
             onClick={handlePreviousQuestion}
             disabled={currentQuestionIndex === 0}
             data-testid="previous-question"
+            size="sm"
+            className="h-11 sm:h-auto min-w-[44px]"
+            aria-label={t("quiz.previousQuestion")}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t("quiz.previousQuestion")}
+            <ArrowLeft className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">{t("quiz.previousQuestion")}</span>
           </Button>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2 sm:space-x-4">
             <Button
               variant="outline"
               onClick={handleMarkForReview}
               data-testid="mark-for-review"
+              size="sm"
+              className="h-11 sm:h-auto min-w-[44px]"
+              aria-label={t("quiz.markForReview")}
             >
-              <Bookmark className="h-4 w-4 mr-2" />
-              {t("quiz.markForReview")}
+              <Bookmark className="h-4 w-4 sm:mr-2" />
+              <span className="hidden md:inline">{t("quiz.markForReview")}</span>
             </Button>
 
             <Button
               variant="outline"
               onClick={() => setShowReportDialog(true)}
               data-testid="report-error-button"
+              size="sm"
+              className="h-11 sm:h-auto min-w-[44px]"
+              aria-label="Zgłoś błąd"
             >
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Zgłoś błąd
+              <AlertTriangle className="h-4 w-4 sm:mr-2" />
+              <span className="hidden md:inline">Zgłoś błąd</span>
             </Button>
 
             {showExplanation && (
               <Button
                 onClick={handleNextQuestion}
                 data-testid="next-question"
+                size="sm"
+                className="h-11 sm:h-auto min-w-[44px]"
+                aria-label={t("quiz.nextQuestion")}
               >
-                {t("quiz.nextQuestion")}
-                <ArrowRight className="h-4 w-4 ml-2" />
+                <span className="hidden sm:inline">{t("quiz.nextQuestion")}</span>
+                <ArrowRight className="h-4 w-4 sm:ml-2" />
               </Button>
             )}
           </div>

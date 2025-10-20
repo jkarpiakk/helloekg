@@ -60,19 +60,20 @@ export default function QuestionCard({
             {/* EKG Image */}
             {question.imageUrl && (
               <div 
-                className="relative group cursor-pointer mb-4 sm:mb-6"
+                className="relative group cursor-pointer mb-4 sm:mb-6 touch-manipulation"
                 onClick={() => onImageClick(question.imageUrl!)}
                 data-testid="question-image"
               >
                 <img
                   src={question.imageUrl}
                   alt="Zapis EKG"
-                  className="w-full h-48 sm:h-56 lg:h-64 object-cover rounded-lg border border-border"
+                  className="w-full h-40 sm:h-48 md:h-56 lg:h-64 object-contain bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-border"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base">
-                    <ZoomIn className="h-4 w-4 mr-2 inline" />
-                    {t("quiz.enlargeImage")}
+                <div className="absolute inset-0 bg-black/0 active:bg-black/20 sm:group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                  <div className="opacity-0 active:opacity-100 sm:group-hover:opacity-100 transition-opacity bg-black/80 text-white px-4 py-2 sm:px-4 sm:py-2 rounded-lg text-base sm:text-base pointer-events-none">
+                    <ZoomIn className="h-5 w-5 sm:h-4 sm:w-4 mr-2 inline" />
+                    <span className="hidden sm:inline">{t("quiz.enlargeImage")}</span>
+                    <span className="sm:hidden">Powiększ</span>
                   </div>
                 </div>
               </div>
@@ -117,21 +118,21 @@ export default function QuestionCard({
             : 'border-red-500 bg-gradient-to-br from-red-50 via-white to-red-50/50 dark:from-red-950/20 dark:via-background dark:to-red-950/10'
         }`} data-testid="explanation-panel">
           <div className={`h-2 w-full ${quizResult.isCorrect ? 'bg-gradient-to-r from-green-400 to-green-600' : 'bg-gradient-to-r from-red-400 to-red-600'}`} />
-          <CardContent className="p-6 sm:p-8 lg:p-10">
-            <div className="flex items-start space-x-5 sm:space-x-6">
-              <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
+          <CardContent className="p-4 sm:p-6 md:p-8">
+            <div className="flex items-start space-x-3 sm:space-x-4 md:space-x-5">
+              <div className={`w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
                 quizResult.isCorrect 
                   ? 'bg-gradient-to-br from-green-400 to-green-600' 
                   : 'bg-gradient-to-br from-red-400 to-red-600'
               }`}>
                 {quizResult.isCorrect ? (
-                  <Check className="h-8 w-8 sm:h-10 sm:w-10 text-white stroke-[3]" />
+                  <Check className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-white stroke-[3]" />
                 ) : (
-                  <X className="h-8 w-8 sm:h-10 sm:w-10 text-white stroke-[3]" />
+                  <X className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-white stroke-[3]" />
                 )}
               </div>
-              <div className="flex-1">
-                <h4 className={`text-2xl sm:text-3xl font-extrabold mb-5 sm:mb-6 ${
+              <div className="flex-1 min-w-0">
+                <h4 className={`text-xl sm:text-2xl md:text-3xl font-extrabold mb-3 sm:mb-4 md:mb-5 ${
                   quizResult.isCorrect 
                     ? 'text-green-700 dark:text-green-400' 
                     : 'text-red-700 dark:text-red-400'
@@ -139,16 +140,16 @@ export default function QuestionCard({
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-inner"
+                  className="bg-white dark:bg-slate-900 p-3 sm:p-4 md:p-5 rounded-lg sm:rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-inner"
                   data-testid="explanation-content"
                 >
                   <div 
-                    className="prose prose-lg sm:prose-xl max-w-none [&>p]:text-slate-900 [&>p]:dark:text-slate-100 [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>ul]:text-slate-900 [&>ul]:dark:text-slate-100 [&>ul]:text-base [&>ul]:sm:text-lg [&>ol]:text-slate-900 [&>ol]:dark:text-slate-100 [&>ol]:text-base [&>ol]:sm:text-lg [&>h1]:text-slate-900 [&>h1]:dark:text-slate-100 [&>h2]:text-slate-900 [&>h2]:dark:text-slate-100 [&>h3]:text-slate-900 [&>h3]:dark:text-slate-100 [&>strong]:text-slate-900 [&>strong]:dark:text-slate-100"
+                    className="prose prose-sm sm:prose-base md:prose-lg max-w-none [&>p]:text-slate-900 [&>p]:dark:text-slate-100 [&>p]:text-sm [&>p]:sm:text-base [&>p]:md:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>ul]:text-slate-900 [&>ul]:dark:text-slate-100 [&>ul]:text-sm [&>ul]:sm:text-base [&>ul]:md:text-lg [&>ol]:text-slate-900 [&>ol]:dark:text-slate-100 [&>ol]:text-sm [&>ol]:sm:text-base [&>ol]:md:text-lg [&>h1]:text-slate-900 [&>h1]:dark:text-slate-100 [&>h2]:text-slate-900 [&>h2]:dark:text-slate-100 [&>h3]:text-slate-900 [&>h3]:dark:text-slate-100 [&>strong]:text-slate-900 [&>strong]:dark:text-slate-100"
                     dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
                   />
                 </div>
-                <div className="mt-6 sm:mt-7 flex items-center space-x-3">
-                  <Badge variant="outline" className={`text-base sm:text-lg py-2 px-4 ${
+                <div className="mt-3 sm:mt-4 md:mt-5 flex items-center flex-wrap gap-2">
+                  <Badge variant="outline" className={`text-sm sm:text-base md:text-lg py-1.5 sm:py-2 px-3 sm:px-4 ${
                     quizResult.isCorrect 
                       ? 'border-green-300 dark:border-green-700 text-green-700 dark:text-green-400' 
                       : 'border-red-300 dark:border-red-700 text-red-700 dark:text-red-400'
