@@ -209,42 +209,48 @@ export default function StudentDashboard() {
               <CardContent>
                 <div className="space-y-3 sm:space-y-4">
                   {sections?.map((section, index) => (
-                    <div key={section.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-border rounded-lg">
-                      <div className="flex items-center space-x-3 sm:space-x-4">
-                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          section.completionPercentage >= 100 
-                            ? 'bg-chart-2/10' 
-                            : section.completionPercentage > 0 
-                              ? 'bg-primary/10' 
-                              : 'bg-muted'
-                        }`}>
-                          <Play className={`h-5 w-5 sm:h-6 sm:w-6 ${
+                    <Link 
+                      key={section.id} 
+                      href={`/quiz?sectionId=${section.id}`}
+                      className="block"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-border rounded-lg hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer group">
+                        <div className="flex items-center space-x-3 sm:space-x-4">
+                          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform ${
                             section.completionPercentage >= 100 
-                              ? 'text-chart-2' 
+                              ? 'bg-chart-2/10' 
                               : section.completionPercentage > 0 
-                                ? 'text-primary' 
-                                : 'text-muted-foreground'
-                          }`} />
+                                ? 'bg-primary/10' 
+                                : 'bg-muted'
+                          }`}>
+                            <Play className={`h-5 w-5 sm:h-6 sm:w-6 ${
+                              section.completionPercentage >= 100 
+                                ? 'text-chart-2' 
+                                : section.completionPercentage > 0 
+                                  ? 'text-primary' 
+                                  : 'text-muted-foreground'
+                            }`} />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm sm:text-base font-semibold text-foreground truncate">{section.title}</h4>
+                            <p className="text-xs sm:text-sm text-muted-foreground">
+                              15 {t("dashboard.questions")} • {Math.round(section.completionPercentage)}% {t("dashboard.completed")}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm sm:text-base font-semibold text-foreground truncate">{section.title}</h4>
-                          <p className="text-xs sm:text-sm text-muted-foreground">
-                            15 {t("dashboard.questions")} • {Math.round(section.completionPercentage)}% {t("dashboard.completed")}
-                          </p>
+                        <div className="flex items-center space-x-3 sm:space-x-4">
+                          <div className="flex-1 sm:w-32 h-2 bg-secondary rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${section.completionPercentage}%` }}
+                            />
+                          </div>
+                          <span className="text-xs sm:text-sm text-muted-foreground font-mono w-12">
+                            {Math.round(section.completionPercentage)}%
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3 sm:space-x-4">
-                        <div className="flex-1 sm:w-32 h-2 bg-secondary rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${section.completionPercentage}%` }}
-                          />
-                        </div>
-                        <span className="text-xs sm:text-sm text-muted-foreground font-mono w-12">
-                          {Math.round(section.completionPercentage)}%
-                        </span>
-                      </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </CardContent>
