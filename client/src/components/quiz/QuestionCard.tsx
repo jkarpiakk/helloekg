@@ -111,40 +111,45 @@ export default function QuestionCard({
 
       {/* Explanation Panel */}
       {showExplanation && quizResult && (
-        <Card className={`shadow-xl border-2 ${
+        <Card className={`shadow-2xl border-2 overflow-hidden ${
           quizResult.isCorrect 
-            ? 'border-green-500 bg-green-50 dark:bg-green-950/30' 
-            : 'border-red-500 bg-red-50 dark:bg-red-950/30'
+            ? 'border-green-500 bg-gradient-to-br from-green-50 via-white to-green-50/50 dark:from-green-950/20 dark:via-background dark:to-green-950/10' 
+            : 'border-red-500 bg-gradient-to-br from-red-50 via-white to-red-50/50 dark:from-red-950/20 dark:via-background dark:to-red-950/10'
         }`} data-testid="explanation-panel">
-          <CardContent className="p-5 sm:p-7 lg:p-10">
-            <div className="flex items-start space-x-4 sm:space-x-5">
-              <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 ${
+          <div className={`h-2 w-full ${quizResult.isCorrect ? 'bg-gradient-to-r from-green-400 to-green-600' : 'bg-gradient-to-r from-red-400 to-red-600'}`} />
+          <CardContent className="p-6 sm:p-8 lg:p-10">
+            <div className="flex items-start space-x-5 sm:space-x-6">
+              <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
                 quizResult.isCorrect 
-                  ? 'bg-green-500 dark:bg-green-600' 
-                  : 'bg-red-500 dark:bg-red-600'
+                  ? 'bg-gradient-to-br from-green-400 to-green-600' 
+                  : 'bg-gradient-to-br from-red-400 to-red-600'
               }`}>
                 {quizResult.isCorrect ? (
-                  <Check className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                  <Check className="h-8 w-8 sm:h-10 sm:w-10 text-white stroke-[3]" />
                 ) : (
-                  <X className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                  <X className="h-8 w-8 sm:h-10 sm:w-10 text-white stroke-[3]" />
                 )}
               </div>
               <div className="flex-1">
-                <h4 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-5 ${
+                <h4 className={`text-2xl sm:text-3xl font-extrabold mb-5 sm:mb-6 ${
                   quizResult.isCorrect 
-                    ? 'text-green-700 dark:text-green-300' 
-                    : 'text-red-700 dark:text-red-300'
+                    ? 'text-green-700 dark:text-green-400' 
+                    : 'text-red-700 dark:text-red-400'
                 }`} data-testid="result-title">
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="prose prose-base sm:prose-lg prose-slate dark:prose-invert max-w-none leading-relaxed"
+                  className="prose prose-lg sm:prose-xl prose-slate dark:prose-invert max-w-none leading-relaxed text-foreground [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>ul]:text-base [&>ul]:sm:text-lg [&>ol]:text-base [&>ol]:sm:text-lg [&>h1]:text-xl [&>h1]:sm:text-2xl [&>h2]:text-lg [&>h2]:sm:text-xl [&>h3]:text-base [&>h3]:sm:text-lg"
                   dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
                   data-testid="explanation-content"
                 />
-                <div className="mt-4 sm:mt-5 flex items-center space-x-4">
-                  <Badge variant="outline" className="text-sm sm:text-base py-1 px-3">
-                    {t("quiz.timeSpent")} {Math.round(quizResult.timeMs / 1000)}s
+                <div className="mt-6 sm:mt-7 flex items-center space-x-3">
+                  <Badge variant="outline" className={`text-base sm:text-lg py-2 px-4 ${
+                    quizResult.isCorrect 
+                      ? 'border-green-300 dark:border-green-700 text-green-700 dark:text-green-400' 
+                      : 'border-red-300 dark:border-red-700 text-red-700 dark:text-red-400'
+                  }`}>
+                    ⏱️ {Math.round(quizResult.timeMs / 1000)}s
                   </Badge>
                 </div>
               </div>
