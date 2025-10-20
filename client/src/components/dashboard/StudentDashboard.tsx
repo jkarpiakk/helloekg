@@ -149,11 +149,11 @@ export default function StudentDashboard() {
               <CardContent>
                 <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                   {/* Interactive Lecture */}
-                  <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5">
-                    <Link href="/lecture" className="block">
+                  <Link href="/lecture" className="block">
+                    <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5 touch-manipulation">
                       <div className="flex items-center justify-between mb-4">
-                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Heart className="h-6 w-6 text-primary animate-pulse" />
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Heart className="h-5 w-5 sm:h-6 sm:w-6 text-primary animate-pulse" />
                         </div>
                         <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20">NOWE!</Badge>
                       </div>
@@ -167,36 +167,36 @@ export default function StudentDashboard() {
                         <span>•</span>
                         <span>9 sekcji</span>
                       </div>
-                    </Link>
-                  </div>
+                    </div>
+                  </Link>
 
                   {/* Continue where left off */}
-                  <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group">
-                    <Link href="/quiz" className="block">
+                  <Link href="/quiz" className="block">
+                    <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
                       <div className="flex items-center justify-between mb-4">
-                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Play className="h-6 w-6 text-primary" />
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Play className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                         </div>
                         <span className="text-sm text-muted-foreground">Moduł 1</span>
                       </div>
                       <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">Kontynuuj naukę</h3>
                       <p className="text-xs sm:text-sm text-muted-foreground">{t("dashboard.lastActivity")} 2 {t("dashboard.hoursAgo")}</p>
-                    </Link>
-                  </div>
+                    </div>
+                  </Link>
 
                   {/* Review mistakes */}
-                  <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg transition-all cursor-pointer group">
-                    <Link href="/quiz?mode=review" className="block">
+                  <Link href="/quiz?mode=review" className="block">
+                    <div className="p-4 sm:p-6 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
                       <div className="flex items-center justify-between mb-4">
-                        <div className="w-12 h-12 bg-chart-3/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <RotateCcw className="h-6 w-6 text-chart-3" />
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 bg-chart-3/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <RotateCcw className="h-5 w-5 sm:h-6 sm:w-6 text-chart-3" />
                         </div>
                         <span className="text-sm text-muted-foreground">5 pytań</span>
                       </div>
                       <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">{t("dashboard.review")}</h3>
                       <p className="text-xs sm:text-sm text-muted-foreground">{t("dashboard.strengthenKnowledge")}</p>
-                    </Link>
-                  </div>
+                    </div>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

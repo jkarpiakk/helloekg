@@ -28,7 +28,7 @@ export default function QuestionCard({
   const { t } = useTranslation();
 
   const getOptionClassName = (index: number): string => {
-    const baseClass = "quiz-option p-3 sm:p-4 lg:p-6 border-2 rounded-xl cursor-pointer transition-all";
+    const baseClass = "quiz-option !min-h-[48px] py-3 px-4 sm:p-4 lg:p-6 border-2 rounded-xl cursor-pointer transition-all touch-manipulation flex items-center";
     
     if (!showExplanation) {
       return `${baseClass} border-border hover:shadow-lg hover:-translate-y-1`;
