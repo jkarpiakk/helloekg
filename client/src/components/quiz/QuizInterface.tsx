@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -29,6 +29,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const [examSessionId, setExamSessionId] = useState<string | null>(null);
   const [examTotalQuestions, setExamTotalQuestions] = useState<number>(0);
   const [examFinished, setExamFinished] = useState(false);
+  const quizContentRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -144,6 +145,15 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     }
   };
 
+  const scrollToTop = () => {
+    if (quizContentRef.current) {
+      quizContentRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }
+  };
+
   const handleNextQuestion = () => {
     const nextIndex = currentQuestionIndex + 1;
     
@@ -158,6 +168,8 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     setShowExplanation(false);
     setQuizResult(null);
     setStartTime(Date.now());
+    
+    setTimeout(scrollToTop, 100);
   };
 
   const handlePreviousQuestion = () => {
@@ -167,6 +179,8 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       setShowExplanation(false);
       setQuizResult(null);
       setStartTime(Date.now());
+      
+      setTimeout(scrollToTop, 100);
     }
   };
 
@@ -333,7 +347,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       </div>
 
       {/* Quiz Content */}
-      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div ref={quizContentRef} className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         <QuestionCard
           question={question}
           selectedAnswer={selectedAnswer}
