@@ -20,6 +20,17 @@ These advanced features are fully developed and tested but temporarily disabled 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### October 20, 2025 - Mobile Quiz UX Improvements
+- **Auto-scroll to Question**: Implemented automatic scroll to top when navigating between quiz questions (Next/Previous). Uses `window.scrollTo({ top: 0, behavior: 'smooth' })` with 100ms delay to ensure smooth mobile experience.
+- **Mobile Panel Scaling**: Optimized explanation panel sizing for mobile devices:
+  - Reduced icon sizes from 48px to 40px on mobile
+  - Reduced result title from text-xl to text-lg on mobile
+  - Reduced padding and margins throughout panel for better mobile fit
+  - Maintained larger sizes on tablet/desktop (sm/md breakpoints)
+- **Instant Explanation Display**: Backend now sends `correctIndex` and `explanation` with quiz questions; frontend uses optimistic UI update to display results immediately (<50ms) without waiting for API response.
+
 ## System Architecture
 
 ### Frontend Architecture
