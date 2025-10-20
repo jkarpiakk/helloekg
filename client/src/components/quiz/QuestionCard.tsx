@@ -139,10 +139,14 @@ export default function QuestionCard({
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="prose prose-lg sm:prose-xl prose-slate dark:prose-invert max-w-none leading-relaxed text-foreground [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>ul]:text-base [&>ul]:sm:text-lg [&>ol]:text-base [&>ol]:sm:text-lg [&>h1]:text-xl [&>h1]:sm:text-2xl [&>h2]:text-lg [&>h2]:sm:text-xl [&>h3]:text-base [&>h3]:sm:text-lg"
-                  dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
+                  className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-inner"
                   data-testid="explanation-content"
-                />
+                >
+                  <div 
+                    className="prose prose-lg sm:prose-xl max-w-none [&>p]:text-slate-900 [&>p]:dark:text-slate-100 [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>ul]:text-slate-900 [&>ul]:dark:text-slate-100 [&>ul]:text-base [&>ul]:sm:text-lg [&>ol]:text-slate-900 [&>ol]:dark:text-slate-100 [&>ol]:text-base [&>ol]:sm:text-lg [&>h1]:text-slate-900 [&>h1]:dark:text-slate-100 [&>h2]:text-slate-900 [&>h2]:dark:text-slate-100 [&>h3]:text-slate-900 [&>h3]:dark:text-slate-100 [&>strong]:text-slate-900 [&>strong]:dark:text-slate-100"
+                    dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
+                  />
+                </div>
                 <div className="mt-6 sm:mt-7 flex items-center space-x-3">
                   <Badge variant="outline" className={`text-base sm:text-lg py-2 px-4 ${
                     quizResult.isCorrect 
