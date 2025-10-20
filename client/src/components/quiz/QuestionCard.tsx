@@ -111,31 +111,39 @@ export default function QuestionCard({
 
       {/* Explanation Panel */}
       {showExplanation && quizResult && (
-        <Card className="shadow-lg" data-testid="explanation-panel">
-          <CardContent className="p-4 sm:p-6 lg:p-8">
-            <div className="flex items-start space-x-3 sm:space-x-4">
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+        <Card className={`shadow-xl border-2 ${
+          quizResult.isCorrect 
+            ? 'border-green-500 bg-green-50 dark:bg-green-950/30' 
+            : 'border-red-500 bg-red-50 dark:bg-red-950/30'
+        }`} data-testid="explanation-panel">
+          <CardContent className="p-5 sm:p-7 lg:p-10">
+            <div className="flex items-start space-x-4 sm:space-x-5">
+              <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 ${
                 quizResult.isCorrect 
-                  ? 'bg-green-100 dark:bg-green-900' 
-                  : 'bg-red-100 dark:bg-red-900'
+                  ? 'bg-green-500 dark:bg-green-600' 
+                  : 'bg-red-500 dark:bg-red-600'
               }`}>
                 {quizResult.isCorrect ? (
-                  <Check className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 dark:text-green-400" />
+                  <Check className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                 ) : (
-                  <X className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 dark:text-red-400" />
+                  <X className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4" data-testid="result-title">
+                <h4 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-5 ${
+                  quizResult.isCorrect 
+                    ? 'text-green-700 dark:text-green-400' 
+                    : 'text-red-700 dark:text-red-400'
+                }`} data-testid="result-title">
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="prose prose-sm sm:prose prose-slate max-w-none"
+                  className="prose prose-base sm:prose-lg lg:prose-xl prose-slate dark:prose-invert max-w-none text-foreground leading-relaxed bg-background/50 dark:bg-background/30 p-4 sm:p-5 rounded-lg border border-border"
                   dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
                   data-testid="explanation-content"
                 />
-                <div className="mt-3 sm:mt-4 flex items-center space-x-4 text-xs sm:text-sm text-muted-foreground">
-                  <Badge variant="outline" className="text-xs sm:text-sm">
+                <div className="mt-4 sm:mt-5 flex items-center space-x-4">
+                  <Badge variant="outline" className="text-sm sm:text-base py-1 px-3">
                     {t("quiz.timeSpent")} {Math.round(quizResult.timeMs / 1000)}s
                   </Badge>
                 </div>
