@@ -138,21 +138,10 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   };
 
   const scrollToTop = () => {
-    if (quizContentRef.current) {
-      const headerHeight = 80;
-      const elementPosition = quizContentRef.current.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.pageYOffset - headerHeight;
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      });
-    } else {
-      window.scrollTo({ 
-        top: 0, 
-        behavior: 'smooth' 
-      });
-    }
+    window.scrollTo({ 
+      top: 0, 
+      behavior: 'smooth' 
+    });
   };
 
   const handleNextQuestion = () => {
