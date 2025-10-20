@@ -119,13 +119,6 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     const timeMs = Date.now() - startTime;
 
     if (question) {
-      console.log('[INSTANT EXPLANATION] Question data:', {
-        hasCorrectIndex: 'correctIndex' in question,
-        hasExplanation: 'explanation' in question,
-        correctIndex: question.correctIndex,
-        explanationLength: question.explanation?.length
-      });
-      
       const optimisticResult: QuizResult = {
         isCorrect: answerIndex === question.correctIndex,
         correctIndex: question.correctIndex,
@@ -133,7 +126,6 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         timeMs,
       };
       
-      console.log('[INSTANT EXPLANATION] Setting result immediately:', optimisticResult.isCorrect ? 'CORRECT' : 'INCORRECT');
       setQuizResult(optimisticResult);
       setShowExplanation(true);
 
