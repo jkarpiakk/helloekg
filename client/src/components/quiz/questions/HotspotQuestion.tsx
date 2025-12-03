@@ -208,18 +208,27 @@ export default function HotspotQuestion({
         >
           {config.hotspots.map(hotspot => renderHotspotOverlay(hotspot))}
           
-          {/* Show click markers - simple blue dot */}
-          {clickCoordinates.map((coord, idx) => (
-            <circle
-              key={`click-${idx}`}
-              cx={`${coord.x}%`}
-              cy={`${coord.y}%`}
-              r="1.5%"
-              fill="rgb(59, 130, 246)"
-              stroke="white"
-              strokeWidth="0.5"
-            />
-          ))}
+          {/* Show click markers - blue dot, green if correct, red if wrong */}
+          {clickCoordinates.map((coord, idx) => {
+            const isInCorrectHotspot = config.hotspots.some(h => h.isCorrect && isPointInHotspot(coord.x, coord.y, h));
+            let fillColor = "rgb(59, 130, 246)"; // blue by default
+            
+            if (showResult) {
+              fillColor = isInCorrectHotspot ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)"; // green or red
+            }
+            
+            return (
+              <circle
+                key={`click-${idx}`}
+                cx={`${coord.x}%`}
+                cy={`${coord.y}%`}
+                r="1.5%"
+                fill={fillColor}
+                stroke="white"
+                strokeWidth="0.5"
+              />
+            );
+          })}
         </svg>
 
         {showResult && config.hotspots.filter(h => h.isCorrect).map(hotspot => {
