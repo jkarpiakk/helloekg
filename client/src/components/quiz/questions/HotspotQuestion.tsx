@@ -213,61 +213,18 @@ export default function HotspotQuestion({
         >
           {config.hotspots.map(hotspot => renderHotspotOverlay(hotspot))}
           
-          {/* Show click markers */}
-          {clickCoordinates.map((coord, idx) => {
-            const isInHotspot = config.hotspots.some(h => isPointInHotspot(coord.x, coord.y, h));
-            const isLastClick = idx === clickCoordinates.length - 1;
-            
-            return (
-              <g key={`click-${idx}`}>
-                {/* Outer ring for visibility */}
-                <circle
-                  cx={`${coord.x}%`}
-                  cy={`${coord.y}%`}
-                  r={isLastClick ? "2.5%" : "1.8%"}
-                  fill="none"
-                  stroke={showResult 
-                    ? (isInHotspot ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)")
-                    : "rgb(59, 130, 246)"}
-                  strokeWidth={isLastClick ? "0.8" : "0.5"}
-                  opacity={isLastClick ? 1 : 0.7}
-                />
-                {/* Inner dot */}
-                <circle
-                  cx={`${coord.x}%`}
-                  cy={`${coord.y}%`}
-                  r={isLastClick ? "1.2%" : "0.8%"}
-                  fill={showResult 
-                    ? (isInHotspot ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)")
-                    : "rgb(59, 130, 246)"}
-                  opacity={isLastClick ? 1 : 0.8}
-                />
-                {/* Crosshair for last click */}
-                {isLastClick && !showResult && (
-                  <>
-                    <line
-                      x1={`${coord.x - 3}%`}
-                      y1={`${coord.y}%`}
-                      x2={`${coord.x + 3}%`}
-                      y2={`${coord.y}%`}
-                      stroke="rgb(59, 130, 246)"
-                      strokeWidth="0.3"
-                      opacity="0.6"
-                    />
-                    <line
-                      x1={`${coord.x}%`}
-                      y1={`${coord.y - 3}%`}
-                      x2={`${coord.x}%`}
-                      y2={`${coord.y + 3}%`}
-                      stroke="rgb(59, 130, 246)"
-                      strokeWidth="0.3"
-                      opacity="0.6"
-                    />
-                  </>
-                )}
-              </g>
-            );
-          })}
+          {/* Show click markers - simple blue dot */}
+          {clickCoordinates.map((coord, idx) => (
+            <circle
+              key={`click-${idx}`}
+              cx={`${coord.x}%`}
+              cy={`${coord.y}%`}
+              r="1.5%"
+              fill="rgb(59, 130, 246)"
+              stroke="white"
+              strokeWidth="0.5"
+            />
+          ))}
         </svg>
 
         {showResult && config.hotspots.filter(h => h.isCorrect).map(hotspot => {
