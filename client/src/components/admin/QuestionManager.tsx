@@ -172,21 +172,33 @@ export default function QuestionManager() {
   };
 
   const handleSaveQuestion = (data: any) => {
-    // Transform data from QuestionFormData format to database format
-    const transformedData = {
+    const questionType = data.questionType || "multiple_choice";
+    
+    const transformedData: any = {
       sectionId: data.sectionId,
-      title: data.questionText.substring(0, 100) || "Pytanie", // Extract title from question text
+      title: data.questionText.substring(0, 100) || "Pytanie",
       bodyMd: data.questionText,
       explanationMd: data.explanation,
-      answers: data.answerOptions.map((option: string, index: number) => ({
-        text: option,
-        isCorrect: index === data.correctAnswerIndex
-      })),
       imageUrl: data.imageUrl,
       difficulty: data.difficultyLevel,
       tags: data.tags,
       status: data.status,
+      questionType: questionType,
     };
+
+    if (questionType === "multiple_choice") {
+      transformedData.answers = data.answerOptions.map((option: string, index: number) => ({
+        text: option,
+        isCorrect: index === data.correctAnswerIndex
+      }));
+      transformedData.questionConfig = { type: 'multiple_choice' };
+    } else {
+      transformedData.answers = [];
+      transformedData.questionConfig = { 
+        type: questionType, 
+        config: data.questionConfig 
+      };
+    }
 
     if (editingQuestion) {
       updateQuestionMutation.mutate({ id: editingQuestion.id, data: transformedData });

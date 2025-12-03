@@ -6,15 +6,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useTranslation } from "@/lib/i18n";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Upload, Plus, Trash2, Edit, Save, X, Image as ImageIcon } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { Plus, Trash2, Save, X, Image as ImageIcon, MousePointer, GripVertical, ArrowLeftRight, ListOrdered, Target } from "lucide-react";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import type { Question, Section, Module } from "@shared/schema";
+import type { Question, Section, Module, DragDropConfig, FillBlankConfig, MatchingConfig, SortingConfig, HotspotConfig } from "@shared/schema";
+import type { QuestionType } from "@/types";
+import { 
+  DragDropEditor, 
+  FillBlankEditor, 
+  MatchingEditor, 
+  SortingEditor, 
+  HotspotEditor,
+  QUESTION_TYPE_LABELS,
+  QUESTION_TYPE_DESCRIPTIONS,
+  getDefaultConfig
+} from "./QuestionTypeEditors";
+
+type QuestionConfig = DragDropConfig | FillBlankConfig | MatchingConfig | SortingConfig | HotspotConfig;
 
 interface QuestionFormData {
   sectionId: string;
@@ -27,6 +38,8 @@ interface QuestionFormData {
   tags: string[];
   order: number;
   status: "draft" | "review" | "published";
+  questionType: QuestionType;
+  questionConfig?: QuestionConfig;
 }
 
 interface QuestionEditorProps {
@@ -54,6 +67,15 @@ const quillFormats = [
   'list', 'bullet', 'color', 'background', 'link', 'image'
 ];
 
+const QUESTION_TYPE_ICONS: Record<QuestionType, any> = {
+  multiple_choice: MousePointer,
+  drag_drop: GripVertical,
+  fill_blank: ListOrdered,
+  matching: ArrowLeftRight,
+  sorting: ListOrdered,
+  hotspot: Target,
+};
+
 export default function QuestionEditor({
   question,
   sections,
@@ -73,22 +95,20 @@ export default function QuestionEditor({
     tags: question?.tags || [],
     order: question?.order || 1,
     status: question?.status as "draft" | "review" | "published" || "draft",
+    questionType: (question as any)?.questionType || "multiple_choice",
+    questionConfig: (question as any)?.questionConfig || undefined,
   });
 
   const [tagInput, setTagInput] = useState("");
-  const [imageUploading, setImageUploading] = useState(false);
   const questionQuillRef = useRef<ReactQuill>(null);
   const explanationQuillRef = useRef<ReactQuill>(null);
   const { toast } = useToast();
 
-  // Upload image mutation
   const uploadImageMutation = useMutation({
     mutationFn: async (file: File) => {
-      // Get upload URL
       const uploadResponse = await apiRequest("POST", "/api/admin/upload");
       const { uploadURL } = await uploadResponse.json();
 
-      // Upload file to object storage
       const fileUploadResponse = await fetch(uploadURL, {
         method: "PUT",
         body: file,
@@ -101,7 +121,6 @@ export default function QuestionEditor({
         throw new Error("Failed to upload file");
       }
 
-      // Set ACL policy for the uploaded image
       const aclResponse = await apiRequest("PUT", "/api/admin/images", {
         imageURL: uploadURL,
       });
@@ -129,7 +148,6 @@ export default function QuestionEditor({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast({
         title: "Błąd",
@@ -139,7 +157,6 @@ export default function QuestionEditor({
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "Błąd",
@@ -151,6 +168,41 @@ export default function QuestionEditor({
 
     uploadImageMutation.mutate(file);
   }, [uploadImageMutation, toast]);
+
+  const handleHotspotImageUpload = async (file: File): Promise<string> => {
+    const uploadResponse = await apiRequest("POST", "/api/admin/upload");
+    const { uploadURL } = await uploadResponse.json();
+
+    const fileUploadResponse = await fetch(uploadURL, {
+      method: "PUT",
+      body: file,
+      headers: {
+        "Content-Type": file.type,
+      },
+    });
+
+    if (!fileUploadResponse.ok) {
+      throw new Error("Failed to upload file");
+    }
+
+    const aclResponse = await apiRequest("PUT", "/api/admin/images", {
+      imageURL: uploadURL,
+    });
+    const { objectPath } = await aclResponse.json();
+
+    return objectPath;
+  };
+
+  const handleQuestionTypeChange = (type: QuestionType) => {
+    if (type === formData.questionType) return;
+    
+    const config = getDefaultConfig(type);
+    setFormData(prev => ({
+      ...prev,
+      questionType: type,
+      questionConfig: config || undefined,
+    }));
+  };
 
   const handleAnswerOptionChange = (index: number, value: string) => {
     const newOptions = [...formData.answerOptions];
@@ -178,7 +230,6 @@ export default function QuestionEditor({
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
 
-    // Validation
     if (!formData.sectionId) {
       toast({
         title: "Błąd",
@@ -197,13 +248,15 @@ export default function QuestionEditor({
       return;
     }
 
-    if (formData.answerOptions.some(option => !option.trim())) {
-      toast({
-        title: "Błąd",
-        description: "Wszystkie opcje odpowiedzi muszą być wypełnione",
-        variant: "destructive",
-      });
-      return;
+    if (formData.questionType === "multiple_choice") {
+      if (formData.answerOptions.some(option => !option.trim())) {
+        toast({
+          title: "Błąd",
+          description: "Wszystkie opcje odpowiedzi muszą być wypełnione",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     if (!formData.explanation.trim()) {
@@ -221,6 +274,50 @@ export default function QuestionEditor({
   const selectedModule = modules.find(m => 
     m.sections.some(s => s.id === formData.sectionId)
   );
+
+  const renderQuestionTypeEditor = () => {
+    switch (formData.questionType) {
+      case "drag_drop":
+        return (
+          <DragDropEditor
+            config={formData.questionConfig as DragDropConfig || getDefaultConfig("drag_drop") as DragDropConfig}
+            onChange={(config) => setFormData(prev => ({ ...prev, questionConfig: config }))}
+          />
+        );
+      case "fill_blank":
+        return (
+          <FillBlankEditor
+            config={formData.questionConfig as FillBlankConfig || getDefaultConfig("fill_blank") as FillBlankConfig}
+            onChange={(config) => setFormData(prev => ({ ...prev, questionConfig: config }))}
+          />
+        );
+      case "matching":
+        return (
+          <MatchingEditor
+            config={formData.questionConfig as MatchingConfig || getDefaultConfig("matching") as MatchingConfig}
+            onChange={(config) => setFormData(prev => ({ ...prev, questionConfig: config }))}
+          />
+        );
+      case "sorting":
+        return (
+          <SortingEditor
+            config={formData.questionConfig as SortingConfig || getDefaultConfig("sorting") as SortingConfig}
+            onChange={(config) => setFormData(prev => ({ ...prev, questionConfig: config }))}
+          />
+        );
+      case "hotspot":
+        return (
+          <HotspotEditor
+            config={formData.questionConfig as HotspotConfig || getDefaultConfig("hotspot") as HotspotConfig}
+            onChange={(config) => setFormData(prev => ({ ...prev, questionConfig: config }))}
+            onImageUpload={handleHotspotImageUpload}
+            isUploading={uploadImageMutation.isPending}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -254,9 +351,40 @@ export default function QuestionEditor({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Question text */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Typ pytania</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3 md:grid md:grid-cols-3">
+                {(Object.keys(QUESTION_TYPE_LABELS) as QuestionType[]).map((type) => {
+                  const Icon = QUESTION_TYPE_ICONS[type];
+                  const isSelected = formData.questionType === type;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => handleQuestionTypeChange(type)}
+                      className={`flex-1 min-w-[140px] p-3 md:p-4 rounded-lg border-2 text-left transition-all ${
+                        isSelected 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      data-testid={`btn-type-${type}`}
+                    >
+                      <Icon className={`h-5 w-5 mb-2 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <div className="font-medium text-sm">{QUESTION_TYPE_LABELS[type]}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {QUESTION_TYPE_DESCRIPTIONS[type]}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Treść pytania</CardTitle>
@@ -277,99 +405,109 @@ export default function QuestionEditor({
                 />
               </div>
 
-              {/* Image upload */}
-              <div>
-                <Label htmlFor="imageUpload">Obraz EKG (opcjonalny)</Label>
-                <div className="mt-2">
-                  {formData.imageUrl ? (
-                    <div className="relative">
-                      <img
-                        src={formData.imageUrl}
-                        alt="EKG"
-                        className="max-w-full h-auto rounded border"
-                        data-testid="img-question-preview"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={() => setFormData(prev => ({ ...prev, imageUrl: "" }))}
-                        data-testid="button-remove-image"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        id="imageUpload"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        data-testid="input-image-upload"
-                      />
-                      <label
-                        htmlFor="imageUpload"
-                        className="cursor-pointer flex flex-col items-center"
-                      >
-                        {uploadImageMutation.isPending ? (
-                          <LoadingSpinner size="lg" className="mb-2" />
-                        ) : (
-                          <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
-                        )}
-                        <span className="text-sm text-muted-foreground">
-                          {uploadImageMutation.isPending ? "Przesyłanie..." : "Kliknij aby przesłać obraz"}
-                        </span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          PNG, JPG, max 5MB
-                        </span>
-                      </label>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Answer options */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Opcje odpowiedzi</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {formData.answerOptions.map((option, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    name="correctAnswer"
-                    checked={formData.correctAnswerIndex === index}
-                    onChange={() => setFormData(prev => ({ ...prev, correctAnswerIndex: index }))}
-                    className="mt-1"
-                    data-testid={`radio-correct-${index}`}
-                  />
-                  <div className="flex-1">
-                    <Label className="text-sm font-medium">
-                      Opcja {String.fromCharCode(65 + index)}
-                      {formData.correctAnswerIndex === index && (
-                        <Badge variant="default" className="ml-2 text-xs">Poprawna</Badge>
-                      )}
-                    </Label>
-                    <Input
-                      value={option}
-                      onChange={(e) => handleAnswerOptionChange(index, e.target.value)}
-                      placeholder={`Opcja ${String.fromCharCode(65 + index)}`}
-                      className="mt-1"
-                      data-testid={`input-answer-${index}`}
-                    />
+              {formData.questionType !== "hotspot" && (
+                <div>
+                  <Label htmlFor="imageUpload">Obraz EKG (opcjonalny)</Label>
+                  <div className="mt-2">
+                    {formData.imageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={formData.imageUrl}
+                          alt="EKG"
+                          className="max-w-full h-auto rounded border"
+                          data-testid="img-question-preview"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                          onClick={() => setFormData(prev => ({ ...prev, imageUrl: "" }))}
+                          data-testid="button-remove-image"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                        <input
+                          type="file"
+                          id="imageUpload"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          data-testid="input-image-upload"
+                        />
+                        <label
+                          htmlFor="imageUpload"
+                          className="cursor-pointer flex flex-col items-center"
+                        >
+                          {uploadImageMutation.isPending ? (
+                            <LoadingSpinner size="lg" className="mb-2" />
+                          ) : (
+                            <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                          )}
+                          <span className="text-sm text-muted-foreground">
+                            {uploadImageMutation.isPending ? "Przesyłanie..." : "Kliknij aby przesłać obraz"}
+                          </span>
+                          <span className="text-xs text-muted-foreground mt-1">
+                            PNG, JPG, max 5MB
+                          </span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
 
-          {/* Explanation */}
+          {formData.questionType === "multiple_choice" ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Opcje odpowiedzi</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {formData.answerOptions.map((option, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="correctAnswer"
+                      checked={formData.correctAnswerIndex === index}
+                      onChange={() => setFormData(prev => ({ ...prev, correctAnswerIndex: index }))}
+                      className="mt-1"
+                      data-testid={`radio-correct-${index}`}
+                    />
+                    <div className="flex-1">
+                      <Label className="text-sm font-medium">
+                        Opcja {String.fromCharCode(65 + index)}
+                        {formData.correctAnswerIndex === index && (
+                          <Badge variant="default" className="ml-2 text-xs">Poprawna</Badge>
+                        )}
+                      </Label>
+                      <Input
+                        value={option}
+                        onChange={(e) => handleAnswerOptionChange(index, e.target.value)}
+                        placeholder={`Opcja ${String.fromCharCode(65 + index)}`}
+                        className="mt-1"
+                        data-testid={`input-answer-${index}`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Konfiguracja {QUESTION_TYPE_LABELS[formData.questionType]}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderQuestionTypeEditor()}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Wyjaśnienie (Metoda Feynmana)</CardTitle>
@@ -393,9 +531,7 @@ export default function QuestionEditor({
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Question settings */}
           <Card>
             <CardHeader>
               <CardTitle>Ustawienia pytania</CardTitle>
@@ -478,7 +614,6 @@ export default function QuestionEditor({
             </CardContent>
           </Card>
 
-          {/* Tags */}
           <Card>
             <CardHeader>
               <CardTitle>Tagi</CardTitle>
@@ -515,7 +650,6 @@ export default function QuestionEditor({
             </CardContent>
           </Card>
 
-          {/* Preview info */}
           {selectedModule && (
             <Card>
               <CardHeader>
@@ -529,6 +663,12 @@ export default function QuestionEditor({
                   <div>
                     <span className="font-medium">Sekcja:</span>{" "}
                     {sections.find(s => s.id === formData.sectionId)?.title}
+                  </div>
+                  <div>
+                    <span className="font-medium">Typ:</span>{" "}
+                    <Badge variant="outline">
+                      {QUESTION_TYPE_LABELS[formData.questionType]}
+                    </Badge>
                   </div>
                   <div>
                     <span className="font-medium">Poziom:</span>{" "}
