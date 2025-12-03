@@ -209,7 +209,7 @@ export default function QuestionCard({
                 >
                   <div 
                     className="prose prose-sm sm:prose-base md:prose-lg max-w-none [&>p]:text-slate-900 [&>p]:dark:text-slate-100 [&>p]:text-xs [&>p]:sm:text-base [&>p]:md:text-lg [&>p]:leading-snug [&>p]:sm:leading-relaxed [&>p]:font-medium [&>ul]:text-slate-900 [&>ul]:dark:text-slate-100 [&>ul]:text-xs [&>ul]:sm:text-base [&>ul]:md:text-lg [&>ol]:text-slate-900 [&>ol]:dark:text-slate-100 [&>ol]:text-xs [&>ol]:sm:text-base [&>ol]:md:text-lg [&>h1]:text-slate-900 [&>h1]:dark:text-slate-100 [&>h2]:text-slate-900 [&>h2]:dark:text-slate-100 [&>h3]:text-slate-900 [&>h3]:dark:text-slate-100 [&>strong]:text-slate-900 [&>strong]:dark:text-slate-100"
-                    dangerouslySetInnerHTML={sanitizeHtml(quizResult.explanation)}
+                    dangerouslySetInnerHTML={sanitizeMarkdown(quizResult.explanation)}
                   />
                 </div>
                 <div className="mt-1.5 sm:mt-3 md:mt-4 flex items-center flex-wrap gap-1 sm:gap-2">

@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import Stripe from "stripe";
+import express from "express";
+import path from "path";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { storage } from "./storage";
@@ -52,6 +54,9 @@ const statusUpdateSchema = z.object({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit environment
   app.set('trust proxy', 1);
+  
+  // Serve static files from attached_assets
+  app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets')));
   
   // Session configuration
   app.use(session({
