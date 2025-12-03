@@ -139,26 +139,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set session
       req.session.userId = user.id;
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: user.id,
-        action: "user_login",
-        entityType: "user",
-        entityId: user.id,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          locale: user.locale
+      
+      // Save session explicitly before responding
+      req.session.save(async (err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: "Błąd sesji" });
         }
+
+        // Create audit log
+        await storage.createAuditLog({
+          actorId: user.id,
+          action: "user_login",
+          entityType: "user",
+          entityId: user.id,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+
+        res.json({
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            locale: user.locale
+          }
+        });
       });
     } catch (error: any) {
       console.error("Login error:", error);
