@@ -511,14 +511,19 @@ export type InsertLectureChapter = z.infer<typeof insertLectureChapterSchema>;
 export type BlogPost = typeof blogPosts.$inferSelect;
 export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
 
-// Demo question for homepage
+// Demo question for homepage - supports all 6 question types
 export const demoQuestions = pgTable("demo_questions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   question: text("question").notNull(),
-  options: json("options").$type<string[]>().notNull(),
-  correctIndex: integer("correct_index").notNull(),
+  // For multiple_choice type - legacy fields for backward compatibility
+  options: json("options").$type<string[]>().default([]),
+  correctIndex: integer("correct_index").default(0),
   explanation: text("explanation").notNull(),
   imageUrl: text("image_url"),
+  // New fields for all question types
+  questionType: varchar("question_type", { length: 50 }).notNull().default("multiple_choice"),
+  questionConfig: json("question_config").$type<QuestionConfig>(),
+  displayOrder: integer("display_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),

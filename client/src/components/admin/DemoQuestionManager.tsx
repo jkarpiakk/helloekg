@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,25 +7,148 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Eye, Plus, Trash2, Save } from "lucide-react";
-import type { DemoQuestion } from "@shared/schema";
+import { 
+  Eye, Plus, Trash2, Save, GripVertical, 
+  ListChecks, Puzzle, TextCursor, Link2, ArrowUpDown, Target 
+} from "lucide-react";
+import { 
+  DragDropEditor, 
+  FillBlankEditor, 
+  MatchingEditor, 
+  SortingEditor, 
+  HotspotEditor 
+} from "./QuestionTypeEditors";
+import type { DemoQuestion, QuestionConfig } from "@shared/schema";
+import type { QuestionType } from "@/types";
+
+const QUESTION_TYPE_LABELS: Record<QuestionType, { label: string; icon: any; description: string }> = {
+  multiple_choice: { 
+    label: "ABCD - Wielokrotny wybór", 
+    icon: ListChecks,
+    description: "Klasyczne pytanie z 4 opcjami odpowiedzi"
+  },
+  drag_drop: { 
+    label: "Przeciągnij i upuść", 
+    icon: Puzzle,
+    description: "Przeciągnij elementy do odpowiednich stref"
+  },
+  fill_blank: { 
+    label: "Uzupełnij lukę", 
+    icon: TextCursor,
+    description: "Wpisz brakujące słowa w tekście"
+  },
+  matching: { 
+    label: "Dopasuj pary", 
+    icon: Link2,
+    description: "Połącz elementy z dwóch kolumn"
+  },
+  sorting: { 
+    label: "Uporządkuj", 
+    icon: ArrowUpDown,
+    description: "Ułóż elementy w prawidłowej kolejności"
+  },
+  hotspot: { 
+    label: "Punkty na obrazie", 
+    icon: Target,
+    description: "Kliknij na prawidłowy obszar na obrazku EKG"
+  },
+};
+
+const getDefaultConfig = (type: QuestionType): QuestionConfig | undefined => {
+  switch (type) {
+    case 'multiple_choice':
+      return undefined;
+    case 'drag_drop':
+      return {
+        type: 'drag_drop',
+        sources: [
+          { id: 'source_1', content: 'Element 1', label: '' },
+          { id: 'source_2', content: 'Element 2', label: '' },
+        ],
+        targets: [
+          { id: 'target_1', label: 'Strefa 1', acceptsSourceId: 'source_1' },
+          { id: 'target_2', label: 'Strefa 2', acceptsSourceId: 'source_2' },
+        ],
+      };
+    case 'fill_blank':
+      return {
+        type: 'fill_blank',
+        template: 'Załamek {{blank:blank_1}} odpowiada za...',
+        blanks: [
+          { id: 'blank_1', correctAnswers: ['P'], validationType: 'exact', position: 0, placeholder: '?' }
+        ],
+      };
+    case 'matching':
+      return {
+        type: 'matching',
+        leftColumn: [
+          { id: 'left_1', text: 'Element A' },
+          { id: 'left_2', text: 'Element B' },
+        ],
+        rightColumn: [
+          { id: 'right_1', text: 'Dopasowanie 1' },
+          { id: 'right_2', text: 'Dopasowanie 2' },
+        ],
+        correctPairs: [
+          { leftId: 'left_1', rightId: 'right_1' },
+          { leftId: 'left_2', rightId: 'right_2' },
+        ],
+        shuffleRight: true,
+      };
+    case 'sorting':
+      return {
+        type: 'sorting',
+        items: [
+          { id: 'item_1', text: 'Krok 1' },
+          { id: 'item_2', text: 'Krok 2' },
+          { id: 'item_3', text: 'Krok 3' },
+        ],
+        correctOrder: ['item_1', 'item_2', 'item_3'],
+      };
+    case 'hotspot':
+      return {
+        type: 'hotspot',
+        imageUrl: '',
+        hotspots: [],
+        allowMultiple: false,
+      };
+    default:
+      return undefined;
+  }
+};
+
+interface FormData {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+  imageUrl: string;
+  questionType: QuestionType;
+  questionConfig?: QuestionConfig;
+  displayOrder: number;
+  isActive: boolean;
+}
 
 export default function DemoQuestionManager() {
   const [editingQuestion, setEditingQuestion] = useState<DemoQuestion | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     question: "",
     options: ["", "", "", ""],
     correctIndex: 0,
     explanation: "",
     imageUrl: "",
+    questionType: "multiple_choice",
+    questionConfig: undefined,
+    displayOrder: 0,
     isActive: true,
   });
   const { toast } = useToast();
 
-  // Fetch all demo questions
   const { data: questions, isLoading } = useQuery({
     queryKey: ["/api/admin/demo-question"],
     queryFn: async () => {
@@ -34,7 +157,6 @@ export default function DemoQuestionManager() {
     },
   });
 
-  // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/admin/demo-question", data);
@@ -57,7 +179,6 @@ export default function DemoQuestionManager() {
     },
   });
 
-  // Update mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const response = await apiRequest("PATCH", `/api/admin/demo-question/${id}`, data);
@@ -81,7 +202,6 @@ export default function DemoQuestionManager() {
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await apiRequest("DELETE", `/api/admin/demo-question/${id}`);
@@ -110,6 +230,9 @@ export default function DemoQuestionManager() {
       correctIndex: 0,
       explanation: "",
       imageUrl: "",
+      questionType: "multiple_choice",
+      questionConfig: undefined,
+      displayOrder: 0,
       isActive: true,
     });
     setEditingQuestion(null);
@@ -119,19 +242,67 @@ export default function DemoQuestionManager() {
     setEditingQuestion(question);
     setFormData({
       question: question.question,
-      options: question.options,
-      correctIndex: question.correctIndex,
+      options: question.options || ["", "", "", ""],
+      correctIndex: question.correctIndex || 0,
       explanation: question.explanation,
       imageUrl: question.imageUrl || "",
+      questionType: (question.questionType as QuestionType) || "multiple_choice",
+      questionConfig: question.questionConfig as QuestionConfig | undefined,
+      displayOrder: question.displayOrder || 0,
       isActive: question.isActive,
     });
   };
 
+  const handleQuestionTypeChange = (newType: QuestionType) => {
+    setFormData({
+      ...formData,
+      questionType: newType,
+      questionConfig: getDefaultConfig(newType),
+    });
+  };
+
+  const handleConfigChange = (config: QuestionConfig) => {
+    setFormData({ ...formData, questionConfig: config });
+  };
+
   const handleSave = () => {
+    if (!formData.question.trim()) {
+      toast({
+        title: "Błąd",
+        description: "Treść pytania jest wymagana",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.questionType === 'multiple_choice') {
+      const filledOptions = formData.options.filter(o => o.trim());
+      if (filledOptions.length < 2) {
+        toast({
+          title: "Błąd",
+          description: "Wymagane są minimum 2 odpowiedzi",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    const payload = {
+      question: formData.question,
+      options: formData.questionType === 'multiple_choice' ? formData.options : [],
+      correctIndex: formData.questionType === 'multiple_choice' ? formData.correctIndex : 0,
+      explanation: formData.explanation,
+      imageUrl: formData.imageUrl || null,
+      questionType: formData.questionType,
+      questionConfig: formData.questionConfig,
+      displayOrder: formData.displayOrder,
+      isActive: formData.isActive,
+    };
+
     if (editingQuestion) {
-      updateMutation.mutate({ id: editingQuestion.id, data: formData });
+      updateMutation.mutate({ id: editingQuestion.id, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -139,6 +310,10 @@ export default function DemoQuestionManager() {
     const newOptions = [...formData.options];
     newOptions[index] = value;
     setFormData({ ...formData, options: newOptions });
+  };
+
+  const handleImageUpload = async (file: File): Promise<string> => {
+    return URL.createObjectURL(file);
   };
 
   if (isLoading) {
@@ -149,16 +324,103 @@ export default function DemoQuestionManager() {
     );
   }
 
+  const renderQuestionTypeEditor = () => {
+    const { questionType, questionConfig } = formData;
+
+    if (questionType === 'multiple_choice') {
+      return (
+        <div className="space-y-4">
+          <Label className="text-base font-semibold">Odpowiedzi ABCD</Label>
+          {formData.options.map((option, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <Badge variant={formData.correctIndex === index ? "default" : "outline"} className="w-8 justify-center">
+                {String.fromCharCode(65 + index)}
+              </Badge>
+              <Input
+                value={option}
+                onChange={(e) => handleOptionChange(index, e.target.value)}
+                placeholder={`Odpowiedź ${String.fromCharCode(65 + index)}`}
+                className="flex-1"
+                data-testid={`input-option-${index}`}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant={formData.correctIndex === index ? "default" : "outline"}
+                onClick={() => setFormData({ ...formData, correctIndex: index })}
+                data-testid={`button-correct-${index}`}
+              >
+                {formData.correctIndex === index ? "✓ Poprawna" : "Oznacz"}
+              </Button>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (questionType === 'drag_drop' && questionConfig?.type === 'drag_drop') {
+      return (
+        <DragDropEditor
+          config={questionConfig}
+          onChange={(config) => handleConfigChange({ ...config, type: 'drag_drop' })}
+        />
+      );
+    }
+
+    if (questionType === 'fill_blank' && questionConfig?.type === 'fill_blank') {
+      return (
+        <FillBlankEditor
+          config={questionConfig}
+          onChange={(config) => handleConfigChange({ ...config, type: 'fill_blank' })}
+        />
+      );
+    }
+
+    if (questionType === 'matching' && questionConfig?.type === 'matching') {
+      return (
+        <MatchingEditor
+          config={questionConfig}
+          onChange={(config) => handleConfigChange({ ...config, type: 'matching' })}
+        />
+      );
+    }
+
+    if (questionType === 'sorting' && questionConfig?.type === 'sorting') {
+      return (
+        <SortingEditor
+          config={questionConfig}
+          onChange={(config) => handleConfigChange({ ...config, type: 'sorting' })}
+        />
+      );
+    }
+
+    if (questionType === 'hotspot' && questionConfig?.type === 'hotspot') {
+      return (
+        <HotspotEditor
+          config={questionConfig}
+          onChange={(config) => handleConfigChange({ ...config, type: 'hotspot' })}
+          onImageUpload={handleImageUpload}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  const getQuestionTypeIcon = (type: QuestionType) => {
+    const Icon = QUESTION_TYPE_LABELS[type].icon;
+    return <Icon className="h-4 w-4" />;
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-foreground">Pytanie Demonstracyjne</h2>
+        <h2 className="text-2xl font-bold text-foreground">Pytania Demonstracyjne</h2>
         <Badge variant="outline">
-          Aktywne pytanie wyświetla się na stronie głównej
+          Aktywne pytania wyświetlają się na stronie głównej
         </Badge>
       </div>
 
-      {/* Editor Form */}
       <Card>
         <CardHeader>
           <CardTitle>
@@ -167,7 +429,40 @@ export default function DemoQuestionManager() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="question">Pytanie</Label>
+            <Label>Typ pytania</Label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {(Object.keys(QUESTION_TYPE_LABELS) as QuestionType[]).map((type) => {
+                const { label, icon: Icon, description } = QUESTION_TYPE_LABELS[type];
+                const isSelected = formData.questionType === type;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => handleQuestionTypeChange(type)}
+                    className={`
+                      p-3 rounded-lg border-2 text-left transition-all
+                      ${isSelected 
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2' 
+                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                      }
+                    `}
+                    data-testid={`button-type-${type}`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <span className={`text-sm font-medium ${isSelected ? 'text-primary' : ''}`}>
+                        {label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="question">Treść pytania</Label>
             <Textarea
               id="question"
               value={formData.question}
@@ -178,50 +473,44 @@ export default function DemoQuestionManager() {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Odpowiedzi</Label>
-            {formData.options.map((option, index) => (
-              <div key={index} className="flex items-center space-x-2">
-                <Input
-                  value={option}
-                  onChange={(e) => handleOptionChange(index, e.target.value)}
-                  placeholder={`Odpowiedź ${index + 1}`}
-                  data-testid={`input-option-${index}`}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={formData.correctIndex === index ? "default" : "outline"}
-                  onClick={() => setFormData({ ...formData, correctIndex: index })}
-                  data-testid={`button-correct-${index}`}
-                >
-                  {formData.correctIndex === index ? "✓ Poprawna" : "Oznacz jako poprawną"}
-                </Button>
-              </div>
-            ))}
+          <div className="border rounded-lg p-4 bg-muted/20">
+            {renderQuestionTypeEditor()}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="explanation">Wyjaśnienie</Label>
+            <Label htmlFor="explanation">Wyjaśnienie (wyświetlane po odpowiedzi)</Label>
             <Textarea
               id="explanation"
               value={formData.explanation}
               onChange={(e) => setFormData({ ...formData, explanation: e.target.value })}
               placeholder="Szczegółowe wyjaśnienie odpowiedzi..."
-              rows={5}
+              rows={4}
               data-testid="input-explanation"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="imageUrl">URL obrazu (opcjonalnie)</Label>
-            <Input
-              id="imageUrl"
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              placeholder="https://example.com/ekg-image.jpg"
-              data-testid="input-image-url"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="imageUrl">URL obrazu (opcjonalnie)</Label>
+              <Input
+                id="imageUrl"
+                value={formData.imageUrl}
+                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                placeholder="https://example.com/ekg-image.jpg"
+                data-testid="input-image-url"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="displayOrder">Kolejność wyświetlania</Label>
+              <Input
+                id="displayOrder"
+                type="number"
+                value={formData.displayOrder}
+                onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+                data-testid="input-display-order"
+              />
+            </div>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -252,58 +541,78 @@ export default function DemoQuestionManager() {
         </CardContent>
       </Card>
 
-      {/* List of Demo Questions */}
       <Card>
         <CardHeader>
-          <CardTitle>Istniejące pytania demo</CardTitle>
+          <CardTitle>Istniejące pytania demo ({questions?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {questions && questions.length > 0 ? (
-              questions.map((question) => (
-                <div
-                  key={question.id}
-                  className="border rounded-lg p-4 hover:bg-secondary/20 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="font-medium">{question.question}</h3>
-                        {question.isActive && (
-                          <Badge variant="default">Aktywne</Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        <div>
-                          <strong>Poprawna odpowiedź:</strong>{" "}
-                          {question.options[question.correctIndex]}
+              questions
+                .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                .map((question) => {
+                  const qType = (question.questionType || 'multiple_choice') as QuestionType;
+                  const typeInfo = QUESTION_TYPE_LABELS[qType];
+                  const Icon = typeInfo?.icon || ListChecks;
+                  
+                  return (
+                    <div
+                      key={question.id}
+                      className={`border rounded-lg p-4 transition-colors ${
+                        question.isActive 
+                          ? 'border-primary/30 bg-primary/5' 
+                          : 'hover:bg-secondary/20'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Icon className="h-4 w-4 text-muted-foreground" />
+                            <Badge variant="secondary" className="text-xs">
+                              {typeInfo?.label || 'ABCD'}
+                            </Badge>
+                            {question.isActive && (
+                              <Badge variant="default">Aktywne</Badge>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              #{question.displayOrder || 0}
+                            </Badge>
+                          </div>
+                          <h3 className="font-medium mb-1 line-clamp-2">{question.question}</h3>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            {qType === 'multiple_choice' && question.options && question.correctIndex !== null && (
+                              <div>
+                                <strong>Poprawna:</strong>{" "}
+                                {question.options[question.correctIndex]}
+                              </div>
+                            )}
+                            <div className="text-xs">
+                              Utworzono: {new Date(question.createdAt).toLocaleDateString('pl-PL')}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Utworzono: {new Date(question.createdAt).toLocaleDateString('pl-PL')}
+                        <div className="flex items-center space-x-2 ml-4">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(question)}
+                            data-testid={`button-edit-${question.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteMutation.mutate(question.id)}
+                            data-testid={`button-delete-${question.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEdit(question)}
-                        data-testid={`button-edit-${question.id}`}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteMutation.mutate(question.id)}
-                        data-testid={`button-delete-${question.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))
+                  );
+                })
             ) : (
               <p className="text-center text-muted-foreground py-8">
                 Brak pytań demo. Utwórz pierwsze pytanie powyżej.
