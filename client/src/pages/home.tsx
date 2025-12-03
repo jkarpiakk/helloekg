@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "@/lib/i18n";
@@ -10,20 +9,32 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import AuthForms from "@/components/auth/AuthForms";
 import PricingSection from "@/components/payment/PricingSection";
-import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart, X } from "lucide-react";
+import DemoQuestionRenderer from "@/components/demo/DemoQuestionRenderer";
+import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart } from "lucide-react";
 import { Link } from "wouter";
-import afEcgImage from "@assets/af ecg_1757697444254.jpg";
 import type { DemoQuestion } from "@shared/schema";
+
+const FALLBACK_DEMO_QUESTIONS: DemoQuestion[] = [{
+  id: 'fallback-1',
+  question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
+  options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
+  correctIndex: 1,
+  explanation: "Wyobraź sobie orkiestrę bez dyrygenta! W normalnym rytmie wszyscy muzycy słuchają jednego dyrygenta i grają w takcie. Ale w migotaniu przedsionków nagle dziesiątki muzyków zaczyna grać swoje własne melodie jednocześnie - jeden gra walca, drugi tango, trzeci rock. Powstaje kompletny chaos! Przedsionki 'migocą' od tych wszystkich sprzecznych sygnałów, a komory próbują nadążyć za tym chaosem - stąd ten nieregularny, nieprzewidywalny rytm, jakby serce 'potykało się' przy każdym uderzeniu.",
+  imageUrl: null,
+  questionType: 'multiple_choice',
+  questionConfig: null,
+  displayOrder: 0,
+  isActive: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}];
 
 export default function Home() {
   const [location, setLocation] = useLocation();
   const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showResult, setShowResult] = useState(false);
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
-  // Open auth dialog if URL param exists
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const authParam = urlParams.get('auth');
@@ -35,45 +46,20 @@ export default function Home() {
 
   const handleAuthSuccess = () => {
     setAuthMode(null);
-    // Remove auth param from URL
     const url = new URL(window.location.href);
     url.searchParams.delete('auth');
     window.history.replaceState({}, '', url.pathname);
   };
 
-  // Fetch demo question from API
-  const { data: apiDemoQuestion } = useQuery({
-    queryKey: ["/api/demo-question"],
+  const { data: demoQuestions } = useQuery({
+    queryKey: ["/api/demo-questions"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/demo-question");
-      return response.json() as Promise<DemoQuestion>;
+      const response = await apiRequest("GET", "/api/demo-questions");
+      return response.json() as Promise<DemoQuestion[]>;
     },
   });
 
-  // Fallback to hardcoded question if API fails
-  const demoQuestion = apiDemoQuestion ? {
-    question: apiDemoQuestion.question,
-    options: apiDemoQuestion.options,
-    correct: apiDemoQuestion.correctIndex,
-    explanation: apiDemoQuestion.explanation,
-    imageUrl: apiDemoQuestion.imageUrl
-  } : {
-    question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
-    options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
-    correct: 1,
-    explanation: "Wyobraź sobie orkiestrę bez dyrygenta! W normalnym rytmie wszyscy muzycy słuchają jednego dyrygenta i grają w takcie. Ale w migotaniu przedsionków nagle dziesiątki muzyków zaczyna grać swoje własne melodie jednocześnie - jeden gra walca, drugi tango, trzeci rock. Powstaje kompletny chaos! Przedsionki 'migocą' od tych wszystkich sprzecznych sygnałów, a komory próbują nadążyć za tym chaosem - stąd ten nieregularny, nieprzewidywalny rytm, jakby serce 'potykało się' przy każdym uderzeniu."
-  };
-
-  const handleAnswerSelect = (index: number) => {
-    if (showResult) return;
-    setSelectedAnswer(index);
-    setShowResult(true);
-  };
-
-  const resetDemo = () => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-  };
+  const questions = (demoQuestions && demoQuestions.length > 0) ? demoQuestions : FALLBACK_DEMO_QUESTIONS;
 
   return (
     <div className="min-h-screen bg-background">
@@ -153,147 +139,12 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Hero Demo */}
+            {/* Hero Demo - All 6 Question Types */}
             <div className="relative">
-              <Card className="shadow-2xl p-3 sm:p-4 lg:p-6 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1.5 sm:h-2 bg-gradient-to-r from-primary to-chart-2"></div>
-                
-                {/* Sample quiz preview */}
-                <div className="space-y-4 sm:space-y-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Pytanie 1 z 10</span>
-                    <div className="w-16 sm:w-20 h-1.5 sm:h-2 bg-secondary rounded-full overflow-hidden">
-                      <div className="w-2 h-full bg-primary rounded-full"></div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-                      <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground">
-                        {demoQuestion.question}
-                      </h3>
-                      {showResult && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="w-full sm:w-auto"
-                          onClick={resetDemo}
-                          data-testid="reset-demo-button"
-                        >
-                          Spróbuj ponownie
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {/* Real EKG image - Atrial Fibrillation */}
-                    <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 border border-border">
-                      <img 
-                        src={demoQuestion.imageUrl || afEcgImage} 
-                        alt="Zapis EKG" 
-                        className="w-full h-auto rounded"
-                        data-testid="demo-ecg-image"
-                      />
-                    </div>
-
-                    {/* Interactive quiz options */}
-                    <div className="space-y-2 sm:space-y-3">
-                      {demoQuestion.options.map((option, index) => {
-                        const isSelected = selectedAnswer === index;
-                        const isCorrect = index === demoQuestion.correct;
-                        
-                        let buttonClass = "p-3 sm:p-4 border border-border rounded-lg cursor-pointer transition-all duration-200 text-left text-sm sm:text-base";
-                        
-                        if (showResult) {
-                          if (isCorrect) {
-                            buttonClass += " bg-green-100 border-green-500 text-green-800 dark:bg-green-900/30 dark:border-green-600 dark:text-green-300";
-                          } else if (isSelected) {
-                            buttonClass += " bg-red-100 border-red-500 text-red-800 dark:bg-red-900/30 dark:border-red-600 dark:text-red-300";
-                          }
-                        } else {
-                          buttonClass += " hover:bg-secondary/50 hover:border-primary/50";
-                        }
-                        
-                        return (
-                          <button
-                            key={index}
-                            onClick={() => handleAnswerSelect(index)}
-                            className={buttonClass}
-                            disabled={showResult}
-                            data-testid={`demo-option-${index}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <span className="font-semibold mr-2 sm:mr-3">{String.fromCharCode(65 + index)}.</span>
-                                {option}
-                              </div>
-                              {showResult && isCorrect && (
-                                <Check className="h-5 w-5 text-green-600" />
-                              )}
-                              {showResult && isSelected && !isCorrect && (
-                                <X className="h-5 w-5 text-red-600" />
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Result explanation */}
-                    {showResult && (
-                      <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-                        <div className="p-3 sm:p-4 bg-primary/5 border border-primary/20 rounded-lg" data-testid="demo-result-panel">
-                          <div className="flex items-start space-x-2 sm:space-x-3">
-                            <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                              selectedAnswer === demoQuestion.correct 
-                                ? 'bg-green-500 text-white' 
-                                : 'bg-red-500 text-white'
-                            }`}>
-                              {selectedAnswer === demoQuestion.correct ? (
-                                <Check className="h-3 w-3 sm:h-4 sm:w-4" />
-                              ) : (
-                                <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-semibold text-foreground mb-1 text-sm sm:text-base" data-testid="demo-result-status">
-                                {selectedAnswer === demoQuestion.correct 
-                                  ? "Brawo! Poprawna odpowiedź!" 
-                                  : "Niepoprawnie. Prawidłowa odpowiedź to: " + demoQuestion.options[demoQuestion.correct]
-                                }
-                              </p>
-                              <p className="text-xs sm:text-sm text-muted-foreground" data-testid="demo-result-explanation">
-                                {demoQuestion.explanation}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Quick registration CTA for non-authenticated users */}
-                        {!isAuthenticated && (
-                          <div className="bg-gradient-to-r from-primary/10 to-chart-2/10 border border-primary/30 rounded-lg p-3 sm:p-4">
-                            <div className="text-center space-y-2 sm:space-y-3">
-                              <p className="text-xs sm:text-sm font-semibold text-foreground">
-                                Chcesz nauczyć się więcej? 500+ podobnych pytań czeka!
-                              </p>
-                              <Button 
-                                onClick={() => setAuthMode("register")}
-                                className="w-full bg-primary hover:bg-primary/90 text-sm sm:text-base"
-                                data-testid="demo-register-cta"
-                              >
-                                <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                                Rozpocznij naukę
-                              </Button>
-                              <p className="text-xs text-muted-foreground">
-                                Rejestracja zajmuje mniej niż minutę
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
+              <DemoQuestionRenderer 
+                questions={questions}
+                onRegisterClick={() => setAuthMode("register")}
+              />
               
               {/* Floating success element */}
               <div className="hidden sm:flex absolute -top-4 -right-4 w-16 h-16 sm:w-20 sm:h-20 bg-chart-2 rounded-full items-center justify-center shadow-lg">

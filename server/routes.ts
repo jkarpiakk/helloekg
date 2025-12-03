@@ -2056,7 +2056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Demo Question Routes
-  // Public route to get active demo question
+  // Public route to get active demo question (legacy - returns single)
   app.get("/api/demo-question", async (req, res) => {
     try {
       const demoQuestion = await storage.getActiveDemoQuestion();
@@ -2064,6 +2064,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Demo question fetch error:", error);
       res.status(500).json({ error: "Błąd podczas pobierania pytania demo" });
+    }
+  });
+
+  // Public route to get all active demo questions
+  app.get("/api/demo-questions", async (req, res) => {
+    try {
+      const demoQuestions = await storage.getActiveDemoQuestions();
+      res.json(demoQuestions);
+    } catch (error: any) {
+      console.error("Demo questions fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania pytań demo" });
     }
   });
 

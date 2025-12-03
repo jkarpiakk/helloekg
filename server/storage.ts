@@ -97,6 +97,7 @@ export interface IStorage {
   
   // Demo question methods
   getActiveDemoQuestion(): Promise<DemoQuestion | undefined>;
+  getActiveDemoQuestions(): Promise<DemoQuestion[]>;
   getAllDemoQuestions(): Promise<DemoQuestion[]>;
   createDemoQuestion(data: InsertDemoQuestion): Promise<DemoQuestion>;
   updateDemoQuestion(id: string, updates: Partial<InsertDemoQuestion>): Promise<DemoQuestion>;
@@ -723,13 +724,21 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(demoQuestions)
       .where(eq(demoQuestions.isActive, true))
-      .orderBy(desc(demoQuestions.createdAt))
+      .orderBy(demoQuestions.displayOrder, desc(demoQuestions.createdAt))
       .limit(1);
     return question || undefined;
   }
 
+  async getActiveDemoQuestions(): Promise<DemoQuestion[]> {
+    return db
+      .select()
+      .from(demoQuestions)
+      .where(eq(demoQuestions.isActive, true))
+      .orderBy(demoQuestions.displayOrder, demoQuestions.createdAt);
+  }
+
   async getAllDemoQuestions(): Promise<DemoQuestion[]> {
-    return db.select().from(demoQuestions).orderBy(desc(demoQuestions.createdAt));
+    return db.select().from(demoQuestions).orderBy(demoQuestions.displayOrder, desc(demoQuestions.createdAt));
   }
 
   async createDemoQuestion(data: InsertDemoQuestion): Promise<DemoQuestion> {
