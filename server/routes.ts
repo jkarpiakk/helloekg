@@ -50,6 +50,9 @@ const statusUpdateSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Trust proxy for Replit environment
+  app.set('trust proxy', 1);
+  
   // Session configuration
   app.use(session({
     secret: process.env.SESSION_SECRET || 'ekg-academy-secret-key-change-in-production',
@@ -58,6 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
+      sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     }
   }));
