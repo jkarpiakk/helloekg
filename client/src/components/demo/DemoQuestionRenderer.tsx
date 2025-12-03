@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   Check, X, GraduationCap, ChevronLeft, ChevronRight, 
-  ListChecks, Puzzle, TextCursor, Link2, ArrowUpDown, Target 
+  ListChecks, Puzzle, TextCursor, Link2, ArrowUpDown, Target,
+  Lightbulb, Sparkles
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import type { DemoQuestion, QuestionConfig, DragDropConfig, FillBlankConfig, MatchingConfig, SortingConfig, HotspotConfig } from "@shared/schema";
@@ -61,6 +63,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
   const [currentAnswer, setCurrentAnswer] = useState<AnswerData | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
+  const [showExplanationModal, setShowExplanationModal] = useState(false);
   const { isAuthenticated } = useAuth();
 
   const currentQuestion = questions[currentIndex];
@@ -72,6 +75,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     setCurrentAnswer(null);
     setShowResult(false);
     setIsCorrect(false);
+    setShowExplanationModal(false);
   }, [currentIndex]);
 
   const handleMultipleChoiceSelect = (index: number) => {
@@ -447,30 +451,43 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
 
           {showResult && (
             <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-              <div className="p-3 sm:p-4 bg-primary/5 border border-primary/20 rounded-lg" data-testid="demo-result-panel">
-                <div className="flex items-start space-x-2 sm:space-x-3">
-                  <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                  }`}>
-                    {isCorrect ? (
-                      <Check className="h-3 w-3 sm:h-4 sm:w-4" />
-                    ) : (
-                      <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                    )}
+              <div className={`p-3 sm:p-4 rounded-lg border ${
+                isCorrect 
+                  ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+                  : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+              }`} data-testid="demo-result-panel">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      isCorrect ? 'bg-green-500' : 'bg-red-500'
+                    }`}>
+                      {isCorrect ? (
+                        <Check className="h-5 w-5 text-white" />
+                      ) : (
+                        <X className="h-5 w-5 text-white" />
+                      )}
+                    </div>
+                    <div>
+                      <p className={`font-bold text-base sm:text-lg ${
+                        isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+                      }`} data-testid="demo-result-status">
+                        {isCorrect ? "Brawo! Poprawna odpowiedź!" : "Niepoprawna odpowiedź"}
+                      </p>
+                      {!isCorrect && questionType === 'multiple_choice' && currentQuestion.options && (
+                        <p className="text-sm text-muted-foreground">
+                          Prawidłowa: {currentQuestion.options[currentQuestion.correctIndex || 0]}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-foreground mb-1 text-sm sm:text-base" data-testid="demo-result-status">
-                      {isCorrect 
-                        ? "Brawo! Poprawna odpowiedź!" 
-                        : questionType === 'multiple_choice' && currentQuestion.options
-                          ? `Niepoprawnie. Prawidłowa odpowiedź to: ${currentQuestion.options[currentQuestion.correctIndex || 0]}`
-                          : "Niepoprawnie. Spróbuj ponownie!"
-                      }
-                    </p>
-                    <p className="text-xs sm:text-sm text-muted-foreground" data-testid="demo-result-explanation">
-                      {currentQuestion.explanation}
-                    </p>
-                  </div>
+                  <Button
+                    onClick={() => setShowExplanationModal(true)}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+                    data-testid="open-explanation-modal"
+                  >
+                    <Lightbulb className="h-4 w-4 mr-2" />
+                    Zobacz wyjaśnienie
+                  </Button>
                 </div>
               </div>
               
@@ -539,6 +556,98 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
           </div>
         )}
       </div>
+
+      {/* Explanation Modal */}
+      <Dialog open={showExplanationModal} onOpenChange={setShowExplanationModal}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-xl sm:text-2xl">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                <Lightbulb className="h-6 w-6 text-white" />
+              </div>
+              <span>Wyjaśnienie odpowiedzi</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Question recap */}
+            <div className="p-4 bg-secondary/50 rounded-lg border border-border">
+              <p className="text-sm text-muted-foreground mb-2">Pytanie:</p>
+              <p className="font-medium text-foreground">{currentQuestion?.question}</p>
+            </div>
+
+            {/* Result badge */}
+            <div className="flex items-center gap-3">
+              <div className={`px-4 py-2 rounded-full font-semibold flex items-center gap-2 ${
+                isCorrect 
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+              }`}>
+                {isCorrect ? (
+                  <>
+                    <Check className="h-5 w-5" />
+                    Poprawna odpowiedź!
+                  </>
+                ) : (
+                  <>
+                    <X className="h-5 w-5" />
+                    Niepoprawna odpowiedź
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Correct answer for multiple choice */}
+            {!isCorrect && questionType === 'multiple_choice' && currentQuestion?.options && (
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-600 dark:text-green-400 mb-1">Prawidłowa odpowiedź:</p>
+                <p className="font-semibold text-green-700 dark:text-green-300">
+                  {String.fromCharCode(65 + (currentQuestion.correctIndex || 0))}. {currentQuestion.options[currentQuestion.correctIndex || 0]}
+                </p>
+              </div>
+            )}
+
+            {/* Main explanation */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-primary">
+                <Sparkles className="h-5 w-5" />
+                <h3 className="font-semibold text-lg">Dlaczego tak jest?</h3>
+              </div>
+              <div className="p-5 bg-gradient-to-br from-primary/5 to-chart-2/5 rounded-xl border border-primary/20">
+                <p className="text-foreground leading-relaxed text-base sm:text-lg" data-testid="demo-result-explanation">
+                  {currentQuestion?.explanation}
+                </p>
+              </div>
+            </div>
+
+            {/* CTA for non-authenticated users */}
+            {!isAuthenticated && (
+              <div className="mt-6 p-5 bg-gradient-to-r from-primary/10 to-chart-2/10 rounded-xl border border-primary/30">
+                <div className="text-center space-y-3">
+                  <p className="font-semibold text-foreground text-lg">
+                    🎓 Chcesz nauczyć się więcej?
+                  </p>
+                  <p className="text-muted-foreground">
+                    Dołącz do kursu i uzyskaj dostęp do 500+ pytań z wyjaśnieniami!
+                  </p>
+                  <Button 
+                    onClick={() => {
+                      setShowExplanationModal(false);
+                      onRegisterClick();
+                    }}
+                    size="lg"
+                    className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+                    data-testid="modal-register-cta"
+                  >
+                    <GraduationCap className="h-5 w-5 mr-2" />
+                    Rozpocznij naukę teraz
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
