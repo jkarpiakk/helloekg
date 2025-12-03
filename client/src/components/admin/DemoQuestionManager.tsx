@@ -14,7 +14,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { 
   Eye, Plus, Trash2, Save, GripVertical, 
-  ListChecks, Puzzle, TextCursor, Link2, ArrowUpDown, Target 
+  ListChecks, Puzzle, TextCursor, Link2, ArrowUpDown, Target,
+  Upload, Image as ImageIcon
 } from "lucide-react";
 import { 
   DragDropEditor, 
@@ -136,6 +137,7 @@ interface FormData {
 
 export default function DemoQuestionManager() {
   const [editingQuestion, setEditingQuestion] = useState<DemoQuestion | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     question: "",
     options: ["", "", "", ""],
@@ -313,6 +315,7 @@ export default function DemoQuestionManager() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
+    setIsUploading(true);
     try {
       // 1. Get signed upload URL from server
       const uploadResponse = await apiRequest("POST", "/api/admin/upload");
@@ -342,6 +345,42 @@ export default function DemoQuestionManager() {
         variant: "destructive",
       });
       throw error;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Błąd",
+        description: "Można przesłać tylko pliki obrazów",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Błąd",
+        description: "Maksymalny rozmiar pliku to 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      const objectPath = await handleImageUpload(file);
+      setFormData({ ...formData, imageUrl: objectPath });
+      toast({
+        title: "Sukces",
+        description: "Obraz został przesłany",
+      });
+    } catch (error) {
+      // Error already handled in handleImageUpload
     }
   };
 
@@ -518,28 +557,71 @@ export default function DemoQuestionManager() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {formData.questionType !== 'hotspot' && (
             <div className="space-y-2">
-              <Label htmlFor="imageUrl">URL obrazu (opcjonalnie)</Label>
-              <Input
-                id="imageUrl"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="https://example.com/ekg-image.jpg"
-                data-testid="input-image-url"
-              />
+              <Label>Obraz EKG (opcjonalny)</Label>
+              <div className="mt-2">
+                {formData.imageUrl ? (
+                  <div className="relative">
+                    <img
+                      src={formData.imageUrl}
+                      alt="EKG"
+                      className="max-w-full h-auto rounded border max-h-48 object-contain"
+                      data-testid="img-demo-preview"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => setFormData({ ...formData, imageUrl: "" })}
+                      data-testid="button-remove-demo-image"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                    <input
+                      type="file"
+                      id="demoImageUpload"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      data-testid="input-demo-image-upload"
+                    />
+                    <label
+                      htmlFor="demoImageUpload"
+                      className="cursor-pointer flex flex-col items-center"
+                    >
+                      {isUploading ? (
+                        <LoadingSpinner size="lg" className="mb-2" />
+                      ) : (
+                        <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                      )}
+                      <span className="text-sm text-muted-foreground">
+                        {isUploading ? "Przesyłanie..." : "Kliknij aby przesłać obraz"}
+                      </span>
+                      <span className="text-xs text-muted-foreground mt-1">
+                        PNG, JPG, max 5MB
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="displayOrder">Kolejność wyświetlania</Label>
-              <Input
-                id="displayOrder"
-                type="number"
-                value={formData.displayOrder}
-                onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
-                placeholder="0"
-                data-testid="input-display-order"
-              />
-            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="displayOrder">Kolejność wyświetlania</Label>
+            <Input
+              id="displayOrder"
+              type="number"
+              value={formData.displayOrder}
+              onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+              placeholder="0"
+              data-testid="input-display-order"
+            />
           </div>
 
           <div className="flex items-center space-x-2">
