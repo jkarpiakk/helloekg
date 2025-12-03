@@ -10,14 +10,10 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  useDraggable,
+  useDroppable,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { GripVertical, Check, X } from "lucide-react";
 import type { DragDropConfig, AnswerData, QuizResult } from "@/types";
 
@@ -44,13 +40,11 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
-  } = useSortable({ id, disabled });
+  } = useDraggable({ id, disabled });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
   };
 
   let borderClass = "border-border";
@@ -103,10 +97,15 @@ interface DropZoneProps {
 }
 
 function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZoneProps) {
+  const { isOver, setNodeRef } = useDroppable({ id });
+  
   let borderClass = "border-dashed border-muted-foreground/30";
   let bgClass = "bg-muted/30";
   
-  if (placedItem) {
+  if (isOver) {
+    borderClass = "border-dashed border-primary";
+    bgClass = "bg-primary/10";
+  } else if (placedItem) {
     if (isCorrect) {
       borderClass = "border-solid border-green-500";
       bgClass = "bg-green-50 dark:bg-green-950/20";
@@ -121,6 +120,7 @@ function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZonePro
 
   return (
     <div
+      ref={setNodeRef}
       data-testid={`drop-zone-${id}`}
       className={`
         min-h-[60px] sm:min-h-[72px] p-3 sm:p-4 rounded-lg border-2
@@ -236,22 +236,17 @@ export default function DragDropQuestion({
             <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               Elementy do przeciągnięcia
             </h4>
-            <SortableContext
-              items={availableSources.map(s => s.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2">
-                {availableSources.map(source => (
-                  <DraggableItem
-                    key={source.id}
-                    id={source.id}
-                    content={source.content}
-                    imageUrl={source.imageUrl}
-                    disabled={disabled}
-                  />
-                ))}
-              </div>
-            </SortableContext>
+            <div className="space-y-2">
+              {availableSources.map(source => (
+                <DraggableItem
+                  key={source.id}
+                  id={source.id}
+                  content={source.content}
+                  imageUrl={source.imageUrl}
+                  disabled={disabled}
+                />
+              ))}
+            </div>
             {availableSources.length === 0 && !showResult && (
               <p className="text-sm text-muted-foreground italic p-3">
                 Wszystkie elementy zostały rozmieszczone
