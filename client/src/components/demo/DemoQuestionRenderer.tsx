@@ -218,7 +218,19 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
   };
 
   const renderInteractiveQuestion = () => {
-    if (!questionConfig) return null;
+    if (!questionConfig || questionConfig.type === 'multiple_choice') {
+      return null;
+    }
+    
+    if (!('config' in questionConfig) || !questionConfig.config) {
+      return (
+        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-center">
+          <p className="text-amber-800 dark:text-amber-200 text-sm">
+            Konfiguracja pytania nie jest kompletna. Uzupełnij konfigurację w panelu admina.
+          </p>
+        </div>
+      );
+    }
 
     const mockResult = showResult ? {
       isCorrect,
@@ -230,6 +242,9 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
 
     if (questionConfig.type === 'drag_drop') {
       const config = questionConfig.config as DragDropConfig;
+      if (!config.sources || !config.targets) {
+        return <div className="text-amber-600 text-sm">Brak konfiguracji drag & drop</div>;
+      }
       return (
         <div className="space-y-4">
           <DragDropQuestion
@@ -254,6 +269,9 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     
     if (questionConfig.type === 'fill_blank') {
       const config = questionConfig.config as FillBlankConfig;
+      if (!config.blanks || !config.template) {
+        return <div className="text-amber-600 text-sm">Brak konfiguracji uzupełniania luk</div>;
+      }
       return (
         <div className="space-y-4">
           <FillBlankQuestion
@@ -278,6 +296,9 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     
     if (questionConfig.type === 'matching') {
       const config = questionConfig.config as MatchingConfig;
+      if (!config.leftColumn || !config.rightColumn || !config.correctPairs) {
+        return <div className="text-amber-600 text-sm">Brak konfiguracji dopasowywania</div>;
+      }
       return (
         <div className="space-y-4">
           <MatchingQuestion
@@ -302,6 +323,9 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     
     if (questionConfig.type === 'sorting') {
       const config = questionConfig.config as SortingConfig;
+      if (!config.items || !config.correctOrder) {
+        return <div className="text-amber-600 text-sm">Brak konfiguracji sortowania</div>;
+      }
       return (
         <div className="space-y-4">
           <SortingQuestion
@@ -326,6 +350,9 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     
     if (questionConfig.type === 'hotspot') {
       const config = questionConfig.config as HotspotConfig;
+      if (!config.hotspots || !config.imageUrl) {
+        return <div className="text-amber-600 text-sm">Brak konfiguracji zaznaczania obszarów</div>;
+      }
       return (
         <div className="space-y-4">
           <HotspotQuestion
