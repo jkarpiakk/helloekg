@@ -86,13 +86,26 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     setCurrentAnswer(answer);
   }, []);
 
+  // Helper to extract config from both nested and flat structures
+  const extractConfig = useCallback(() => {
+    if (!questionConfig) return null;
+    if ('config' in questionConfig && questionConfig.config) {
+      return questionConfig.config;
+    }
+    // Flat structure - the questionConfig itself contains the config data
+    const { type, ...configData } = questionConfig as any;
+    return configData;
+  }, [questionConfig]);
+
   const handleSubmitInteractive = () => {
     if (!currentAnswer || !questionConfig) return;
     
     let correct = false;
+    const config = extractConfig();
+    if (!config) return;
     
     if (questionConfig.type === 'drag_drop' && currentAnswer.type === 'drag_drop') {
-      const ddConfig = questionConfig.config as DragDropConfig;
+      const ddConfig = config as DragDropConfig;
       const ddAnswer = currentAnswer as DragDropAnswer;
       const placements = ddAnswer.placements;
       correct = ddConfig.targets.every((target) => {
@@ -102,7 +115,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     }
     
     if (questionConfig.type === 'fill_blank' && currentAnswer.type === 'fill_blank') {
-      const fbConfig = questionConfig.config as FillBlankConfig;
+      const fbConfig = config as FillBlankConfig;
       const fbAnswer = currentAnswer as FillBlankAnswer;
       const filledBlanks = fbAnswer.filledBlanks || [];
       correct = fbConfig.blanks.every((blank) => {
@@ -113,7 +126,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     }
     
     if (questionConfig.type === 'matching' && currentAnswer.type === 'matching') {
-      const mConfig = questionConfig.config as MatchingConfig;
+      const mConfig = config as MatchingConfig;
       const mAnswer = currentAnswer as MatchingAnswer;
       const userPairs = mAnswer.pairs;
       correct = mConfig.correctPairs.every((cp) => {
@@ -122,7 +135,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     }
     
     if (questionConfig.type === 'sorting' && currentAnswer.type === 'sorting') {
-      const sConfig = questionConfig.config as SortingConfig;
+      const sConfig = config as SortingConfig;
       const sAnswer = currentAnswer as SortingAnswer;
       const userOrder = sAnswer.order;
       correct = userOrder.length === sConfig.correctOrder.length &&
@@ -130,7 +143,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     }
     
     if (questionConfig.type === 'hotspot' && currentAnswer.type === 'hotspot') {
-      const hConfig = questionConfig.config as HotspotConfig;
+      const hConfig = config as HotspotConfig;
       const hAnswer = currentAnswer as HotspotAnswer;
       const clickedIds = hAnswer.clickedHotspots;
       const correctIds = hConfig.hotspots.filter((h) => h.isCorrect).map((h) => h.id);
@@ -221,16 +234,6 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     if (!questionConfig || questionConfig.type === 'multiple_choice') {
       return null;
     }
-    
-    if (!('config' in questionConfig) || !questionConfig.config) {
-      return (
-        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-center">
-          <p className="text-amber-800 dark:text-amber-200 text-sm">
-            Konfiguracja pytania nie jest kompletna. Uzupełnij konfigurację w panelu admina.
-          </p>
-        </div>
-      );
-    }
 
     const mockResult = showResult ? {
       isCorrect,
@@ -240,8 +243,18 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
       feedback: isCorrect ? { correctItems: [], incorrectItems: [] } : { correctItems: [], incorrectItems: [] }
     } : undefined;
 
+    // Handle both nested config structure and flat structure from database
+    const getConfig = () => {
+      if ('config' in questionConfig && questionConfig.config) {
+        return questionConfig.config;
+      }
+      // Flat structure - the questionConfig itself contains the config data
+      const { type, ...configData } = questionConfig as any;
+      return configData;
+    };
+
     if (questionConfig.type === 'drag_drop') {
-      const config = questionConfig.config as DragDropConfig;
+      const config = getConfig() as DragDropConfig;
       if (!config.sources || !config.targets) {
         return <div className="text-amber-600 text-sm">Brak konfiguracji drag & drop</div>;
       }
@@ -268,7 +281,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     }
     
     if (questionConfig.type === 'fill_blank') {
-      const config = questionConfig.config as FillBlankConfig;
+      const config = getConfig() as FillBlankConfig;
       if (!config.blanks || !config.template) {
         return <div className="text-amber-600 text-sm">Brak konfiguracji uzupełniania luk</div>;
       }
@@ -295,7 +308,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     }
     
     if (questionConfig.type === 'matching') {
-      const config = questionConfig.config as MatchingConfig;
+      const config = getConfig() as MatchingConfig;
       if (!config.leftColumn || !config.rightColumn || !config.correctPairs) {
         return <div className="text-amber-600 text-sm">Brak konfiguracji dopasowywania</div>;
       }
@@ -322,7 +335,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     }
     
     if (questionConfig.type === 'sorting') {
-      const config = questionConfig.config as SortingConfig;
+      const config = getConfig() as SortingConfig;
       if (!config.items || !config.correctOrder) {
         return <div className="text-amber-600 text-sm">Brak konfiguracji sortowania</div>;
       }
@@ -349,7 +362,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     }
     
     if (questionConfig.type === 'hotspot') {
-      const config = questionConfig.config as HotspotConfig;
+      const config = getConfig() as HotspotConfig;
       if (!config.hotspots || !config.imageUrl) {
         return <div className="text-amber-600 text-sm">Brak konfiguracji zaznaczania obszarów</div>;
       }
