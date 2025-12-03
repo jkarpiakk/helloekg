@@ -9,7 +9,7 @@ import { ArrowLeft, ArrowRight, Bookmark, X, AlertTriangle } from "lucide-react"
 import QuestionCard from "./QuestionCard";
 import ImageLightbox from "./ImageLightbox";
 import ReportErrorDialog from "./ReportErrorDialog";
-import type { QuizQuestion, QuizResult } from "@/types";
+import type { QuizQuestion, QuizResult, AnswerData } from "@/types";
 
 interface QuizInterfaceProps {
   sectionId?: string;
@@ -21,6 +21,7 @@ interface QuizInterfaceProps {
 export default function QuizInterface({ sectionId, mode = "learn", examQuestionCount, onExit }: QuizInterfaceProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [currentAnswerData, setCurrentAnswerData] = useState<AnswerData | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [startTime, setStartTime] = useState(Date.now());
@@ -76,13 +77,14 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
   // Submit answer mutation
   const submitAnswerMutation = useMutation({
-    mutationFn: async (data: { questionId: string; selectedIndex: number; timeMs: number; sessionId?: string }) => {
+    mutationFn: async (data: { questionId: string; selectedIndex: number; timeMs: number; sessionId?: string; answerData?: AnswerData }) => {
       if (mode === "exam" && examSessionId) {
         const response = await apiRequest("POST", "/api/exam/answer", {
           sessionId: examSessionId,
           questionId: data.questionId,
           selectedIndex: data.selectedIndex,
-          timeMs: data.timeMs
+          timeMs: data.timeMs,
+          answerData: data.answerData
         });
         return response.json() as Promise<QuizResult>;
       } else {
@@ -90,7 +92,8 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
           questionId: data.questionId,
           selectedIndex: data.selectedIndex,
           timeMs: data.timeMs,
-          mode
+          mode,
+          answerData: data.answerData
         });
         return response.json() as Promise<QuizResult>;
       }
@@ -137,6 +140,24 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     }
   };
 
+  const handleAnswerChange = (answerData: AnswerData) => {
+    setCurrentAnswerData(answerData);
+  };
+
+  const handleSubmitInteractiveAnswer = () => {
+    if (!question || !currentAnswerData || submitAnswerMutation.isPending) return;
+
+    const timeMs = Date.now() - startTime;
+    setShowExplanation(true);
+
+    submitAnswerMutation.mutate({
+      questionId: question.id,
+      selectedIndex: -1,
+      timeMs,
+      answerData: currentAnswerData,
+    });
+  };
+
   const scrollToTop = () => {
     window.scrollTo({ 
       top: 0, 
@@ -155,6 +176,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     
     setCurrentQuestionIndex(nextIndex);
     setSelectedAnswer(null);
+    setCurrentAnswerData(null);
     setShowExplanation(false);
     setQuizResult(null);
     setStartTime(Date.now());
@@ -166,6 +188,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1);
       setSelectedAnswer(null);
+      setCurrentAnswerData(null);
       setShowExplanation(false);
       setQuizResult(null);
       setStartTime(Date.now());
@@ -344,9 +367,25 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
           showExplanation={showExplanation}
           quizResult={quizResult || undefined}
           onAnswerSelect={handleAnswerSelect}
+          onAnswerChange={handleAnswerChange}
           onImageClick={openLightbox}
           isSubmitting={submitAnswerMutation.isPending}
         />
+
+        {/* Submit button for interactive question types */}
+        {question.questionType && question.questionType !== 'multiple_choice' && question.questionConfig && !showExplanation && (
+          <div className="mt-4 sm:mt-6 flex justify-center">
+            <Button
+              onClick={handleSubmitInteractiveAnswer}
+              disabled={!currentAnswerData || submitAnswerMutation.isPending}
+              className="w-full sm:w-auto min-w-[200px]"
+              size="lg"
+              data-testid="submit-interactive-answer"
+            >
+              {submitAnswerMutation.isPending ? "Sprawdzam..." : "Sprawdź odpowiedź"}
+            </Button>
+          </div>
+        )}
 
         {/* Navigation */}
         <div className="flex justify-between items-center mt-6 sm:mt-8 gap-2">

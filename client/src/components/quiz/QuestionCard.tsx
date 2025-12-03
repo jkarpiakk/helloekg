@@ -3,8 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/lib/i18n";
 import { sanitizeMarkdown, sanitizeHtml } from "@/lib/sanitize";
-import { Check, X, ZoomIn } from "lucide-react";
-import type { QuizQuestion, QuizResult } from "@/types";
+import { Check, X, ZoomIn, GripVertical, Type, Link2, ArrowUpDown, Target } from "lucide-react";
+import type { QuizQuestion, QuizResult, AnswerData, QuestionType } from "@/types";
+import { QuestionRenderer } from "./questions";
 
 interface QuestionCardProps {
   question: QuizQuestion;
@@ -12,9 +13,43 @@ interface QuestionCardProps {
   showExplanation: boolean;
   quizResult?: QuizResult;
   onAnswerSelect: (index: number) => void;
+  onAnswerChange?: (answer: AnswerData) => void;
   onImageClick: (imageUrl: string) => void;
   isSubmitting: boolean;
 }
+
+const questionTypeInfo: Record<QuestionType, { label: string; icon: JSX.Element; color: string }> = {
+  multiple_choice: {
+    label: "Wybór odpowiedzi",
+    icon: <Type className="h-3 w-3" />,
+    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+  },
+  drag_drop: {
+    label: "Przeciągnij i upuść",
+    icon: <GripVertical className="h-3 w-3" />,
+    color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+  },
+  fill_blank: {
+    label: "Uzupełnij luki",
+    icon: <Type className="h-3 w-3" />,
+    color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+  },
+  matching: {
+    label: "Dopasuj pary",
+    icon: <Link2 className="h-3 w-3" />,
+    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+  },
+  sorting: {
+    label: "Ułóż w kolejności",
+    icon: <ArrowUpDown className="h-3 w-3" />,
+    color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+  },
+  hotspot: {
+    label: "Zaznacz na obrazku",
+    icon: <Target className="h-3 w-3" />,
+    color: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200"
+  }
+};
 
 export default function QuestionCard({
   question,
@@ -22,10 +57,14 @@ export default function QuestionCard({
   showExplanation,
   quizResult,
   onAnswerSelect,
+  onAnswerChange,
   onImageClick,
   isSubmitting,
 }: QuestionCardProps) {
   const { t } = useTranslation();
+  const questionType = question.questionType || 'multiple_choice';
+  const isInteractiveType = questionType !== 'multiple_choice' && question.questionConfig;
+  const typeInfo = questionTypeInfo[questionType];
 
   const getOptionClassName = (index: number): string => {
     const baseClass = "quiz-option !min-h-[48px] py-3 px-4 sm:p-4 lg:p-6 border-2 rounded-xl cursor-pointer transition-all touch-manipulation flex items-center";
@@ -53,12 +92,23 @@ export default function QuestionCard({
       <Card className="shadow-lg">
         <CardContent className="p-4 sm:p-6 lg:p-8">
           <div className="mb-4 sm:mb-6 lg:mb-8">
-            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-4 sm:mb-6" data-testid="question-title">
-              {question.title}
-            </h3>
+            <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
+              <h3 className="text-lg sm:text-xl font-semibold text-foreground" data-testid="question-title">
+                {question.title}
+              </h3>
+              {isInteractiveType && (
+                <Badge 
+                  variant="secondary" 
+                  className={`flex items-center gap-1 text-xs shrink-0 ${typeInfo.color}`}
+                >
+                  {typeInfo.icon}
+                  <span className="hidden sm:inline">{typeInfo.label}</span>
+                </Badge>
+              )}
+            </div>
             
-            {/* EKG Image */}
-            {question.imageUrl && (
+            {/* EKG Image - only for non-hotspot questions */}
+            {question.imageUrl && questionType !== 'hotspot' && (
               <div 
                 className="relative group cursor-pointer mb-4 sm:mb-6 touch-manipulation"
                 onClick={() => onImageClick(question.imageUrl!)}
@@ -89,24 +139,38 @@ export default function QuestionCard({
             )}
           </div>
 
-          {/* Answer Options */}
-          <div className="space-y-4" data-testid="answer-options">
-            {question.answers.map((answer, index) => (
-              <div
-                key={index}
-                className={getOptionClassName(index)}
-                onClick={() => !showExplanation && !isSubmitting && onAnswerSelect(index)}
-                data-testid={`answer-option-${index}`}
-              >
-                <div className="flex items-center">
-                  <span className="font-bold text-base sm:text-lg mr-2 sm:mr-4 w-6 sm:w-8">
-                    {String.fromCharCode(65 + index)}.
-                  </span>
-                  <span className="text-sm sm:text-base">{answer.text}</span>
+          {/* Interactive Question Types */}
+          {isInteractiveType && onAnswerChange && (
+            <QuestionRenderer
+              question={question}
+              onAnswerChange={onAnswerChange}
+              disabled={showExplanation}
+              showResult={showExplanation}
+              result={quizResult}
+              onImageClick={onImageClick}
+            />
+          )}
+
+          {/* Multiple Choice Answer Options */}
+          {!isInteractiveType && (
+            <div className="space-y-4" data-testid="answer-options">
+              {question.answers.map((answer, index) => (
+                <div
+                  key={index}
+                  className={getOptionClassName(index)}
+                  onClick={() => !showExplanation && !isSubmitting && onAnswerSelect(index)}
+                  data-testid={`answer-option-${index}`}
+                >
+                  <div className="flex items-center">
+                    <span className="font-bold text-base sm:text-lg mr-2 sm:mr-4 w-6 sm:w-8">
+                      {String.fromCharCode(65 + index)}.
+                    </span>
+                    <span className="text-sm sm:text-base">{answer.text}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

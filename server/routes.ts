@@ -428,18 +428,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/exam/answer", requireAuth, requireActiveSubscription, async (req, res) => {
     try {
-      const { sessionId, questionId, selectedIndex, timeMs } = req.body;
+      const { sessionId, questionId, selectedIndex, timeMs, answerData } = req.body;
 
-      if (!sessionId || typeof questionId !== 'string' || typeof selectedIndex !== 'number' || typeof timeMs !== 'number') {
+      if (!sessionId || typeof questionId !== 'string' || typeof timeMs !== 'number') {
         return res.status(400).json({ error: "Nieprawidłowe dane" });
+      }
+
+      // For interactive question types, answerData is required
+      // For multiple choice, selectedIndex is required
+      if (answerData === undefined && typeof selectedIndex !== 'number') {
+        return res.status(400).json({ error: "Nieprawidłowe dane odpowiedzi" });
       }
 
       const result = await quizService.submitExamAnswer(
         sessionId,
         questionId,
-        selectedIndex,
+        selectedIndex ?? -1,
         timeMs,
-        req.user!.id
+        req.user!.id,
+        answerData
       );
 
       res.json(result);
@@ -472,18 +479,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/quiz/answer", requireAuth, requireActiveSubscription, async (req, res) => {
     try {
-      const { questionId, selectedIndex, timeMs, mode = "learn" } = req.body;
+      const { questionId, selectedIndex, timeMs, mode = "learn", answerData } = req.body;
 
-      if (typeof questionId !== 'string' || typeof selectedIndex !== 'number' || typeof timeMs !== 'number') {
+      if (typeof questionId !== 'string' || typeof timeMs !== 'number') {
         return res.status(400).json({ error: "Nieprawidłowe dane" });
+      }
+
+      // For interactive question types, answerData is required
+      // For multiple choice, selectedIndex is required
+      if (answerData === undefined && typeof selectedIndex !== 'number') {
+        return res.status(400).json({ error: "Nieprawidłowe dane odpowiedzi" });
       }
 
       const result = await quizService.submitAnswer(
         req.user!.id,
         questionId,
-        selectedIndex,
+        selectedIndex ?? -1,
         timeMs,
-        mode
+        mode,
+        answerData
       );
 
       // Przyznaj XP i aktualizuj streak po każdej odpowiedzi

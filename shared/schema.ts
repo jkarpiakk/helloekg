@@ -93,6 +93,74 @@ export const lectureChapters = pgTable("lecture_chapters", {
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+// ======= QUESTION TYPE CONFIGURATIONS =======
+
+// Drag & Drop configuration
+export interface DragDropConfig {
+  sources: Array<{ id: string; content: string; label?: string; imageUrl?: string }>;
+  targets: Array<{ id: string; label: string; acceptsSourceId: string; imageUrl?: string }>;
+  backgroundImageUrl?: string;
+}
+
+// Fill-in-the-blank configuration
+export interface FillBlankConfig {
+  template: string; // Text with {{blank:id}} placeholders
+  blanks: Array<{
+    id: string;
+    position: number; // Position in text where blank appears
+    correctAnswers: string[]; // Multiple accepted answers
+    validationType: 'exact' | 'regex' | 'numeric_range';
+    regex?: string; // For regex validation
+    numericRange?: { min: number; max: number }; // For numeric range
+    placeholder?: string; // Placeholder text for input
+    hint?: string; // Optional hint for the blank
+  }>;
+}
+
+// Matching pairs configuration
+export interface MatchingConfig {
+  leftColumn: Array<{ id: string; text: string; imageUrl?: string }>;
+  rightColumn: Array<{ id: string; text: string; imageUrl?: string }>;
+  correctPairs: Array<{ leftId: string; rightId: string }>;
+  shuffleRight: boolean;
+}
+
+// Sorting configuration
+export interface SortingConfig {
+  items: Array<{ id: string; text: string; imageUrl?: string }>;
+  correctOrder: string[]; // Array of item IDs in correct order
+}
+
+// Hotspot configuration
+export interface HotspotConfig {
+  imageUrl: string;
+  hotspots: Array<{
+    id: string;
+    label?: string;
+    shape: 'rect' | 'circle' | 'polygon';
+    coords: number[]; // [x1, y1, x2, y2] for rect, [cx, cy, r] for circle, [x1,y1,...] for polygon
+    isCorrect: boolean;
+  }>;
+  allowMultiple: boolean; // Can user select multiple hotspots?
+}
+
+// Media assets for all question types
+export interface QuestionMediaAssets {
+  promptImage?: string; // Main question image
+  answerImages?: Array<{ id: string; url: string; alt?: string }>; // For image-based answers
+  backgroundImage?: string; // For drag-drop or hotspot background
+  explanationImage?: string; // Image in explanation
+}
+
+// Union type for all question configs
+export type QuestionConfig = 
+  | { type: 'multiple_choice' }
+  | { type: 'drag_drop'; config: DragDropConfig }
+  | { type: 'fill_blank'; config: FillBlankConfig }
+  | { type: 'matching'; config: MatchingConfig }
+  | { type: 'sorting'; config: SortingConfig }
+  | { type: 'hotspot'; config: HotspotConfig };
+
 // Questions
 export const questions = pgTable("questions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -112,18 +180,65 @@ export const questions = pgTable("questions", {
   reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  // NEW: Question type and configuration for interactive questions
+  questionType: varchar("question_type", { length: 30 }).notNull().default("multiple_choice"),
+  questionConfig: json("question_config").$type<QuestionConfig>(),
+  mediaAssets: json("media_assets").$type<QuestionMediaAssets>(),
 });
+
+// Answer data types for different question types
+export interface MultipleChoiceAnswer {
+  type: 'multiple_choice';
+  selectedIndex: number;
+}
+
+export interface DragDropAnswer {
+  type: 'drag_drop';
+  placements: Array<{ sourceId: string; targetId: string }>;
+}
+
+export interface FillBlankAnswer {
+  type: 'fill_blank';
+  filledBlanks: Array<{ blankId: string; value: string }>;
+}
+
+export interface MatchingAnswer {
+  type: 'matching';
+  pairs: Array<{ leftId: string; rightId: string }>;
+}
+
+export interface SortingAnswer {
+  type: 'sorting';
+  order: string[]; // Item IDs in user's order
+}
+
+export interface HotspotAnswer {
+  type: 'hotspot';
+  clickedHotspots: string[]; // IDs of clicked hotspots
+  clickCoordinates?: { x: number; y: number }[]; // Actual click positions
+}
+
+export type AnswerData = 
+  | MultipleChoiceAnswer
+  | DragDropAnswer
+  | FillBlankAnswer
+  | MatchingAnswer
+  | SortingAnswer
+  | HotspotAnswer;
 
 // User attempts on questions
 export const attempts = pgTable("attempts", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   questionId: uuid("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
-  selectedIndex: integer("selected_index").notNull(),
+  selectedIndex: integer("selected_index").notNull(), // Keep for backward compatibility with ABCD
   isCorrect: boolean("is_correct").notNull(),
   timeMs: integer("time_ms").notNull(),
   mode: varchar("mode", { length: 20 }).notNull().default("learn"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  // NEW: Structured answer data for all question types
+  answerData: json("answer_data").$type<AnswerData>(),
+  partialScore: decimal("partial_score", { precision: 5, scale: 2 }), // For questions with partial scoring (matching, fill-blank)
 });
 
 // User progress per section

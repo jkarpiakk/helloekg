@@ -11,7 +11,23 @@ import type {
   SupportTicket,
   AuditLog,
   BlogPost,
-  InsertBlogPost
+  InsertBlogPost,
+  // New question type configs
+  DragDropConfig,
+  FillBlankConfig,
+  MatchingConfig,
+  SortingConfig,
+  HotspotConfig,
+  QuestionConfig,
+  QuestionMediaAssets,
+  // Answer data types
+  AnswerData,
+  MultipleChoiceAnswer,
+  DragDropAnswer,
+  FillBlankAnswer,
+  MatchingAnswer,
+  SortingAnswer,
+  HotspotAnswer,
 } from "@shared/schema";
 
 export type {
@@ -26,8 +42,27 @@ export type {
   SupportTicket,
   AuditLog,
   BlogPost,
-  InsertBlogPost
+  InsertBlogPost,
+  // New question type configs
+  DragDropConfig,
+  FillBlankConfig,
+  MatchingConfig,
+  SortingConfig,
+  HotspotConfig,
+  QuestionConfig,
+  QuestionMediaAssets,
+  // Answer data types
+  AnswerData,
+  MultipleChoiceAnswer,
+  DragDropAnswer,
+  FillBlankAnswer,
+  MatchingAnswer,
+  SortingAnswer,
+  HotspotAnswer,
 };
+
+// Question type literal type
+export type QuestionType = 'multiple_choice' | 'drag_drop' | 'fill_blank' | 'matching' | 'sorting' | 'hotspot';
 
 // Additional frontend-specific types
 export interface AuthUser {
@@ -48,6 +83,10 @@ export interface QuizQuestion {
   sectionId: string;
   correctIndex: number;
   explanation: string;
+  // New fields for interactive question types
+  questionType: QuestionType;
+  questionConfig?: QuestionConfig;
+  mediaAssets?: QuestionMediaAssets;
 }
 
 export interface QuizResult {
@@ -62,6 +101,13 @@ export interface QuizResult {
     description: string;
     icon: string;
   }>;
+  // New fields for interactive question types
+  partialScore?: number; // 0-1 for partial credit (matching, fill-blank)
+  correctAnswer?: AnswerData; // The correct answer for comparison
+  feedback?: {
+    correctItems?: string[]; // IDs of correctly answered items
+    incorrectItems?: string[]; // IDs of incorrectly answered items
+  };
 }
 
 export interface UserProgress {
@@ -116,6 +162,8 @@ export interface QuizState {
   showExplanation: boolean;
   isSubmitting: boolean;
   startTime: number;
+  // New fields for interactive question types
+  currentAnswer?: AnswerData; // Current answer state for any question type
 }
 
 // API Response types
