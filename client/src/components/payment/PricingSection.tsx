@@ -76,7 +76,7 @@ export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
   if (isLoading) {
     return (
       <section className="py-20" id="pricing">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-center">
             <LoadingSpinner size="lg" />
           </div>
@@ -87,7 +87,7 @@ export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
 
   return (
     <section className="py-20" id="pricing">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
             {t("pricing.title")}

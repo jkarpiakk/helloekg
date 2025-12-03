@@ -100,7 +100,7 @@ export default function Quiz() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" size="sm" asChild data-testid="back-to-dashboard">
@@ -118,7 +118,7 @@ export default function Quiz() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Mode Selection */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
           <Card 

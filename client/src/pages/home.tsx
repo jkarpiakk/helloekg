@@ -69,7 +69,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/10"></div>
         <div className="absolute inset-0 opacity-5 ekg-pattern"></div>
         
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 items-center">
             {/* Hero Content */}
             <div className="space-y-6 sm:space-y-8">
@@ -157,7 +157,7 @@ export default function Home() {
 
       {/* How It Works Section */}
       <section id="how-it-works" className="py-12 sm:py-16 lg:py-20 bg-secondary/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
               Dlaczego ten kurs jest inny?
@@ -212,7 +212,7 @@ export default function Home() {
 
       {/* Course Content Section */}
       <section className="py-12 sm:py-16 lg:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
               Co zawiera kurs?

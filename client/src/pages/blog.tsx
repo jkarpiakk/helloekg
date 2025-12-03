@@ -93,7 +93,7 @@ export default function Blog() {
 
       {/* Header Section */}
       <section className="py-16 bg-gradient-to-br from-primary/5 to-secondary/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
           {/* Breadcrumbs */}
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-6" data-testid="breadcrumbs">
             <Link href="/" className="hover:text-primary transition-colors" data-testid="breadcrumb-home">
@@ -117,7 +117,7 @@ export default function Blog() {
 
       {/* Filters Section */}
       <section className="py-8 bg-card border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             {/* Search Bar */}
             <form onSubmit={handleSearch} className="flex-1 max-w-md" data-testid="search-form">
@@ -174,7 +174,7 @@ export default function Blog() {
 
       {/* Content Section */}
       <section className="py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
           {error && (
             <Alert className="mb-8" data-testid="error-alert">
               <AlertDescription>

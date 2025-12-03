@@ -60,7 +60,7 @@ export default function CertificatePage() {
     <div className="min-h-screen bg-background">
       {/* Print Controls - Hidden when printing */}
       <div className="print:hidden bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link href="/dashboard">
               <Button variant="ghost" size="sm" data-testid="back-to-dashboard">

@@ -109,7 +109,7 @@ export default function StudentDashboard() {
     <div className="min-h-screen bg-background">
       {/* Dashboard Header */}
       <div className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-foreground" data-testid="welcome-message">
@@ -130,7 +130,7 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Main content */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6 lg:space-y-8">

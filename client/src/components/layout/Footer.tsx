@@ -5,7 +5,7 @@ import logoImage from "@assets/logo ekg 2_1757715460574.png";
 export default function Footer() {
   return (
     <footer className="bg-card border-t border-border mt-20">
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid md:grid-cols-4 gap-8">
           {/* Company info */}
           <div className="space-y-4">
