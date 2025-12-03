@@ -63,13 +63,15 @@ export default function FillBlankQuestion({
       const isCorrect = result?.feedback?.correctItems?.includes(blank.id);
       const isIncorrect = result?.feedback?.incorrectItems?.includes(blank.id);
 
-      let inputClass = "inline-block w-28 sm:w-36 md:w-40 mx-1 my-1 text-center";
+      let inputClass = "inline-block w-28 sm:w-36 md:w-40 mx-1 my-1 text-center font-medium border-2 transition-all duration-200";
       if (showResult) {
         if (isCorrect) {
-          inputClass += " border-green-500 bg-green-50 dark:bg-green-950/20";
+          inputClass += " border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 shadow-sm shadow-green-500/20";
         } else if (isIncorrect) {
-          inputClass += " border-red-500 bg-red-50 dark:bg-red-950/20";
+          inputClass += " border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 shadow-sm shadow-red-500/20";
         }
+      } else {
+        inputClass += " border-border hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20";
       }
 
       const correctAnswer = showResult && isIncorrect && result?.correctAnswer?.type === 'fill_blank'
@@ -91,14 +93,14 @@ export default function FillBlankQuestion({
             data-testid={`blank-input-${blank.id}`}
           />
           {showResult && isCorrect && (
-            <Check className="h-4 w-4 text-green-500" />
+            <Check className="h-5 w-5 text-green-600 dark:text-green-400" data-testid={`blank-correct-${blank.id}`} />
           )}
           {showResult && isIncorrect && (
             <>
-              <X className="h-4 w-4 text-red-500" />
+              <X className="h-5 w-5 text-red-600 dark:text-red-400" data-testid={`blank-incorrect-${blank.id}`} />
               {correctAnswer && (
-                <span className="text-xs text-green-600 dark:text-green-400 font-medium ml-1">
-                  ({correctAnswer})
+                <span className="text-xs text-green-700 dark:text-green-400 font-semibold ml-1 px-1.5 py-0.5 bg-green-100 dark:bg-green-900/40 rounded">
+                  {correctAnswer}
                 </span>
               )}
             </>
@@ -134,10 +136,14 @@ export default function FillBlankQuestion({
         {renderTextWithBlanks()}
       </div>
 
-      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-        <span className="font-medium">Podpowiedź:</span>
+      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap" data-testid="fill-blank-hints">
+        <span className="font-semibold text-foreground">Podpowiedzi:</span>
         {config.blanks.map((blank, index) => (
-          <span key={blank.id} className="px-2 py-1 bg-muted rounded">
+          <span 
+            key={blank.id} 
+            className="px-2 py-1 bg-primary/10 text-primary rounded-md font-medium border border-primary/20"
+            data-testid={`hint-${blank.id}`}
+          >
             [{index + 1}] {blank.hint || 'bez podpowiedzi'}
           </span>
         ))}

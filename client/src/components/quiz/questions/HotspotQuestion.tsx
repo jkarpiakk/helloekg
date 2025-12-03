@@ -183,14 +183,18 @@ export default function HotspotQuestion({
       </p>
 
       <div 
-        className="relative rounded-lg overflow-hidden border-2 border-border"
+        className={`relative rounded-lg overflow-hidden border-2 transition-all duration-200 ${
+          disabled 
+            ? 'border-muted' 
+            : 'border-primary/30 hover:border-primary hover:shadow-lg'
+        }`}
         data-testid="hotspot-container"
       >
         <img
           ref={imageRef}
           src={config.imageUrl}
           alt="Obraz z zaznaczalnymi obszarami"
-          className={`w-full h-auto ${disabled ? 'cursor-default' : 'cursor-crosshair'}`}
+          className={`w-full h-auto transition-opacity ${disabled ? 'cursor-default' : 'cursor-crosshair hover:opacity-95'}`}
           onClick={handleImageClick}
           data-testid="hotspot-image"
         />
@@ -239,12 +243,12 @@ export default function HotspotQuestion({
         })}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <MousePointer2 className="h-4 w-4" />
-          <span>
+      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" data-testid="hotspot-status">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <MousePointer2 className={`h-5 w-5 ${clickedHotspots.size > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+          <span className={clickedHotspots.size > 0 ? 'text-foreground' : 'text-muted-foreground'}>
             {clickedHotspots.size === 0 
-              ? "Kliknij na obrazek" 
+              ? "Kliknij na obrazek, aby zaznaczyć" 
               : `Zaznaczono: ${clickedHotspots.size} ${config.allowMultiple ? 'obszarów' : 'obszar'}`}
           </span>
         </div>
@@ -255,21 +259,22 @@ export default function HotspotQuestion({
             size="sm"
             onClick={handleClear}
             data-testid="clear-hotspots"
+            className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
           >
-            Wyczyść zaznaczenie
+            Wyczyść
           </Button>
         )}
       </div>
 
       {showResult && (
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-green-500/30 border border-green-500" />
-            <span>Prawidłowy obszar</span>
+        <div className="flex items-center gap-4 text-sm p-3 bg-muted/20 rounded-lg" data-testid="hotspot-legend">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded bg-green-500/30 border-2 border-green-500 shadow-sm" />
+            <span className="font-medium text-green-700 dark:text-green-400">Prawidłowy obszar</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-red-500/30 border border-red-500" />
-            <span>Błędne zaznaczenie</span>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded bg-red-500/30 border-2 border-red-500 shadow-sm" />
+            <span className="font-medium text-red-700 dark:text-red-400">Błędne zaznaczenie</span>
           </div>
         </div>
       )}

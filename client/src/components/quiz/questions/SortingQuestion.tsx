@@ -55,46 +55,58 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
     transition,
   };
 
-  let borderClass = "border-border";
-  let bgClass = "bg-card";
+  let borderClass = "border-border hover:border-primary/50";
+  let bgClass = "bg-card hover:bg-primary/5";
+  let shadowClass = "hover:shadow-md";
+  let positionBgClass = "bg-muted text-muted-foreground";
+  
   if (isCorrect) {
     borderClass = "border-green-500";
-    bgClass = "bg-green-50 dark:bg-green-950/20";
+    bgClass = "bg-green-50 dark:bg-green-950/30";
+    shadowClass = "shadow-md shadow-green-500/20";
+    positionBgClass = "bg-green-500 text-white";
   } else if (isIncorrect) {
     borderClass = "border-red-500";
-    bgClass = "bg-red-50 dark:bg-red-950/20";
+    bgClass = "bg-red-50 dark:bg-red-950/30";
+    shadowClass = "shadow-md shadow-red-500/20";
+    positionBgClass = "bg-red-500 text-white";
+  } else if (disabled) {
+    borderClass = "border-muted";
+    bgClass = "bg-muted/30";
+    shadowClass = "";
   }
 
   return (
     <div
       ref={setNodeRef}
       style={style}
+      data-testid={`sortable-item-${id}`}
       className={`
         flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg border-2 
-        ${borderClass} ${bgClass}
-        ${isDragging ? "opacity-50 shadow-lg z-50" : ""}
-        ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
-        touch-manipulation transition-all
+        ${borderClass} ${bgClass} ${shadowClass}
+        ${isDragging ? "opacity-70 shadow-xl scale-105 z-50" : ""}
+        ${disabled ? "cursor-default opacity-80" : "cursor-grab active:cursor-grabbing active:scale-[0.98]"}
+        touch-manipulation transition-all duration-200
       `}
       {...attributes}
       {...listeners}
     >
-      <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-muted text-sm font-bold">
+      <div className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full ${positionBgClass} text-sm font-bold shadow-sm`}>
         {position}
       </div>
       {!disabled && (
-        <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+        <GripVertical className="h-5 w-5 text-primary/60 flex-shrink-0" />
       )}
       {imageUrl && (
         <img 
           src={imageUrl} 
           alt={content} 
-          className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded"
+          className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded border border-border"
         />
       )}
-      <span className="text-sm sm:text-base flex-1">{content}</span>
-      {isCorrect && <Check className="h-5 w-5 text-green-500" />}
-      {isIncorrect && <X className="h-5 w-5 text-red-500" />}
+      <span className="text-sm sm:text-base flex-1 font-medium">{content}</span>
+      {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
+      {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
     </div>
   );
 }

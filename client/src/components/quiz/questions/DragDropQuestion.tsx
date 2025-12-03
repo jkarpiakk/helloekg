@@ -47,43 +47,52 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
   };
 
-  let borderClass = "border-border";
-  let bgClass = "bg-card";
+  let borderClass = "border-border hover:border-primary/50";
+  let bgClass = "bg-card hover:bg-primary/5";
+  let shadowClass = "hover:shadow-md";
+  
   if (isCorrect) {
     borderClass = "border-green-500";
-    bgClass = "bg-green-50 dark:bg-green-950/20";
+    bgClass = "bg-green-50 dark:bg-green-950/30";
+    shadowClass = "shadow-md shadow-green-500/20";
   } else if (isIncorrect) {
     borderClass = "border-red-500";
-    bgClass = "bg-red-50 dark:bg-red-950/20";
+    bgClass = "bg-red-50 dark:bg-red-950/30";
+    shadowClass = "shadow-md shadow-red-500/20";
+  } else if (disabled) {
+    borderClass = "border-muted";
+    bgClass = "bg-muted/30";
+    shadowClass = "";
   }
 
   return (
     <div
       ref={setNodeRef}
       style={style}
+      data-testid={`draggable-item-${id}`}
       className={`
         flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg border-2 
-        ${borderClass} ${bgClass}
-        ${isDragging ? "opacity-50 shadow-lg" : ""}
-        ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
-        touch-manipulation transition-all
+        ${borderClass} ${bgClass} ${shadowClass}
+        ${isDragging ? "opacity-70 shadow-xl scale-105 z-50" : ""}
+        ${disabled ? "cursor-default opacity-80" : "cursor-grab active:cursor-grabbing active:scale-[0.98]"}
+        touch-manipulation transition-all duration-200
       `}
       {...attributes}
       {...listeners}
     >
       {!disabled && (
-        <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+        <GripVertical className="h-5 w-5 text-primary/60 flex-shrink-0" />
       )}
       {imageUrl && (
         <img 
           src={imageUrl} 
           alt={content} 
-          className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded"
+          className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded border border-border"
         />
       )}
-      <span className="text-sm sm:text-base flex-1">{content}</span>
-      {isCorrect && <Check className="h-5 w-5 text-green-500" />}
-      {isIncorrect && <X className="h-5 w-5 text-red-500" />}
+      <span className="text-sm sm:text-base flex-1 font-medium">{content}</span>
+      {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
+      {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
     </div>
   );
 }
@@ -99,22 +108,27 @@ interface DropZoneProps {
 function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({ id });
   
-  let borderClass = "border-dashed border-muted-foreground/30";
-  let bgClass = "bg-muted/30";
+  let borderClass = "border-dashed border-muted-foreground/40";
+  let bgClass = "bg-muted/20";
+  let shadowClass = "";
   
   if (isOver) {
-    borderClass = "border-dashed border-primary";
-    bgClass = "bg-primary/10";
+    borderClass = "border-dashed border-primary border-[3px]";
+    bgClass = "bg-primary/15";
+    shadowClass = "shadow-lg shadow-primary/20";
   } else if (placedItem) {
     if (isCorrect) {
       borderClass = "border-solid border-green-500";
-      bgClass = "bg-green-50 dark:bg-green-950/20";
+      bgClass = "bg-green-50 dark:bg-green-950/30";
+      shadowClass = "shadow-md shadow-green-500/20";
     } else if (isIncorrect) {
       borderClass = "border-solid border-red-500";
-      bgClass = "bg-red-50 dark:bg-red-950/20";
+      bgClass = "bg-red-50 dark:bg-red-950/30";
+      shadowClass = "shadow-md shadow-red-500/20";
     } else {
       borderClass = "border-solid border-primary";
-      bgClass = "bg-primary/5";
+      bgClass = "bg-primary/10";
+      shadowClass = "shadow-sm";
     }
   }
 
@@ -124,25 +138,30 @@ function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZonePro
       data-testid={`drop-zone-${id}`}
       className={`
         min-h-[60px] sm:min-h-[72px] p-3 sm:p-4 rounded-lg border-2
-        ${borderClass} ${bgClass}
-        flex items-center justify-center transition-all
+        ${borderClass} ${bgClass} ${shadowClass}
+        flex items-center justify-center transition-all duration-200
       `}
     >
       {placedItem ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-testid={`placed-item-${placedItem.id}`}>
           {placedItem.imageUrl && (
             <img 
               src={placedItem.imageUrl} 
               alt={placedItem.content} 
-              className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded"
+              className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded border border-border"
             />
           )}
           <span className="text-sm sm:text-base font-medium">{placedItem.content}</span>
-          {isCorrect && <Check className="h-4 w-4 text-green-500" />}
-          {isIncorrect && <X className="h-4 w-4 text-red-500" />}
+          {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
+          {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
         </div>
       ) : (
-        <span className="text-xs sm:text-sm text-muted-foreground">{label}</span>
+        <div className="flex flex-col items-center gap-1">
+          <div className="w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+            <span className="text-muted-foreground/50 text-lg">+</span>
+          </div>
+          <span className="text-xs sm:text-sm text-muted-foreground font-medium">{label}</span>
+        </div>
       )}
     </div>
   );

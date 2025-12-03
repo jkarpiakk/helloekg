@@ -70,20 +70,23 @@ export default function QuestionCard({
     const baseClass = "quiz-option !min-h-[48px] py-3 px-4 sm:p-4 lg:p-6 border-2 rounded-xl cursor-pointer transition-all touch-manipulation flex items-center";
     
     if (!showExplanation) {
-      return `${baseClass} border-border hover:shadow-lg hover:-translate-y-1`;
+      if (selectedAnswer === index) {
+        return `${baseClass} border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 shadow-lg`;
+      }
+      return `${baseClass} border-border hover:border-primary/50 hover:bg-primary/5 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]`;
     }
 
     if (selectedAnswer === index) {
       return quizResult?.isCorrect 
-        ? `${baseClass} correct border-green-500 bg-green-500 text-white`
-        : `${baseClass} incorrect border-red-500 bg-red-500 text-white`;
+        ? `${baseClass} correct border-green-500 bg-green-500 text-white shadow-lg shadow-green-500/30`
+        : `${baseClass} incorrect border-red-500 bg-red-500 text-white shadow-lg shadow-red-500/30`;
     }
 
     if (quizResult && index === quizResult.correctIndex) {
-      return `${baseClass} correct border-green-500 bg-green-500 text-white`;
+      return `${baseClass} correct border-green-500 bg-green-500 text-white shadow-lg shadow-green-500/30`;
     }
 
-    return `${baseClass} neutral border-muted-foreground bg-muted-foreground text-white`;
+    return `${baseClass} border-muted bg-muted/50 text-muted-foreground opacity-60`;
   };
 
   return (

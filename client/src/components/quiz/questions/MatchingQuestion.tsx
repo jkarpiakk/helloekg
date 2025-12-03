@@ -69,38 +69,38 @@ export default function MatchingQuestion({
   }, [disabled, selectedLeft, pairs, onChange]);
 
   const getLeftItemClass = (leftId: string) => {
-    const baseClass = "p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all touch-manipulation";
+    const baseClass = "p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 touch-manipulation";
     const isPaired = pairs.has(leftId);
     const isSelected = selectedLeft === leftId;
     
     if (showResult) {
       const isCorrect = result?.feedback?.correctItems?.includes(leftId);
       const isIncorrect = result?.feedback?.incorrectItems?.includes(leftId);
-      if (isCorrect) return `${baseClass} border-green-500 bg-green-50 dark:bg-green-950/20`;
-      if (isIncorrect) return `${baseClass} border-red-500 bg-red-50 dark:bg-red-950/20`;
-      return `${baseClass} border-muted bg-muted/30`;
+      if (isCorrect) return `${baseClass} border-green-500 bg-green-50 dark:bg-green-950/30 shadow-md shadow-green-500/20`;
+      if (isIncorrect) return `${baseClass} border-red-500 bg-red-50 dark:bg-red-950/30 shadow-md shadow-red-500/20`;
+      return `${baseClass} border-muted bg-muted/30 opacity-60`;
     }
     
-    if (isSelected) return `${baseClass} border-primary bg-primary/10 ring-2 ring-primary`;
-    if (isPaired) return `${baseClass} border-primary bg-primary/5`;
-    return `${baseClass} border-border hover:border-primary/50`;
+    if (isSelected) return `${baseClass} border-primary bg-primary/15 ring-2 ring-primary ring-offset-2 shadow-lg scale-[1.02]`;
+    if (isPaired) return `${baseClass} border-primary bg-primary/10 shadow-sm`;
+    return `${baseClass} border-border hover:border-primary/50 hover:bg-primary/5 hover:shadow-md active:scale-[0.98]`;
   };
 
   const getRightItemClass = (rightId: string) => {
-    const baseClass = "p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all touch-manipulation";
+    const baseClass = "p-3 sm:p-4 rounded-lg border-2 transition-all duration-200 touch-manipulation";
     const isPaired = Array.from(pairs.values()).includes(rightId);
     
     if (showResult) {
-      return `${baseClass} border-muted bg-muted/30`;
+      return `${baseClass} border-muted bg-muted/30 opacity-60 cursor-default`;
     }
     
     if (!selectedLeft) {
-      if (isPaired) return `${baseClass} border-primary/30 bg-primary/5 cursor-default`;
-      return `${baseClass} border-border cursor-default`;
+      if (isPaired) return `${baseClass} border-primary/40 bg-primary/10 cursor-default shadow-sm`;
+      return `${baseClass} border-border cursor-default opacity-70`;
     }
     
-    if (isPaired) return `${baseClass} border-primary/30 bg-primary/5`;
-    return `${baseClass} border-border hover:border-primary/50`;
+    if (isPaired) return `${baseClass} border-primary/40 bg-primary/10 cursor-pointer`;
+    return `${baseClass} border-border cursor-pointer hover:border-primary hover:bg-primary/10 hover:shadow-md active:scale-[0.98]`;
   };
 
   const getConnectedRight = (leftId: string) => {
@@ -142,8 +142,8 @@ export default function MatchingQuestion({
                         />
                       )}
                       <span className="text-sm sm:text-base flex-1">{item.text}</span>
-                      {showResult && isCorrect && <Check className="h-5 w-5 text-green-500" />}
-                      {showResult && isIncorrect && <X className="h-5 w-5 text-red-500" />}
+                      {showResult && isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" data-testid={`match-correct-${item.id}`} />}
+                      {showResult && isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" data-testid={`match-incorrect-${item.id}`} />}
                       {connectedRight && !showResult && (
                         <Link2 className="h-4 w-4 text-primary" />
                       )}
@@ -189,8 +189,11 @@ export default function MatchingQuestion({
       </div>
 
       {selectedLeft && (
-        <div className="text-center text-sm text-muted-foreground animate-pulse">
-          Wybierz element z kolumny B, aby połączyć
+        <div 
+          className="text-center text-sm font-medium text-primary bg-primary/10 py-2 px-4 rounded-lg animate-pulse"
+          data-testid="matching-instruction"
+        >
+          👆 Wybierz element z kolumny B, aby połączyć
         </div>
       )}
 
