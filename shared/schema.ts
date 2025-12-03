@@ -216,6 +216,7 @@ export interface HotspotAnswer {
   type: 'hotspot';
   clickedHotspots: string[]; // IDs of clicked hotspots
   clickCoordinates?: { x: number; y: number }[]; // Actual click positions
+  clickedOutside?: boolean; // Whether user clicked outside any hotspot area
 }
 
 export type AnswerData = 

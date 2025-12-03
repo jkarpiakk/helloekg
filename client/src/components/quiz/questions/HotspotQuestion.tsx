@@ -60,12 +60,18 @@ export default function HotspotQuestion({
     const x = ((event.clientX - rect.left) / rect.width) * 100;
     const y = ((event.clientY - rect.top) / rect.height) * 100;
 
-    setClickCoordinates(prev => [...prev, { x, y }]);
+    const newCoordinates = config.allowMultiple 
+      ? [...clickCoordinates, { x, y }]
+      : [{ x, y }];
+    
+    setClickCoordinates(newCoordinates);
+
+    const newClickedHotspots = new Set(config.allowMultiple ? clickedHotspots : []);
+    let foundHotspot = false;
 
     for (const hotspot of config.hotspots) {
       if (isPointInHotspot(x, y, hotspot)) {
-        const newClickedHotspots = new Set(clickedHotspots);
-        
+        foundHotspot = true;
         if (config.allowMultiple) {
           if (newClickedHotspots.has(hotspot.id)) {
             newClickedHotspots.delete(hotspot.id);
@@ -76,18 +82,19 @@ export default function HotspotQuestion({
           newClickedHotspots.clear();
           newClickedHotspots.add(hotspot.id);
         }
-        
-        setClickedHotspots(newClickedHotspots);
-
-        const answerData: AnswerData = {
-          type: 'hotspot',
-          clickedHotspots: Array.from(newClickedHotspots),
-          clickCoordinates: [...clickCoordinates, { x, y }],
-        };
-        onChange(answerData);
-        return;
+        break;
       }
     }
+    
+    setClickedHotspots(newClickedHotspots);
+
+    const answerData: AnswerData = {
+      type: 'hotspot',
+      clickedHotspots: Array.from(newClickedHotspots),
+      clickCoordinates: newCoordinates,
+      clickedOutside: !foundHotspot,
+    };
+    onChange(answerData);
   }, [disabled, config, clickedHotspots, clickCoordinates, onChange]);
 
   const handleClear = () => {
@@ -205,6 +212,62 @@ export default function HotspotQuestion({
           preserveAspectRatio="none"
         >
           {config.hotspots.map(hotspot => renderHotspotOverlay(hotspot))}
+          
+          {/* Show click markers */}
+          {clickCoordinates.map((coord, idx) => {
+            const isInHotspot = config.hotspots.some(h => isPointInHotspot(coord.x, coord.y, h));
+            const isLastClick = idx === clickCoordinates.length - 1;
+            
+            return (
+              <g key={`click-${idx}`}>
+                {/* Outer ring for visibility */}
+                <circle
+                  cx={`${coord.x}%`}
+                  cy={`${coord.y}%`}
+                  r={isLastClick ? "2.5%" : "1.8%"}
+                  fill="none"
+                  stroke={showResult 
+                    ? (isInHotspot ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)")
+                    : "rgb(59, 130, 246)"}
+                  strokeWidth={isLastClick ? "0.8" : "0.5"}
+                  opacity={isLastClick ? 1 : 0.7}
+                />
+                {/* Inner dot */}
+                <circle
+                  cx={`${coord.x}%`}
+                  cy={`${coord.y}%`}
+                  r={isLastClick ? "1.2%" : "0.8%"}
+                  fill={showResult 
+                    ? (isInHotspot ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)")
+                    : "rgb(59, 130, 246)"}
+                  opacity={isLastClick ? 1 : 0.8}
+                />
+                {/* Crosshair for last click */}
+                {isLastClick && !showResult && (
+                  <>
+                    <line
+                      x1={`${coord.x - 3}%`}
+                      y1={`${coord.y}%`}
+                      x2={`${coord.x + 3}%`}
+                      y2={`${coord.y}%`}
+                      stroke="rgb(59, 130, 246)"
+                      strokeWidth="0.3"
+                      opacity="0.6"
+                    />
+                    <line
+                      x1={`${coord.x}%`}
+                      y1={`${coord.y - 3}%`}
+                      x2={`${coord.x}%`}
+                      y2={`${coord.y + 3}%`}
+                      stroke="rgb(59, 130, 246)"
+                      strokeWidth="0.3"
+                      opacity="0.6"
+                    />
+                  </>
+                )}
+              </g>
+            );
+          })}
         </svg>
 
         {showResult && config.hotspots.filter(h => h.isCorrect).map(hotspot => {
@@ -245,15 +308,17 @@ export default function HotspotQuestion({
 
       <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" data-testid="hotspot-status">
         <div className="flex items-center gap-2 text-sm font-medium">
-          <MousePointer2 className={`h-5 w-5 ${clickedHotspots.size > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-          <span className={clickedHotspots.size > 0 ? 'text-foreground' : 'text-muted-foreground'}>
-            {clickedHotspots.size === 0 
-              ? "Kliknij na obrazek, aby zaznaczyć" 
-              : `Zaznaczono: ${clickedHotspots.size} ${config.allowMultiple ? 'obszarów' : 'obszar'}`}
+          <MousePointer2 className={`h-5 w-5 ${clickCoordinates.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+          <span className={clickCoordinates.length > 0 ? 'text-foreground' : 'text-muted-foreground'}>
+            {clickCoordinates.length === 0 
+              ? "Kliknij na obrazek, aby zaznaczyć miejsce" 
+              : clickedHotspots.size > 0
+                ? `Zaznaczono obszar ${config.allowMultiple ? `(${clickedHotspots.size})` : ''}`
+                : "Zaznaczono miejsce poza obszarami"}
           </span>
         </div>
         
-        {!disabled && clickedHotspots.size > 0 && (
+        {!disabled && clickCoordinates.length > 0 && (
           <Button
             variant="outline"
             size="sm"
