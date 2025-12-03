@@ -108,28 +108,23 @@ export default function HotspotQuestion({
   };
 
   const renderHotspotOverlay = (hotspot: HotspotConfig['hotspots'][0]) => {
-    const isClicked = clickedHotspots.has(hotspot.id);
-    const isCorrect = result?.feedback?.correctItems?.includes(hotspot.id);
     const isIncorrect = result?.feedback?.incorrectItems?.includes(hotspot.id);
     
     let fillColor = 'transparent';
     let strokeColor = 'transparent';
     
-    if (showResult) {
-      if (hotspot.isCorrect) {
-        fillColor = 'rgba(34, 197, 94, 0.3)';
-        strokeColor = 'rgb(34, 197, 94)';
-      } else if (isIncorrect) {
-        fillColor = 'rgba(239, 68, 68, 0.3)';
-        strokeColor = 'rgb(239, 68, 68)';
-      }
-    } else if (isClicked) {
-      fillColor = 'rgba(59, 130, 246, 0.3)';
-      strokeColor = 'rgb(59, 130, 246)';
+    // Only show overlay after checking answer (showResult)
+    if (!showResult) return null;
+    
+    if (hotspot.isCorrect) {
+      fillColor = 'rgba(34, 197, 94, 0.3)';
+      strokeColor = 'rgb(34, 197, 94)';
+    } else if (isIncorrect) {
+      fillColor = 'rgba(239, 68, 68, 0.3)';
+      strokeColor = 'rgb(239, 68, 68)';
+    } else {
+      return null; // Don't show anything for non-clicked, non-correct hotspots
     }
-
-    const shouldShow = showResult || isClicked;
-    if (!shouldShow) return null;
 
     switch (hotspot.shape) {
       case 'rect': {
