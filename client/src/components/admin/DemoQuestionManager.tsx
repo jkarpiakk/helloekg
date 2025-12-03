@@ -313,7 +313,36 @@ export default function DemoQuestionManager() {
   };
 
   const handleImageUpload = async (file: File): Promise<string> => {
-    return URL.createObjectURL(file);
+    try {
+      // 1. Get signed upload URL from server
+      const uploadResponse = await apiRequest("POST", "/api/admin/upload");
+      const { uploadURL } = await uploadResponse.json();
+      
+      // 2. Upload file directly to object storage
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+      
+      // 3. Set public ACL and get permanent path
+      const aclResponse = await apiRequest("PUT", "/api/admin/images", {
+        imageURL: uploadURL,
+      });
+      const { objectPath } = await aclResponse.json();
+      
+      return objectPath;
+    } catch (error) {
+      console.error("Image upload error:", error);
+      toast({
+        title: "Błąd uploadu",
+        description: "Nie udało się przesłać obrazka. Spróbuj ponownie.",
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
 
   if (isLoading) {
