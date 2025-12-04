@@ -107,33 +107,32 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Dashboard Header - ultra compact on mobile */}
+      {/* Dashboard Header */}
       <div className="bg-card border-b border-border">
-        <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-lg sm:text-2xl font-bold text-foreground tracking-tight" data-testid="welcome-message">
+              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground" data-testid="welcome-message">
                 {t("dashboard.welcome")}, {user?.firstName}!
               </h1>
-              <p className="text-xs sm:text-base text-muted-foreground">{t("dashboard.continueWhere")}</p>
+              <p className="text-sm md:text-base text-muted-foreground">{t("dashboard.continueWhere")}</p>
             </div>
-            <div className="flex items-center flex-wrap gap-2">
-              {subscription && (
-                <div className="bg-chart-2/10 text-chart-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-chart-2/20 text-[11px] sm:text-sm">
-                  <Crown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 inline" />
-                  <span className="hidden sm:inline">Plan do </span>
-                  {new Date(subscription.endDate).toLocaleDateString('pl-PL')}
-                </div>
-              )}
-            </div>
+            {subscription && (
+              <div className="bg-chart-2/10 text-chart-2 px-3 md:px-4 py-2 rounded-lg border border-chart-2/20 text-xs md:text-sm inline-flex items-center self-start md:self-auto">
+                <Crown className="h-4 w-4 mr-2" />
+                <span className="hidden md:inline">Plan aktywny do </span>
+                <span className="md:hidden">Do </span>
+                {new Date(subscription.endDate).toLocaleDateString('pl-PL')}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-6">
-        <div className="grid lg:grid-cols-[2fr_1fr] gap-3 sm:gap-6 lg:gap-8">
-          {/* Main content */}
-          <div className="space-y-3 sm:space-y-6 lg:space-y-8">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-8">
+        <div className="grid lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
+          {/* Main content - 2 columns on large screens */}
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
             {/* Progress Overview */}
             <ProgressCard
               overallProgress={overallProgress}
