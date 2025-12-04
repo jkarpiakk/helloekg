@@ -1,6 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useTranslation } from "@/lib/i18n";
-import { Target, Flame } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Target, Flame, TrendingUp } from "lucide-react";
 
 interface ProgressCardProps {
   overallProgress: number;
@@ -9,64 +8,67 @@ interface ProgressCardProps {
 }
 
 export default function ProgressCard({ overallProgress, successRate, streak }: ProgressCardProps) {
-  const { t } = useTranslation();
+  const ringSize = 56;
+  const strokeWidth = 5;
+  const radius = (ringSize - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (circumference * overallProgress / 100);
 
   return (
-    <Card>
-      <CardHeader className="pb-2 sm:pb-4">
-        <CardTitle className="text-base sm:text-lg">{t("dashboard.overallProgress")}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {/* Mobile: horizontal compact layout */}
-        <div className="flex items-center gap-4 sm:hidden">
-          {/* Progress ring - smaller on mobile */}
-          <div className="relative w-20 h-20 flex-shrink-0">
-            <svg className="w-20 h-20 progress-ring" data-testid="progress-ring">
+    <Card className="overflow-hidden">
+      <CardContent className="px-3 py-3 sm:px-6 sm:py-5">
+        {/* Mobile: ultra-compact horizontal layout */}
+        <div className="flex items-center gap-3 sm:hidden">
+          {/* Progress ring - 56px */}
+          <div className="relative flex-shrink-0" style={{ width: ringSize, height: ringSize }}>
+            <svg width={ringSize} height={ringSize} className="progress-ring -rotate-90" data-testid="progress-ring-mobile">
               <circle 
-                cx="40" 
-                cy="40" 
-                r="32" 
+                cx={ringSize/2} 
+                cy={ringSize/2} 
+                r={radius} 
                 stroke="var(--border)" 
-                strokeWidth="6" 
+                strokeWidth={strokeWidth} 
                 fill="none"
               />
               <circle 
-                cx="40" 
-                cy="40" 
-                r="32" 
+                cx={ringSize/2} 
+                cy={ringSize/2} 
+                r={radius} 
                 stroke="var(--primary)" 
-                strokeWidth="6" 
+                strokeWidth={strokeWidth} 
                 fill="none"
+                strokeLinecap="round"
                 className="progress-ring-circle"
                 style={{ 
-                  strokeDashoffset: 201 - (201 * overallProgress / 100)
+                  strokeDasharray: circumference,
+                  strokeDashoffset: offset
                 }}
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-bold text-primary" data-testid="overall-progress-mobile">
+              <span className="text-sm font-bold text-primary" data-testid="overall-progress-mobile">
                 {Math.round(overallProgress)}%
               </span>
             </div>
           </div>
           
-          {/* Stats in column */}
-          <div className="flex-1 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-chart-2" />
-                <span className="text-sm text-muted-foreground">Skuteczność</span>
+          {/* Stats grid - 2 columns */}
+          <div className="flex-1 grid grid-cols-2 gap-2">
+            <div className="flex flex-col items-center bg-muted/30 rounded-lg py-2 px-1">
+              <div className="flex items-center gap-1 mb-0.5">
+                <Target className="h-3 w-3 text-chart-2" />
+                <span className="text-[10px] text-muted-foreground tracking-tight">Celność</span>
               </div>
-              <span className="text-lg font-bold text-chart-2" data-testid="success-rate-mobile">
+              <span className="text-base font-bold text-chart-2" data-testid="success-rate-mobile">
                 {Math.round(successRate)}%
               </span>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Flame className="h-4 w-4 text-chart-3" />
-                <span className="text-sm text-muted-foreground">Dni z rzędu</span>
+            <div className="flex flex-col items-center bg-muted/30 rounded-lg py-2 px-1">
+              <div className="flex items-center gap-1 mb-0.5">
+                <Flame className="h-3 w-3 text-chart-3" />
+                <span className="text-[10px] text-muted-foreground tracking-tight">Seria</span>
               </div>
-              <span className="text-lg font-bold text-chart-3" data-testid="streak-count-mobile">
+              <span className="text-base font-bold text-chart-3" data-testid="streak-count-mobile">
                 {streak}
               </span>
             </div>
@@ -74,55 +76,66 @@ export default function ProgressCard({ overallProgress, successRate, streak }: P
         </div>
 
         {/* Desktop: 3 column grid */}
-        <div className="hidden sm:grid sm:grid-cols-3 gap-6">
+        <div className="hidden sm:grid sm:grid-cols-3 gap-4 lg:gap-6">
           {/* Overall progress */}
           <div className="text-center">
-            <div className="relative w-24 h-24 mx-auto mb-4">
-              <svg className="w-24 h-24 progress-ring" data-testid="progress-ring">
+            <div className="relative w-20 h-20 lg:w-24 lg:h-24 mx-auto mb-3">
+              <svg className="w-full h-full progress-ring -rotate-90" data-testid="progress-ring">
                 <circle 
-                  cx="48" 
-                  cy="48" 
-                  r="40" 
+                  cx="50%" 
+                  cy="50%" 
+                  r="38%" 
                   stroke="var(--border)" 
                   strokeWidth="8" 
                   fill="none"
                 />
                 <circle 
-                  cx="48" 
-                  cy="48" 
-                  r="40" 
+                  cx="50%" 
+                  cy="50%" 
+                  r="38%" 
                   stroke="var(--primary)" 
                   strokeWidth="8" 
                   fill="none"
+                  strokeLinecap="round"
                   className="progress-ring-circle"
                   style={{ 
-                    strokeDashoffset: 628 - (628 * overallProgress / 100)
+                    strokeDasharray: "239",
+                    strokeDashoffset: 239 - (239 * overallProgress / 100)
                   }}
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold text-primary" data-testid="overall-progress">
+                <span className="text-xl lg:text-2xl font-bold text-primary" data-testid="overall-progress">
                   {Math.round(overallProgress)}%
                 </span>
               </div>
             </div>
-            <p className="text-muted-foreground">{t("dashboard.overallProgress")}</p>
+            <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span className="text-xs lg:text-sm">Postęp</span>
+            </div>
           </div>
 
           {/* Accuracy */}
-          <div className="text-center">
-            <div className="text-3xl font-bold text-chart-2 mb-2" data-testid="success-rate">
+          <div className="text-center flex flex-col justify-center">
+            <div className="text-2xl lg:text-3xl font-bold text-chart-2 mb-1" data-testid="success-rate">
               {Math.round(successRate)}%
             </div>
-            <p className="text-muted-foreground">{t("dashboard.accuracy")}</p>
+            <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
+              <Target className="h-3.5 w-3.5" />
+              <span className="text-xs lg:text-sm">Skuteczność</span>
+            </div>
           </div>
 
           {/* Streak */}
-          <div className="text-center">
-            <div className="text-3xl font-bold text-chart-3 mb-2" data-testid="streak-count">
+          <div className="text-center flex flex-col justify-center">
+            <div className="text-2xl lg:text-3xl font-bold text-chart-3 mb-1" data-testid="streak-count">
               {streak}
             </div>
-            <p className="text-muted-foreground">{t("dashboard.streak")}</p>
+            <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
+              <Flame className="h-3.5 w-3.5" />
+              <span className="text-xs lg:text-sm">Dni z rzędu</span>
+            </div>
           </div>
         </div>
       </CardContent>
