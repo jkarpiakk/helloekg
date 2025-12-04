@@ -14,10 +14,10 @@ export default function ProgressCard({ overallProgress, successRate, streak }: P
         <CardTitle className="text-lg md:text-xl">Ogólny postęp</CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-4 md:px-6 md:pb-6">
-        {/* Mobile: vertical stack. Tablet+: horizontal */}
-        <div className="flex flex-col gap-4 xs:flex-row xs:items-center md:gap-6">
+        {/* Mobile: vertical stack. sm+: horizontal */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center md:gap-6">
           {/* Progress Ring */}
-          <div className="relative flex-shrink-0 w-20 h-20 md:w-24 md:h-24 mx-auto xs:mx-0">
+          <div className="relative flex-shrink-0 w-20 h-20 md:w-24 md:h-24 mx-auto sm:mx-0">
             <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
               <circle 
                 cx="50" 
@@ -50,8 +50,8 @@ export default function ProgressCard({ overallProgress, successRate, streak }: P
             </div>
           </div>
           
-          {/* Stats - stack on smallest screens, side by side on xs+ */}
-          <div className="w-full xs:flex-1 grid grid-cols-2 gap-3 md:gap-4">
+          {/* Stats - stack vertically on smallest screens, side by side on sm+ */}
+          <div className="w-full sm:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <div className="bg-muted/40 rounded-lg p-3 md:p-4 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <Target className="h-5 w-5 flex-shrink-0 text-chart-2" />
