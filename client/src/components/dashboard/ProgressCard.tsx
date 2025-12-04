@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "@/lib/i18n";
+import { Target, Flame } from "lucide-react";
 
 interface ProgressCardProps {
   overallProgress: number;
@@ -12,11 +13,68 @@ export default function ProgressCard({ overallProgress, successRate, streak }: P
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t("dashboard.overallProgress")}</CardTitle>
+      <CardHeader className="pb-2 sm:pb-4">
+        <CardTitle className="text-base sm:text-lg">{t("dashboard.overallProgress")}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid md:grid-cols-3 gap-6">
+        {/* Mobile: horizontal compact layout */}
+        <div className="flex items-center gap-4 sm:hidden">
+          {/* Progress ring - smaller on mobile */}
+          <div className="relative w-20 h-20 flex-shrink-0">
+            <svg className="w-20 h-20 progress-ring" data-testid="progress-ring">
+              <circle 
+                cx="40" 
+                cy="40" 
+                r="32" 
+                stroke="var(--border)" 
+                strokeWidth="6" 
+                fill="none"
+              />
+              <circle 
+                cx="40" 
+                cy="40" 
+                r="32" 
+                stroke="var(--primary)" 
+                strokeWidth="6" 
+                fill="none"
+                className="progress-ring-circle"
+                style={{ 
+                  strokeDashoffset: 201 - (201 * overallProgress / 100)
+                }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-lg font-bold text-primary" data-testid="overall-progress-mobile">
+                {Math.round(overallProgress)}%
+              </span>
+            </div>
+          </div>
+          
+          {/* Stats in column */}
+          <div className="flex-1 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-chart-2" />
+                <span className="text-sm text-muted-foreground">Skuteczność</span>
+              </div>
+              <span className="text-lg font-bold text-chart-2" data-testid="success-rate-mobile">
+                {Math.round(successRate)}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Flame className="h-4 w-4 text-chart-3" />
+                <span className="text-sm text-muted-foreground">Dni z rzędu</span>
+              </div>
+              <span className="text-lg font-bold text-chart-3" data-testid="streak-count-mobile">
+                {streak}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop: 3 column grid */}
+        <div className="hidden sm:grid sm:grid-cols-3 gap-6">
           {/* Overall progress */}
           <div className="text-center">
             <div className="relative w-24 h-24 mx-auto mb-4">
