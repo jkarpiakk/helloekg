@@ -113,7 +113,7 @@ export default function StudentDashboard() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground" data-testid="welcome-message">
-                {t("dashboard.welcome")}, {user?.firstName}!
+                {t("dashboard.welcome")}, {user?.firstName}! 🔄
               </h1>
               <p className="text-base text-muted-foreground">{t("dashboard.continueWhere")}</p>
             </div>
