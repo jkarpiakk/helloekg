@@ -64,9 +64,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: true, // Always true - Replit uses HTTPS proxy
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'none', // Required for iframe/cross-site (Replit webview)
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     }
   }));
