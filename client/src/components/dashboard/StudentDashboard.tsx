@@ -113,7 +113,7 @@ export default function StudentDashboard() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground" data-testid="welcome-message">
-                {t("dashboard.welcome")}, {user?.firstName}! 🔄
+                {t("dashboard.welcome")}, {user?.firstName}!
               </h1>
               <p className="text-base text-muted-foreground">{t("dashboard.continueWhere")}</p>
             </div>
@@ -146,26 +146,20 @@ export default function StudentDashboard() {
                 <CardTitle className="text-lg md:text-xl">{t("dashboard.continue")}</CardTitle>
               </CardHeader>
               <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
-                <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:gap-6">
+                <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4">
                   {/* Interactive Lecture */}
                   <Link href="/lecture" className="block">
-                    <div className="p-4 md:p-5 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5 touch-manipulation">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4 md:flex-col md:gap-3">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <div className="p-4 border border-border rounded-xl hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5 touch-manipulation">
+                      <div className="space-y-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                           <Heart className="h-6 w-6 text-primary animate-pulse" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-1 md:mb-2">
-                            <h3 className="text-base md:text-lg font-semibold text-foreground">Interaktywny wykład</h3>
-                            <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-base px-2.5 py-0.5 flex-shrink-0">NOWE</Badge>
-                          </div>
+                        <div>
+                          <h3 className="text-base font-semibold text-foreground mb-1">Interaktywny wykład</h3>
+                          <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-sm px-2 py-0.5 mb-2">NOWE</Badge>
                           <p className="text-base text-muted-foreground">
                             Podstawy EKG przez wizualne analogie
                           </p>
-                          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mt-2">
-                            <Clock className="h-4 w-4" />
-                            <span>45 min • 9 sekcji</span>
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -173,16 +167,14 @@ export default function StudentDashboard() {
 
                   {/* Continue where left off */}
                   <Link href="/quiz" className="block">
-                    <div className="p-4 md:p-5 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4 md:flex-col md:gap-3">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <div className="p-4 border border-border rounded-xl hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
+                      <div className="space-y-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                           <Play className="h-6 w-6 text-primary" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1 md:mb-2">
-                            <h3 className="text-base md:text-lg font-semibold text-foreground">Kontynuuj naukę</h3>
-                            <span className="text-base text-muted-foreground">Moduł 1</span>
-                          </div>
+                        <div>
+                          <h3 className="text-base font-semibold text-foreground mb-1">Kontynuuj naukę</h3>
+                          <p className="text-base text-muted-foreground">Moduł 1</p>
                           <p className="text-base text-muted-foreground">{t("dashboard.lastActivity")} 2h</p>
                         </div>
                       </div>
@@ -191,16 +183,14 @@ export default function StudentDashboard() {
 
                   {/* Review mistakes */}
                   <Link href="/quiz?mode=review" className="block">
-                    <div className="p-4 md:p-5 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4 md:flex-col md:gap-3">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-chart-3/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <div className="p-4 border border-border rounded-xl hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
+                      <div className="space-y-3">
+                        <div className="w-12 h-12 bg-chart-3/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
                           <RotateCcw className="h-6 w-6 text-chart-3" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1 md:mb-2">
-                            <h3 className="text-base md:text-lg font-semibold text-foreground">{t("dashboard.review")}</h3>
-                            <span className="text-base text-muted-foreground">5 pytań</span>
-                          </div>
+                        <div>
+                          <h3 className="text-base font-semibold text-foreground mb-1">{t("dashboard.review")}</h3>
+                          <p className="text-base text-muted-foreground">5 pytań</p>
                           <p className="text-base text-muted-foreground">{t("dashboard.strengthenKnowledge")}</p>
                         </div>
                       </div>
@@ -216,39 +206,43 @@ export default function StudentDashboard() {
                 <CardTitle className="text-lg md:text-xl">{t("dashboard.moduleProgress")}</CardTitle>
               </CardHeader>
               <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
-                <div className="space-y-3 md:space-y-4">
+                <div className="space-y-3">
                   {sections?.map((section, index) => (
                     <Link 
                       key={section.id} 
                       href={`/quiz?sectionId=${section.id}`}
                       className="block"
                     >
-                      <div className="flex items-center gap-4 p-4 border border-border rounded-lg hover:shadow-lg hover:border-primary/50 active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group touch-manipulation min-h-[60px]">
-                        <div className={`w-11 h-11 md:w-12 md:h-12 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform ${
-                          section.completionPercentage >= 100 
-                            ? 'bg-chart-2/10' 
-                            : section.completionPercentage > 0 
-                              ? 'bg-primary/10' 
-                              : 'bg-muted'
-                        }`}>
-                          <Play className={`h-5 w-5 ${
-                            section.completionPercentage >= 100 
-                              ? 'text-chart-2' 
-                              : section.completionPercentage > 0 
-                                ? 'text-primary' 
-                                : 'text-muted-foreground'
-                          }`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-base font-semibold text-foreground truncate">{section.title}</h4>
-                          <div className="flex items-center gap-3 mt-1.5">
+                      <div className="p-4 border border-border rounded-lg hover:shadow-lg hover:border-primary/50 active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
+                        <div className="space-y-3">
+                          {/* Title row */}
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform ${
+                              section.completionPercentage >= 100 
+                                ? 'bg-chart-2/10' 
+                                : section.completionPercentage > 0 
+                                  ? 'bg-primary/10' 
+                                  : 'bg-muted'
+                            }`}>
+                              <Play className={`h-5 w-5 ${
+                                section.completionPercentage >= 100 
+                                  ? 'text-chart-2' 
+                                  : section.completionPercentage > 0 
+                                    ? 'text-primary' 
+                                    : 'text-muted-foreground'
+                              }`} />
+                            </div>
+                            <h4 className="text-base font-semibold text-foreground">{section.title}</h4>
+                          </div>
+                          {/* Progress bar row */}
+                          <div className="flex items-center gap-3">
                             <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
                               <div 
                                 className="h-full bg-primary rounded-full transition-all"
                                 style={{ width: `${section.completionPercentage}%` }}
                               />
                             </div>
-                            <span className="text-base text-muted-foreground font-medium whitespace-nowrap min-w-[44px] text-right">
+                            <span className="text-base text-muted-foreground font-medium">
                               {Math.round(section.completionPercentage)}%
                             </span>
                           </div>
