@@ -150,19 +150,19 @@ export default function StudentDashboard() {
                   {/* Interactive Lecture */}
                   <Link href="/lecture" className="block">
                     <div className="p-4 md:p-5 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5 touch-manipulation">
-                      <div className="flex items-start gap-4 md:flex-col">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4 md:flex-col md:gap-3">
                         <div className="w-12 h-12 md:w-14 md:h-14 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                           <Heart className="h-6 w-6 text-primary animate-pulse" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 md:mt-3 md:mb-2">
+                          <div className="flex flex-wrap items-center gap-2 mb-1 md:mb-2">
                             <h3 className="text-base md:text-lg font-semibold text-foreground">Interaktywny wykład</h3>
                             <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-base px-2.5 py-0.5 flex-shrink-0">NOWE</Badge>
                           </div>
-                          <p className="text-base text-muted-foreground md:mb-3 mt-1">
+                          <p className="text-base text-muted-foreground">
                             Podstawy EKG przez wizualne analogie
                           </p>
-                          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mt-2">
                             <Clock className="h-4 w-4" />
                             <span>45 min • 9 sekcji</span>
                           </div>
@@ -174,16 +174,16 @@ export default function StudentDashboard() {
                   {/* Continue where left off */}
                   <Link href="/quiz" className="block">
                     <div className="p-4 md:p-5 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                      <div className="flex items-start gap-4 md:flex-col">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4 md:flex-col md:gap-3">
                         <div className="w-12 h-12 md:w-14 md:h-14 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                           <Play className="h-6 w-6 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 md:mt-3 md:mb-2">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1 md:mb-2">
                             <h3 className="text-base md:text-lg font-semibold text-foreground">Kontynuuj naukę</h3>
                             <span className="text-base text-muted-foreground">Moduł 1</span>
                           </div>
-                          <p className="text-base text-muted-foreground mt-1">{t("dashboard.lastActivity")} 2h</p>
+                          <p className="text-base text-muted-foreground">{t("dashboard.lastActivity")} 2h</p>
                         </div>
                       </div>
                     </div>
@@ -192,16 +192,16 @@ export default function StudentDashboard() {
                   {/* Review mistakes */}
                   <Link href="/quiz?mode=review" className="block">
                     <div className="p-4 md:p-5 border border-border rounded-xl hover:shadow-lg active:shadow-xl active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                      <div className="flex items-start gap-4 md:flex-col">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4 md:flex-col md:gap-3">
                         <div className="w-12 h-12 md:w-14 md:h-14 bg-chart-3/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                           <RotateCcw className="h-6 w-6 text-chart-3" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 md:mt-3 md:mb-2">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1 md:mb-2">
                             <h3 className="text-base md:text-lg font-semibold text-foreground">{t("dashboard.review")}</h3>
                             <span className="text-base text-muted-foreground">5 pytań</span>
                           </div>
-                          <p className="text-base text-muted-foreground mt-1">{t("dashboard.strengthenKnowledge")}</p>
+                          <p className="text-base text-muted-foreground">{t("dashboard.strengthenKnowledge")}</p>
                         </div>
                       </div>
                     </div>

@@ -15,9 +15,9 @@ export default function ProgressCard({ overallProgress, successRate, streak }: P
       </CardHeader>
       <CardContent className="px-4 pb-4 md:px-6 md:pb-6">
         {/* Mobile: vertical stack. sm+: horizontal */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center md:gap-6">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center md:gap-6">
           {/* Progress Ring */}
-          <div className="relative flex-shrink-0 w-20 h-20 md:w-24 md:h-24 mx-auto sm:mx-0">
+          <div className="relative flex-shrink-0 w-20 h-20 md:w-24 md:h-24">
             <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
               <circle 
                 cx="50" 
