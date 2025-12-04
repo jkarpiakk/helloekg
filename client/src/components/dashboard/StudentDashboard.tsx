@@ -159,7 +159,7 @@ export default function StudentDashboard() {
                             <h3 className="text-base md:text-lg font-semibold text-foreground truncate">Interaktywny wykład</h3>
                             <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-base px-2.5 py-0.5">NOWE</Badge>
                           </div>
-                          <p className="text-base text-muted-foreground line-clamp-2 md:line-clamp-none md:mb-3">
+                          <p className="text-base text-muted-foreground md:mb-3">
                             Podstawy EKG przez wizualne analogie
                           </p>
                           <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mt-1">
