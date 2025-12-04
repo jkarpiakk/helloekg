@@ -142,57 +142,49 @@ export default function StudentDashboard() {
 
             {/* Continue Learning */}
             <Card>
-              <CardHeader className="pb-3 md:pb-4 px-4 md:px-6">
-                <CardTitle className="text-lg md:text-xl">{t("dashboard.continue")}</CardTitle>
+              <CardHeader className="pb-2 px-4 md:px-6 pt-4">
+                <CardTitle className="text-lg">{t("dashboard.continue")}</CardTitle>
               </CardHeader>
-              <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
-                <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4">
+              <CardContent className="px-4 md:px-6 pb-4">
+                <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3">
                   {/* Interactive Lecture */}
                   <Link href="/lecture" className="block">
-                    <div className="p-4 border border-border rounded-xl hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer group bg-gradient-to-br from-primary/5 to-chart-2/5 touch-manipulation">
-                      <div className="space-y-3">
-                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Heart className="h-6 w-6 text-primary animate-pulse" />
+                    <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:shadow-md active:scale-[0.98] transition-all cursor-pointer group bg-gradient-to-r from-primary/5 to-chart-2/5 touch-manipulation">
+                      <div className="w-11 h-11 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Heart className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-semibold text-foreground">Interaktywny wykład</h3>
+                          <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-xs px-1.5 py-0">NOWE</Badge>
                         </div>
-                        <div>
-                          <h3 className="text-base font-semibold text-foreground mb-1">Interaktywny wykład</h3>
-                          <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-sm px-2 py-0.5 mb-2">NOWE</Badge>
-                          <p className="text-base text-muted-foreground">
-                            Podstawy EKG przez wizualne analogie
-                          </p>
-                        </div>
+                        <p className="text-sm text-muted-foreground">Podstawy EKG</p>
                       </div>
                     </div>
                   </Link>
 
                   {/* Continue where left off */}
                   <Link href="/quiz" className="block">
-                    <div className="p-4 border border-border rounded-xl hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                      <div className="space-y-3">
-                        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Play className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-semibold text-foreground mb-1">Kontynuuj naukę</h3>
-                          <p className="text-base text-muted-foreground">Moduł 1</p>
-                          <p className="text-base text-muted-foreground">{t("dashboard.lastActivity")} 2h</p>
-                        </div>
+                    <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:shadow-md active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
+                      <div className="w-11 h-11 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Play className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-semibold text-foreground">Kontynuuj naukę</h3>
+                        <p className="text-sm text-muted-foreground">Moduł 1 • {t("dashboard.lastActivity")} 2h</p>
                       </div>
                     </div>
                   </Link>
 
                   {/* Review mistakes */}
                   <Link href="/quiz?mode=review" className="block">
-                    <div className="p-4 border border-border rounded-xl hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                      <div className="space-y-3">
-                        <div className="w-12 h-12 bg-chart-3/10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <RotateCcw className="h-6 w-6 text-chart-3" />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-semibold text-foreground mb-1">{t("dashboard.review")}</h3>
-                          <p className="text-base text-muted-foreground">5 pytań</p>
-                          <p className="text-base text-muted-foreground">{t("dashboard.strengthenKnowledge")}</p>
-                        </div>
+                    <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:shadow-md active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
+                      <div className="w-11 h-11 bg-chart-3/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <RotateCcw className="h-5 w-5 text-chart-3" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-semibold text-foreground">{t("dashboard.review")}</h3>
+                        <p className="text-sm text-muted-foreground">5 pytań do powtórki</p>
                       </div>
                     </div>
                   </Link>
@@ -202,49 +194,45 @@ export default function StudentDashboard() {
 
             {/* Module Progress */}
             <Card>
-              <CardHeader className="pb-3 md:pb-4 px-4 md:px-6">
-                <CardTitle className="text-lg md:text-xl">{t("dashboard.moduleProgress")}</CardTitle>
+              <CardHeader className="pb-2 px-4 md:px-6 pt-4">
+                <CardTitle className="text-lg">{t("dashboard.moduleProgress")}</CardTitle>
               </CardHeader>
-              <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
-                <div className="space-y-3">
-                  {sections?.map((section, index) => (
+              <CardContent className="px-4 md:px-6 pb-4">
+                <div className="space-y-2">
+                  {sections?.map((section) => (
                     <Link 
                       key={section.id} 
                       href={`/quiz?sectionId=${section.id}`}
                       className="block"
                     >
-                      <div className="p-4 border border-border rounded-lg hover:shadow-lg hover:border-primary/50 active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                        <div className="space-y-3">
-                          {/* Title row */}
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform ${
-                              section.completionPercentage >= 100 
-                                ? 'bg-chart-2/10' 
-                                : section.completionPercentage > 0 
-                                  ? 'bg-primary/10' 
-                                  : 'bg-muted'
-                            }`}>
-                              <Play className={`h-5 w-5 ${
-                                section.completionPercentage >= 100 
-                                  ? 'text-chart-2' 
-                                  : section.completionPercentage > 0 
-                                    ? 'text-primary' 
-                                    : 'text-muted-foreground'
-                              }`} />
-                            </div>
-                            <h4 className="text-base font-semibold text-foreground">{section.title}</h4>
-                          </div>
-                          {/* Progress bar row */}
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-primary rounded-full transition-all"
-                                style={{ width: `${section.completionPercentage}%` }}
-                              />
-                            </div>
-                            <span className="text-base text-muted-foreground font-medium">
+                      <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:shadow-md hover:border-primary/50 active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          section.completionPercentage >= 100 
+                            ? 'bg-chart-2/10' 
+                            : section.completionPercentage > 0 
+                              ? 'bg-primary/10' 
+                              : 'bg-muted'
+                        }`}>
+                          <Play className={`h-5 w-5 ${
+                            section.completionPercentage >= 100 
+                              ? 'text-chart-2' 
+                              : section.completionPercentage > 0 
+                                ? 'text-primary' 
+                                : 'text-muted-foreground'
+                          }`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <h4 className="text-sm font-medium text-foreground">{section.title}</h4>
+                            <span className="text-sm text-muted-foreground font-medium flex-shrink-0">
                               {Math.round(section.completionPercentage)}%
                             </span>
+                          </div>
+                          <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${section.completionPercentage}%` }}
+                            />
                           </div>
                         </div>
                       </div>
@@ -256,45 +244,35 @@ export default function StudentDashboard() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-4 md:space-y-6">
+          <div className="space-y-3">
             {/* Certificate Section */}
             <Card>
-              <CardHeader className="pb-3 md:pb-4 px-4 md:px-6">
-                <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-                  <Award className="h-5 w-5 text-chart-2" />
+              <CardHeader className="pb-2 px-4 pt-4">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Award className="h-4 w-4 text-chart-2" />
                   Certyfikat
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
+              <CardContent className="px-4 pb-4">
                 {myCertificates && myCertificates.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="p-4 bg-chart-2/10 border border-chart-2/20 rounded-lg">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="text-lg font-semibold text-foreground">EKG Academy</h4>
-                          <p className="text-base text-muted-foreground">
-                            {new Date(myCertificates[0].issuedAt).toLocaleDateString('pl-PL')}
-                          </p>
-                        </div>
-                        <CheckCircle className="h-6 w-6 text-chart-2" />
-                      </div>
-                      <Link href={`/certificate/${myCertificates[0].certificateId}`}>
-                        <Button className="w-full h-11 text-base" data-testid="button-view-certificate">
-                          Zobacz certyfikat
-                        </Button>
-                      </Link>
+                  <div className="flex items-center gap-3 p-3 bg-chart-2/10 border border-chart-2/20 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-chart-2 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">EKG Academy</p>
+                      <p className="text-xs text-muted-foreground">{new Date(myCertificates[0].issuedAt).toLocaleDateString('pl-PL')}</p>
                     </div>
+                    <Link href={`/certificate/${myCertificates[0].certificateId}`}>
+                      <Button size="sm" className="h-9" data-testid="button-view-certificate">Zobacz</Button>
+                    </Link>
                   </div>
                 ) : certificateEligibility?.isEligible ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 p-4 bg-chart-2/10 border border-chart-2/20 rounded-lg">
-                      <CheckCircle className="h-6 w-6 text-chart-2 flex-shrink-0" />
-                      <p className="text-base text-chart-2 font-medium">
-                        Możesz otrzymać certyfikat!
-                      </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-3 bg-chart-2/10 border border-chart-2/20 rounded-lg">
+                      <CheckCircle className="h-4 w-4 text-chart-2" />
+                      <p className="text-sm text-chart-2 font-medium">Możesz otrzymać certyfikat!</p>
                     </div>
                     <Button 
-                      className="w-full h-11 text-base" 
+                      className="w-full h-10" 
                       onClick={() => generateCertificateMutation.mutate()}
                       disabled={generateCertificateMutation.isPending}
                       data-testid="button-generate-certificate"
@@ -303,25 +281,23 @@ export default function StudentDashboard() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-                      <AlertCircle className="h-6 w-6 text-muted-foreground flex-shrink-0" />
-                      <p className="text-base text-muted-foreground">
-                        Ukończ wymagania
-                      </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Ukończ wymagania</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-muted/50 rounded-lg p-4 text-center">
-                        <div className={`text-2xl font-bold ${certificateEligibility?.completedModules === certificateEligibility?.totalModules ? "text-chart-2" : "text-foreground"}`}>
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-muted/50 rounded-lg p-3 text-center">
+                        <div className={`text-lg font-bold ${certificateEligibility?.completedModules === certificateEligibility?.totalModules ? "text-chart-2" : "text-foreground"}`}>
                           {certificateEligibility?.completedModules || 0}/{certificateEligibility?.totalModules || 0}
                         </div>
-                        <div className="text-base text-muted-foreground">Moduły</div>
+                        <div className="text-xs text-muted-foreground">Moduły</div>
                       </div>
-                      <div className="bg-muted/50 rounded-lg p-4 text-center">
-                        <div className={`text-2xl font-bold ${certificateEligibility?.successRate >= 0.8 ? "text-chart-2" : "text-foreground"}`}>
+                      <div className="flex-1 bg-muted/50 rounded-lg p-3 text-center">
+                        <div className={`text-lg font-bold ${certificateEligibility?.successRate >= 0.8 ? "text-chart-2" : "text-foreground"}`}>
                           {Math.round((certificateEligibility?.successRate || 0) * 100)}%
                         </div>
-                        <div className="text-base text-muted-foreground">Min. 80%</div>
+                        <div className="text-xs text-muted-foreground">Min. 80%</div>
                       </div>
                     </div>
                   </div>
@@ -331,16 +307,16 @@ export default function StudentDashboard() {
 
             {/* Weak areas */}
             <Card>
-              <CardHeader className="pb-3 md:pb-4 px-4 md:px-6">
-                <CardTitle className="text-lg md:text-xl">{t("dashboard.weakAreas")}</CardTitle>
+              <CardHeader className="pb-2 px-4 pt-4">
+                <CardTitle className="text-base">{t("dashboard.weakAreas")}</CardTitle>
               </CardHeader>
-              <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
-                <div className="space-y-3">
-                  {weakAreas.slice(0, 3).map((area, index) => (
-                    <div key={area.tag} className="flex items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg">
-                      <span className="text-base text-foreground truncate flex-1">{area.tag}</span>
+              <CardContent className="px-4 pb-4">
+                <div className="space-y-2">
+                  {weakAreas.slice(0, 3).map((area) => (
+                    <div key={area.tag} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+                      <span className="text-sm text-foreground flex-1 min-w-0">{area.tag}</span>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="w-20 h-2.5 bg-secondary rounded-full overflow-hidden">
+                        <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
                           <div 
                             className={`h-full rounded-full ${
                               area.successRate < 0.5 ? 'bg-destructive' : 
@@ -349,16 +325,14 @@ export default function StudentDashboard() {
                             style={{ width: `${area.successRate * 100}%` }}
                           />
                         </div>
-                        <span className="text-base text-muted-foreground w-12 text-right font-medium">
+                        <span className="text-sm text-muted-foreground w-10 text-right font-medium">
                           {Math.round(area.successRate * 100)}%
                         </span>
                       </div>
                     </div>
                   ))}
                   {weakAreas.length === 0 && (
-                    <p className="text-base text-muted-foreground text-center py-4">
-                      Brak słabych obszarów
-                    </p>
+                    <p className="text-sm text-muted-foreground text-center py-2">Brak słabych obszarów</p>
                   )}
                 </div>
               </CardContent>
@@ -366,22 +340,22 @@ export default function StudentDashboard() {
 
             {/* Quick stats */}
             <Card>
-              <CardHeader className="pb-3 md:pb-4 px-4 md:px-6">
-                <CardTitle className="text-lg md:text-xl">Statystyki</CardTitle>
+              <CardHeader className="pb-2 px-4 pt-4">
+                <CardTitle className="text-base">Statystyki</CardTitle>
               </CardHeader>
-              <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg">
-                    <span className="text-base text-muted-foreground">Rozwiązane pytania</span>
-                    <span className="text-xl font-bold text-foreground">{stats.totalAttempts}</span>
+              <CardContent className="px-4 pb-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                    <span className="text-sm text-muted-foreground">Rozwiązane pytania</span>
+                    <span className="text-base font-bold text-foreground">{stats.totalAttempts}</span>
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg">
-                    <span className="text-base text-muted-foreground">Średni czas</span>
-                    <span className="text-xl font-bold text-foreground">{Math.round(stats.avgTime / 1000)}s</span>
+                  <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                    <span className="text-sm text-muted-foreground">Średni czas</span>
+                    <span className="text-base font-bold text-foreground">{Math.round(stats.avgTime / 1000)}s</span>
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg">
-                    <span className="text-base text-muted-foreground">Obecna seria</span>
-                    <span className="text-xl font-bold text-foreground">{stats.streak}</span>
+                  <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                    <span className="text-sm text-muted-foreground">Obecna seria</span>
+                    <span className="text-base font-bold text-foreground">{stats.streak}</span>
                   </div>
                 </div>
               </CardContent>
