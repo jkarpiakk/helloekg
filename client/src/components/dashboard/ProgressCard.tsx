@@ -14,12 +14,13 @@ export default function ProgressCard({ overallProgress, successRate, streak }: P
         <CardTitle className="text-lg md:text-xl">Ogólny postęp</CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-4 md:px-6 md:pb-6">
-        {/* Mobile: stacked layout. sm+: side by side */}
-        <div className="space-y-4 sm:space-y-0 sm:flex sm:items-center sm:gap-6">
-          {/* Progress Ring - centered on mobile */}
-          <div className="flex justify-center sm:justify-start sm:flex-shrink-0">
-            <div className="relative w-20 h-20 md:w-24 md:h-24">
-              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+        {/* 3 boxes stacked on mobile, row on sm+ */}
+        <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
+          
+          {/* Box 1: Progress Ring */}
+          <div className="bg-muted/40 rounded-lg p-4 flex flex-col items-center justify-center">
+            <div className="relative w-20 h-20 mx-auto block">
+              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 block">
                 <circle 
                   cx="50" 
                   cy="50" 
@@ -45,34 +46,36 @@ export default function ProgressCard({ overallProgress, successRate, streak }: P
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-lg md:text-xl font-bold text-primary" data-testid="overall-progress">
+                <span className="text-lg font-bold text-primary" data-testid="overall-progress">
                   {Math.round(overallProgress)}%
                 </span>
               </div>
             </div>
+            <span className="text-base text-muted-foreground mt-2">Ukończono</span>
           </div>
-          
-          {/* Stats - stacked on mobile, side by side on sm+ */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:flex-1">
-            <div className="bg-muted/40 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Target className="h-5 w-5 flex-shrink-0 text-chart-2" />
-                <span className="text-base text-muted-foreground">Celność</span>
-              </div>
-              <span className="text-xl md:text-2xl font-bold text-chart-2" data-testid="success-rate">
-                {Math.round(successRate)}%
-              </span>
+
+          {/* Box 2: Celność */}
+          <div className="bg-muted/40 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="h-5 w-5 flex-shrink-0 text-chart-2" />
+              <span className="text-base text-muted-foreground">Celność</span>
             </div>
-            <div className="bg-muted/40 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Flame className="h-5 w-5 flex-shrink-0 text-chart-3" />
-                <span className="text-base text-muted-foreground">Seria</span>
-              </div>
-              <span className="text-xl md:text-2xl font-bold text-chart-3" data-testid="streak-count">
-                {streak} dni
-              </span>
-            </div>
+            <span className="text-2xl font-bold text-chart-2 block" data-testid="success-rate">
+              {Math.round(successRate)}%
+            </span>
           </div>
+
+          {/* Box 3: Seria */}
+          <div className="bg-muted/40 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Flame className="h-5 w-5 flex-shrink-0 text-chart-3" />
+              <span className="text-base text-muted-foreground">Seria</span>
+            </div>
+            <span className="text-2xl font-bold text-chart-3 block" data-testid="streak-count">
+              {streak} dni
+            </span>
+          </div>
+
         </div>
       </CardContent>
     </Card>
