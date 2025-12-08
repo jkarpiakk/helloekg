@@ -238,7 +238,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 safe-bottom">
         <div className="max-w-2xl w-full">
-          <div className="glass-card-light dark:glass-card rounded-2xl shadow-app-lg p-5 sm:p-6 lg:p-8 text-center motion-safe:animate-slide-up">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-app-lg p-5 sm:p-6 lg:p-8 text-center motion-safe:animate-slide-up border border-border/50 dark:border-slate-700/50">
             <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl mx-auto mb-6 flex items-center justify-center ${
               passed ? "bg-green-500/15 text-green-500 shadow-glow-success" : "bg-red-500/15 text-red-500"
             }`}>
@@ -255,11 +255,11 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
             </p>
 
             <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-              <div className="glass-card-light dark:glass-card p-4 sm:p-5 rounded-2xl shadow-app">
-                <div className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
+              <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl shadow-app border border-slate-200 dark:border-slate-700">
+                <div className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-1">
                   {examSummary.totalQuestions}
                 </div>
-                <div className="text-sm text-muted-foreground">Pytań</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Pytań</div>
               </div>
               <div className="stat-card-teal p-4 sm:p-5 rounded-2xl shadow-app">
                 <div className="text-2xl sm:text-3xl font-bold text-green-500 mb-1">
@@ -267,11 +267,11 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                 </div>
                 <div className="text-sm text-muted-foreground">Poprawnych</div>
               </div>
-              <div className="glass-card-light dark:glass-card p-4 sm:p-5 rounded-2xl shadow-app border-red-500/30">
+              <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl shadow-app border border-red-200 dark:border-red-900/50">
                 <div className="text-2xl sm:text-3xl font-bold text-red-500 mb-1">
                   {examSummary.totalQuestions - examSummary.correctAnswers}
                 </div>
-                <div className="text-sm text-muted-foreground">Błędnych</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">Błędnych</div>
               </div>
             </div>
 
@@ -323,7 +323,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   return (
     <div className="min-h-screen bg-background">
       {/* Quiz Header - Premium glass styling */}
-      <div className="sticky top-0 z-40 glass-card-light dark:glass-card shadow-app safe-top">
+      <div className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-app safe-top border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center space-x-3">

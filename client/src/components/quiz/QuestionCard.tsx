@@ -206,11 +206,11 @@ export default function QuestionCard({
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-4 sm:p-5 rounded-xl shadow-app border border-border/30 dark:border-slate-600/30"
+                  className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-xl shadow-app border border-slate-200 dark:border-slate-600"
                   data-testid="explanation-content"
                 >
                   <div 
-                    className="prose prose-base sm:prose-lg max-w-none [&>p]:text-foreground [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>ul]:text-foreground [&>ul]:text-base [&>ul]:sm:text-lg [&>ol]:text-foreground [&>ol]:text-base [&>ol]:sm:text-lg [&>h1]:text-foreground [&>h2]:text-foreground [&>h3]:text-foreground [&>strong]:text-foreground"
+                    className="prose prose-base sm:prose-lg max-w-none prose-slate dark:prose-invert [&>*]:text-slate-800 dark:[&>*]:text-slate-100 [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>strong]:text-slate-900 dark:[&>strong]:text-white [&>strong]:font-bold"
                     dangerouslySetInnerHTML={sanitizeMarkdown(quizResult.explanation)}
                   />
                 </div>
