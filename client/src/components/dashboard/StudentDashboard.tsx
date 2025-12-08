@@ -7,8 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import ProgressCard from "./ProgressCard";
-import { Play, RotateCcw, Crown, Award, Heart, CheckCircle, AlertCircle, Flame, ChevronRight, Target, Clock, HelpCircle
-} from "lucide-react";
+import { Play, RotateCcw, Crown, Award, Heart, CheckCircle, AlertCircle, Flame, ChevronRight, Target, Clock, HelpCircle, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { SectionWithProgress, UserProgress, WeakArea, Certificate } from "@/types";
@@ -340,96 +339,108 @@ export default function StudentDashboard() {
         </div>
       </div>
       
-      {/* ===== DESKTOP LAYOUT ===== */}
-      <div className="hidden md:block">
-        {/* Desktop Header */}
-        <div className="bg-card border-b border-border">
-          <div className="max-w-6xl lg:max-w-[min(92vw,1680px)] mx-auto px-4 md:px-6 lg:px-8 xl:px-12 py-4 md:py-6">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      {/* ===== DESKTOP PREMIUM LAYOUT ===== */}
+      <div className="hidden md:block min-h-screen bg-background">
+        {/* Premium Hero Header with Gradient */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 app-gradient-hero opacity-60" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-chart-2/10 rounded-full blur-3xl" />
+          
+          <div className="relative max-w-7xl mx-auto px-6 lg:px-8 xl:px-12 py-8 lg:py-10">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground" data-testid="welcome-message">
-                  {t("dashboard.welcome")}, {user?.firstName}!
+                <p className="text-sm font-medium text-muted-foreground mb-1">Witaj ponownie</p>
+                <h1 className="text-3xl lg:text-4xl font-bold text-foreground" data-testid="welcome-message">
+                  {user?.firstName}! 👋
                 </h1>
-                <p className="text-base text-muted-foreground">{t("dashboard.continueWhere")}</p>
+                <p className="text-base text-muted-foreground mt-1">{t("dashboard.continueWhere")}</p>
               </div>
-              {subscription && (
-                <div className="bg-chart-2/10 text-chart-2 px-4 py-2.5 rounded-lg border border-chart-2/20 text-base inline-flex items-center self-start md:self-auto">
-                  <Crown className="h-5 w-5 mr-2" />
-                  Plan aktywny do {new Date(subscription.endDate).toLocaleDateString('pl-PL')}
-                </div>
-              )}
+              <div className="flex items-center gap-4">
+                {stats.streak > 0 && (
+                  <div className="stat-card-orange rounded-2xl px-4 py-3 flex items-center gap-2">
+                    <Flame className="h-6 w-6 text-chart-3" />
+                    <div>
+                      <span className="text-2xl font-bold text-chart-3">{stats.streak}</span>
+                      <span className="text-sm text-muted-foreground ml-1">dni</span>
+                    </div>
+                  </div>
+                )}
+                {subscription && (
+                  <div className="stat-card-teal rounded-2xl px-4 py-3 flex items-center gap-2">
+                    <Crown className="h-5 w-5 text-chart-2" />
+                    <span className="text-sm font-medium text-chart-2">
+                      Do {new Date(subscription.endDate).toLocaleDateString('pl-PL')}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
         
         {/* Desktop Content */}
-        <div className="max-w-6xl lg:max-w-[min(92vw,1680px)] mx-auto px-4 md:px-6 lg:px-8 xl:px-12 py-8">
-          <div className="grid lg:grid-cols-[2fr_1fr] gap-6">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 xl:px-12 py-8">
+          <div className="grid lg:grid-cols-[1fr_380px] gap-8">
             {/* Main content */}
-            <div className="space-y-6">
-              {/* Progress Overview */}
+            <div className="space-y-8">
+              {/* Progress Overview - Premium Hero Card */}
               <ProgressCard
                 overallProgress={overallProgress}
                 successRate={stats.successRate * 100}
                 streak={stats.streak}
               />
               
-              {/* Continue Learning */}
-              <Card>
-                <CardHeader className="pb-2 px-6 pt-4">
-                  <CardTitle className="text-lg">{t("dashboard.continue")}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-6 pb-4">
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <Link href="/lecture" className="block">
-                      <div className="h-full p-4 border border-primary/20 rounded-xl bg-gradient-to-br from-primary/10 to-chart-2/5 hover:shadow-md transition-all cursor-pointer">
-                        <div className="w-11 h-11 bg-primary/20 rounded-xl flex items-center justify-center mb-3">
-                          <Heart className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-base font-semibold text-foreground">Interaktywny wykład</h3>
-                          <Badge className="bg-chart-2/20 text-chart-2 border-0 text-xs px-1.5 py-0">NOWE</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">Podstawy EKG</p>
+              {/* Quick Actions - Premium Tiles */}
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-4">Szybkie akcje</h2>
+                <div className="grid grid-cols-3 gap-4">
+                  <Link href="/lecture" className="block group">
+                    <div className="h-full p-6 bg-card border border-border rounded-2xl shadow-app hover:shadow-app-lg hover:border-primary/30 transition-all duration-300 cursor-pointer relative overflow-hidden">
+                      <div className="absolute top-3 right-3">
+                        <Badge className="bg-chart-2 text-chart-2-foreground border-0 text-xs px-2 py-0.5">NOWE</Badge>
                       </div>
-                    </Link>
-                    <Link href="/quiz" className="block">
-                      <div className="h-full p-4 border border-border rounded-xl hover:shadow-md hover:border-primary/30 transition-all cursor-pointer">
-                        <div className="w-11 h-11 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
-                          <Play className="h-5 w-5 text-primary" />
-                        </div>
-                        <h3 className="text-base font-semibold text-foreground mb-1">Kontynuuj naukę</h3>
-                        <p className="text-sm text-muted-foreground">Moduł 1 • Ostatnia aktywność: 2h</p>
+                      <div className="w-14 h-14 bg-gradient-to-br from-primary/20 to-chart-2/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Heart className="h-7 w-7 text-primary" />
                       </div>
-                    </Link>
-                    <Link href="/quiz?mode=review" className="block">
-                      <div className="h-full p-4 border border-chart-3/20 rounded-xl bg-gradient-to-br from-chart-3/5 to-transparent hover:shadow-md transition-all cursor-pointer">
-                        <div className="w-11 h-11 bg-chart-3/10 rounded-xl flex items-center justify-center mb-3">
-                          <RotateCcw className="h-5 w-5 text-chart-3" />
-                        </div>
-                        <h3 className="text-base font-semibold text-foreground mb-1">{t("dashboard.review")}</h3>
-                        <p className="text-sm text-muted-foreground">5 pytań do powtórki</p>
+                      <h3 className="text-lg font-semibold text-foreground mb-1">Interaktywny wykład</h3>
+                      <p className="text-sm text-muted-foreground">Podstawy EKG z wizualizacjami</p>
+                    </div>
+                  </Link>
+                  <Link href="/quiz" className="block group">
+                    <div className="h-full p-6 bg-card border border-border rounded-2xl shadow-app hover:shadow-app-lg hover:border-primary/30 transition-all duration-300 cursor-pointer">
+                      <div className="w-14 h-14 bg-primary/15 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Play className="h-7 w-7 text-primary" />
                       </div>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
+                      <h3 className="text-lg font-semibold text-foreground mb-1">Kontynuuj naukę</h3>
+                      <p className="text-sm text-muted-foreground">Wróć do ostatniego modułu</p>
+                    </div>
+                  </Link>
+                  <Link href="/quiz?mode=review" className="block group">
+                    <div className="h-full p-6 bg-card border border-chart-3/20 rounded-2xl shadow-app hover:shadow-app-lg hover:border-chart-3/40 transition-all duration-300 cursor-pointer bg-gradient-to-br from-chart-3/5 to-transparent">
+                      <div className="w-14 h-14 bg-chart-3/15 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <RotateCcw className="h-7 w-7 text-chart-3" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground mb-1">{t("dashboard.review")}</h3>
+                      <p className="text-sm text-muted-foreground">Powtórz trudne pytania</p>
+                    </div>
+                  </Link>
+                </div>
+              </div>
               
-              {/* Module Progress */}
-              <Card>
-                <CardHeader className="pb-2 px-6 pt-4">
-                  <CardTitle className="text-lg">{t("dashboard.moduleProgress")}</CardTitle>
-                </CardHeader>
-                <CardContent className="px-6 pb-4">
-                  <div className="space-y-3">
-                    {sections?.map((section) => (
+              {/* Module Progress - Premium Cards */}
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-4">{t("dashboard.moduleProgress")}</h2>
+                <div className="bg-card border border-border rounded-2xl shadow-app overflow-hidden">
+                  <div className="divide-y divide-border">
+                    {sections?.map((section, index) => (
                       <Link 
                         key={section.id} 
                         href={`/quiz?sectionId=${section.id}`}
                         className="block"
                       >
-                        <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:shadow-md hover:border-primary/50 active:scale-[0.98] transition-all cursor-pointer">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        <div className="flex items-center gap-4 p-5 hover:bg-muted/30 transition-colors cursor-pointer group">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                             section.completionPercentage >= 100 
                               ? 'bg-chart-2/15' 
                               : section.completionPercentage > 0 
@@ -437,162 +448,176 @@ export default function StudentDashboard() {
                                 : 'bg-muted'
                           }`}>
                             {section.completionPercentage >= 100 ? (
-                              <CheckCircle className="h-5 w-5 text-chart-2" />
+                              <CheckCircle className="h-6 w-6 text-chart-2" />
                             ) : (
-                              <Play className={`h-5 w-5 ${
-                                section.completionPercentage > 0 
-                                  ? 'text-primary' 
-                                  : 'text-muted-foreground'
-                              }`} />
+                              <span className="text-lg font-bold text-foreground">{index + 1}</span>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <h4 className="text-sm font-medium text-foreground line-clamp-1">{section.title}</h4>
-                              <span className="text-sm text-muted-foreground font-semibold flex-shrink-0">
+                            <div className="flex items-center justify-between gap-4 mb-2">
+                              <h4 className="text-base font-medium text-foreground line-clamp-1">{section.title}</h4>
+                              <span className={`text-sm font-semibold flex-shrink-0 ${
+                                section.completionPercentage >= 100 ? 'text-chart-2' : 'text-muted-foreground'
+                              }`}>
                                 {Math.round(section.completionPercentage)}%
                               </span>
                             </div>
-                            <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
                               <div 
-                                className={`h-full rounded-full transition-all ${
+                                className={`h-full rounded-full transition-all duration-500 ${
                                   section.completionPercentage >= 100 ? 'bg-chart-2' : 'bg-primary'
                                 }`}
                                 style={{ width: `${section.completionPercentage}%` }}
                               />
                             </div>
                           </div>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all flex-shrink-0" />
                         </div>
                       </Link>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
 
-            {/* Sidebar */}
-            <div className="space-y-3">
-              {/* Certificate Section */}
-              <Card>
-                <CardHeader className="pb-2 px-4 pt-4">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Award className="h-4 w-4 text-chart-2" />
-                    Certyfikat
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-4">
+            {/* Sidebar - Premium Cards */}
+            <div className="space-y-6">
+              {/* Certificate Section - Premium */}
+              <div className="bg-card border border-border rounded-2xl shadow-app overflow-hidden">
+                <div className="p-5 border-b border-border bg-gradient-to-r from-chart-2/5 to-transparent">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-chart-2/15 flex items-center justify-center">
+                      <Award className="h-5 w-5 text-chart-2" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Certyfikat</h3>
+                  </div>
+                </div>
+                <div className="p-5">
                   {myCertificates && myCertificates.length > 0 ? (
-                    <div className="flex items-center gap-3 p-3 bg-chart-2/10 border border-chart-2/20 rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-chart-2 flex-shrink-0" />
+                    <div className="flex items-center gap-4 p-4 stat-card-teal rounded-xl">
+                      <CheckCircle className="h-6 w-6 text-chart-2 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground">EKG Academy</p>
-                        <p className="text-xs text-muted-foreground">{new Date(myCertificates[0].issuedAt).toLocaleDateString('pl-PL')}</p>
+                        <p className="text-base font-medium text-foreground">EKG Academy</p>
+                        <p className="text-sm text-muted-foreground">{new Date(myCertificates[0].issuedAt).toLocaleDateString('pl-PL')}</p>
                       </div>
                       <Link href={`/certificate/${myCertificates[0].certificateId}`}>
-                        <Button size="sm" className="h-9" data-testid="button-view-certificate-desktop">Zobacz</Button>
+                        <Button size="sm" className="h-10" data-testid="button-view-certificate-desktop">Zobacz</Button>
                       </Link>
                     </div>
                   ) : certificateEligibility?.isEligible ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 p-3 bg-chart-2/10 border border-chart-2/20 rounded-lg">
-                        <CheckCircle className="h-4 w-4 text-chart-2" />
-                        <p className="text-sm text-chart-2 font-medium">Możesz otrzymać certyfikat!</p>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 p-4 stat-card-teal rounded-xl">
+                        <CheckCircle className="h-5 w-5 text-chart-2" />
+                        <p className="text-base text-chart-2 font-medium">Możesz otrzymać certyfikat!</p>
                       </div>
                       <Button 
-                        className="w-full h-10" 
+                        className="w-full h-12 text-base shadow-glow-success" 
                         onClick={() => generateCertificateMutation.mutate()}
                         disabled={generateCertificateMutation.isPending}
                         data-testid="button-generate-certificate-desktop"
                       >
-                        {generateCertificateMutation.isPending ? 'Generowanie...' : 'Generuj certyfikat'}
+                        {generateCertificateMutation.isPending ? 'Generowanie...' : '🎉 Generuj certyfikat'}
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                        <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Ukończ wymagania</p>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
+                        <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Ukończ wymagania aby zdobyć certyfikat</p>
                       </div>
-                      <div className="flex gap-2">
-                        <div className="flex-1 bg-muted/50 rounded-lg p-3 text-center">
-                          <div className={`text-lg font-bold ${certificateEligibility?.completedModules === certificateEligibility?.totalModules ? "text-chart-2" : "text-foreground"}`}>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-muted/30 rounded-xl p-4 text-center">
+                          <div className={`text-2xl font-bold mb-1 ${certificateEligibility?.completedModules === certificateEligibility?.totalModules ? "text-chart-2" : "text-foreground"}`}>
                             {certificateEligibility?.completedModules || 0}/{certificateEligibility?.totalModules || 0}
                           </div>
-                          <div className="text-xs text-muted-foreground">Moduły</div>
+                          <div className="text-xs text-muted-foreground font-medium">Moduły</div>
                         </div>
-                        <div className="flex-1 bg-muted/50 rounded-lg p-3 text-center">
-                          <div className={`text-lg font-bold ${certificateEligibility?.successRate >= 0.8 ? "text-chart-2" : "text-foreground"}`}>
+                        <div className="bg-muted/30 rounded-xl p-4 text-center">
+                          <div className={`text-2xl font-bold mb-1 ${certificateEligibility?.successRate >= 0.8 ? "text-chart-2" : "text-foreground"}`}>
                             {Math.round((certificateEligibility?.successRate || 0) * 100)}%
                           </div>
-                          <div className="text-xs text-muted-foreground">Min. 80%</div>
+                          <div className="text-xs text-muted-foreground font-medium">Min. 80%</div>
                         </div>
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              {/* Weak areas */}
-              <Card>
-                <CardHeader className="pb-2 px-4 pt-4">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Target className="h-4 w-4 text-chart-4" />
-                    {t("dashboard.weakAreas")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-4">
-                  <div className="space-y-2">
+              {/* Weak areas - Premium */}
+              <div className="bg-card border border-border rounded-2xl shadow-app overflow-hidden">
+                <div className="p-5 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-chart-4/15 flex items-center justify-center">
+                      <Target className="h-5 w-5 text-chart-4" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">{t("dashboard.weakAreas")}</h3>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <div className="space-y-3">
                     {weakAreas.slice(0, 3).map((area) => (
-                      <div key={area.tag} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-                        <span className="text-sm text-foreground flex-1 min-w-0">{area.tag}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div key={area.tag} className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                        <span className="text-sm text-foreground flex-1 min-w-0 truncate">{area.tag}</span>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
                             <div 
-                              className={`h-full rounded-full ${
+                              className={`h-full rounded-full transition-all ${
                                 area.successRate < 0.5 ? 'bg-destructive' : 
                                 area.successRate < 0.7 ? 'bg-chart-4' : 'bg-chart-2'
                               }`}
                               style={{ width: `${area.successRate * 100}%` }}
                             />
                           </div>
-                          <span className="text-sm text-muted-foreground w-10 text-right font-medium">
+                          <span className={`text-sm font-semibold w-12 text-right ${
+                            area.successRate < 0.5 ? 'text-destructive' : 
+                            area.successRate < 0.7 ? 'text-chart-4' : 'text-chart-2'
+                          }`}>
                             {Math.round(area.successRate * 100)}%
                           </span>
                         </div>
                       </div>
                     ))}
                     {weakAreas.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-2">Brak słabych obszarów</p>
+                      <div className="text-center py-6">
+                        <CheckCircle className="h-10 w-10 text-chart-2 mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">Świetnie! Brak słabych obszarów</p>
+                      </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              {/* Quick stats */}
-              <Card>
-                <CardHeader className="pb-2 px-4 pt-4">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <HelpCircle className="h-4 w-4 text-primary" />
-                    Statystyki
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-4 pb-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Rozwiązane pytania</span>
-                      <span className="text-base font-bold text-foreground">{stats.totalAttempts}</span>
+              {/* Quick stats - Premium Grid */}
+              <div className="bg-card border border-border rounded-2xl shadow-app overflow-hidden">
+                <div className="p-5 border-b border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Średni czas</span>
-                      <span className="text-base font-bold text-foreground">{Math.round(stats.avgTime / 1000)}s</span>
+                    <h3 className="text-lg font-semibold text-foreground">Statystyki</h3>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-muted/30 rounded-xl">
+                      <HelpCircle className="h-5 w-5 text-primary mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-foreground">{stats.totalAttempts}</div>
+                      <div className="text-xs text-muted-foreground font-medium">Pytań</div>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                      <span className="text-sm text-muted-foreground">Obecna seria</span>
-                      <span className="text-base font-bold text-chart-3">{stats.streak}</span>
+                    <div className="text-center p-4 bg-muted/30 rounded-xl">
+                      <Clock className="h-5 w-5 text-chart-4 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-foreground">{Math.round(stats.avgTime / 1000)}s</div>
+                      <div className="text-xs text-muted-foreground font-medium">Śr. czas</div>
+                    </div>
+                    <div className="text-center p-4 bg-muted/30 rounded-xl">
+                      <Target className="h-5 w-5 text-chart-2 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-chart-2">{Math.round(stats.successRate * 100)}%</div>
+                      <div className="text-xs text-muted-foreground font-medium">Celność</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </div>
         </div>
