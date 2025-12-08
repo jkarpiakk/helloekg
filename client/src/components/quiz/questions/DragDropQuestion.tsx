@@ -14,7 +14,7 @@ import {
   useDroppable,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { GripVertical, Check, X } from "lucide-react";
+import { GripVertical, Check, X, RotateCcw } from "lucide-react";
 import type { DragDropConfig, AnswerData, QuizResult } from "@/types";
 
 interface DragDropQuestionProps {
@@ -32,9 +32,10 @@ interface DraggableItemProps {
   disabled: boolean;
   isCorrect?: boolean;
   isIncorrect?: boolean;
+  isInDropZone?: boolean;
 }
 
-function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect }: DraggableItemProps) {
+function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect, isInDropZone }: DraggableItemProps) {
   const {
     attributes,
     listeners,
@@ -63,6 +64,10 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
     borderClass = "border-slate-200 dark:border-slate-700";
     bgClass = "bg-slate-100 dark:bg-slate-800/50";
     shadowClass = "";
+  } else if (isInDropZone) {
+    borderClass = "border-primary";
+    bgClass = "bg-primary/10";
+    shadowClass = "shadow-sm";
   }
 
   return (
@@ -100,12 +105,15 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
 interface DropZoneProps {
   id: string;
   label: string;
-  placedItem?: { id: string; content: string; imageUrl?: string };
+  children?: React.ReactNode;
+  isEmpty: boolean;
   isCorrect?: boolean;
   isIncorrect?: boolean;
+  onRemove?: () => void;
+  disabled?: boolean;
 }
 
-function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZoneProps) {
+function DropZone({ id, label, children, isEmpty, isCorrect, isIncorrect, onRemove, disabled }: DropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({ id });
   
   let borderClass = "border-dashed border-slate-400 dark:border-slate-500";
@@ -116,7 +124,7 @@ function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZonePro
     borderClass = "border-dashed border-primary border-[3px]";
     bgClass = "bg-primary/15";
     shadowClass = "shadow-lg shadow-primary/20";
-  } else if (placedItem) {
+  } else if (!isEmpty) {
     if (isCorrect) {
       borderClass = "border-solid border-green-500";
       bgClass = "bg-green-50 dark:bg-green-950/30";
@@ -126,8 +134,8 @@ function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZonePro
       bgClass = "bg-red-50 dark:bg-red-950/30";
       shadowClass = "shadow-md shadow-red-500/20";
     } else {
-      borderClass = "border-solid border-primary";
-      bgClass = "bg-primary/10";
+      borderClass = "border-solid border-primary/50";
+      bgClass = "bg-primary/5";
       shadowClass = "shadow-sm";
     }
   }
@@ -137,30 +145,34 @@ function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZonePro
       ref={setNodeRef}
       data-testid={`drop-zone-${id}`}
       className={`
-        min-h-[60px] sm:min-h-[72px] p-3 sm:p-4 rounded-lg border-2
+        min-h-[70px] sm:min-h-[80px] p-2 sm:p-3 rounded-lg border-2
         ${borderClass} ${bgClass} ${shadowClass}
-        flex items-center justify-center transition-all duration-200
+        flex items-center justify-center transition-all duration-200 relative
       `}
     >
-      {placedItem ? (
-        <div className="flex items-center gap-2" data-testid={`placed-item-${placedItem.id}`}>
-          {placedItem.imageUrl && (
-            <img 
-              src={placedItem.imageUrl} 
-              alt={placedItem.content} 
-              className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded border border-border"
-            />
-          )}
-          <span className="text-sm sm:text-base font-medium text-slate-900 dark:text-white">{placedItem.content}</span>
-          {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
-          {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
-        </div>
-      ) : (
+      {!isEmpty && !disabled && onRemove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-colors z-10"
+          data-testid={`remove-from-zone-${id}`}
+          title="Usuń element"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {isEmpty ? (
         <div className="flex flex-col items-center gap-1">
           <div className="w-8 h-8 rounded-full border-2 border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center">
             <span className="text-slate-400 dark:text-slate-500 text-lg">+</span>
           </div>
           <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium">{label}</span>
+        </div>
+      ) : (
+        <div className="w-full">
+          {children}
         </div>
       )}
     </div>
@@ -185,8 +197,8 @@ export default function DragDropQuestion({
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 5,
+        delay: 150,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -194,8 +206,12 @@ export default function DragDropQuestion({
     })
   );
 
+  const getPlacedItems = () => {
+    return new Set(Array.from(placements.values()));
+  };
+
   const availableSources = config.sources.filter(
-    source => !Array.from(placements.values()).includes(source.id)
+    source => !getPlacedItems().has(source.id)
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -211,14 +227,22 @@ export default function DragDropQuestion({
     const sourceId = active.id as string;
     const targetId = over.id as string;
 
+    // Check if dropping on a valid target
     if (config.targets.some(t => t.id === targetId)) {
       const newPlacements = new Map(placements);
       
+      // Remove this source from any previous placement
       Array.from(newPlacements.entries()).forEach(([key, value]) => {
         if (value === sourceId) {
           newPlacements.delete(key);
         }
       });
+      
+      // If target already has something, move it back to available
+      // (just delete the placement, it will appear in availableSources)
+      if (newPlacements.has(targetId)) {
+        // The old item will automatically become available again
+      }
       
       newPlacements.set(targetId, sourceId);
       setPlacements(newPlacements);
@@ -234,6 +258,21 @@ export default function DragDropQuestion({
     }
   }, [placements, config.targets, onChange]);
 
+  const handleRemoveFromZone = useCallback((targetId: string) => {
+    const newPlacements = new Map(placements);
+    newPlacements.delete(targetId);
+    setPlacements(newPlacements);
+
+    const answerData: AnswerData = {
+      type: 'drag_drop',
+      placements: Array.from(newPlacements.entries()).map(([targetId, sourceId]) => ({
+        sourceId,
+        targetId,
+      })),
+    };
+    onChange(answerData);
+  }, [placements, onChange]);
+
   const activeSource = activeDragId 
     ? config.sources.find(s => s.id === activeDragId)
     : null;
@@ -241,7 +280,7 @@ export default function DragDropQuestion({
   return (
     <div className="space-y-4 sm:space-y-6">
       <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
-        Przeciągnij elementy do odpowiednich miejsc
+        Przeciągnij elementy do odpowiednich miejsc. Kliknij <X className="inline h-4 w-4 text-red-500" /> aby usunąć element.
       </p>
 
       <DndContext
@@ -251,6 +290,7 @@ export default function DragDropQuestion({
         onDragEnd={handleDragEnd}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          {/* Left side - available items */}
           <div className="space-y-3" data-testid="drag-sources">
             <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Elementy do przeciągnięcia
@@ -267,17 +307,18 @@ export default function DragDropQuestion({
               ))}
             </div>
             {availableSources.length === 0 && !showResult && (
-              <p className="text-sm text-slate-600 dark:text-slate-400 italic p-3">
-                Wszystkie elementy zostały rozmieszczone
-              </p>
+              <div className="text-sm text-slate-600 dark:text-slate-400 italic p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                ✓ Wszystkie elementy rozmieszczone
+              </div>
             )}
           </div>
 
+          {/* Right side - drop zones */}
           <div className="space-y-3" data-testid="drop-targets">
             <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Miejsca docelowe
             </h4>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {config.targets.map(target => {
                 const placedSourceId = placements.get(target.id);
                 const placedSource = placedSourceId 
@@ -288,19 +329,31 @@ export default function DragDropQuestion({
                 const isIncorrect = result?.feedback?.incorrectItems?.includes(placedSourceId || '');
 
                 return (
-                  <div key={target.id} className="space-y-1">
-                    <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">{target.label}</span>
+                  <div key={target.id} className="space-y-1.5">
+                    <span className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 block">
+                      {target.label}
+                    </span>
                     <DropZone
                       id={target.id}
                       label="Upuść tutaj"
-                      placedItem={placedSource ? {
-                        id: placedSource.id,
-                        content: placedSource.content,
-                        imageUrl: placedSource.imageUrl,
-                      } : undefined}
+                      isEmpty={!placedSource}
                       isCorrect={isCorrect}
                       isIncorrect={isIncorrect}
-                    />
+                      onRemove={() => handleRemoveFromZone(target.id)}
+                      disabled={disabled}
+                    >
+                      {placedSource && (
+                        <DraggableItem
+                          id={placedSource.id}
+                          content={placedSource.content}
+                          imageUrl={placedSource.imageUrl}
+                          disabled={disabled}
+                          isCorrect={isCorrect}
+                          isIncorrect={isIncorrect}
+                          isInDropZone={true}
+                        />
+                      )}
+                    </DropZone>
                   </div>
                 );
               })}
@@ -324,6 +377,14 @@ export default function DragDropQuestion({
           )}
         </DragOverlay>
       </DndContext>
+
+      {showResult && result?.partialScore !== undefined && result.partialScore < 1 && (
+        <div className="mt-4 p-3 sm:p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <p className="text-sm sm:text-base text-amber-800 dark:text-amber-200">
+            Poprawne umieszczenia: {Math.round(result.partialScore * 100)}%
+          </p>
+        </div>
+      )}
     </div>
   );
 }
