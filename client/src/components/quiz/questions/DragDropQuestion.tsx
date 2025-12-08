@@ -1,17 +1,17 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   DndContext,
-  closestCenter,
+  DragOverlay,
+  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
-  DragOverlay,
   DragStartEvent,
   useDroppable,
   useDraggable,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Check, X } from "lucide-react";
 import type { DragDropConfig, AnswerData, QuizResult } from "@/types";
 
@@ -23,28 +23,45 @@ interface DragDropQuestionProps {
   result?: QuizResult;
 }
 
+const SOURCE_PREFIX = "source:";
+const PLACED_PREFIX = "placed:";
+
+function parseId(id: string): { type: 'source' | 'placed'; sourceId: string; targetId?: string } {
+  if (id.startsWith(SOURCE_PREFIX)) {
+    return { type: 'source', sourceId: id.slice(SOURCE_PREFIX.length) };
+  }
+  if (id.startsWith(PLACED_PREFIX)) {
+    const rest = id.slice(PLACED_PREFIX.length);
+    const [targetId, sourceId] = rest.split(':');
+    return { type: 'placed', sourceId, targetId };
+  }
+  return { type: 'source', sourceId: id };
+}
+
 interface DraggableItemProps {
-  id: string;
+  dragId: string;
   content: string;
   imageUrl?: string;
   disabled: boolean;
   isCorrect?: boolean;
   isIncorrect?: boolean;
-  isBeingDragged?: boolean;
 }
 
-function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect, isBeingDragged }: DraggableItemProps) {
+function DraggableItem({ dragId, content, imageUrl, disabled, isCorrect, isIncorrect }: DraggableItemProps) {
   const {
     attributes,
     listeners,
     setNodeRef,
     transform,
     isDragging,
-  } = useDraggable({ id, disabled });
+  } = useDraggable({ 
+    id: dragId,
+    disabled,
+  });
 
   const style: React.CSSProperties = transform ? {
-    transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 1000 : undefined,
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    zIndex: isDragging ? 1000 : 1,
   } : {};
 
   let borderClass = "border-slate-300 dark:border-slate-600";
@@ -58,17 +75,15 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
     bgClass = "bg-red-50 dark:bg-red-950/30";
   }
 
-  const showAsGhost = isDragging || isBeingDragged;
-
   return (
     <div
       ref={setNodeRef}
       style={style}
-      data-testid={`draggable-item-${id}`}
+      data-testid={`draggable-item-${parseId(dragId).sourceId}`}
       className={`
         flex items-center gap-3 p-4 rounded-xl border-2 shadow-sm
         ${borderClass} ${bgClass}
-        ${showAsGhost ? "opacity-30" : ""}
+        ${isDragging ? "opacity-40 shadow-2xl" : ""}
         ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
         touch-manipulation select-none
       `}
@@ -94,21 +109,24 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
 
 interface DropZoneProps {
   id: string;
+  label: string;
   isOver: boolean;
-  children?: React.ReactNode;
-  isEmpty: boolean;
+  hasItem: boolean;
   isCorrect?: boolean;
   isIncorrect?: boolean;
+  children?: React.ReactNode;
 }
 
-function DropZone({ id, isOver, children, isEmpty, isCorrect, isIncorrect }: DropZoneProps) {
-  const { setNodeRef } = useDroppable({ id });
+function DropZone({ id, label, isOver, hasItem, isCorrect, isIncorrect, children }: DropZoneProps) {
+  const { setNodeRef, isOver: isOverThis } = useDroppable({ id });
+  
+  const isHighlighted = isOver || isOverThis;
   
   let containerClass = "border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30";
   
-  if (isOver) {
+  if (isHighlighted) {
     containerClass = "border-2 border-dashed border-primary bg-primary/10 ring-2 ring-primary/30";
-  } else if (!isEmpty) {
+  } else if (hasItem) {
     if (isCorrect) {
       containerClass = "border-2 border-solid border-green-500 bg-green-50 dark:bg-green-950/30";
     } else if (isIncorrect) {
@@ -119,24 +137,29 @@ function DropZone({ id, isOver, children, isEmpty, isCorrect, isIncorrect }: Dro
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      data-testid={`drop-zone-${id}`}
-      className={`min-h-[80px] p-2 rounded-xl transition-all duration-150 ${containerClass}`}
-    >
-      {isEmpty ? (
-        <div className="flex flex-col items-center justify-center h-full min-h-[64px] gap-1">
-          <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center">
-            <span className="text-slate-500 dark:text-slate-400 text-xl font-light">+</span>
+    <div className="space-y-2">
+      <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block">
+        {label}
+      </label>
+      <div
+        ref={setNodeRef}
+        data-testid={`drop-zone-${id}`}
+        className={`min-h-[80px] p-2 rounded-xl transition-colors duration-150 ${containerClass}`}
+      >
+        {children || (
+          <div className="flex flex-col items-center justify-center h-full min-h-[64px] gap-1">
+            <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center">
+              <span className="text-slate-500 dark:text-slate-400 text-xl font-light">+</span>
+            </div>
+            <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Upuść tutaj</span>
           </div>
-          <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Upuść tutaj</span>
-        </div>
-      ) : (
-        children
-      )}
+        )}
+      </div>
     </div>
   );
 }
+
+const SOURCE_CONTAINER_ID = "source-container";
 
 export default function DragDropQuestion({
   config,
@@ -145,112 +168,126 @@ export default function DragDropQuestion({
   showResult,
   result,
 }: DragDropQuestionProps) {
-  const [placements, setPlacements] = useState<Map<string, string>>(new Map());
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [overTargetId, setOverTargetId] = useState<string | null>(null);
-  const dragOriginTargetRef = useRef<string | null>(null);
+  const [placements, setPlacements] = useState<Record<string, string>>({});
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
       },
     })
   );
 
-  const getTargetForSource = (sourceId: string): string | undefined => {
-    const entries = Array.from(placements.entries());
+  const placedSourceIds = useMemo(() => new Set(Object.values(placements)), [placements]);
+  const availableSources = useMemo(
+    () => config.sources.filter(source => !placedSourceIds.has(source.id)),
+    [config.sources, placedSourceIds]
+  );
+
+  const findTargetForSource = useCallback((sourceId: string): string | null => {
+    const entries = Object.entries(placements);
     for (let i = 0; i < entries.length; i++) {
-      const [targetId, sId] = entries[i];
-      if (sId === sourceId) return targetId;
+      if (entries[i][1] === sourceId) {
+        return entries[i][0];
+      }
     }
-    return undefined;
-  };
-
-  const placedSourceIds = new Set(Array.from(placements.values()));
-  const availableSources = config.sources.filter(source => !placedSourceIds.has(source.id));
-
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const sourceId = event.active.id as string;
-    setActiveDragId(sourceId);
-    dragOriginTargetRef.current = getTargetForSource(sourceId) || null;
+    return null;
   }, [placements]);
 
-  const handleDragOver = useCallback((event: any) => {
-    const overId = event.over?.id as string | null;
-    if (overId && config.targets.some(t => t.id === overId)) {
-      setOverTargetId(overId);
-    } else {
-      setOverTargetId(null);
-    }
-  }, [config.targets]);
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    const sourceId = active.id as string;
-    const originTarget = dragOriginTargetRef.current;
-    
-    setActiveDragId(null);
-    setOverTargetId(null);
-    dragOriginTargetRef.current = null;
+    setActiveId(null);
 
     if (!over) return;
 
-    const targetId = over.id as string;
-    const isValidTarget = config.targets.some(t => t.id === targetId);
+    const activeIdStr = active.id as string;
+    const overId = over.id as string;
+    const parsed = parseId(activeIdStr);
+    const sourceId = parsed.sourceId;
     
-    if (!isValidTarget) return;
+    const isTarget = config.targets.some(t => t.id === overId);
+    const isSourceContainer = overId === SOURCE_CONTAINER_ID;
+    
+    if (!isTarget && !isSourceContainer) return;
 
-    const newPlacements = new Map(placements);
+    const currentTargetId = findTargetForSource(sourceId);
     
-    if (originTarget && originTarget !== targetId) {
-      newPlacements.delete(originTarget);
+    if (isSourceContainer) {
+      if (currentTargetId) {
+        const newPlacements = { ...placements };
+        delete newPlacements[currentTargetId];
+        setPlacements(newPlacements);
+        
+        const answerData: AnswerData = {
+          type: 'drag_drop',
+          placements: Object.entries(newPlacements).map(([targetId, srcId]) => ({
+            sourceId: srcId,
+            targetId,
+          })),
+        };
+        onChange(answerData);
+      }
+      return;
+    }
+
+    const newPlacements = { ...placements };
+    
+    if (currentTargetId && currentTargetId !== overId) {
+      delete newPlacements[currentTargetId];
     }
     
-    const existingSourceInTarget = newPlacements.get(targetId);
+    const existingSourceInTarget = newPlacements[overId];
     if (existingSourceInTarget && existingSourceInTarget !== sourceId) {
-      if (originTarget) {
-        newPlacements.set(originTarget, existingSourceInTarget);
+      if (currentTargetId) {
+        newPlacements[currentTargetId] = existingSourceInTarget;
       }
     }
     
-    newPlacements.set(targetId, sourceId);
+    newPlacements[overId] = sourceId;
     setPlacements(newPlacements);
 
     const answerData: AnswerData = {
       type: 'drag_drop',
-      placements: Array.from(newPlacements.entries()).map(([tId, sId]) => ({
-        sourceId: sId,
-        targetId: tId,
+      placements: Object.entries(newPlacements).map(([targetId, srcId]) => ({
+        sourceId: srcId,
+        targetId,
       })),
     };
     onChange(answerData);
-  }, [placements, config.targets, onChange]);
+  }, [placements, config.targets, onChange, findTargetForSource]);
 
   const handleDragCancel = useCallback(() => {
-    setActiveDragId(null);
-    setOverTargetId(null);
-    dragOriginTargetRef.current = null;
+    setActiveId(null);
   }, []);
 
   const handleRemoveFromZone = useCallback((targetId: string) => {
-    const newPlacements = new Map(placements);
-    newPlacements.delete(targetId);
+    const newPlacements = { ...placements };
+    delete newPlacements[targetId];
     setPlacements(newPlacements);
 
     const answerData: AnswerData = {
       type: 'drag_drop',
-      placements: Array.from(newPlacements.entries()).map(([tId, sId]) => ({
-        sourceId: sId,
+      placements: Object.entries(newPlacements).map(([tId, srcId]) => ({
+        sourceId: srcId,
         targetId: tId,
       })),
     };
     onChange(answerData);
   }, [placements, onChange]);
 
-  const activeSource = activeDragId 
-    ? config.sources.find(s => s.id === activeDragId)
+  const activeSourceId = activeId ? parseId(activeId).sourceId : null;
+  const activeSource = activeSourceId 
+    ? config.sources.find(s => s.id === activeSourceId)
     : null;
+
+  const { setNodeRef: setSourceContainerRef } = useDroppable({ 
+    id: SOURCE_CONTAINER_ID 
+  });
 
   return (
     <div className="space-y-6">
@@ -260,26 +297,33 @@ export default function DragDropQuestion({
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={closestCorners}
         onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
+        measuring={{
+          droppable: {
+            strategy: MeasuringStrategy.Always,
+          },
+        }}
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-3" data-testid="drag-sources">
+          <div className="space-y-3">
             <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
               Elementy do przeciągnięcia
             </h4>
-            <div className="space-y-2">
+            <div 
+              ref={setSourceContainerRef}
+              className="space-y-2 min-h-[100px] p-2 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700"
+              data-testid="drag-sources"
+            >
               {availableSources.map(source => (
                 <DraggableItem
                   key={source.id}
-                  id={source.id}
+                  dragId={`${SOURCE_PREFIX}${source.id}`}
                   content={source.content}
                   imageUrl={source.imageUrl}
                   disabled={disabled}
-                  isBeingDragged={activeDragId === source.id}
                 />
               ))}
               {availableSources.length === 0 && !showResult && (
@@ -297,60 +341,57 @@ export default function DragDropQuestion({
             </h4>
             <div className="space-y-4">
               {config.targets.map(target => {
-                const placedSourceId = placements.get(target.id);
+                const placedSourceId = placements[target.id];
                 const placedSource = placedSourceId 
                   ? config.sources.find(s => s.id === placedSourceId)
                   : undefined;
 
                 const isCorrect = showResult && result?.feedback?.correctItems?.includes(target.id);
                 const isIncorrect = showResult && result?.feedback?.incorrectItems?.includes(target.id);
-                const isDraggingFromThisZone = activeDragId === placedSourceId;
+                const isBeingDragged = activeSourceId === placedSourceId;
 
                 return (
-                  <div key={target.id} className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block">
-                      {target.label}
-                    </label>
-                    <DropZone
-                      id={target.id}
-                      isOver={overTargetId === target.id}
-                      isEmpty={!placedSource || isDraggingFromThisZone}
-                      isCorrect={isCorrect}
-                      isIncorrect={isIncorrect}
-                    >
-                      {placedSource && !isDraggingFromThisZone && (
-                        <div className="relative">
-                          <DraggableItem
-                            id={placedSource.id}
-                            content={placedSource.content}
-                            imageUrl={placedSource.imageUrl}
-                            disabled={disabled}
-                            isCorrect={isCorrect}
-                            isIncorrect={isIncorrect}
-                          />
-                          {!disabled && !showResult && (
-                            <button
-                              onClick={() => handleRemoveFromZone(target.id)}
-                              className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg z-10"
-                              data-testid={`remove-btn-${target.id}`}
-                              title="Usuń"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </DropZone>
-                  </div>
+                  <DropZone
+                    key={target.id}
+                    id={target.id}
+                    label={target.label}
+                    isOver={false}
+                    hasItem={!!placedSource && !isBeingDragged}
+                    isCorrect={isCorrect}
+                    isIncorrect={isIncorrect}
+                  >
+                    {placedSource && !isBeingDragged && (
+                      <div className="relative">
+                        <DraggableItem
+                          dragId={`${PLACED_PREFIX}${target.id}:${placedSource.id}`}
+                          content={placedSource.content}
+                          imageUrl={placedSource.imageUrl}
+                          disabled={disabled}
+                          isCorrect={isCorrect}
+                          isIncorrect={isIncorrect}
+                        />
+                        {!disabled && !showResult && (
+                          <button
+                            onClick={() => handleRemoveFromZone(target.id)}
+                            className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg z-10"
+                            data-testid={`remove-btn-${target.id}`}
+                            title="Usuń"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </DropZone>
                 );
               })}
             </div>
           </div>
         </div>
 
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay>
           {activeSource && (
-            <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-white dark:bg-slate-800 shadow-2xl pointer-events-none">
+            <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-white dark:bg-slate-800 shadow-2xl cursor-grabbing">
               <GripVertical className="h-5 w-5 text-primary" />
               {activeSource.imageUrl && (
                 <img 

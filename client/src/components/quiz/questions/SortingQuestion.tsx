@@ -7,8 +7,9 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  DragOverlay,
   DragStartEvent,
+  DragOverlay,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -27,6 +28,12 @@ interface SortingQuestionProps {
   disabled: boolean;
   showResult: boolean;
   result?: QuizResult;
+}
+
+function getItemText(item: { id: string; text?: string; content?: string }): string {
+  if (typeof item.content === 'string') return item.content;
+  if (typeof item.text === 'string') return item.text;
+  return item.id;
 }
 
 interface SortableItemProps {
@@ -49,10 +56,11 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
     isDragging,
   } = useSortable({ id, disabled });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 1000 : undefined,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 1000 : 1,
   };
 
   let borderClass = "border-slate-300 dark:border-slate-600";
@@ -77,14 +85,13 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
       className={`
         flex items-center gap-3 p-4 rounded-xl border-2 shadow-sm
         ${borderClass} ${bgClass}
-        ${isDragging ? "opacity-50 shadow-2xl scale-105" : ""}
         ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
         touch-manipulation select-none
       `}
       {...attributes}
       {...listeners}
     >
-      <div className={`flex items-center justify-center w-8 h-8 rounded-full ${positionBgClass} text-sm font-bold shadow-sm`}>
+      <div className={`flex items-center justify-center w-8 h-8 rounded-full ${positionBgClass} text-sm font-bold shadow-sm flex-shrink-0`}>
         {position}
       </div>
       {!disabled && (
@@ -98,8 +105,33 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
         />
       )}
       <span className="text-base flex-1 font-medium text-slate-900 dark:text-white">{content}</span>
-      {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
-      {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
+      {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />}
+      {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />}
+    </div>
+  );
+}
+
+interface DragOverlayItemProps {
+  content: string;
+  imageUrl?: string;
+  position: number;
+}
+
+function DragOverlayItem({ content, imageUrl, position }: DragOverlayItemProps) {
+  return (
+    <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-white dark:bg-slate-800 shadow-2xl cursor-grabbing">
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white text-sm font-bold shadow-sm flex-shrink-0">
+        {position}
+      </div>
+      <GripVertical className="h-5 w-5 text-primary flex-shrink-0" />
+      {imageUrl && (
+        <img 
+          src={imageUrl} 
+          alt={content} 
+          className="w-12 h-12 object-cover rounded-lg"
+        />
+      )}
+      <span className="text-base font-medium text-slate-900 dark:text-white">{content}</span>
     </div>
   );
 }
@@ -120,12 +152,12 @@ export default function SortingQuestion({
     return shuffled;
   });
   
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -134,17 +166,19 @@ export default function SortingQuestion({
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveDragId(event.active.id as string);
+    setActiveId(event.active.id as string);
   }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveDragId(null);
+    setActiveId(null);
 
     if (!over || active.id === over.id) return;
 
     const oldIndex = items.indexOf(active.id as string);
     const newIndex = items.indexOf(over.id as string);
+
+    if (oldIndex === -1 || newIndex === -1) return;
 
     const newItems = arrayMove(items, oldIndex, newIndex);
     setItems(newItems);
@@ -156,12 +190,16 @@ export default function SortingQuestion({
     onChange(answerData);
   }, [items, onChange]);
 
-  const getItemContent = (itemId: string) => {
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null);
+  }, []);
+
+  const getItemById = (itemId: string) => {
     return config.items.find(i => i.id === itemId);
   };
 
-  const activeItem = activeDragId ? getItemContent(activeDragId) : null;
-  const activeIndex = activeDragId ? items.indexOf(activeDragId) : -1;
+  const activeItem = activeId ? getItemById(activeId) : null;
+  const activeIndex = activeId ? items.indexOf(activeId) : -1;
 
   return (
     <div className="space-y-6">
@@ -174,17 +212,23 @@ export default function SortingQuestion({
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+        measuring={{
+          droppable: {
+            strategy: MeasuringStrategy.Always,
+          },
+        }}
       >
         <SortableContext items={items} strategy={verticalListSortingStrategy}>
           <div className="space-y-2" data-testid="sorting-items">
             {items.map((itemId, index) => {
-              const item = getItemContent(itemId);
+              const item = getItemById(itemId);
               if (!item) return null;
 
               const isCorrect = result?.feedback?.correctItems?.includes(itemId);
               const isIncorrect = result?.feedback?.incorrectItems?.includes(itemId);
+              const itemText = getItemText(item);
 
-              const itemText = item.content || item.text || '';
               return (
                 <SortableItem
                   key={itemId}
@@ -202,21 +246,12 @@ export default function SortingQuestion({
         </SortableContext>
 
         <DragOverlay>
-          {activeItem && (
-            <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-white dark:bg-slate-800 shadow-2xl">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white text-sm font-bold">
-                {activeIndex + 1}
-              </div>
-              <GripVertical className="h-5 w-5 text-primary" />
-              {activeItem.imageUrl && (
-                <img 
-                  src={activeItem.imageUrl} 
-                  alt={activeItem.content || activeItem.text || ''} 
-                  className="w-12 h-12 object-cover rounded-lg"
-                />
-              )}
-              <span className="text-base font-medium text-slate-900 dark:text-white">{activeItem.content || activeItem.text}</span>
-            </div>
+          {activeItem && activeIndex >= 0 && (
+            <DragOverlayItem
+              content={getItemText(activeItem)}
+              imageUrl={activeItem.imageUrl}
+              position={activeIndex + 1}
+            />
           )}
         </DragOverlay>
       </DndContext>
@@ -236,11 +271,11 @@ export default function SortingQuestion({
             Prawidłowa kolejność:
           </p>
           <ol className="list-decimal list-inside text-base text-blue-700 dark:text-blue-300 space-y-1">
-            {result.correctAnswer.order.map((itemId, index) => {
-              const item = getItemContent(itemId);
+            {result.correctAnswer.order.map((itemId: string) => {
+              const item = getItemById(itemId);
               return (
                 <li key={itemId} className="font-medium">
-                  {item?.content || item?.text || itemId}
+                  {item ? getItemText(item) : itemId}
                 </li>
               );
             })}
