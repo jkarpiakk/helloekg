@@ -203,17 +203,33 @@ export default function DragDropQuestion({
     const { active, over } = event;
     setActiveId(null);
 
-    if (!over) return;
+    console.log('[DragDrop] handleDragEnd called', { 
+      activeId: active.id, 
+      overId: over?.id,
+      currentPlacements: placements 
+    });
+
+    if (!over) {
+      console.log('[DragDrop] No over target, returning');
+      return;
+    }
 
     const activeIdStr = String(active.id);
     const overId = String(over.id);
     const parsed = parseId(activeIdStr);
     const sourceId = String(parsed.sourceId);
     
+    console.log('[DragDrop] Parsed:', { activeIdStr, overId, sourceId, parsed });
+    
     const isTarget = config.targets.some(t => String(t.id) === overId);
     const isSourceContainer = overId === SOURCE_CONTAINER_ID;
     
-    if (!isTarget && !isSourceContainer) return;
+    console.log('[DragDrop] Target check:', { isTarget, isSourceContainer, targets: config.targets.map(t => String(t.id)) });
+    
+    if (!isTarget && !isSourceContainer) {
+      console.log('[DragDrop] Not a valid target, returning');
+      return;
+    }
 
     const currentTargetId = findTargetForSource(sourceId);
     
@@ -237,6 +253,8 @@ export default function DragDropQuestion({
 
     const newPlacements = { ...placements };
     
+    console.log('[DragDrop] Before update:', { currentTargetId, overId, newPlacements: {...newPlacements} });
+    
     if (currentTargetId && currentTargetId !== overId) {
       delete newPlacements[currentTargetId];
     }
@@ -249,6 +267,7 @@ export default function DragDropQuestion({
     }
     
     newPlacements[overId] = sourceId;
+    console.log('[DragDrop] After update:', { newPlacements: {...newPlacements} });
     setPlacements(newPlacements);
 
     const answerData: AnswerData = {
@@ -280,9 +299,9 @@ export default function DragDropQuestion({
     onChange(answerData);
   }, [placements, onChange]);
 
-  const activeSourceId = activeId ? parseId(activeId).sourceId : null;
+  const activeSourceId = activeId ? String(parseId(activeId).sourceId) : null;
   const activeSource = activeSourceId 
-    ? config.sources.find(s => s.id === activeSourceId)
+    ? config.sources.find(s => String(s.id) === activeSourceId)
     : null;
 
   const { setNodeRef: setSourceContainerRef } = useDroppable({ 
@@ -317,15 +336,18 @@ export default function DragDropQuestion({
               className="space-y-2 min-h-[100px] p-2 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700"
               data-testid="drag-sources"
             >
-              {availableSources.map(source => (
-                <DraggableItem
-                  key={source.id}
-                  dragId={`${SOURCE_PREFIX}${source.id}`}
-                  content={source.content}
-                  imageUrl={source.imageUrl}
-                  disabled={disabled}
-                />
-              ))}
+              {availableSources.map(source => {
+                const sourceIdStr = String(source.id);
+                return (
+                  <DraggableItem
+                    key={sourceIdStr}
+                    dragId={`${SOURCE_PREFIX}${sourceIdStr}`}
+                    content={source.content}
+                    imageUrl={source.imageUrl}
+                    disabled={disabled}
+                  />
+                );
+              })}
               {availableSources.length === 0 && !showResult && (
                 <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl text-center">
                   <Check className="h-5 w-5 text-green-600 dark:text-green-400 mx-auto mb-1" />
@@ -364,7 +386,7 @@ export default function DragDropQuestion({
                     {placedSource && !isBeingDragged && (
                       <div className="relative">
                         <DraggableItem
-                          dragId={`${PLACED_PREFIX}${targetIdStr}:${placedSource.id}`}
+                          dragId={`${PLACED_PREFIX}${targetIdStr}:${String(placedSource.id)}`}
                           content={placedSource.content}
                           imageUrl={placedSource.imageUrl}
                           disabled={disabled}
