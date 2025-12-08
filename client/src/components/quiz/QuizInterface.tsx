@@ -236,52 +236,57 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     const passed = successRate >= 70;
 
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 safe-bottom">
         <div className="max-w-2xl w-full">
-          <div className="bg-card rounded-lg border border-border p-4 sm:p-6 lg:p-8 text-center">
-            <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full mx-auto mb-6 flex items-center justify-center ${
-              passed ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+          <div className="glass-card-light dark:glass-card rounded-2xl shadow-app-lg p-5 sm:p-6 lg:p-8 text-center motion-safe:animate-slide-up">
+            <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl mx-auto mb-6 flex items-center justify-center ${
+              passed ? "bg-green-500/15 text-green-500 shadow-glow-success" : "bg-red-500/15 text-red-500"
             }`}>
               <span className="text-4xl sm:text-5xl font-bold">{Math.round(successRate)}%</span>
             </div>
             
-            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
               {passed ? "Gratulacje!" : "Egzamin niezaliczony"}
             </h2>
-            <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
+            <p className="text-base text-muted-foreground mb-6 sm:mb-8">
               {passed 
                 ? "Udało Ci się zaliczyć egzamin próbny!" 
                 : "Niestety nie udało się osiągnąć wymaganego progu 70%."}
             </p>
 
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6 sm:mb-8">
-              <div className="bg-background p-3 sm:p-4 rounded-lg border border-border">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
+              <div className="glass-card-light dark:glass-card p-4 sm:p-5 rounded-2xl shadow-app">
                 <div className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
                   {examSummary.totalQuestions}
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Pytań</div>
+                <div className="text-sm text-muted-foreground">Pytań</div>
               </div>
-              <div className="bg-background p-3 sm:p-4 rounded-lg border border-border">
+              <div className="stat-card-teal p-4 sm:p-5 rounded-2xl shadow-app">
                 <div className="text-2xl sm:text-3xl font-bold text-green-500 mb-1">
                   {examSummary.correctAnswers}
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Poprawnych</div>
+                <div className="text-sm text-muted-foreground">Poprawnych</div>
               </div>
-              <div className="bg-background p-3 sm:p-4 rounded-lg border border-border">
+              <div className="glass-card-light dark:glass-card p-4 sm:p-5 rounded-2xl shadow-app border-red-500/30">
                 <div className="text-2xl sm:text-3xl font-bold text-red-500 mb-1">
                   {examSummary.totalQuestions - examSummary.correctAnswers}
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground">Błędnych</div>
+                <div className="text-sm text-muted-foreground">Błędnych</div>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-              <Button onClick={onExit} variant="outline" className="w-full sm:w-auto" data-testid="exit-exam">
+              <Button 
+                onClick={onExit} 
+                variant="outline" 
+                className="w-full sm:w-auto min-h-[48px] rounded-xl active:scale-[0.97] motion-safe:transition-transform" 
+                data-testid="exit-exam"
+              >
                 Wróć do panelu
               </Button>
               <Button 
                 onClick={() => window.location.reload()}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto min-h-[48px] rounded-xl shadow-glow-primary active:scale-[0.97] motion-safe:transition-transform"
                 data-testid="retry-exam"
               >
                 Spróbuj ponownie
@@ -317,31 +322,31 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Quiz Header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
-            <div className="flex items-center space-x-2 sm:space-x-4">
+      {/* Quiz Header - Premium glass styling */}
+      <div className="sticky top-0 z-40 glass-card-light dark:glass-card shadow-app safe-top">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center space-x-3">
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={handleExit}
                 data-testid="exit-quiz"
+                className="min-h-[44px] min-w-[44px] rounded-xl active:scale-[0.97] motion-safe:transition-transform"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h2 className="text-sm sm:text-base font-semibold text-foreground">Moduł EKG</h2>
-                <p className="text-xs sm:text-sm text-muted-foreground">
+                <h2 className="text-base font-semibold text-foreground">Moduł EKG</h2>
+                <p className="text-sm text-muted-foreground">
                   {t("quiz.question")} {currentQuestionIndex + 1}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="w-24 sm:w-32 lg:w-48 h-2 bg-secondary rounded-full overflow-hidden">
+            <div className="flex items-center space-x-3">
+              <div className="w-20 sm:w-32 lg:w-48 h-2.5 bg-secondary/50 rounded-full overflow-hidden shadow-inner">
                 <div 
-                  className="h-full bg-primary rounded-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full motion-safe:transition-all motion-safe:duration-300"
                   style={{ 
                     width: `${mode === "exam" && examTotalQuestions > 0 
                       ? ((currentQuestionIndex + 1) / examTotalQuestions) * 100 
@@ -349,7 +354,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                   }}
                 />
               </div>
-              <span className="text-xs sm:text-sm text-muted-foreground font-mono">
+              <span className="text-sm text-muted-foreground font-mono min-w-[3rem] text-right">
                 {mode === "exam" && examTotalQuestions > 0 
                   ? `${currentQuestionIndex + 1}/${examTotalQuestions}`
                   : `${Math.round(((currentQuestionIndex + 1) / 10) * 100)}%`}
@@ -360,7 +365,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       </div>
 
       {/* Quiz Content */}
-      <div ref={quizContentRef} className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div ref={quizContentRef} className="max-w-4xl mx-auto px-4 py-5 sm:py-8 safe-bottom">
         <QuestionCard
           question={question}
           selectedAnswer={selectedAnswer}
@@ -374,11 +379,11 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
         {/* Submit button for interactive question types */}
         {question.questionType && question.questionType !== 'multiple_choice' && question.questionConfig && !showExplanation && (
-          <div className="mt-4 sm:mt-6 flex justify-center">
+          <div className="mt-5 sm:mt-6 flex justify-center">
             <Button
               onClick={handleSubmitInteractiveAnswer}
               disabled={!currentAnswerData || submitAnswerMutation.isPending}
-              className="w-full sm:w-auto min-w-[200px]"
+              className="w-full sm:w-auto min-w-[200px] min-h-[52px] rounded-xl text-base font-semibold shadow-glow-primary active:scale-[0.97] motion-safe:transition-transform"
               size="lg"
               data-testid="submit-interactive-answer"
             >
@@ -387,52 +392,52 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="flex justify-between items-center mt-6 sm:mt-8 gap-2">
+        {/* Navigation - Premium touch-friendly buttons */}
+        <div className="flex justify-between items-center mt-6 sm:mt-8 gap-3">
           <Button
             variant="outline"
             onClick={handlePreviousQuestion}
             disabled={currentQuestionIndex === 0}
             data-testid="previous-question"
-            className="!h-11 px-3 sm:px-4 !min-w-[44px]"
+            className="min-h-[48px] px-4 min-w-[48px] rounded-xl active:scale-[0.97] motion-safe:transition-transform shadow-app"
             aria-label={t("quiz.previousQuestion")}
           >
-            <ArrowLeft className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline text-sm">{t("quiz.previousQuestion")}</span>
+            <ArrowLeft className="h-5 w-5 sm:mr-2" />
+            <span className="hidden sm:inline text-base">{t("quiz.previousQuestion")}</span>
           </Button>
 
-          <div className="flex items-center gap-2 sm:space-x-4">
+          <div className="flex items-center gap-3">
             <Button
               variant="outline"
               onClick={handleMarkForReview}
               data-testid="mark-for-review"
-              className="!h-11 px-3 sm:px-4 !min-w-[44px]"
+              className="min-h-[48px] px-4 min-w-[48px] rounded-xl active:scale-[0.97] motion-safe:transition-transform shadow-app"
               aria-label={t("quiz.markForReview")}
             >
-              <Bookmark className="h-4 w-4 sm:mr-2" />
-              <span className="hidden md:inline text-sm">{t("quiz.markForReview")}</span>
+              <Bookmark className="h-5 w-5 md:mr-2" />
+              <span className="hidden md:inline text-base">{t("quiz.markForReview")}</span>
             </Button>
 
             <Button
               variant="outline"
               onClick={() => setShowReportDialog(true)}
               data-testid="report-error-button"
-              className="!h-11 px-3 sm:px-4 !min-w-[44px]"
+              className="min-h-[48px] px-4 min-w-[48px] rounded-xl active:scale-[0.97] motion-safe:transition-transform shadow-app"
               aria-label="Zgłoś błąd"
             >
-              <AlertTriangle className="h-4 w-4 sm:mr-2" />
-              <span className="hidden md:inline text-sm">Zgłoś błąd</span>
+              <AlertTriangle className="h-5 w-5 md:mr-2" />
+              <span className="hidden md:inline text-base">Zgłoś błąd</span>
             </Button>
 
             {showExplanation && (
               <Button
                 onClick={handleNextQuestion}
                 data-testid="next-question"
-                className="!h-11 px-3 sm:px-4 !min-w-[44px]"
+                className="min-h-[48px] px-4 min-w-[48px] rounded-xl shadow-glow-primary active:scale-[0.97] motion-safe:transition-transform"
                 aria-label={t("quiz.nextQuestion")}
               >
-                <span className="hidden sm:inline text-sm">{t("quiz.nextQuestion")}</span>
-                <ArrowRight className="h-4 w-4 sm:ml-2" />
+                <span className="hidden sm:inline text-base">{t("quiz.nextQuestion")}</span>
+                <ArrowRight className="h-5 w-5 sm:ml-2" />
               </Button>
             )}
           </div>

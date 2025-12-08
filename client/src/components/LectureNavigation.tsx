@@ -67,7 +67,7 @@ export function LectureNavigation({ sectionId, sectionTitle, onComplete }: Lectu
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center p-8" data-testid="loading-lecture">
+      <div className="min-h-[60vh] flex justify-center items-center" data-testid="loading-lecture">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     );
@@ -75,10 +75,12 @@ export function LectureNavigation({ sectionId, sectionTitle, onComplete }: Lectu
 
   if (!chapters || chapters.length === 0) {
     return (
-      <Card className="p-8 text-center" data-testid="empty-lecture">
-        <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-        <h3 className="text-lg font-medium mb-2">Brak treści wykładu</h3>
-        <p className="text-muted-foreground">
+      <Card className="glass-card rounded-2xl shadow-app p-6 text-center mx-4" data-testid="empty-lecture">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+          <FileText className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2">Brak treści wykładu</h3>
+        <p className="text-muted-foreground text-base">
           Treść wykładu dla tej sekcji nie została jeszcze dodana.
         </p>
       </Card>
@@ -86,165 +88,168 @@ export function LectureNavigation({ sectionId, sectionTitle, onComplete }: Lectu
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      {/* Header with progress */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="lecture-title">
-              <BookOpen className="w-6 h-6" />
-              {sectionTitle}
-            </h1>
-            <p className="text-muted-foreground">
-              Rozdział {currentChapterIndex + 1} z {totalChapters}
-            </p>
+    <div className="min-h-screen pb-28">
+      {/* Sticky Header with Progress - Mobile Optimized */}
+      <div className="sticky top-0 z-40 glass-card border-b border-border/50">
+        <div className="px-4 py-3 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <BookOpen className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-lg font-semibold text-foreground truncate" data-testid="lecture-title">
+                {sectionTitle}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Rozdział {currentChapterIndex + 1} z {totalChapters}
+              </p>
+            </div>
+            <Badge variant="secondary" className="px-3 py-1.5 rounded-lg text-xs" data-testid="lecture-progress">
+              {Math.round(progress)}%
+            </Badge>
           </div>
-          <Badge variant="secondary" data-testid="lecture-progress">
-            <Clock className="w-4 h-4 mr-1" />
-            {Math.round(progress)}% ukończone
-          </Badge>
+          <Progress value={progress} className="h-2" data-testid="progress-bar" />
         </div>
-
-        <Progress value={progress} className="w-full" data-testid="progress-bar" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Navigation Sidebar */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold">Spis treści</h3>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[400px]">
-                <div className="p-4 space-y-2">
-                  {chapters.map((chapter: LectureChapter, index: number) => (
-                    <Button
-                      key={chapter.id}
-                      variant={index === currentChapterIndex ? "default" : "ghost"}
-                      className="w-full justify-start text-left h-auto p-3"
-                      onClick={() => handleJumpToChapter(index)}
-                      data-testid={`chapter-nav-${index}`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-1">
-                          {completedChapters.has(chapter.id) ? (
-                            <Check className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <span className="w-4 h-4 flex items-center justify-center text-xs font-medium bg-muted rounded-full">
-                              {index + 1}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {chapter.title}
-                          </p>
-                        </div>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+      {/* Mobile Chapter Navigation - Horizontal Scroll */}
+      <div className="px-4 py-3 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 min-w-max">
+          {chapters.map((chapter: LectureChapter, index: number) => (
+            <Button
+              key={chapter.id}
+              variant={index === currentChapterIndex ? "default" : "outline"}
+              size="sm"
+              className={`h-10 px-4 rounded-xl whitespace-nowrap active:scale-[0.97] transition-transform ${
+                index === currentChapterIndex ? 'shadow-glow-primary' : ''
+              }`}
+              onClick={() => handleJumpToChapter(index)}
+              data-testid={`chapter-nav-${index}`}
+            >
+              {completedChapters.has(chapter.id) ? (
+                <Check className="w-4 h-4 mr-2 text-green-500" />
+              ) : (
+                <span className="w-5 h-5 mr-2 flex items-center justify-center text-xs font-medium bg-muted/50 rounded-full">
+                  {index + 1}
+                </span>
+              )}
+              <span className="text-sm">{chapter.title.length > 20 ? chapter.title.substring(0, 20) + '...' : chapter.title}</span>
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Content - Mobile Optimized */}
+      <div className="px-4 space-y-4">
+        {/* Chapter Title Card */}
+        <div className="glass-card rounded-2xl shadow-app p-4">
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="px-3 py-1.5 rounded-lg font-medium">
+              {currentChapterIndex + 1}/{totalChapters}
+            </Badge>
+            <h2 className="text-lg font-bold flex-1" data-testid="current-chapter-title">
+              {currentChapter?.title}
+            </h2>
+          </div>
         </div>
 
-        {/* Main Content */}
-        <div className="lg:col-span-3">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold" data-testid="current-chapter-title">
-                  {currentChapter?.title}
-                </h2>
-                <Badge variant="outline">
-                  Rozdział {currentChapterIndex + 1}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Analogy section */}
-              {currentChapter?.analogy && (
-                <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg border-l-4 border-blue-500">
-                  <div className="flex items-start space-x-3">
-                    <span className="text-2xl">💡</span>
-                    <div>
-                      <h4 className="font-medium text-blue-900 dark:text-blue-100">Analogia</h4>
-                      <p className="text-blue-800 dark:text-blue-200" data-testid="chapter-analogy">
-                        {currentChapter.analogy}
-                      </p>
-                    </div>
+        {/* Content Card */}
+        <Card className="glass-card rounded-2xl shadow-app-lg border-0">
+          <CardContent className="p-4 space-y-5">
+            {/* Analogy section */}
+            {currentChapter?.analogy && (
+              <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-lg">💡</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-primary text-sm mb-1">Analogia</h4>
+                    <p className="text-foreground text-base leading-relaxed" data-testid="chapter-analogy">
+                      {currentChapter.analogy}
+                    </p>
                   </div>
                 </div>
-              )}
-
-              {/* Main content */}
-              <div 
-                className="prose dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={renderContent(currentChapter?.contentMd || "")}
-                data-testid="chapter-content"
-              />
-
-              {/* Key Points */}
-              {currentChapter?.keyPoints && currentChapter.keyPoints.length > 0 && (
-                <div className="bg-green-50 dark:bg-green-950/30 p-4 rounded-lg">
-                  <h4 className="font-medium text-green-900 dark:text-green-100 mb-3 flex items-center">
-                    <span className="mr-2">🔑</span>
-                    Kluczowe punkty
-                  </h4>
-                  <ul className="space-y-2">
-                    {currentChapter.keyPoints.map((point: string, index: number) => (
-                      <li 
-                        key={index} 
-                        className="text-green-800 dark:text-green-200 flex items-start"
-                        data-testid={`key-point-${index}`}
-                      >
-                        <Check className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <Separator />
-
-              {/* Navigation buttons */}
-              <div className="flex justify-between items-center">
-                <Button
-                  variant="outline"
-                  onClick={handlePrevious}
-                  disabled={currentChapterIndex === 0}
-                  data-testid="button-previous"
-                >
-                  <ChevronLeft className="w-4 h-4 mr-2" />
-                  Poprzedni
-                </Button>
-
-                <div className="text-sm text-muted-foreground">
-                  {currentChapterIndex + 1} / {totalChapters}
-                </div>
-
-                <Button
-                  onClick={handleNext}
-                  data-testid="button-next"
-                >
-                  {currentChapterIndex === totalChapters - 1 ? (
-                    <>
-                      Zakończ
-                      <Check className="w-4 h-4 ml-2" />
-                    </>
-                  ) : (
-                    <>
-                      Następny
-                      <ChevronRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
               </div>
-            </CardContent>
-          </Card>
+            )}
+
+            {/* Main content */}
+            <div 
+              className="prose dark:prose-invert max-w-none prose-p:text-base prose-p:leading-relaxed prose-headings:text-foreground"
+              dangerouslySetInnerHTML={renderContent(currentChapter?.contentMd || "")}
+              data-testid="chapter-content"
+            />
+
+            {/* Key Points */}
+            {currentChapter?.keyPoints && currentChapter.keyPoints.length > 0 && (
+              <div className="bg-chart-2/10 rounded-xl p-4 space-y-3">
+                <h4 className="font-semibold text-chart-2 flex items-center gap-2 text-base">
+                  <div className="w-8 h-8 rounded-lg bg-chart-2/20 flex items-center justify-center">
+                    <span>🔑</span>
+                  </div>
+                  Kluczowe punkty
+                </h4>
+                <ul className="space-y-3">
+                  {currentChapter.keyPoints.map((point: string, index: number) => (
+                    <li 
+                      key={index} 
+                      className="flex items-start gap-3"
+                      data-testid={`key-point-${index}`}
+                    >
+                      <div className="w-6 h-6 rounded-full bg-chart-2/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Check className="w-3 h-3 text-chart-2" />
+                      </div>
+                      <span className="text-base leading-relaxed">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Sticky Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 glass-card border-t border-border/50 safe-bottom">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3 max-w-4xl mx-auto">
+            <Button
+              variant="outline"
+              onClick={handlePrevious}
+              disabled={currentChapterIndex === 0}
+              className="h-12 px-4 rounded-xl active:scale-[0.97] transition-transform touch-bounce flex items-center gap-2"
+              data-testid="button-previous"
+            >
+              <ChevronLeft className="w-5 h-5" />
+              <span className="hidden sm:inline">Poprzedni</span>
+            </Button>
+
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="font-medium">{currentChapterIndex + 1}</span>
+              <span>/</span>
+              <span>{totalChapters}</span>
+            </div>
+
+            <Button
+              onClick={handleNext}
+              className="h-12 px-4 rounded-xl active:scale-[0.97] transition-transform touch-bounce flex items-center gap-2 shadow-glow-primary"
+              data-testid="button-next"
+            >
+              {currentChapterIndex === totalChapters - 1 ? (
+                <>
+                  <span className="hidden sm:inline">Zakończ</span>
+                  <span className="sm:hidden">Koniec</span>
+                  <Check className="w-5 h-5" />
+                </>
+              ) : (
+                <>
+                  <span className="hidden sm:inline">Następny</span>
+                  <span className="sm:hidden">Dalej</span>
+                  <ChevronRight className="w-5 h-5" />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

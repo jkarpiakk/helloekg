@@ -314,135 +314,161 @@ export default function Lecture() {
   };
 
   if (!isAuthenticated) {
-    return <div>Ładowanie...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <Heart className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">{lectureData.title}</h1>
-              <p className="text-muted-foreground">Czas trwania: {lectureData.duration}</p>
+    <div className="min-h-screen bg-background app-gradient-dark">
+      {/* Sticky Header with Progress */}
+      <div className="sticky top-0 z-40 glass-card border-b border-border/50 safe-top">
+        <div className="px-4 py-3 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <Heart className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-lg font-semibold text-foreground truncate" data-testid="lecture-title">
+                {lectureData.title}
+              </h1>
+              <p className="text-sm text-muted-foreground">{lectureData.duration}</p>
             </div>
           </div>
           
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Postęp wykładu</span>
-              <span className="text-sm text-muted-foreground">
-                {currentSection + 1} / {lectureData.sections.length}
-              </span>
-            </div>
-            <Progress value={progress} className="h-2" />
+          <div className="flex items-center gap-3">
+            <Progress value={progress} className="h-2 flex-1" />
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+              {currentSection + 1}/{lectureData.sections.length}
+            </span>
           </div>
         </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 py-6 pb-28 space-y-6">
 
         {!showQuiz ? (
-          <Card className="mb-8 overflow-hidden">
-            <CardContent className="p-8">
-              {/* Section Header */}
-              <div className="flex items-center gap-4 mb-6">
-                <Badge variant="outline" className="text-lg px-3 py-1">
-                  Sekcja {section.id}
+          <>
+            {/* Section Header Card */}
+            <div className="glass-card rounded-2xl shadow-app p-4 mb-4" data-testid="section-header">
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="text-sm px-3 py-1.5 rounded-lg font-medium">
+                  {section.id}/{lectureData.sections.length}
                 </Badge>
-                <h2 className="text-2xl font-bold">{section.title}</h2>
+                <h2 className="text-lg sm:text-xl font-bold flex-1">{section.title}</h2>
               </div>
+            </div>
 
-              {/* Main Content */}
-              <div className="grid lg:grid-cols-2 gap-8 mb-8">
-                {/* Text Content */}
-                <div className="space-y-6">
-                  <p className="text-lg leading-relaxed text-muted-foreground">
-                    {section.content}
-                  </p>
-                  
-                  {/* Analogy Box */}
-                  <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Volume2 className="h-5 w-5 text-primary" />
-                      <span className="font-semibold text-primary">Analogia Feynmanowska</span>
-                    </div>
-                    <p className="text-foreground font-medium">{section.analogy}</p>
-                  </div>
-
-                  {/* Key Points */}
-                  <div className="space-y-3">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-chart-2" />
-                      Kluczowe punkty:
-                    </h3>
-                    <ul className="space-y-2">
-                      {section.keyPoints.map((point, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <ArrowRight className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                          <span className="text-sm">{point}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Visual Content */}
-                <div className="flex flex-col items-center justify-center bg-gradient-to-br from-secondary/30 to-secondary/10 rounded-xl p-8">
-                  <div className="mb-4">
+            {/* Main Content Card */}
+            <Card className="glass-card rounded-2xl shadow-app-lg overflow-hidden border-0">
+              <CardContent className="p-4 sm:p-6 space-y-5">
+                {/* Visual Content - Mobile First */}
+                <div className="flex flex-col items-center justify-center bg-gradient-to-br from-secondary/30 to-secondary/10 rounded-xl p-6 min-h-[140px]">
+                  <div className="mb-3">
                     {renderVisual(section.visual)}
                   </div>
                   <p className="text-center text-sm text-muted-foreground">
                     Wizualizacja koncepcji
                   </p>
                 </div>
-              </div>
 
-              {/* Navigation */}
-              <div className="flex justify-between items-center">
-                <Button 
-                  variant="outline" 
-                  onClick={prevSection}
-                  disabled={currentSection === 0}
-                  className="flex items-center gap-2"
-                >
-                  <SkipBack className="h-4 w-4" />
-                  Poprzednia
-                </Button>
+                {/* Text Content */}
+                <div className="space-y-4">
+                  <p className="text-base leading-relaxed text-muted-foreground">
+                    {section.content}
+                  </p>
+                  
+                  {/* Analogy Box */}
+                  <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                        <Volume2 className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="font-semibold text-primary text-sm">Analogia Feynmanowska</span>
+                    </div>
+                    <p className="text-foreground font-medium text-base">{section.analogy}</p>
+                  </div>
 
-                <div className="flex items-center gap-2">
+                  {/* Key Points */}
+                  <div className="space-y-3 bg-chart-2/10 rounded-xl p-4">
+                    <h3 className="font-semibold flex items-center gap-2 text-base">
+                      <CheckCircle2 className="h-5 w-5 text-chart-2" />
+                      Kluczowe punkty
+                    </h3>
+                    <ul className="space-y-3">
+                      {section.keyPoints.map((point, index) => (
+                        <li key={index} className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-chart-2/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <ArrowRight className="h-3 w-3 text-chart-2" />
+                          </div>
+                          <span className="text-base leading-relaxed">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sticky Bottom Navigation */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 glass-card border-t border-border/50 safe-bottom">
+              <div className="px-4 py-3 max-w-4xl mx-auto">
+                <div className="flex items-center justify-between gap-3">
+                  <Button 
+                    variant="outline" 
+                    onClick={prevSection}
+                    disabled={currentSection === 0}
+                    className="h-12 px-4 rounded-xl active:scale-[0.97] transition-transform touch-bounce flex items-center gap-2"
+                    data-testid="button-previous"
+                  >
+                    <SkipBack className="h-5 w-5" />
+                    <span className="hidden sm:inline">Poprzednia</span>
+                  </Button>
+
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsPlaying(!isPlaying)}
-                    className="flex items-center gap-2"
+                    className="h-12 w-12 rounded-xl p-0 active:scale-[0.97] transition-transform"
+                    data-testid="button-play"
                   >
-                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    {isPlaying ? "Pauza" : "Odtwórz"}
+                    {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                  </Button>
+
+                  <Button 
+                    onClick={nextSection}
+                    className="h-12 px-4 rounded-xl active:scale-[0.97] transition-transform touch-bounce flex items-center gap-2 shadow-glow-primary"
+                    data-testid="button-next"
+                  >
+                    <span className="hidden sm:inline">
+                      {currentSection === lectureData.sections.length - 1 ? "Quiz" : "Następna"}
+                    </span>
+                    <span className="sm:hidden">
+                      {currentSection === lectureData.sections.length - 1 ? "Quiz" : "Dalej"}
+                    </span>
+                    <SkipForward className="h-5 w-5" />
                   </Button>
                 </div>
-
-                <Button 
-                  onClick={nextSection}
-                  className="flex items-center gap-2"
-                >
-                  {currentSection === lectureData.sections.length - 1 ? "Quiz" : "Następna"}
-                  <SkipForward className="h-4 w-4" />
-                </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </>
         ) : (
-          /* Quiz Section */
-          <Card className="mb-8">
-            <CardContent className="p-8">
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold mb-2">Quiz kontrolny</h2>
-                <p className="text-muted-foreground">Sprawdź swoją wiedzę z wykładu</p>
+          /* Quiz Section - Premium Mobile Styling */
+          <Card className="glass-card rounded-2xl shadow-app-lg border-0 mb-24">
+            <CardContent className="p-4 sm:p-6">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/20 flex items-center justify-center">
+                  <Target className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold mb-2">Quiz kontrolny</h2>
+                <p className="text-muted-foreground text-base">Sprawdź swoją wiedzę z wykładu</p>
               </div>
 
               {lectureData.quiz.map((quizItem, index) => (
-                <div key={index} className="mb-8">
-                  <h3 className="text-lg font-semibold mb-4">{quizItem.question}</h3>
+                <div key={index} className="mb-6" data-testid={`quiz-question-${index}`}>
+                  <h3 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">{quizItem.question}</h3>
                   
                   <div className="space-y-3 mb-4">
                     {quizItem.options.map((option, optionIndex) => (
@@ -450,35 +476,43 @@ export default function Lecture() {
                         key={optionIndex}
                         onClick={() => handleAnswerSelect(optionIndex)}
                         disabled={selectedAnswer !== null}
-                        className={`w-full p-4 text-left border rounded-lg transition-colors ${
+                        data-testid={`quiz-option-${index}-${optionIndex}`}
+                        className={`w-full min-h-[52px] p-4 text-left border rounded-xl transition-all active:scale-[0.98] flex items-center gap-3 ${
                           selectedAnswer === null 
-                            ? "hover:bg-secondary/50 border-border"
+                            ? "hover:bg-secondary/50 border-border glass-card"
                             : selectedAnswer === optionIndex
                               ? optionIndex === quizItem.correct 
-                                ? "bg-green-100 border-green-500 text-green-700"
-                                : "bg-red-100 border-red-500 text-red-700"
+                                ? "bg-green-500/20 border-green-500 text-green-400"
+                                : "bg-red-500/20 border-red-500 text-red-400"
                               : optionIndex === quizItem.correct
-                                ? "bg-green-100 border-green-500 text-green-700"
-                                : "border-border"
+                                ? "bg-green-500/20 border-green-500 text-green-400"
+                                : "border-border/50 opacity-60"
                         }`}
                       >
-                        <span className="font-semibold mr-3">{String.fromCharCode(65 + optionIndex)}.</span>
-                        {option}
+                        <span className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center font-semibold text-sm flex-shrink-0">
+                          {String.fromCharCode(65 + optionIndex)}
+                        </span>
+                        <span className="text-base leading-relaxed">{option}</span>
                       </button>
                     ))}
                   </div>
 
                   {showExplanation && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-blue-800 mb-2">Wyjaśnienie:</h4>
-                      <p className="text-blue-700">{quizItem.explanation}</p>
+                    <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 mt-4">
+                      <h4 className="font-semibold text-primary mb-2 text-base">Wyjaśnienie:</h4>
+                      <p className="text-muted-foreground text-base leading-relaxed">{quizItem.explanation}</p>
                     </div>
                   )}
                 </div>
               ))}
 
-              <div className="text-center">
-                <Button onClick={() => setLocation("/dashboard")} size="lg">
+              <div className="pt-4">
+                <Button 
+                  onClick={() => setLocation("/dashboard")} 
+                  size="lg"
+                  className="w-full h-14 rounded-xl text-base font-semibold active:scale-[0.97] transition-transform shadow-glow-primary"
+                  data-testid="button-finish"
+                >
                   Zakończ wykład
                 </Button>
               </div>

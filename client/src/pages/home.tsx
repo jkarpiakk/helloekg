@@ -62,7 +62,7 @@ export default function Home() {
   const questions = (demoQuestions && demoQuestions.length > 0) ? demoQuestions : FALLBACK_DEMO_QUESTIONS;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Hero Section */}
       <section className="relative py-12 sm:py-16 lg:py-32 overflow-hidden">
         {/* Medical pattern background */}
@@ -90,7 +90,7 @@ export default function Home() {
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 {isAuthenticated ? (
-                  <Button className="shadow-lg hover:scale-105 transition-transform w-full sm:w-auto" asChild data-testid="start-learning-button">
+                  <Button className="min-h-[44px] shadow-app-lg hover:scale-105 active:scale-[0.97] transition-transform w-full sm:w-auto rounded-xl text-base" asChild data-testid="start-learning-button">
                     <Link href="/dashboard">
                       <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                       {t("hero.cta.start")}
@@ -98,7 +98,7 @@ export default function Home() {
                   </Button>
                 ) : (
                   <Button 
-                    className="shadow-lg hover:scale-105 transition-transform w-full sm:w-auto"
+                    className="min-h-[44px] shadow-app-lg hover:scale-105 active:scale-[0.97] transition-transform w-full sm:w-auto rounded-xl text-base"
                     onClick={() => setAuthMode("register")}
                     data-testid="start-learning-button"
                   >
@@ -108,7 +108,7 @@ export default function Home() {
                 )}
                 <Button 
                   variant="outline"
-                  className="w-full sm:w-auto"
+                  className="min-h-[44px] active:scale-[0.97] transition-transform w-full sm:w-auto rounded-xl text-base"
                   onClick={() => {
                     document.getElementById('how-it-works')?.scrollIntoView({ 
                       behavior: 'smooth',
@@ -167,42 +167,42 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             {/* Step 1 */}
-            <div className="text-center group">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform shadow-lg">
+            <div className="text-center group bg-card/50 rounded-2xl p-4 sm:p-6 shadow-app">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-glow-primary">
                 <GraduationCap className="h-6 w-6 sm:h-8 sm:w-8 text-primary-foreground" />
               </div>
               <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">
                 Metoda Feynmanowska
               </h3>
-              <p className="text-sm sm:text-base text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                 Skomplikowane mechanizmy zostają przełożone na proste, codzienne obrazy. Impuls w węźle zatokowym działa jak dyrygent orkiestry, a zespół QRS to potężny silnik komór serca.
               </p>
             </div>
 
             {/* Step 2 */}
-            <div className="text-center group">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-chart-2 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform shadow-lg">
+            <div className="text-center group bg-card/50 rounded-2xl p-4 sm:p-6 shadow-app">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-chart-2 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-glow-success">
                 <Play className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
               </div>
               <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">
                 Active Recall
               </h3>
-              <p className="text-sm sm:text-base text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                 Każda sekcja kończy się pytaniami, które zmuszają Cię do przywołania wiedzy z pamięci. To sprawdzona metoda, która znacznie poprawia zdolność do trwałego zapamiętania informacji.
               </p>
             </div>
 
             {/* Step 3 */}
-            <div className="text-center group">
+            <div className="text-center group bg-card/50 rounded-2xl p-4 sm:p-6 shadow-app">
               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-chart-3 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 group-hover:scale-110 transition-transform shadow-lg">
                 <Award className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
               </div>
               <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">
                 Powtarzanie sukcesywne
               </h3>
-              <p className="text-sm sm:text-base text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                 Regularnie wracamy do kluczowych informacji w różnym kontekście, zgodnie z krzywą zapominania. Każdy nowy element wiedzy buduje się na solidnych fundamentach.
               </p>
             </div>
@@ -222,55 +222,55 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
             {/* 500+ Questions */}
-            <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center hover:shadow-lg transition-shadow">
+            <div className="bg-card border border-border rounded-2xl p-3 sm:p-6 text-center hover:shadow-app-lg transition-shadow shadow-app">
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <span className="text-xl sm:text-2xl font-bold text-primary">500+</span>
+                <span className="text-lg sm:text-2xl font-bold text-primary">500+</span>
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2 sm:mb-3">
+              <h3 className="text-sm sm:text-lg font-semibold text-foreground mb-2 sm:mb-3">
                 Pytań w formie quizu
               </h3>
-              <p className="text-muted-foreground text-xs sm:text-sm">
+              <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                 Z natychmiastowym feedbackiem i szczegółowymi wyjaśnieniami każdej odpowiedzi
               </p>
             </div>
 
             {/* Structured Chapters */}
-            <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center hover:shadow-lg transition-shadow">
+            <div className="bg-card border border-border rounded-2xl p-3 sm:p-6 text-center hover:shadow-app-lg transition-shadow shadow-app">
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-chart-2/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-chart-2" />
+                <BookOpen className="h-5 w-5 sm:h-8 sm:w-8 text-chart-2" />
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2 sm:mb-3">
+              <h3 className="text-sm sm:text-lg font-semibold text-foreground mb-2 sm:mb-3">
                 Strukturalne rozdziały
               </h3>
-              <p className="text-muted-foreground text-xs sm:text-sm">
+              <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                 Od podstaw do zaawansowanych zagadnień: rytm, oś serca, arytmie i zawały
               </p>
             </div>
 
             {/* Clinical Cases */}
-            <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center hover:shadow-lg transition-shadow">
+            <div className="bg-card border border-border rounded-2xl p-3 sm:p-6 text-center hover:shadow-app-lg transition-shadow shadow-app">
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-chart-3/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Heart className="h-6 w-6 sm:h-8 sm:w-8 text-chart-3" />
+                <Heart className="h-5 w-5 sm:h-8 sm:w-8 text-chart-3" />
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2 sm:mb-3">
+              <h3 className="text-sm sm:text-lg font-semibold text-foreground mb-2 sm:mb-3">
                 Przypadki kliniczne
               </h3>
-              <p className="text-muted-foreground text-xs sm:text-sm">
+              <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                 Prawdziwe zapisy EKG analizowane krok po kroku w praktycznym kontekście
               </p>
             </div>
 
             {/* Scientific Methods */}
-            <div className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center hover:shadow-lg transition-shadow">
+            <div className="bg-card border border-border rounded-2xl p-3 sm:p-6 text-center hover:shadow-app-lg transition-shadow shadow-app">
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-chart-4/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <Star className="h-6 w-6 sm:h-8 sm:w-8 text-chart-4" />
+                <Star className="h-5 w-5 sm:h-8 sm:w-8 text-chart-4" />
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2 sm:mb-3">
+              <h3 className="text-sm sm:text-lg font-semibold text-foreground mb-2 sm:mb-3">
                 Metody oparte na badaniach
               </h3>
-              <p className="text-muted-foreground text-xs sm:text-sm">
+              <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                 Successive relearning i aktywne przywoływanie dla trwałości wiedzy
               </p>
             </div>

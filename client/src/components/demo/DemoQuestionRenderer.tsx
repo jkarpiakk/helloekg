@@ -396,7 +396,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
   };
 
   return (
-    <Card className="shadow-2xl p-3 sm:p-4 lg:p-6 relative overflow-hidden">
+    <Card className="shadow-app-lg rounded-2xl p-3 sm:p-4 lg:p-6 relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-1.5 sm:h-2 bg-gradient-to-r from-primary to-chart-2"></div>
       
       <div className="space-y-4 sm:space-y-6">
@@ -427,7 +427,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
               <Button 
                 variant="outline" 
                 size="sm"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto min-h-[40px] rounded-xl active:scale-[0.97] transition-transform text-xs sm:text-sm"
                 onClick={resetDemo}
                 data-testid="reset-demo-button"
               >
@@ -482,11 +482,12 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
                   </div>
                   <Button
                     onClick={() => setShowExplanationModal(true)}
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+                    className="min-h-[44px] bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg rounded-xl active:scale-[0.97] transition-transform text-xs sm:text-sm"
                     data-testid="open-explanation-modal"
                   >
-                    <Lightbulb className="h-4 w-4 mr-2" />
-                    Zobacz wyjaśnienie
+                    <Lightbulb className="h-4 w-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Zobacz wyjaśnienie</span>
+                    <span className="sm:hidden">Wyjaśnienie</span>
                   </Button>
                 </div>
               </div>
@@ -499,7 +500,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
                     </p>
                     <Button 
                       onClick={onRegisterClick}
-                      className="w-full bg-primary hover:bg-primary/90 text-sm sm:text-base"
+                      className="w-full min-h-[44px] bg-primary hover:bg-primary/90 text-sm sm:text-base rounded-xl active:scale-[0.97] transition-transform shadow-app"
                       data-testid="demo-register-cta"
                     >
                       <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
@@ -522,20 +523,21 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
               size="sm"
               onClick={goToPrev}
               disabled={currentIndex === 0}
+              className="min-h-[44px] min-w-[44px] rounded-xl active:scale-[0.97] transition-transform text-xs sm:text-sm px-2 sm:px-3"
               data-testid="demo-prev-button"
             >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Poprzednie
+              <ChevronLeft className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Poprzednie</span>
             </Button>
             
-            <div className="flex gap-1">
+            <div className="flex gap-1.5 sm:gap-1">
               {questions.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentIndex(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${
+                  className={`w-2.5 h-2.5 sm:w-2 sm:h-2 rounded-full transition-all ${
                     idx === currentIndex 
-                      ? 'bg-primary w-4' 
+                      ? 'bg-primary w-5 sm:w-4' 
                       : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
                   }`}
                   data-testid={`demo-dot-${idx}`}
@@ -548,10 +550,11 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
               size="sm"
               onClick={goToNext}
               disabled={currentIndex === questions.length - 1}
+              className="min-h-[44px] min-w-[44px] rounded-xl active:scale-[0.97] transition-transform text-xs sm:text-sm px-2 sm:px-3"
               data-testid="demo-next-button"
             >
-              Następne
-              <ChevronRight className="h-4 w-4 ml-1" />
+              <span className="hidden sm:inline">Następne</span>
+              <ChevronRight className="h-4 w-4 sm:ml-1" />
             </Button>
           </div>
         )}

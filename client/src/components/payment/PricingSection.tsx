@@ -86,18 +86,18 @@ export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
   }
 
   return (
-    <section className="py-20" id="pricing">
+    <section className="py-12 sm:py-16 lg:py-20" id="pricing">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+        <div className="text-center mb-10 sm:mb-16">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
             {t("pricing.title")}
           </h2>
-          <p className="text-xl text-muted-foreground">
+          <p className="text-sm sm:text-base lg:text-xl text-muted-foreground">
             {t("pricing.subtitle")}
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8 max-w-5xl mx-auto">
           {uniquePlans?.map((plan) => {
             const extras: PlanExtras = planFeatures[plan.durationDays] || { features: [] };
             const duration = plan.durationDays === 30 ? "1 miesiąc dostępu" 
@@ -107,39 +107,39 @@ export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
             return (
               <Card 
                 key={plan.id}
-                className={`relative hover:shadow-xl transition-all hover:-translate-y-2 ${
+                className={`relative hover:shadow-app-lg transition-all hover:-translate-y-2 rounded-2xl shadow-app ${
                   extras.isPopular ? 'border-2 border-primary' : ''
                 }`}
                 data-testid={`pricing-plan-${plan.durationDays}`}
               >
                 {extras.isPopular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <Badge className="bg-primary text-primary-foreground px-4 py-1">
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <Badge className="bg-primary text-primary-foreground px-3 sm:px-4 py-1 text-xs sm:text-sm">
                       {t("pricing.popular")}
                     </Badge>
                   </div>
                 )}
                 
-                <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl font-bold text-foreground mb-2">
+                <CardHeader className="text-center pb-4 sm:pb-8 pt-6 sm:pt-8">
+                  <CardTitle className="text-lg sm:text-2xl font-bold text-foreground mb-2">
                     {plan.name}
                   </CardTitle>
-                  <div className="text-4xl font-bold text-primary mb-2">
+                  <div className="text-2xl sm:text-4xl font-bold text-primary mb-2">
                     {plan.price} zł
                   </div>
-                  <p className="text-muted-foreground">{duration}</p>
+                  <p className="text-xs sm:text-base text-muted-foreground">{duration}</p>
                   {extras.savings && (
-                    <Badge variant="outline" className="bg-chart-2/10 text-chart-2 mt-2">
+                    <Badge variant="outline" className="bg-chart-2/10 text-chart-2 mt-2 text-xs">
                       {extras.savings}
                     </Badge>
                   )}
                 </CardHeader>
                 
-                <CardContent className="space-y-6">
-                  <ul className="space-y-4">
+                <CardContent className="space-y-4 sm:space-y-6 pb-6">
+                  <ul className="space-y-2 sm:space-y-4">
                     {extras.features.map((feature, index) => (
-                      <li key={index} className="flex items-center text-foreground">
-                        <Check className="h-5 w-5 text-chart-2 mr-3 flex-shrink-0" />
+                      <li key={index} className="flex items-center text-foreground text-sm sm:text-base">
+                        <Check className="h-4 w-4 sm:h-5 sm:w-5 text-chart-2 mr-2 sm:mr-3 flex-shrink-0" />
                         <span>{feature}</span>
                       </li>
                     ))}
@@ -147,9 +147,9 @@ export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
                   
                   {isAuthenticated ? (
                     <Button 
-                      className={`w-full ${
+                      className={`w-full min-h-[44px] rounded-xl active:scale-[0.97] transition-transform text-sm sm:text-base ${
                         extras.isPopular 
-                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-app-lg' 
                           : ''
                       }`}
                       variant={extras.isPopular ? "default" : "outline"}
@@ -162,9 +162,9 @@ export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
                     </Button>
                   ) : (
                     <Button 
-                      className={`w-full ${
+                      className={`w-full min-h-[44px] rounded-xl active:scale-[0.97] transition-transform text-sm sm:text-base ${
                         extras.isPopular 
-                          ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                          ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-app-lg' 
                           : ''
                       }`}
                       variant={extras.isPopular ? "default" : "outline"}
@@ -181,28 +181,28 @@ export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
         </div>
 
         {/* Payment methods */}
-        <div className="text-center mt-12">
-          <p className="text-muted-foreground mb-4">
+        <div className="text-center mt-8 sm:mt-12">
+          <p className="text-muted-foreground mb-3 sm:mb-4 text-xs sm:text-base">
             {t("pricing.payment.title")}
           </p>
-          <div className="flex justify-center items-center space-x-6 flex-wrap">
-            <div className="flex items-center space-x-2">
-              <CreditCard className="h-6 w-6 text-muted-foreground" />
-              <span className="text-muted-foreground">Visa</span>
+          <div className="flex justify-center items-center gap-3 sm:gap-6 flex-wrap">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <CreditCard className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
+              <span className="text-muted-foreground text-xs sm:text-base">Visa</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <CreditCard className="h-6 w-6 text-muted-foreground" />
-              <span className="text-muted-foreground">Mastercard</span>
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <CreditCard className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
+              <span className="text-muted-foreground text-xs sm:text-base">Mastercard</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <Smartphone className="h-6 w-6 text-muted-foreground" />
-              <span className="text-muted-foreground">Apple Pay</span>
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <Smartphone className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
+              <span className="text-muted-foreground text-xs sm:text-base">Apple Pay</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <Smartphone className="h-6 w-6 text-muted-foreground" />
-              <span className="text-muted-foreground">Google Pay</span>
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <Smartphone className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
+              <span className="text-muted-foreground text-xs sm:text-base">Google Pay</span>
             </div>
-            <span className="text-muted-foreground font-semibold">PayU</span>
+            <span className="text-muted-foreground font-semibold text-xs sm:text-base">PayU</span>
           </div>
         </div>
       </div>
