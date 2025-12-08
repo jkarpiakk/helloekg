@@ -55,10 +55,10 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
     transition,
   };
 
-  let borderClass = "border-border hover:border-primary/50";
-  let bgClass = "bg-card hover:bg-primary/5";
+  let borderClass = "border-slate-300 dark:border-slate-600 hover:border-primary/50";
+  let bgClass = "bg-white dark:bg-slate-800 hover:bg-primary/5";
   let shadowClass = "hover:shadow-md";
-  let positionBgClass = "bg-muted text-muted-foreground";
+  let positionBgClass = "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
   
   if (isCorrect) {
     borderClass = "border-green-500";
@@ -71,8 +71,8 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
     shadowClass = "shadow-md shadow-red-500/20";
     positionBgClass = "bg-red-500 text-white";
   } else if (disabled) {
-    borderClass = "border-muted";
-    bgClass = "bg-muted/30";
+    borderClass = "border-slate-200 dark:border-slate-700";
+    bgClass = "bg-slate-100 dark:bg-slate-800/50";
     shadowClass = "";
   }
 
@@ -177,7 +177,7 @@ export default function SortingQuestion({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <p className="text-sm sm:text-base text-muted-foreground">
+      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
         Ułóż elementy we właściwej kolejności przeciągając je
       </p>
 
@@ -214,8 +214,8 @@ export default function SortingQuestion({
 
         <DragOverlay>
           {activeItem && (
-            <div className="flex items-center gap-2 p-3 sm:p-4 rounded-lg border-2 border-primary bg-card shadow-xl">
-              <GripVertical className="h-5 w-5 text-muted-foreground" />
+            <div className="flex items-center gap-2 p-3 sm:p-4 rounded-lg border-2 border-primary bg-white dark:bg-slate-800 shadow-xl">
+              <GripVertical className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               {activeItem.imageUrl && (
                 <img 
                   src={activeItem.imageUrl} 

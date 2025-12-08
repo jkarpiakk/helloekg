@@ -178,7 +178,7 @@ export default function HotspotQuestion({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <p className="text-sm sm:text-base text-muted-foreground">
+      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
         {config.allowMultiple 
           ? "Kliknij na wszystkie prawidłowe obszary na obrazku"
           : "Kliknij na prawidłowy obszar na obrazku"}
@@ -267,10 +267,10 @@ export default function HotspotQuestion({
         })}
       </div>
 
-      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" data-testid="hotspot-status">
+      <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" data-testid="hotspot-status">
         <div className="flex items-center gap-2 text-sm font-medium">
-          <MousePointer2 className={`h-5 w-5 ${clickCoordinates.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-          <span className={clickCoordinates.length > 0 ? 'text-foreground' : 'text-muted-foreground'}>
+          <MousePointer2 className={`h-5 w-5 ${clickCoordinates.length > 0 ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} />
+          <span className={clickCoordinates.length > 0 ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}>
             {clickCoordinates.length === 0 
               ? "Kliknij na obrazek, aby zaznaczyć miejsce" 
               : clickedHotspots.size > 0
@@ -293,7 +293,7 @@ export default function HotspotQuestion({
       </div>
 
       {showResult && (
-        <div className="flex items-center gap-4 text-sm p-3 bg-muted/20 rounded-lg" data-testid="hotspot-legend">
+        <div className="flex items-center gap-4 text-sm p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" data-testid="hotspot-legend">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded bg-green-500/30 border-2 border-green-500 shadow-sm" />
             <span className="font-medium text-green-700 dark:text-green-400">Prawidłowy obszar</span>

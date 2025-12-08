@@ -111,13 +111,13 @@ export default function MatchingQuestion({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <p className="text-sm sm:text-base text-muted-foreground">
+      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
         Połącz elementy z lewej kolumny z odpowiadającymi im elementami z prawej
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div className="space-y-3" data-testid="matching-left">
-          <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
             Kolumna A
           </h4>
           <div className="space-y-2">
@@ -150,7 +150,7 @@ export default function MatchingQuestion({
                     </div>
                   </div>
                   {connectedRight && (
-                    <div className="ml-4 pl-3 border-l-2 border-primary/30 text-xs sm:text-sm text-muted-foreground">
+                    <div className="ml-4 pl-3 border-l-2 border-primary/30 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                       → {connectedRight.text}
                     </div>
                   )}
@@ -161,7 +161,7 @@ export default function MatchingQuestion({
         </div>
 
         <div className="space-y-3" data-testid="matching-right">
-          <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
             Kolumna B
           </h4>
           <div className="space-y-2">

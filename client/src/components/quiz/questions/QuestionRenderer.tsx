@@ -132,11 +132,11 @@ export default function QuestionRenderer({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card className="shadow-lg">
+      <Card className="shadow-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
         <CardContent className="p-4 sm:p-6 lg:p-8">
           <div className="mb-4 sm:mb-6 lg:mb-8">
             <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
-              <h3 className="text-lg sm:text-xl font-semibold text-foreground" data-testid="question-title">
+              <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white" data-testid="question-title">
                 {question.title}
               </h3>
               {questionType !== 'multiple_choice' && (
@@ -173,7 +173,7 @@ export default function QuestionRenderer({
 
             {question.bodyMd && (
               <div 
-                className="prose prose-sm sm:prose prose-slate max-w-none mb-4 sm:mb-6"
+                className="prose prose-sm sm:prose prose-slate dark:prose-invert max-w-none mb-4 sm:mb-6 [&>*]:text-slate-700 dark:[&>*]:text-slate-200"
                 dangerouslySetInnerHTML={sanitizeMarkdown(question.bodyMd)}
                 data-testid="question-body"
               />

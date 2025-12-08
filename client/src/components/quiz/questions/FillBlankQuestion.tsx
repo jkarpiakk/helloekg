@@ -80,7 +80,7 @@ export default function FillBlankQuestion({
 
       parts.push(
         <span key={`blank-${blank.id}`} className="inline-flex items-center gap-1 align-middle">
-          <span className="text-xs text-muted-foreground font-medium mr-1">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium mr-1">
             [{blankIndex + 1}]
           </span>
           <Input
@@ -125,19 +125,19 @@ export default function FillBlankQuestion({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <p className="text-sm sm:text-base text-muted-foreground">
+      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
         Uzupełnij puste pola odpowiednimi wartościami
       </p>
 
       <div 
-        className="text-base sm:text-lg leading-relaxed sm:leading-loose p-4 sm:p-6 bg-muted/30 rounded-lg"
+        className="text-base sm:text-lg leading-relaxed sm:leading-loose p-4 sm:p-6 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
         data-testid="fill-blank-text"
       >
         {renderTextWithBlanks()}
       </div>
 
-      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap" data-testid="fill-blank-hints">
-        <span className="font-semibold text-foreground">Podpowiedzi:</span>
+      <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 flex-wrap" data-testid="fill-blank-hints">
+        <span className="font-semibold text-slate-900 dark:text-white">Podpowiedzi:</span>
         {config.blanks.map((blank, index) => (
           <span 
             key={blank.id} 

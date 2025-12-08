@@ -47,8 +47,8 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
   };
 
-  let borderClass = "border-border hover:border-primary/50";
-  let bgClass = "bg-card hover:bg-primary/5";
+  let borderClass = "border-slate-300 dark:border-slate-600 hover:border-primary/50";
+  let bgClass = "bg-white dark:bg-slate-800 hover:bg-primary/5";
   let shadowClass = "hover:shadow-md";
   
   if (isCorrect) {
@@ -60,8 +60,8 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
     bgClass = "bg-red-50 dark:bg-red-950/30";
     shadowClass = "shadow-md shadow-red-500/20";
   } else if (disabled) {
-    borderClass = "border-muted";
-    bgClass = "bg-muted/30";
+    borderClass = "border-slate-200 dark:border-slate-700";
+    bgClass = "bg-slate-100 dark:bg-slate-800/50";
     shadowClass = "";
   }
 
@@ -108,8 +108,8 @@ interface DropZoneProps {
 function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({ id });
   
-  let borderClass = "border-dashed border-muted-foreground/40";
-  let bgClass = "bg-muted/20";
+  let borderClass = "border-dashed border-slate-400 dark:border-slate-500";
+  let bgClass = "bg-slate-100 dark:bg-slate-800/50";
   let shadowClass = "";
   
   if (isOver) {
@@ -157,10 +157,10 @@ function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZonePro
         </div>
       ) : (
         <div className="flex flex-col items-center gap-1">
-          <div className="w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
-            <span className="text-muted-foreground/50 text-lg">+</span>
+          <div className="w-8 h-8 rounded-full border-2 border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center">
+            <span className="text-slate-400 dark:text-slate-500 text-lg">+</span>
           </div>
-          <span className="text-xs sm:text-sm text-muted-foreground font-medium">{label}</span>
+          <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium">{label}</span>
         </div>
       )}
     </div>
@@ -240,7 +240,7 @@ export default function DragDropQuestion({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <p className="text-sm sm:text-base text-muted-foreground">
+      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
         Przeciągnij elementy do odpowiednich miejsc
       </p>
 
@@ -252,7 +252,7 @@ export default function DragDropQuestion({
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <div className="space-y-3" data-testid="drag-sources">
-            <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Elementy do przeciągnięcia
             </h4>
             <div className="space-y-2">
@@ -267,14 +267,14 @@ export default function DragDropQuestion({
               ))}
             </div>
             {availableSources.length === 0 && !showResult && (
-              <p className="text-sm text-muted-foreground italic p-3">
+              <p className="text-sm text-slate-600 dark:text-slate-400 italic p-3">
                 Wszystkie elementy zostały rozmieszczone
               </p>
             )}
           </div>
 
           <div className="space-y-3" data-testid="drop-targets">
-            <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Miejsca docelowe
             </h4>
             <div className="space-y-2">
@@ -310,8 +310,8 @@ export default function DragDropQuestion({
 
         <DragOverlay>
           {activeSource && (
-            <div className="flex items-center gap-2 p-3 sm:p-4 rounded-lg border-2 border-primary bg-card shadow-xl">
-              <GripVertical className="h-5 w-5 text-muted-foreground" />
+            <div className="flex items-center gap-2 p-3 sm:p-4 rounded-lg border-2 border-primary bg-white dark:bg-slate-800 shadow-xl">
+              <GripVertical className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               {activeSource.imageUrl && (
                 <img 
                   src={activeSource.imageUrl} 
