@@ -129,8 +129,8 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-8">
-        <div className="grid lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
+      <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-8">
+        <div className="grid lg:grid-cols-3 gap-4 md:gap-6 lg:gap-6">
           {/* Main content - 2 columns on large screens */}
           <div className="lg:col-span-2 space-y-4 md:space-y-6">
             {/* Progress Overview */}
