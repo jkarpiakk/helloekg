@@ -185,16 +185,6 @@ export default function DragDropQuestion({
     [config.sources, placedSourceIds]
   );
 
-  const findTargetForSource = useCallback((sourceId: string): string | null => {
-    const entries = Object.entries(placements);
-    for (let i = 0; i < entries.length; i++) {
-      if (entries[i][1] === sourceId) {
-        return entries[i][0];
-      }
-    }
-    return null;
-  }, [placements]);
-
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   }, []);
@@ -203,101 +193,107 @@ export default function DragDropQuestion({
     const { active, over } = event;
     setActiveId(null);
 
-    console.log('[DragDrop] handleDragEnd called', { 
-      activeId: active.id, 
-      overId: over?.id,
-      currentPlacements: placements 
-    });
-
-    if (!over) {
-      console.log('[DragDrop] No over target, returning');
-      return;
-    }
+    if (!over) return;
 
     const activeIdStr = String(active.id);
     const overId = String(over.id);
     const parsed = parseId(activeIdStr);
     const sourceId = String(parsed.sourceId);
     
-    console.log('[DragDrop] Parsed:', { activeIdStr, overId, sourceId, parsed });
-    
     const isTarget = config.targets.some(t => String(t.id) === overId);
     const isSourceContainer = overId === SOURCE_CONTAINER_ID;
     
-    console.log('[DragDrop] Target check:', { isTarget, isSourceContainer, targets: config.targets.map(t => String(t.id)) });
-    
-    if (!isTarget && !isSourceContainer) {
-      console.log('[DragDrop] Not a valid target, returning');
-      return;
-    }
+    if (!isTarget && !isSourceContainer) return;
 
-    const currentTargetId = findTargetForSource(sourceId);
-    
-    if (isSourceContainer) {
-      if (currentTargetId) {
-        const newPlacements = { ...placements };
+    // Use functional update to avoid stale closure
+    setPlacements(prevPlacements => {
+      // Find current target for this source
+      let currentTargetId: string | null = null;
+      for (const [tId, sId] of Object.entries(prevPlacements)) {
+        if (sId === sourceId) {
+          currentTargetId = tId;
+          break;
+        }
+      }
+
+      // Handle return to source container
+      if (isSourceContainer) {
+        if (currentTargetId) {
+          const newPlacements = { ...prevPlacements };
+          delete newPlacements[currentTargetId];
+          
+          // Trigger onChange with new state
+          setTimeout(() => {
+            onChange({
+              type: 'drag_drop',
+              placements: Object.entries(newPlacements).map(([targetId, srcId]) => ({
+                sourceId: srcId,
+                targetId,
+              })),
+            });
+          }, 0);
+          
+          return newPlacements;
+        }
+        return prevPlacements;
+      }
+
+      // Handle drop on target
+      const newPlacements = { ...prevPlacements };
+      
+      // Remove from old target if moving
+      if (currentTargetId && currentTargetId !== overId) {
         delete newPlacements[currentTargetId];
-        setPlacements(newPlacements);
-        
-        const answerData: AnswerData = {
+      }
+      
+      // Swap if target already has an item
+      const existingSourceInTarget = newPlacements[overId];
+      if (existingSourceInTarget && existingSourceInTarget !== sourceId) {
+        if (currentTargetId) {
+          newPlacements[currentTargetId] = existingSourceInTarget;
+        }
+      }
+      
+      // Place in new target
+      newPlacements[overId] = sourceId;
+
+      // Trigger onChange with new state
+      setTimeout(() => {
+        onChange({
           type: 'drag_drop',
           placements: Object.entries(newPlacements).map(([targetId, srcId]) => ({
             sourceId: srcId,
             targetId,
           })),
-        };
-        onChange(answerData);
-      }
-      return;
-    }
+        });
+      }, 0);
 
-    const newPlacements = { ...placements };
-    
-    console.log('[DragDrop] Before update:', { currentTargetId, overId, newPlacements: {...newPlacements} });
-    
-    if (currentTargetId && currentTargetId !== overId) {
-      delete newPlacements[currentTargetId];
-    }
-    
-    const existingSourceInTarget = newPlacements[overId];
-    if (existingSourceInTarget && existingSourceInTarget !== sourceId) {
-      if (currentTargetId) {
-        newPlacements[currentTargetId] = existingSourceInTarget;
-      }
-    }
-    
-    newPlacements[overId] = sourceId;
-    console.log('[DragDrop] After update:', { newPlacements: {...newPlacements} });
-    setPlacements(newPlacements);
-
-    const answerData: AnswerData = {
-      type: 'drag_drop',
-      placements: Object.entries(newPlacements).map(([targetId, srcId]) => ({
-        sourceId: srcId,
-        targetId,
-      })),
-    };
-    onChange(answerData);
-  }, [placements, config.targets, onChange, findTargetForSource]);
+      return newPlacements;
+    });
+  }, [config.targets, onChange]);
 
   const handleDragCancel = useCallback(() => {
     setActiveId(null);
   }, []);
 
   const handleRemoveFromZone = useCallback((targetId: string) => {
-    const newPlacements = { ...placements };
-    delete newPlacements[targetId];
-    setPlacements(newPlacements);
-
-    const answerData: AnswerData = {
-      type: 'drag_drop',
-      placements: Object.entries(newPlacements).map(([tId, srcId]) => ({
-        sourceId: srcId,
-        targetId: tId,
-      })),
-    };
-    onChange(answerData);
-  }, [placements, onChange]);
+    setPlacements(prevPlacements => {
+      const newPlacements = { ...prevPlacements };
+      delete newPlacements[targetId];
+      
+      setTimeout(() => {
+        onChange({
+          type: 'drag_drop',
+          placements: Object.entries(newPlacements).map(([tId, srcId]) => ({
+            sourceId: srcId,
+            targetId: tId,
+          })),
+        });
+      }, 0);
+      
+      return newPlacements;
+    });
+  }, [onChange]);
 
   const activeSourceId = activeId ? String(parseId(activeId).sourceId) : null;
   const activeSource = activeSourceId 
