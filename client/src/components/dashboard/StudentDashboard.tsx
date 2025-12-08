@@ -8,9 +8,9 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import ProgressCard from "./ProgressCard";
-import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle, BookOpen, Home
+import { Play, RotateCcw, Crown, Award, Heart, CheckCircle, AlertCircle
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { SectionWithProgress, UserProgress, WeakArea, Certificate } from "@/types";
 
@@ -106,10 +106,10 @@ export default function StudentDashboard() {
     sections.reduce((acc, section) => acc + section.completionPercentage, 0) / sections.length : 0;
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
-      {/* Desktop Header - hidden on mobile */}
-      <div className="hidden md:block bg-card border-b border-border">
-        <div className="w-full max-w-[min(92vw,1680px)] mx-auto px-4 md:px-6 lg:px-8 xl:px-12 2xl:px-16 py-4 md:py-6">
+    <div className="min-h-screen bg-background">
+      {/* Dashboard Header */}
+      <div className="bg-card border-b border-border">
+        <div className="max-w-6xl lg:max-w-[min(92vw,1680px)] mx-auto px-4 md:px-6 lg:px-8 xl:px-12 py-4 md:py-6">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground" data-testid="welcome-message">
@@ -129,32 +129,8 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Mobile Header - sticky app-style */}
-      <div className="md:hidden sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-foreground" data-testid="welcome-message-mobile">
-              Cześć, {user?.firstName}!
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {stats.streak > 0 && (
-              <div className="flex items-center gap-1 bg-chart-3/10 text-chart-3 px-2 py-1 rounded-full text-sm font-medium">
-                <Flame className="h-4 w-4" />
-                {stats.streak}
-              </div>
-            )}
-            {subscription && (
-              <div className="bg-chart-2/10 text-chart-2 p-1.5 rounded-full">
-                <Crown className="h-4 w-4" />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
-      <div className="w-full max-w-[min(92vw,1680px)] mx-auto px-4 md:px-6 lg:px-8 xl:px-12 2xl:px-16 py-4 md:py-8">
+      <div className="max-w-6xl lg:max-w-[min(92vw,1680px)] mx-auto px-4 md:px-6 lg:px-8 xl:px-12 py-4 md:py-8">
         <div className="grid lg:grid-cols-[2fr_1fr] gap-4 md:gap-6">
           {/* Main content */}
           <div className="space-y-4 md:space-y-6">
@@ -421,28 +397,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-2 z-50" data-testid="mobile-bottom-nav">
-        <div className="grid grid-cols-4 gap-2">
-          <Link href="/dashboard" className="flex flex-col items-center gap-1 py-2 text-primary" data-testid="nav-dashboard">
-            <Home className="h-5 w-5" />
-            <span className="text-xs font-medium">Panel</span>
-          </Link>
-          <Link href="/quiz" className="flex flex-col items-center gap-1 py-2 text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-quiz">
-            <Play className="h-5 w-5" />
-            <span className="text-xs">Quiz</span>
-          </Link>
-          <Link href="/modules" className="flex flex-col items-center gap-1 py-2 text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-modules">
-            <BookOpen className="h-5 w-5" />
-            <span className="text-xs">Moduły</span>
-          </Link>
-          <Link href={myCertificates?.[0] ? `/certificate/${myCertificates[0].certificateId}` : "/dashboard"} className="flex flex-col items-center gap-1 py-2 text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-certificate">
-            <Award className="h-5 w-5" />
-            <span className="text-xs">Certyfikat</span>
-          </Link>
-        </div>
-      </nav>
     </div>
   );
 }
