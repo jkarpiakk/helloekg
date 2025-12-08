@@ -322,31 +322,32 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Quiz Header - Premium glass styling */}
-      <div className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-app safe-top border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      {/* Quiz Header - Premium gradient styling */}
+      <div className="sticky top-0 z-40 bg-gradient-to-r from-slate-900 via-slate-800 to-primary/90 dark:from-slate-950 dark:via-slate-900 dark:to-primary/80 shadow-xl safe-top">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+        <div className="max-w-4xl mx-auto px-4 py-4 relative">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
               <Button
                 variant="ghost"
                 onClick={handleExit}
                 data-testid="exit-quiz"
-                className="min-h-[44px] min-w-[44px] rounded-xl active:scale-[0.97] motion-safe:transition-transform"
+                className="min-h-[44px] min-w-[44px] rounded-xl text-white/90 hover:text-white hover:bg-white/10 active:scale-[0.97] motion-safe:transition-all"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Moduł EKG</h2>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
+                <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">Moduł EKG</h2>
+                <p className="text-sm text-white/70 font-medium">
                   {t("quiz.question")} {currentQuestionIndex + 1}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
-              <div className="w-20 sm:w-32 lg:w-48 h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
+              <div className="w-20 sm:w-32 lg:w-48 h-3 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
                 <div 
-                  className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full motion-safe:transition-all motion-safe:duration-300"
+                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-300 rounded-full motion-safe:transition-all motion-safe:duration-500 shadow-[0_0_12px_rgba(52,211,153,0.5)]"
                   style={{ 
                     width: `${mode === "exam" && examTotalQuestions > 0 
                       ? ((currentQuestionIndex + 1) / examTotalQuestions) * 100 
@@ -354,7 +355,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                   }}
                 />
               </div>
-              <span className="text-sm text-slate-700 dark:text-slate-300 font-mono min-w-[3rem] text-right">
+              <span className="text-sm text-white font-bold tabular-nums min-w-[3rem] text-right">
                 {mode === "exam" && examTotalQuestions > 0 
                   ? `${currentQuestionIndex + 1}/${examTotalQuestions}`
                   : `${Math.round(((currentQuestionIndex + 1) / 10) * 100)}%`}
