@@ -67,13 +67,13 @@ export default function QuestionCard({
   const typeInfo = questionTypeInfo[questionType];
 
   const getOptionClassName = (index: number): string => {
-    const baseClass = "quiz-option min-h-[52px] py-4 px-4 border-2 rounded-2xl cursor-pointer touch-manipulation flex items-center motion-safe:transition-all motion-safe:duration-200";
+    const baseClass = "min-h-[52px] py-4 px-4 border-2 rounded-2xl cursor-pointer touch-manipulation flex items-center motion-safe:transition-all motion-safe:duration-200";
     
     if (!showExplanation) {
       if (selectedAnswer === index) {
-        return `${baseClass} bg-white/80 dark:bg-slate-800/90 border-primary ring-2 ring-primary ring-offset-2 shadow-app-lg text-foreground`;
+        return `${baseClass} bg-white dark:bg-slate-800 border-primary ring-2 ring-primary ring-offset-2 shadow-app-lg text-slate-900 dark:text-white`;
       }
-      return `${baseClass} bg-white/70 dark:bg-slate-800/80 border-border/50 dark:border-slate-600/50 hover:border-primary/50 hover:bg-white dark:hover:bg-slate-700/90 hover:shadow-app-lg active:scale-[0.97] shadow-app text-foreground`;
+      return `${baseClass} bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-primary/50 hover:shadow-app-lg active:scale-[0.97] shadow-app text-slate-900 dark:text-white`;
     }
 
     if (selectedAnswer === index) {
@@ -86,7 +86,7 @@ export default function QuestionCard({
       return `${baseClass} correct border-green-500 bg-green-500 text-white shadow-glow-success`;
     }
 
-    return `${baseClass} border-muted/30 bg-muted/20 dark:bg-slate-800/50 text-muted-foreground opacity-60`;
+    return `${baseClass} border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 opacity-60`;
   };
 
   return (
