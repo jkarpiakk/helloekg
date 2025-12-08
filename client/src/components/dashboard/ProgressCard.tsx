@@ -1,5 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Target, Flame } from "lucide-react";
+import { Target, Flame, Zap, TrendingUp } from "lucide-react";
 
 interface ProgressCardProps {
   overallProgress: number;
@@ -8,95 +7,126 @@ interface ProgressCardProps {
 }
 
 export default function ProgressCard({ overallProgress, successRate, streak }: ProgressCardProps) {
+  const circumference = 2 * Math.PI * 54;
+  const strokeDashoffset = circumference - (circumference * overallProgress / 100);
+  
   return (
     <>
-      {/* Mobile Hero Card - app-like full-width design */}
+      {/* Mobile Premium Hero - App Store quality */}
       <div className="md:hidden">
-        <Card className="bg-gradient-to-br from-primary/15 via-background to-chart-2/10 border-primary/20 rounded-2xl overflow-hidden shadow-lg">
-          <CardContent className="p-5">
-            {/* Large centered progress ring */}
-            <div className="flex flex-col items-center mb-5">
-              <div className="relative w-36 h-36">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+        <div className="relative overflow-hidden rounded-3xl app-gradient-hero shadow-app-lg">
+          {/* Decorative gradient orbs */}
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-chart-2/20 rounded-full blur-2xl" />
+          
+          <div className="relative p-6">
+            {/* Header with motivational text */}
+            <div className="text-center mb-6">
+              <p className="text-sm font-medium text-muted-foreground mb-1">Twój postęp</p>
+              <h2 className="text-title text-foreground">
+                {overallProgress >= 80 ? "Świetna robota! 🎉" : 
+                 overallProgress >= 50 ? "Jesteś w połowie drogi!" :
+                 overallProgress >= 20 ? "Dobry początek!" : "Zaczynamy przygodę!"}
+              </h2>
+            </div>
+            
+            {/* Large animated progress ring */}
+            <div className="flex justify-center mb-6">
+              <div className="relative w-44 h-44">
+                {/* Outer glow ring */}
+                <div className={`absolute inset-0 rounded-full ${overallProgress >= 80 ? 'shadow-glow-success animate-pulse-glow' : ''}`} />
+                
+                <svg viewBox="0 0 120 120" className="w-full h-full progress-ring-glow">
+                  {/* Background track */}
                   <circle 
-                    cx="50" 
-                    cy="50" 
-                    r="42" 
+                    cx="60" 
+                    cy="60" 
+                    r="54" 
                     stroke="currentColor"
-                    strokeWidth="6" 
+                    strokeWidth="8" 
                     fill="none"
-                    className="text-muted/20"
+                    className="text-muted/15"
                   />
+                  {/* Gradient progress arc */}
                   <circle 
-                    cx="50" 
-                    cy="50" 
-                    r="42" 
-                    stroke="url(#progressGradient)"
-                    strokeWidth="6" 
+                    cx="60" 
+                    cy="60" 
+                    r="54" 
+                    stroke="url(#premiumGradient)"
+                    strokeWidth="8" 
                     fill="none"
                     strokeLinecap="round"
                     className="transition-all duration-1000 ease-out"
                     style={{ 
-                      strokeDasharray: 264,
-                      strokeDashoffset: 264 - (264 * overallProgress / 100)
+                      strokeDasharray: circumference,
+                      strokeDashoffset: strokeDashoffset,
+                      transform: 'rotate(-90deg)',
+                      transformOrigin: '60px 60px'
                     }}
                   />
                   <defs>
-                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="hsl(var(--primary))" />
-                      <stop offset="100%" stopColor="hsl(var(--chart-2))" />
+                    <linearGradient id="premiumGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="hsl(221 83% 53%)" />
+                      <stop offset="50%" stopColor="hsl(200 80% 50%)" />
+                      <stop offset="100%" stopColor="hsl(173 58% 39%)" />
                     </linearGradient>
                   </defs>
                 </svg>
+                
+                {/* Center content */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-bold text-foreground" data-testid="overall-progress-mobile">
+                  <span className="text-display text-foreground" data-testid="overall-progress-mobile">
                     {Math.round(overallProgress)}%
                   </span>
-                  <span className="text-base text-muted-foreground">ukończono</span>
+                  <span className="text-sm text-muted-foreground font-medium">ukończono</span>
                 </div>
               </div>
-              <p className="text-base text-muted-foreground mt-2">Twój postęp w nauce EKG</p>
             </div>
             
-            {/* Stats row - large touch targets */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* Celność */}
-              <div className="bg-card/80 backdrop-blur border border-chart-2/30 rounded-2xl p-4 min-h-[100px] flex flex-col justify-center active:scale-[0.98] transition-transform touch-manipulation">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 rounded-xl bg-chart-2/20 flex items-center justify-center">
-                    <Target className="h-6 w-6 text-chart-2" />
-                  </div>
-                  <span className="text-base text-muted-foreground font-medium">Celność</span>
+            {/* Stats grid - premium tiles */}
+            <div className="grid grid-cols-3 gap-3">
+              {/* Accuracy stat */}
+              <div className="stat-card-teal rounded-2xl p-4 text-center touch-bounce" data-testid="stat-accuracy">
+                <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-chart-2/20 flex items-center justify-center">
+                  <Target className="h-5 w-5 text-chart-2" />
                 </div>
-                <span className="text-3xl font-bold text-chart-2" data-testid="success-rate-mobile">
+                <span className="block text-2xl font-bold text-chart-2" data-testid="success-rate-mobile">
                   {Math.round(successRate)}%
                 </span>
+                <span className="block text-xs text-muted-foreground font-medium mt-0.5">Celność</span>
               </div>
               
-              {/* Seria */}
-              <div className="bg-card/80 backdrop-blur border border-chart-3/30 rounded-2xl p-4 min-h-[100px] flex flex-col justify-center active:scale-[0.98] transition-transform touch-manipulation">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 rounded-xl bg-chart-3/20 flex items-center justify-center">
-                    <Flame className="h-6 w-6 text-chart-3" />
-                  </div>
-                  <span className="text-base text-muted-foreground font-medium">Seria</span>
+              {/* Streak stat */}
+              <div className="stat-card-orange rounded-2xl p-4 text-center touch-bounce" data-testid="stat-streak">
+                <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-chart-3/20 flex items-center justify-center">
+                  <Flame className="h-5 w-5 text-chart-3" />
                 </div>
-                <span className="text-3xl font-bold text-chart-3" data-testid="streak-count-mobile">
-                  {streak} <span className="text-lg font-normal text-muted-foreground">dni</span>
+                <span className="block text-2xl font-bold text-chart-3" data-testid="streak-count-mobile">
+                  {streak}
                 </span>
+                <span className="block text-xs text-muted-foreground font-medium mt-0.5">Seria dni</span>
+              </div>
+              
+              {/* Level/XP stat */}
+              <div className="stat-card-purple rounded-2xl p-4 text-center touch-bounce" data-testid="stat-level">
+                <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-chart-4/20 flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-chart-4" />
+                </div>
+                <span className="block text-2xl font-bold text-chart-4">
+                  {Math.floor(overallProgress / 10) + 1}
+                </span>
+                <span className="block text-xs text-muted-foreground font-medium mt-0.5">Poziom</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Desktop Card - horizontal layout */}
       <div className="hidden md:block">
-        <Card>
-          <CardHeader className="pb-2 px-6 pt-5">
-            <CardTitle className="text-lg lg:text-xl">Ogólny postęp</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 pt-4">
+        <div className="bg-card border border-border rounded-2xl shadow-sm">
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Ogólny postęp</h3>
             <div className="flex items-center gap-8 lg:gap-12">
               {/* Progress Ring */}
               <div className="flex-shrink-0">
@@ -162,8 +192,8 @@ export default function ProgressCard({ overallProgress, successRate, streak }: P
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </>
   );
