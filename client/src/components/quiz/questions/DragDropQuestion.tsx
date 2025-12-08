@@ -181,7 +181,7 @@ export default function DragDropQuestion({
 
   const placedSourceIds = useMemo(() => new Set(Object.values(placements)), [placements]);
   const availableSources = useMemo(
-    () => config.sources.filter(source => !placedSourceIds.has(source.id)),
+    () => config.sources.filter(source => !placedSourceIds.has(String(source.id))),
     [config.sources, placedSourceIds]
   );
 
@@ -205,12 +205,12 @@ export default function DragDropQuestion({
 
     if (!over) return;
 
-    const activeIdStr = active.id as string;
-    const overId = over.id as string;
+    const activeIdStr = String(active.id);
+    const overId = String(over.id);
     const parsed = parseId(activeIdStr);
-    const sourceId = parsed.sourceId;
+    const sourceId = String(parsed.sourceId);
     
-    const isTarget = config.targets.some(t => t.id === overId);
+    const isTarget = config.targets.some(t => String(t.id) === overId);
     const isSourceContainer = overId === SOURCE_CONTAINER_ID;
     
     if (!isTarget && !isSourceContainer) return;
@@ -341,9 +341,10 @@ export default function DragDropQuestion({
             </h4>
             <div className="space-y-4">
               {config.targets.map(target => {
-                const placedSourceId = placements[target.id];
+                const targetIdStr = String(target.id);
+                const placedSourceId = placements[targetIdStr];
                 const placedSource = placedSourceId 
-                  ? config.sources.find(s => s.id === placedSourceId)
+                  ? config.sources.find(s => String(s.id) === placedSourceId)
                   : undefined;
 
                 const isCorrect = showResult && result?.feedback?.correctItems?.includes(target.id);
@@ -352,8 +353,8 @@ export default function DragDropQuestion({
 
                 return (
                   <DropZone
-                    key={target.id}
-                    id={target.id}
+                    key={targetIdStr}
+                    id={targetIdStr}
                     label={target.label}
                     isOver={false}
                     hasItem={!!placedSource && !isBeingDragged}
@@ -363,7 +364,7 @@ export default function DragDropQuestion({
                     {placedSource && !isBeingDragged && (
                       <div className="relative">
                         <DraggableItem
-                          dragId={`${PLACED_PREFIX}${target.id}:${placedSource.id}`}
+                          dragId={`${PLACED_PREFIX}${targetIdStr}:${placedSource.id}`}
                           content={placedSource.content}
                           imageUrl={placedSource.imageUrl}
                           disabled={disabled}
@@ -372,9 +373,9 @@ export default function DragDropQuestion({
                         />
                         {!disabled && !showResult && (
                           <button
-                            onClick={() => handleRemoveFromZone(target.id)}
+                            onClick={() => handleRemoveFromZone(targetIdStr)}
                             className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg z-10"
-                            data-testid={`remove-btn-${target.id}`}
+                            data-testid={`remove-btn-${targetIdStr}`}
                             title="Usuń"
                           >
                             <X className="h-4 w-4" />
