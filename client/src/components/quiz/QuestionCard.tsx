@@ -96,7 +96,7 @@ export default function QuestionCard({
         <CardContent className="p-5 sm:p-6 lg:p-8">
           <div className="mb-5 sm:mb-6 lg:mb-8">
             <div className="flex items-start justify-between gap-3 mb-4">
-              <h3 className="text-lg sm:text-xl font-semibold text-foreground leading-snug" data-testid="question-title">
+              <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white leading-snug" data-testid="question-title">
                 {question.title}
               </h3>
               {isInteractiveType && (
