@@ -73,8 +73,8 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
       className={`
         flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg border-2 
         ${borderClass} ${bgClass} ${shadowClass}
-        ${isDragging ? "opacity-70 shadow-xl scale-105 z-50" : ""}
-        ${disabled ? "cursor-default opacity-80" : "cursor-grab active:cursor-grabbing active:scale-[0.98]"}
+        ${isDragging ? "opacity-90 shadow-xl scale-105 z-50" : ""}
+        ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing active:scale-[0.98]"}
         touch-manipulation transition-all duration-200
       `}
       {...attributes}
@@ -90,7 +90,7 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
           className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded border border-border"
         />
       )}
-      <span className="text-sm sm:text-base flex-1 font-medium">{content}</span>
+      <span className="text-sm sm:text-base flex-1 font-medium text-slate-900 dark:text-white">{content}</span>
       {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
       {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
     </div>
@@ -151,7 +151,7 @@ function DropZone({ id, label, placedItem, isCorrect, isIncorrect }: DropZonePro
               className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded border border-border"
             />
           )}
-          <span className="text-sm sm:text-base font-medium">{placedItem.content}</span>
+          <span className="text-sm sm:text-base font-medium text-slate-900 dark:text-white">{placedItem.content}</span>
           {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
           {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
         </div>
@@ -289,7 +289,7 @@ export default function DragDropQuestion({
 
                 return (
                   <div key={target.id} className="space-y-1">
-                    <span className="text-xs sm:text-sm font-medium">{target.label}</span>
+                    <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">{target.label}</span>
                     <DropZone
                       id={target.id}
                       label="Upuść tutaj"
@@ -319,7 +319,7 @@ export default function DragDropQuestion({
                   className="w-10 h-10 object-cover rounded"
                 />
               )}
-              <span className="text-sm sm:text-base">{activeSource.content}</span>
+              <span className="text-sm sm:text-base text-slate-900 dark:text-white">{activeSource.content}</span>
             </div>
           )}
         </DragOverlay>

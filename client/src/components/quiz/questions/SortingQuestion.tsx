@@ -84,8 +84,8 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
       className={`
         flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg border-2 
         ${borderClass} ${bgClass} ${shadowClass}
-        ${isDragging ? "opacity-70 shadow-xl scale-105 z-50" : ""}
-        ${disabled ? "cursor-default opacity-80" : "cursor-grab active:cursor-grabbing active:scale-[0.98]"}
+        ${isDragging ? "opacity-90 shadow-xl scale-105 z-50" : ""}
+        ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing active:scale-[0.98]"}
         touch-manipulation transition-all duration-200
       `}
       {...attributes}
@@ -104,7 +104,7 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
           className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded border border-border"
         />
       )}
-      <span className="text-sm sm:text-base flex-1 font-medium">{content}</span>
+      <span className="text-sm sm:text-base flex-1 font-medium text-slate-900 dark:text-white">{content}</span>
       {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
       {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
     </div>
@@ -223,7 +223,7 @@ export default function SortingQuestion({
                   className="w-10 h-10 object-cover rounded"
                 />
               )}
-              <span className="text-sm sm:text-base">{activeItem.text}</span>
+              <span className="text-sm sm:text-base text-slate-900 dark:text-white">{activeItem.text}</span>
             </div>
           )}
         </DragOverlay>

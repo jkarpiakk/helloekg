@@ -76,14 +76,14 @@ export default function MatchingQuestion({
     if (showResult) {
       const isCorrect = result?.feedback?.correctItems?.includes(leftId);
       const isIncorrect = result?.feedback?.incorrectItems?.includes(leftId);
-      if (isCorrect) return `${baseClass} border-green-500 bg-green-50 dark:bg-green-950/30 shadow-md shadow-green-500/20`;
-      if (isIncorrect) return `${baseClass} border-red-500 bg-red-50 dark:bg-red-950/30 shadow-md shadow-red-500/20`;
-      return `${baseClass} border-muted bg-muted/30 opacity-60`;
+      if (isCorrect) return `${baseClass} border-green-500 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200 shadow-md shadow-green-500/20`;
+      if (isIncorrect) return `${baseClass} border-red-500 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 shadow-md shadow-red-500/20`;
+      return `${baseClass} border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400`;
     }
     
-    if (isSelected) return `${baseClass} border-primary bg-primary/15 ring-2 ring-primary ring-offset-2 shadow-lg scale-[1.02]`;
-    if (isPaired) return `${baseClass} border-primary bg-primary/10 shadow-sm`;
-    return `${baseClass} border-border hover:border-primary/50 hover:bg-primary/5 hover:shadow-md active:scale-[0.98]`;
+    if (isSelected) return `${baseClass} border-primary bg-primary/15 text-slate-900 dark:text-white ring-2 ring-primary ring-offset-2 shadow-lg scale-[1.02]`;
+    if (isPaired) return `${baseClass} border-primary bg-primary/10 text-slate-900 dark:text-white shadow-sm`;
+    return `${baseClass} border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white hover:border-primary/50 hover:bg-primary/5 hover:shadow-md active:scale-[0.98]`;
   };
 
   const getRightItemClass = (rightId: string) => {
@@ -91,16 +91,16 @@ export default function MatchingQuestion({
     const isPaired = Array.from(pairs.values()).includes(rightId);
     
     if (showResult) {
-      return `${baseClass} border-muted bg-muted/30 opacity-60 cursor-default`;
+      return `${baseClass} border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 cursor-default`;
     }
     
     if (!selectedLeft) {
-      if (isPaired) return `${baseClass} border-primary/40 bg-primary/10 cursor-default shadow-sm`;
-      return `${baseClass} border-border cursor-default opacity-70`;
+      if (isPaired) return `${baseClass} border-primary/40 bg-primary/10 text-slate-900 dark:text-white cursor-default shadow-sm`;
+      return `${baseClass} border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-default`;
     }
     
-    if (isPaired) return `${baseClass} border-primary/40 bg-primary/10 cursor-pointer`;
-    return `${baseClass} border-border cursor-pointer hover:border-primary hover:bg-primary/10 hover:shadow-md active:scale-[0.98]`;
+    if (isPaired) return `${baseClass} border-primary/40 bg-primary/10 text-slate-900 dark:text-white cursor-pointer`;
+    return `${baseClass} border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white cursor-pointer hover:border-primary hover:bg-primary/10 hover:shadow-md active:scale-[0.98]`;
   };
 
   const getConnectedRight = (leftId: string) => {
@@ -141,7 +141,7 @@ export default function MatchingQuestion({
                           className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded"
                         />
                       )}
-                      <span className="text-sm sm:text-base flex-1">{item.text}</span>
+                      <span className="text-sm sm:text-base font-medium flex-1">{item.text}</span>
                       {showResult && isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" data-testid={`match-correct-${item.id}`} />}
                       {showResult && isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" data-testid={`match-incorrect-${item.id}`} />}
                       {connectedRight && !showResult && (
@@ -180,7 +180,7 @@ export default function MatchingQuestion({
                       className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded"
                     />
                   )}
-                  <span className="text-sm sm:text-base">{item.text}</span>
+                  <span className="text-sm sm:text-base font-medium">{item.text}</span>
                 </div>
               </div>
             ))}
