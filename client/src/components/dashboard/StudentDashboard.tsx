@@ -8,9 +8,9 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import ProgressCard from "./ProgressCard";
-import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle
+import { Play, RotateCcw, Crown, Target, Flame, Award, Heart, Clock, CheckCircle, AlertCircle, BookOpen, Home
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { SectionWithProgress, UserProgress, WeakArea, Certificate } from "@/types";
 
@@ -106,10 +106,10 @@ export default function StudentDashboard() {
     sections.reduce((acc, section) => acc + section.completionPercentage, 0) / sections.length : 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Dashboard Header */}
-      <div className="bg-card border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
+      {/* Desktop Header - hidden on mobile */}
+      <div className="hidden md:block bg-card border-b border-border">
+        <div className="w-full max-w-[min(92vw,1680px)] mx-auto px-4 md:px-6 lg:px-8 xl:px-12 2xl:px-16 py-4 md:py-6">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground" data-testid="welcome-message">
@@ -129,10 +129,35 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 xl:px-10 py-4 md:py-8">
-        <div className="grid lg:grid-cols-3 gap-4 md:gap-6 lg:gap-6">
-          {/* Main content - 2 columns on large screens */}
-          <div className="lg:col-span-2 space-y-4 md:space-y-6">
+      {/* Mobile Header - sticky app-style */}
+      <div className="md:hidden sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-foreground" data-testid="welcome-message-mobile">
+              Cześć, {user?.firstName}!
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {stats.streak > 0 && (
+              <div className="flex items-center gap-1 bg-chart-3/10 text-chart-3 px-2 py-1 rounded-full text-sm font-medium">
+                <Flame className="h-4 w-4" />
+                {stats.streak}
+              </div>
+            )}
+            {subscription && (
+              <div className="bg-chart-2/10 text-chart-2 p-1.5 rounded-full">
+                <Crown className="h-4 w-4" />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="w-full max-w-[min(92vw,1680px)] mx-auto px-4 md:px-6 lg:px-8 xl:px-12 2xl:px-16 py-4 md:py-8">
+        <div className="grid lg:grid-cols-[2fr_1fr] gap-4 md:gap-6">
+          {/* Main content */}
+          <div className="space-y-4 md:space-y-6">
             {/* Progress Overview */}
             <ProgressCard
               overallProgress={overallProgress}
@@ -140,52 +165,85 @@ export default function StudentDashboard() {
               streak={stats.streak}
             />
 
-            {/* Continue Learning */}
-            <Card>
+            {/* Continue Learning - Mobile: horizontal scroll, Desktop: grid */}
+            <Card className="overflow-hidden">
               <CardHeader className="pb-2 px-4 md:px-6 pt-4">
                 <CardTitle className="text-lg">{t("dashboard.continue")}</CardTitle>
               </CardHeader>
-              <CardContent className="px-4 md:px-6 pb-4">
-                <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3">
-                  {/* Interactive Lecture */}
-                  <Link href="/lecture" className="block">
-                    <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:shadow-md active:scale-[0.98] transition-all cursor-pointer group bg-gradient-to-r from-primary/5 to-chart-2/5 touch-manipulation">
-                      <div className="w-11 h-11 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Heart className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+              <CardContent className="px-0 md:px-6 pb-4">
+                {/* Mobile: Horizontal scrollable */}
+                <div className="md:hidden overflow-x-auto scrollbar-hide">
+                  <div className="flex gap-3 px-4 pb-2">
+                    {/* Interactive Lecture */}
+                    <Link href="/lecture" className="flex-shrink-0 w-[260px]">
+                      <div className="h-full p-4 border border-primary/20 rounded-xl bg-gradient-to-br from-primary/10 to-chart-2/5 active:scale-[0.98] transition-all touch-manipulation">
+                        <div className="w-11 h-11 bg-primary/20 rounded-xl flex items-center justify-center mb-3">
+                          <Heart className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-base font-semibold text-foreground">Interaktywny wykład</h3>
-                          <Badge className="bg-chart-2/10 text-chart-2 border-chart-2/20 text-xs px-1.5 py-0">NOWE</Badge>
+                          <Badge className="bg-chart-2/20 text-chart-2 border-0 text-xs px-1.5 py-0">NOWE</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">Podstawy EKG</p>
                       </div>
-                    </div>
-                  </Link>
+                    </Link>
 
-                  {/* Continue where left off */}
-                  <Link href="/quiz" className="block">
-                    <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:shadow-md active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                      <div className="w-11 h-11 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Play className="h-5 w-5 text-primary" />
+                    {/* Continue Quiz */}
+                    <Link href="/quiz" className="flex-shrink-0 w-[260px]">
+                      <div className="h-full p-4 border border-border rounded-xl bg-card active:scale-[0.98] transition-all touch-manipulation">
+                        <div className="w-11 h-11 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
+                          <Play className="h-5 w-5 text-primary" />
+                        </div>
+                        <h3 className="text-base font-semibold text-foreground mb-1">Kontynuuj naukę</h3>
+                        <p className="text-sm text-muted-foreground">Moduł 1 • Ostatnia aktywność: 2h</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-semibold text-foreground">Kontynuuj naukę</h3>
-                        <p className="text-sm text-muted-foreground">Moduł 1 • {t("dashboard.lastActivity")} 2h</p>
-                      </div>
-                    </div>
-                  </Link>
+                    </Link>
 
-                  {/* Review mistakes */}
-                  <Link href="/quiz?mode=review" className="block">
-                    <div className="flex items-center gap-3 p-3 border border-border rounded-lg hover:shadow-md active:scale-[0.98] transition-all cursor-pointer group touch-manipulation">
-                      <div className="w-11 h-11 bg-chart-3/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <RotateCcw className="h-5 w-5 text-chart-3" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-semibold text-foreground">{t("dashboard.review")}</h3>
+                    {/* Review mistakes */}
+                    <Link href="/quiz?mode=review" className="flex-shrink-0 w-[260px]">
+                      <div className="h-full p-4 border border-chart-3/20 rounded-xl bg-gradient-to-br from-chart-3/5 to-transparent active:scale-[0.98] transition-all touch-manipulation">
+                        <div className="w-11 h-11 bg-chart-3/10 rounded-xl flex items-center justify-center mb-3">
+                          <RotateCcw className="h-5 w-5 text-chart-3" />
+                        </div>
+                        <h3 className="text-base font-semibold text-foreground mb-1">{t("dashboard.review")}</h3>
                         <p className="text-sm text-muted-foreground">5 pytań do powtórki</p>
                       </div>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Desktop: Grid layout */}
+                <div className="hidden md:grid md:grid-cols-3 gap-4">
+                  <Link href="/lecture" className="block">
+                    <div className="h-full p-4 border border-primary/20 rounded-xl bg-gradient-to-br from-primary/10 to-chart-2/5 hover:shadow-md transition-all cursor-pointer">
+                      <div className="w-11 h-11 bg-primary/20 rounded-xl flex items-center justify-center mb-3">
+                        <Heart className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-base font-semibold text-foreground">Interaktywny wykład</h3>
+                        <Badge className="bg-chart-2/20 text-chart-2 border-0 text-xs px-1.5 py-0">NOWE</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Podstawy EKG</p>
+                    </div>
+                  </Link>
+
+                  <Link href="/quiz" className="block">
+                    <div className="h-full p-4 border border-border rounded-xl hover:shadow-md hover:border-primary/30 transition-all cursor-pointer">
+                      <div className="w-11 h-11 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
+                        <Play className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground mb-1">Kontynuuj naukę</h3>
+                      <p className="text-sm text-muted-foreground">Moduł 1 • Ostatnia aktywność: 2h</p>
+                    </div>
+                  </Link>
+
+                  <Link href="/quiz?mode=review" className="block">
+                    <div className="h-full p-4 border border-chart-3/20 rounded-xl bg-gradient-to-br from-chart-3/5 to-transparent hover:shadow-md transition-all cursor-pointer">
+                      <div className="w-11 h-11 bg-chart-3/10 rounded-xl flex items-center justify-center mb-3">
+                        <RotateCcw className="h-5 w-5 text-chart-3" />
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground mb-1">{t("dashboard.review")}</h3>
+                      <p className="text-sm text-muted-foreground">5 pytań do powtórki</p>
                     </div>
                   </Link>
                 </div>
@@ -363,6 +421,28 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border px-4 py-2 z-50" data-testid="mobile-bottom-nav">
+        <div className="grid grid-cols-4 gap-2">
+          <Link href="/dashboard" className="flex flex-col items-center gap-1 py-2 text-primary" data-testid="nav-dashboard">
+            <Home className="h-5 w-5" />
+            <span className="text-xs font-medium">Panel</span>
+          </Link>
+          <Link href="/quiz" className="flex flex-col items-center gap-1 py-2 text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-quiz">
+            <Play className="h-5 w-5" />
+            <span className="text-xs">Quiz</span>
+          </Link>
+          <Link href="/modules" className="flex flex-col items-center gap-1 py-2 text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-modules">
+            <BookOpen className="h-5 w-5" />
+            <span className="text-xs">Moduły</span>
+          </Link>
+          <Link href={myCertificates?.[0] ? `/certificate/${myCertificates[0].certificateId}` : "/dashboard"} className="flex flex-col items-center gap-1 py-2 text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-certificate">
+            <Award className="h-5 w-5" />
+            <span className="text-xs">Certyfikat</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 }

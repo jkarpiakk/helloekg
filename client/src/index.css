@@ -206,3 +206,13 @@
 .animate-heart-rotate {
   animation: heart-rotate 20s linear infinite;
 }
+
+/* Hide scrollbar for horizontal scroll containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
