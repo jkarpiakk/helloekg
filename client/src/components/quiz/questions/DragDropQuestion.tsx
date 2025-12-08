@@ -1,18 +1,17 @@
 import { useState, useCallback } from "react";
 import {
   DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
   useDroppable,
   useDraggable,
-  pointerWithin,
-  rectIntersection,
 } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Check, X } from "lucide-react";
 import type { DragDropConfig, AnswerData, QuizResult } from "@/types";
 
@@ -42,10 +41,10 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
     isDragging,
   } = useDraggable({ id, disabled });
 
-  const style: React.CSSProperties = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 1000 : undefined,
-  } : {};
+  };
 
   let borderClass = "border-slate-300 dark:border-slate-600";
   let bgClass = "bg-white dark:bg-slate-800";
@@ -74,7 +73,7 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
       {...listeners}
     >
       {!disabled && (
-        <GripVertical className="h-5 w-5 text-slate-400 flex-shrink-0" />
+        <GripVertical className="h-5 w-5 text-slate-500 dark:text-slate-400 flex-shrink-0" />
       )}
       {imageUrl && (
         <img 
@@ -92,30 +91,27 @@ function DraggableItem({ id, content, imageUrl, disabled, isCorrect, isIncorrect
 
 interface DropZoneProps {
   id: string;
-  label: string;
-  placedItem?: { id: string; content: string; imageUrl?: string };
   isOver: boolean;
+  children?: React.ReactNode;
+  isEmpty: boolean;
   isCorrect?: boolean;
   isIncorrect?: boolean;
-  onRemove?: () => void;
-  disabled?: boolean;
-  showResult?: boolean;
 }
 
-function DropZone({ id, label, placedItem, isOver, isCorrect, isIncorrect, onRemove, disabled, showResult }: DropZoneProps) {
+function DropZone({ id, isOver, children, isEmpty, isCorrect, isIncorrect }: DropZoneProps) {
   const { setNodeRef } = useDroppable({ id });
   
   let containerClass = "border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30";
   
   if (isOver) {
     containerClass = "border-2 border-dashed border-primary bg-primary/10 ring-2 ring-primary/30";
-  } else if (placedItem) {
+  } else if (!isEmpty) {
     if (isCorrect) {
       containerClass = "border-2 border-solid border-green-500 bg-green-50 dark:bg-green-950/30";
     } else if (isIncorrect) {
       containerClass = "border-2 border-solid border-red-500 bg-red-50 dark:bg-red-950/30";
     } else {
-      containerClass = "border-2 border-solid border-primary/60 bg-primary/5";
+      containerClass = "border-2 border-solid border-primary/50 bg-white dark:bg-slate-800";
     }
   }
 
@@ -123,40 +119,17 @@ function DropZone({ id, label, placedItem, isOver, isCorrect, isIncorrect, onRem
     <div
       ref={setNodeRef}
       data-testid={`drop-zone-${id}`}
-      className={`min-h-[80px] p-3 rounded-xl ${containerClass} relative`}
+      className={`min-h-[80px] p-2 rounded-xl ${containerClass}`}
     >
-      {placedItem ? (
-        <div className="flex items-center gap-3">
-          {placedItem.imageUrl && (
-            <img 
-              src={placedItem.imageUrl} 
-              alt={placedItem.content} 
-              className="w-10 h-10 object-cover rounded-lg border border-slate-200 dark:border-slate-600"
-            />
-          )}
-          <span className="text-base font-medium text-slate-900 dark:text-white flex-1">
-            {placedItem.content}
-          </span>
-          {showResult && isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
-          {showResult && isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
-          {!disabled && !showResult && onRemove && (
-            <button
-              onClick={onRemove}
-              className="w-8 h-8 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center transition-colors"
-              data-testid={`remove-btn-${id}`}
-              title="Usuń i wybierz ponownie"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+      {isEmpty ? (
+        <div className="flex flex-col items-center justify-center h-full min-h-[64px] gap-1">
+          <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center">
+            <span className="text-slate-500 dark:text-slate-400 text-xl font-light">+</span>
+          </div>
+          <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Upuść tutaj</span>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center h-full min-h-[56px] gap-1">
-          <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-400 dark:border-slate-500 flex items-center justify-center">
-            <span className="text-slate-400 dark:text-slate-500 text-xl font-light">+</span>
-          </div>
-          <span className="text-sm text-slate-500 dark:text-slate-400">Upuść tutaj</span>
-        </div>
+        children
       )}
     </div>
   );
@@ -173,27 +146,34 @@ export default function DragDropQuestion({
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [overTargetId, setOverTargetId] = useState<string | null>(null);
 
-  const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: {
-      distance: 10,
-    },
-  });
-
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      delay: 200,
-      tolerance: 5,
-    },
-  });
-
-  const sensors = useSensors(mouseSensor, touchSensor);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const placedSourceIds = new Set(Array.from(placements.values()));
   const availableSources = config.sources.filter(source => !placedSourceIds.has(source.id));
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveDragId(event.active.id as string);
-  }, []);
+    const sourceId = event.active.id as string;
+    setActiveDragId(sourceId);
+    
+    // If dragging from a drop zone, remove it from placements first
+    const newPlacements = new Map(placements);
+    let removed = false;
+    Array.from(newPlacements.entries()).forEach(([key, value]) => {
+      if (value === sourceId) {
+        newPlacements.delete(key);
+        removed = true;
+      }
+    });
+    if (removed) {
+      setPlacements(newPlacements);
+    }
+  }, [placements]);
 
   const handleDragOver = useCallback((event: any) => {
     const overId = event.over?.id as string | null;
@@ -218,10 +198,6 @@ export default function DragDropQuestion({
     if (!isValidTarget) return;
 
     const newPlacements = new Map(placements);
-    
-    // If this target already has something, that item goes back to available
-    // (we just overwrite it in the map)
-    
     newPlacements.set(targetId, sourceId);
     setPlacements(newPlacements);
 
@@ -261,12 +237,13 @@ export default function DragDropQuestion({
 
   return (
     <div className="space-y-6">
-      <p className="text-base text-slate-600 dark:text-slate-300">
+      <p className="text-base text-slate-700 dark:text-slate-300">
         Przeciągnij elementy do odpowiednich miejsc
       </p>
 
       <DndContext
         sensors={sensors}
+        collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -275,8 +252,8 @@ export default function DragDropQuestion({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Available items */}
           <div className="space-y-3" data-testid="drag-sources">
-            <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-              Elementy
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              Elementy do przeciągnięcia
             </h4>
             <div className="space-y-2">
               {availableSources.map(source => (
@@ -291,7 +268,7 @@ export default function DragDropQuestion({
               {availableSources.length === 0 && !showResult && (
                 <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl text-center">
                   <Check className="h-5 w-5 text-green-600 dark:text-green-400 mx-auto mb-1" />
-                  <p className="text-sm text-green-700 dark:text-green-300">Wszystkie elementy rozmieszczone</p>
+                  <p className="text-sm text-green-700 dark:text-green-300 font-medium">Wszystkie elementy rozmieszczone</p>
                 </div>
               )}
             </div>
@@ -299,7 +276,7 @@ export default function DragDropQuestion({
 
           {/* Drop zones */}
           <div className="space-y-3" data-testid="drop-targets">
-            <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
               Miejsca docelowe
             </h4>
             <div className="space-y-4">
@@ -314,24 +291,39 @@ export default function DragDropQuestion({
 
                 return (
                   <div key={target.id} className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+                    <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block">
                       {target.label}
                     </label>
                     <DropZone
                       id={target.id}
-                      label="Upuść tutaj"
-                      placedItem={placedSource ? {
-                        id: placedSource.id,
-                        content: placedSource.content,
-                        imageUrl: placedSource.imageUrl,
-                      } : undefined}
                       isOver={overTargetId === target.id}
+                      isEmpty={!placedSource}
                       isCorrect={isCorrect}
                       isIncorrect={isIncorrect}
-                      onRemove={() => handleRemoveFromZone(target.id)}
-                      disabled={disabled}
-                      showResult={showResult}
-                    />
+                    >
+                      {placedSource && (
+                        <div className="relative">
+                          <DraggableItem
+                            id={placedSource.id}
+                            content={placedSource.content}
+                            imageUrl={placedSource.imageUrl}
+                            disabled={disabled}
+                            isCorrect={isCorrect}
+                            isIncorrect={isIncorrect}
+                          />
+                          {!disabled && !showResult && (
+                            <button
+                              onClick={() => handleRemoveFromZone(target.id)}
+                              className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg z-10"
+                              data-testid={`remove-btn-${target.id}`}
+                              title="Usuń"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </DropZone>
                   </div>
                 );
               })}
@@ -339,7 +331,7 @@ export default function DragDropQuestion({
           </div>
         </div>
 
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay>
           {activeSource && (
             <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-white dark:bg-slate-800 shadow-2xl">
               <GripVertical className="h-5 w-5 text-primary" />

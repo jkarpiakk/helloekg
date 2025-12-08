@@ -4,7 +4,6 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -53,27 +52,21 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    zIndex: isDragging ? 1000 : undefined,
   };
 
-  let borderClass = "border-slate-300 dark:border-slate-600 hover:border-primary/50";
-  let bgClass = "bg-white dark:bg-slate-800 hover:bg-primary/5";
-  let shadowClass = "hover:shadow-md";
-  let positionBgClass = "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300";
+  let borderClass = "border-slate-300 dark:border-slate-600";
+  let bgClass = "bg-white dark:bg-slate-800";
+  let positionBgClass = "bg-slate-700 text-white";
   
   if (isCorrect) {
     borderClass = "border-green-500";
     bgClass = "bg-green-50 dark:bg-green-950/30";
-    shadowClass = "shadow-md shadow-green-500/20";
     positionBgClass = "bg-green-500 text-white";
   } else if (isIncorrect) {
     borderClass = "border-red-500";
     bgClass = "bg-red-50 dark:bg-red-950/30";
-    shadowClass = "shadow-md shadow-red-500/20";
     positionBgClass = "bg-red-500 text-white";
-  } else if (disabled) {
-    borderClass = "border-slate-200 dark:border-slate-700";
-    bgClass = "bg-slate-100 dark:bg-slate-800/50";
-    shadowClass = "";
   }
 
   return (
@@ -82,29 +75,29 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
       style={style}
       data-testid={`sortable-item-${id}`}
       className={`
-        flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg border-2 
-        ${borderClass} ${bgClass} ${shadowClass}
-        ${isDragging ? "opacity-90 shadow-xl scale-105 z-50" : ""}
-        ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing active:scale-[0.98]"}
-        touch-manipulation transition-all duration-200
+        flex items-center gap-3 p-4 rounded-xl border-2 shadow-sm
+        ${borderClass} ${bgClass}
+        ${isDragging ? "opacity-50 shadow-2xl scale-105" : ""}
+        ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
+        touch-manipulation select-none
       `}
       {...attributes}
       {...listeners}
     >
-      <div className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full ${positionBgClass} text-sm font-bold shadow-sm`}>
+      <div className={`flex items-center justify-center w-8 h-8 rounded-full ${positionBgClass} text-sm font-bold shadow-sm`}>
         {position}
       </div>
       {!disabled && (
-        <GripVertical className="h-5 w-5 text-primary/60 flex-shrink-0" />
+        <GripVertical className="h-5 w-5 text-slate-400 flex-shrink-0" />
       )}
       {imageUrl && (
         <img 
           src={imageUrl} 
           alt={content} 
-          className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded border border-border"
+          className="w-12 h-12 object-cover rounded-lg border border-slate-200 dark:border-slate-600"
         />
       )}
-      <span className="text-sm sm:text-base flex-1 font-medium text-slate-900 dark:text-white">{content}</span>
+      <span className="text-base flex-1 font-medium text-slate-900 dark:text-white">{content}</span>
       {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400" />}
       {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400" />}
     </div>
@@ -133,12 +126,6 @@ export default function SortingQuestion({
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 200,
-        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -174,10 +161,11 @@ export default function SortingQuestion({
   };
 
   const activeItem = activeDragId ? getItemContent(activeDragId) : null;
+  const activeIndex = activeDragId ? items.indexOf(activeDragId) : -1;
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
+    <div className="space-y-6">
+      <p className="text-base text-slate-700 dark:text-slate-300">
         Ułóż elementy we właściwej kolejności przeciągając je
       </p>
 
@@ -196,11 +184,12 @@ export default function SortingQuestion({
               const isCorrect = result?.feedback?.correctItems?.includes(itemId);
               const isIncorrect = result?.feedback?.incorrectItems?.includes(itemId);
 
+              const itemText = item.content || item.text || '';
               return (
                 <SortableItem
                   key={itemId}
                   id={itemId}
-                  content={item.text}
+                  content={itemText}
                   imageUrl={item.imageUrl}
                   position={index + 1}
                   disabled={disabled}
@@ -214,24 +203,27 @@ export default function SortingQuestion({
 
         <DragOverlay>
           {activeItem && (
-            <div className="flex items-center gap-2 p-3 sm:p-4 rounded-lg border-2 border-primary bg-white dark:bg-slate-800 shadow-xl">
-              <GripVertical className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+            <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-white dark:bg-slate-800 shadow-2xl">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white text-sm font-bold">
+                {activeIndex + 1}
+              </div>
+              <GripVertical className="h-5 w-5 text-primary" />
               {activeItem.imageUrl && (
                 <img 
                   src={activeItem.imageUrl} 
-                  alt={activeItem.text} 
-                  className="w-10 h-10 object-cover rounded"
+                  alt={activeItem.content || activeItem.text || ''} 
+                  className="w-12 h-12 object-cover rounded-lg"
                 />
               )}
-              <span className="text-sm sm:text-base text-slate-900 dark:text-white">{activeItem.text}</span>
+              <span className="text-base font-medium text-slate-900 dark:text-white">{activeItem.content || activeItem.text}</span>
             </div>
           )}
         </DragOverlay>
       </DndContext>
 
       {showResult && result?.partialScore !== undefined && result.partialScore < 1 && (
-        <div className="mt-4 p-3 sm:p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <p className="text-sm sm:text-base text-amber-800 dark:text-amber-200">
+        <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <p className="text-base text-amber-800 dark:text-amber-200">
             Poprawne pozycje: {Math.round(result.partialScore * 100)}% 
             ({result.feedback?.correctItems?.length || 0} z {config.items.length})
           </p>
@@ -239,16 +231,16 @@ export default function SortingQuestion({
       )}
 
       {showResult && result?.correctAnswer?.type === 'sorting' && (
-        <div className="mt-4 p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
             Prawidłowa kolejność:
           </p>
-          <ol className="list-decimal list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
+          <ol className="list-decimal list-inside text-base text-blue-700 dark:text-blue-300 space-y-1">
             {result.correctAnswer.order.map((itemId, index) => {
               const item = getItemContent(itemId);
               return (
-                <li key={itemId}>
-                  {item?.text || itemId}
+                <li key={itemId} className="font-medium">
+                  {item?.content || item?.text || itemId}
                 </li>
               );
             })}

@@ -127,7 +127,7 @@ export interface MatchingConfig {
 
 // Sorting configuration
 export interface SortingConfig {
-  items: Array<{ id: string; text: string; imageUrl?: string }>;
+  items: Array<{ id: string; text?: string; content?: string; imageUrl?: string }>;
   correctOrder: string[]; // Array of item IDs in correct order
 }
 
