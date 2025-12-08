@@ -71,9 +71,9 @@ export default function QuestionCard({
     
     if (!showExplanation) {
       if (selectedAnswer === index) {
-        return `${baseClass} glass-card-light dark:glass-card border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 shadow-app-lg`;
+        return `${baseClass} bg-white/80 dark:bg-slate-800/90 border-primary ring-2 ring-primary ring-offset-2 shadow-app-lg text-foreground`;
       }
-      return `${baseClass} glass-card-light dark:glass-card border-border/50 hover:border-primary/50 hover:bg-primary/5 hover:shadow-app-lg active:scale-[0.97] shadow-app`;
+      return `${baseClass} bg-white/70 dark:bg-slate-800/80 border-border/50 dark:border-slate-600/50 hover:border-primary/50 hover:bg-white dark:hover:bg-slate-700/90 hover:shadow-app-lg active:scale-[0.97] shadow-app text-foreground`;
     }
 
     if (selectedAnswer === index) {
@@ -86,13 +86,13 @@ export default function QuestionCard({
       return `${baseClass} correct border-green-500 bg-green-500 text-white shadow-glow-success`;
     }
 
-    return `${baseClass} border-muted/30 bg-muted/30 text-muted-foreground opacity-50`;
+    return `${baseClass} border-muted/30 bg-muted/20 dark:bg-slate-800/50 text-muted-foreground opacity-60`;
   };
 
   return (
     <div className="space-y-5 sm:space-y-6 lg:space-y-8">
       {/* Question Card - Premium glass styling */}
-      <Card className="glass-card-light dark:glass-card shadow-app-lg rounded-2xl overflow-hidden motion-safe:animate-slide-up">
+      <Card className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-app-lg rounded-2xl overflow-hidden motion-safe:animate-slide-up border border-border/50 dark:border-slate-700/50">
         <CardContent className="p-5 sm:p-6 lg:p-8">
           <div className="mb-5 sm:mb-6 lg:mb-8">
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -206,7 +206,7 @@ export default function QuestionCard({
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="glass-card-light dark:glass-card p-4 sm:p-5 rounded-xl shadow-app"
+                  className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm p-4 sm:p-5 rounded-xl shadow-app border border-border/30 dark:border-slate-600/30"
                   data-testid="explanation-content"
                 >
                   <div 
