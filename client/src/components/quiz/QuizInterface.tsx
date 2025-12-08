@@ -336,15 +336,15 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h2 className="text-base font-semibold text-foreground">Moduł EKG</h2>
-                <p className="text-sm text-muted-foreground">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Moduł EKG</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
                   {t("quiz.question")} {currentQuestionIndex + 1}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
-              <div className="w-20 sm:w-32 lg:w-48 h-2.5 bg-secondary/50 rounded-full overflow-hidden shadow-inner">
+              <div className="w-20 sm:w-32 lg:w-48 h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
                 <div 
                   className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full motion-safe:transition-all motion-safe:duration-300"
                   style={{ 
@@ -354,7 +354,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                   }}
                 />
               </div>
-              <span className="text-sm text-muted-foreground font-mono min-w-[3rem] text-right">
+              <span className="text-sm text-slate-700 dark:text-slate-300 font-mono min-w-[3rem] text-right">
                 {mode === "exam" && examTotalQuestions > 0 
                   ? `${currentQuestionIndex + 1}/${examTotalQuestions}`
                   : `${Math.round(((currentQuestionIndex + 1) / 10) * 100)}%`}
