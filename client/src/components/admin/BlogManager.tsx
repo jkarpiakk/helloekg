@@ -23,7 +23,7 @@ interface BlogWithAuthor extends BlogPost {
 }
 
 interface BlogPostsResponse {
-  data: BlogWithAuthor[];
+  items: BlogWithAuthor[];
   total: number;
   page: number;
   pageSize: number;
@@ -253,7 +253,7 @@ export default function BlogManager() {
     );
   }
 
-  const posts = postsResponse?.data || [];
+  const posts = postsResponse?.items || [];
   const totalPosts = postsResponse?.total || 0;
   const hasMore = postsResponse?.hasMore || false;
 
@@ -265,10 +265,10 @@ export default function BlogManager() {
           <h2 className="text-2xl font-bold text-foreground">Zarządzanie blogiem</h2>
           <div className="flex items-center space-x-2">
             <Badge variant="outline" className="bg-green-50">
-              Opublikowane: {posts.filter(p => p.status === "published").length}
+              Opublikowane: {posts.filter((p: BlogWithAuthor) => p.status === "published").length}
             </Badge>
             <Badge variant="outline" className="bg-gray-50">
-              Szkice: {posts.filter(p => p.status === "draft").length}
+              Szkice: {posts.filter((p: BlogWithAuthor) => p.status === "draft").length}
             </Badge>
             <Badge variant="outline">
               Łącznie: {totalPosts}
@@ -398,7 +398,7 @@ export default function BlogManager() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {posts.map((post) => (
+                  {posts.map((post: BlogWithAuthor) => (
                     <TableRow key={post.id} className="hover:bg-secondary/50" data-testid={`post-row-${post.id}`}>
                       <TableCell>
                         <div className="flex items-start space-x-3">
@@ -443,7 +443,7 @@ export default function BlogManager() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {(post.tags || []).slice(0, 3).map((tag, index) => (
+                          {(post.tags || []).slice(0, 3).map((tag: string, index: number) => (
                             <Badge key={index} variant="outline" className="text-xs">
                               {tag}
                             </Badge>
