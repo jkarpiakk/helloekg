@@ -1598,7 +1598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { action, durationMonths = 1 } = req.body; // action: "grant" or "revoke"
       
-      const user = await storage.getUserById(id);
+      const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
       if (!user) {
         return res.status(404).json({ error: "Użytkownik nie znaleziony" });
       }
