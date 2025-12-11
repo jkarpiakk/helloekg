@@ -652,7 +652,7 @@ export class DatabaseStorage implements IStorage {
         title: blogPosts.title,
         slug: blogPosts.slug,
         excerpt: blogPosts.excerpt,
-        content: blogPosts.content,
+        contentMd: blogPosts.contentMd,
         featuredImage: blogPosts.featuredImage,
         tags: blogPosts.tags,
         status: blogPosts.status,
