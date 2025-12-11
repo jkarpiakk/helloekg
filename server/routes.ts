@@ -490,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get sections with user progress (legacy endpoint)
-  app.get("/api/sections", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.get("/api/sections", requireAuth, async (req, res) => {
     try {
       let allSections = await storage.getSections();
       const userProgress = await storage.getUserProgress(req.user!.id);
@@ -499,6 +499,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAdmin = ["owner", "admin", "reviewer"].includes(req.user!.role);
       if (!isAdmin) {
         allSections = allSections.filter(s => s.isVisible !== false);
+      }
+      
+      // Check if user has active subscription
+      const subscription = await storage.getUserActiveSubscription(req.user!.id);
+      const hasActiveSubscription = subscription && new Date(subscription.endDate) > new Date();
+      
+      // If no active subscription, only show sections from demo modules
+      if (!hasActiveSubscription && !isAdmin) {
+        // Get demo module IDs
+        const allModules = await storage.getModules();
+        const demoModuleIds = allModules
+          .filter(m => m.title.toLowerCase().includes('demo'))
+          .map(m => m.id);
+        allSections = allSections.filter(s => demoModuleIds.includes(s.moduleId));
       }
       
       const sectionsWithProgress = allSections.map(section => {
