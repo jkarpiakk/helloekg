@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 export default function QuestionManager() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [moduleFilter, setModuleFilter] = useState<string>("all");
   const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showEditor, setShowEditor] = useState(false);
@@ -167,10 +168,41 @@ export default function QuestionManager() {
     },
   });
 
-  // Get currently selected section
+  // Toggle module visibility mutation
+  const toggleModuleVisibilityMutation = useMutation({
+    mutationFn: async ({ id, isVisible }: { id: string; isVisible: boolean }) => {
+      const response = await apiRequest("PUT", `/api/admin/modules/${id}`, { isVisible });
+      return response.json();
+    },
+    onSuccess: (_, { isVisible }) => {
+      toast({
+        title: "Sukces",
+        description: isVisible ? "Moduł jest teraz widoczny" : "Moduł został ukryty",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/modules"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zmienić widoczności modułu",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Get currently selected module and section
+  const selectedModule = moduleFilter !== "all" 
+    ? modules?.find(m => m.id === moduleFilter) 
+    : null;
+  
   const selectedSection = sectionFilter !== "all" 
     ? allSections.find(s => s.id === sectionFilter) 
     : null;
+  
+  // Filter sections by selected module
+  const filteredSections = moduleFilter !== "all" 
+    ? allSections.filter(s => s.moduleId === moduleFilter)
+    : allSections;
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -302,7 +334,7 @@ export default function QuestionManager() {
       {/* Filters */}
       <Card>
         <CardContent className="p-6">
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 {t("admin.status")}
@@ -321,6 +353,46 @@ export default function QuestionManager() {
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
+                Moduł
+              </label>
+              <div className="flex items-center gap-2">
+                <Select value={moduleFilter} onValueChange={(v) => { setModuleFilter(v); setSectionFilter("all"); }}>
+                  <SelectTrigger data-testid="module-filter" className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Wszystkie moduły</SelectItem>
+                    {modules?.map(module => (
+                      <SelectItem key={module.id} value={module.id}>
+                        <span className="flex items-center gap-2">
+                          {module.title}
+                          {module.isVisible === false && (
+                            <span className="text-orange-600 text-xs">(ukryty)</span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedModule && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => toggleModuleVisibilityMutation.mutate({ 
+                      id: selectedModule.id, 
+                      isVisible: selectedModule.isVisible === false 
+                    })}
+                    title={selectedModule.isVisible !== false ? "Ukryj moduł" : "Pokaż moduł"}
+                    className={selectedModule.isVisible === false ? "text-orange-600 border-orange-400 bg-orange-50 dark:bg-orange-950/30" : "text-muted-foreground"}
+                    disabled={toggleModuleVisibilityMutation.isPending}
+                  >
+                    <EyeOff className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Sekcja
               </label>
               <div className="flex items-center gap-2">
@@ -330,22 +402,15 @@ export default function QuestionManager() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Wszystkie sekcje</SelectItem>
-                    {modules?.map(module => (
-                      <div key={module.id}>
-                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground bg-muted">
-                          {module.title}
-                        </div>
-                        {module.sections.map(section => (
-                          <SelectItem key={section.id} value={section.id}>
-                            <span className="flex items-center gap-2">
-                              {section.title}
-                              {section.isVisible === false && (
-                                <span className="text-orange-600 text-xs">(ukryta)</span>
-                              )}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </div>
+                    {filteredSections.map(section => (
+                      <SelectItem key={section.id} value={section.id}>
+                        <span className="flex items-center gap-2">
+                          {section.title}
+                          {section.isVisible === false && (
+                            <span className="text-orange-600 text-xs">(ukryta)</span>
+                          )}
+                        </span>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
