@@ -64,10 +64,16 @@ export class AuthService {
   }
 
   async verifyEmail(token: string): Promise<User | null> {
-    // This would need a more complex implementation to find user by token
-    // For now, simplified approach
-    const users = await storage.getUserByEmail(""); // This needs to be implemented differently
-    return null; // Placeholder
+    const user = await storage.getUserByVerificationToken(token);
+    if (!user) return null;
+
+    // Mark email as verified and clear token
+    const updatedUser = await storage.updateUser(user.id, {
+      emailVerified: true,
+      emailVerificationToken: null
+    });
+
+    return updatedUser;
   }
 
   async initiatePasswordReset(email: string): Promise<string | null> {

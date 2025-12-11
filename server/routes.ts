@@ -171,6 +171,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email verification endpoint
+  app.get("/api/auth/verify-email", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: "Brak tokenu weryfikacyjnego" });
+      }
+
+      const user = await authService.verifyEmail(token);
+      
+      if (!user) {
+        return res.status(400).json({ error: "Nieprawidłowy lub wygasły token weryfikacyjny" });
+      }
+
+      await storage.createAuditLog({
+        actorId: user.id,
+        action: "email_verified",
+        entityType: "user",
+        entityId: user.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Adres e-mail został zweryfikowany. Możesz się teraz zalogować." 
+      });
+    } catch (error: any) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ error: "Błąd podczas weryfikacji e-maila" });
+    }
+  });
+
+  // Resend verification email
+  app.post("/api/auth/resend-verification", authRateLimit, async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Podaj adres e-mail" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        // Don't reveal if email exists or not
+        return res.json({ message: "Jeśli konto istnieje, wysłaliśmy nowy link weryfikacyjny" });
+      }
+
+      if (user.emailVerified) {
+        return res.status(400).json({ error: "Adres e-mail został już zweryfikowany" });
+      }
+
+      // Generate new token
+      const newToken = authService.generateToken();
+      await storage.updateUser(user.id, { emailVerificationToken: newToken });
+
+      // Send verification email
+      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/verify-email?token=${newToken}`;
+      const emailTemplate = emailService.getEmailVerificationTemplate(user.firstName, verificationUrl);
+      
+      try {
+        await emailService.sendEmail(user.email, emailTemplate);
+      } catch (emailError) {
+        console.error("Failed to resend verification email:", emailError);
+        return res.status(500).json({ error: "Nie udało się wysłać e-maila" });
+      }
+
+      res.json({ message: "Nowy link weryfikacyjny został wysłany na Twój adres e-mail" });
+    } catch (error: any) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ error: "Błąd podczas wysyłania e-maila" });
+    }
+  });
+
   app.post("/api/auth/logout", requireAuth, async (req, res) => {
     req.session.destroy((err) => {
       if (err) {
