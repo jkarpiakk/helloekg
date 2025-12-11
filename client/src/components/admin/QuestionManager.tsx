@@ -9,7 +9,7 @@ import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Plus, Upload, Edit, Eye, Trash2, Check, X } from "lucide-react";
+import { Plus, Upload, Edit, Eye, Trash2, Check, X, EyeOff } from "lucide-react";
 import type { QuestionWithStats } from "@/types";
 import QuestionEditor from "./QuestionEditor";
 import ImportModal from "./ImportModal";
@@ -144,6 +144,33 @@ export default function QuestionManager() {
       });
     },
   });
+
+  // Toggle section visibility mutation
+  const toggleSectionVisibilityMutation = useMutation({
+    mutationFn: async ({ id, isVisible }: { id: string; isVisible: boolean }) => {
+      const response = await apiRequest("PUT", `/api/admin/sections/${id}`, { isVisible });
+      return response.json();
+    },
+    onSuccess: (_, { isVisible }) => {
+      toast({
+        title: "Sukces",
+        description: isVisible ? "Sekcja jest teraz widoczna" : "Sekcja została ukryta",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/modules"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zmienić widoczności sekcji",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Get currently selected section
+  const selectedSection = sectionFilter !== "all" 
+    ? allSections.find(s => s.id === sectionFilter) 
+    : null;
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -294,19 +321,50 @@ export default function QuestionManager() {
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                {t("admin.module")}
+                Sekcja
               </label>
-              <Select value={sectionFilter} onValueChange={setSectionFilter}>
-                <SelectTrigger data-testid="section-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Wszystkie moduły</SelectItem>
-                  <SelectItem value="module1">Moduł 1: Podstawy</SelectItem>
-                  <SelectItem value="module2">Moduł 2: Rytmy</SelectItem>
-                  <SelectItem value="module3">Moduł 3: Zawał</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                  <SelectTrigger data-testid="section-filter" className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Wszystkie sekcje</SelectItem>
+                    {modules?.map(module => (
+                      <div key={module.id}>
+                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground bg-muted">
+                          {module.title}
+                        </div>
+                        {module.sections.map(section => (
+                          <SelectItem key={section.id} value={section.id}>
+                            <span className="flex items-center gap-2">
+                              {section.title}
+                              {section.isVisible === false && (
+                                <span className="text-orange-600 text-xs">(ukryta)</span>
+                              )}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedSection && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => toggleSectionVisibilityMutation.mutate({ 
+                      id: selectedSection.id, 
+                      isVisible: selectedSection.isVisible === false 
+                    })}
+                    title={selectedSection.isVisible !== false ? "Ukryj sekcję" : "Pokaż sekcję"}
+                    className={selectedSection.isVisible === false ? "text-orange-600 border-orange-400 bg-orange-50 dark:bg-orange-950/30" : "text-muted-foreground"}
+                    disabled={toggleSectionVisibilityMutation.isPending}
+                  >
+                    <EyeOff className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
