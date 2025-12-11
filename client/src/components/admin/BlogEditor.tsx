@@ -48,12 +48,15 @@ const quillModules = {
     ['blockquote', 'code-block'],
     ['clean']
   ],
+  clipboard: {
+    matchVisual: true,
+  },
 };
 
 const quillFormats = [
   'header', 'bold', 'italic', 'underline', 'strike',
-  'list', 'bullet', 'color', 'background', 'link', 'image',
-  'blockquote', 'code-block'
+  'list', 'bullet', 'indent', 'color', 'background', 'link', 'image',
+  'blockquote', 'code-block', 'align', 'font', 'size', 'script', 'direction'
 ];
 
 export default function BlogEditor({
