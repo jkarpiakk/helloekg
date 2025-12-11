@@ -318,13 +318,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get modules with sections and user progress
   app.get("/api/modules", requireAuth, requireActiveSubscription, async (req, res) => {
     try {
-      const modules = await storage.getModules();
+      let allModules = await storage.getModules();
       const userProgress = await storage.getUserProgress(req.user!.id);
+      
+      // Filter hidden modules for non-admin users
+      const isAdmin = ["owner", "admin", "reviewer"].includes(req.user!.role);
+      if (!isAdmin) {
+        allModules = allModules.filter(m => m.isVisible !== false);
+      }
       
       // Build modules with sections and progress
       const modulesWithSections = await Promise.all(
-        modules.map(async (module) => {
-          const sections = await storage.getSectionsByModule(module.id);
+        allModules.map(async (module) => {
+          let sections = await storage.getSectionsByModule(module.id);
+          
+          // Filter hidden sections for non-admin users
+          if (!isAdmin) {
+            sections = sections.filter(s => s.isVisible !== false);
+          }
           
           // Add progress to each section
           const sectionsWithProgress = sections.map(section => {
@@ -359,10 +370,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get sections with user progress (legacy endpoint)
   app.get("/api/sections", requireAuth, requireActiveSubscription, async (req, res) => {
     try {
-      const sections = await storage.getSections();
+      let allSections = await storage.getSections();
       const userProgress = await storage.getUserProgress(req.user!.id);
       
-      const sectionsWithProgress = sections.map(section => {
+      // Filter hidden sections for non-admin users
+      const isAdmin = ["owner", "admin", "reviewer"].includes(req.user!.role);
+      if (!isAdmin) {
+        allSections = allSections.filter(s => s.isVisible !== false);
+      }
+      
+      const sectionsWithProgress = allSections.map(section => {
         const progress = userProgress.find(p => p.sectionId === section.id);
         return {
           ...section,

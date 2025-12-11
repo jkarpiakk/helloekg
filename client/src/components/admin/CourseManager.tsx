@@ -12,7 +12,7 @@ import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Plus, Edit, Trash2, BookOpen, FileText, GripVertical, ArrowUp, ArrowDown, Presentation } from "lucide-react";
+import { Plus, Edit, Trash2, BookOpen, FileText, GripVertical, ArrowUp, ArrowDown, Presentation, EyeOff } from "lucide-react";
 import { LectureEditor } from "./LectureEditor";
 import {
   DndContext,
@@ -42,6 +42,7 @@ interface ModuleFormData {
   description: string;
   order: number;
   isLocked: boolean;
+  isVisible: boolean;
   prerequisiteModuleId?: string;
 }
 
@@ -51,6 +52,7 @@ interface SectionFormData {
   description: string;
   order: number;
   isLocked: boolean;
+  isVisible: boolean;
   prerequisiteSectionId?: string;
 }
 
@@ -94,6 +96,7 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
                   <BookOpen className="h-4 w-4" />
                   <span>Moduł {module.order}: {module.title}</span>
                   {module.isLocked && <Badge variant="secondary">Zablokowany</Badge>}
+                  {module.isVisible === false && <Badge variant="outline" className="text-orange-600 border-orange-400"><EyeOff className="h-3 w-3 mr-1" />Ukryty</Badge>}
                 </CardTitle>
                 {module.description && (
                   <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
@@ -127,6 +130,7 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
                       {module.order}.{section.order} - {section.title}
                     </span>
                     {section.isLocked && <Badge variant="outline" className="text-xs">Zablokowany</Badge>}
+                    {section.isVisible === false && <Badge variant="outline" className="text-xs text-orange-600 border-orange-400"><EyeOff className="h-2 w-2 mr-1" />Ukryty</Badge>}
                   </div>
                   <div className="flex items-center space-x-1">
                     <Button 
@@ -355,6 +359,7 @@ export default function CourseManager() {
       description: formData.get("description") as string,
       order: parseInt(formData.get("order") as string),
       isLocked: formData.get("isLocked") === "on",
+      isVisible: formData.get("isVisible") === "on",
       prerequisiteModuleId: formData.get("prerequisiteModuleId") as string || undefined,
     };
 
@@ -375,6 +380,7 @@ export default function CourseManager() {
       description: formData.get("description") as string,
       order: parseInt(formData.get("order") as string),
       isLocked: formData.get("isLocked") === "on",
+      isVisible: formData.get("isVisible") === "on",
       prerequisiteSectionId: formData.get("prerequisiteSectionId") as string || undefined,
     };
 
@@ -525,6 +531,16 @@ export default function CourseManager() {
               <Label htmlFor="isLocked">Zablokowany</Label>
             </div>
             
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="isVisible"
+                name="isVisible"
+                defaultChecked={editingModule?.isVisible !== false}
+                data-testid="switch-module-visible"
+              />
+              <Label htmlFor="isVisible">Widoczny dla użytkowników</Label>
+            </div>
+            
             <div className="flex justify-end space-x-2">
               <Button 
                 type="button" 
@@ -597,6 +613,16 @@ export default function CourseManager() {
                 data-testid="switch-section-locked"
               />
               <Label htmlFor="sectionIsLocked">Zablokowany</Label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="sectionIsVisible"
+                name="isVisible"
+                defaultChecked={editingSection?.isVisible !== false}
+                data-testid="switch-section-visible"
+              />
+              <Label htmlFor="sectionIsVisible">Widoczny dla użytkowników</Label>
             </div>
             
             <div className="flex justify-end space-x-2">
