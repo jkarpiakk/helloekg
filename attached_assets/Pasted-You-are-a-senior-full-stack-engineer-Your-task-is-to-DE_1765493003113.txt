@@ -1,0 +1,93 @@
+You are a senior full-stack engineer.  
+Your task is to DESIGN AND IMPLEMENT a complete, production-ready authentication and payment flow for a web app with **maximum smoothness and minimum friction**. The main goal is to **minimize user drop-off** during account creation and checkout.
+
+### Context & Goals
+- The app sells access to a digital product (e.g., online course / SaaS).
+- We want users to go from landing page → account → payment → access in **as few clicks and fields as possible**.
+- The flow should be **effortless, intuitive, and fast**, optimized for both desktop and mobile.
+- Avoid unnecessary steps such as email confirmation links if possible. Email can be used for receipts and login, but **NO separate “verify your email” step** should block access after payment.
+
+### Tech Requirements
+- Use a modern, popular stack that works well on Replit. Prefer:
+  - Frontend: React with a simple routing setup.
+  - Backend: Node.js + Express or a minimal framework.
+  - Auth: passwordless or simple email+password with optional social logins (Google, Apple, etc.).
+  - Payments: Stripe (or another well-supported provider) with hosted checkout.
+- Organize the code clearly: separate routes/controllers/services, and use environment variables for secrets.
+
+### Authentication Flow (Low Friction)
+1. Provide 2–3 simple options on the signup/login screen:
+   - “Continue with Google” (and optionally Apple).
+   - “Continue with email” using a single field and passwordless magic link OR simple password.
+2. Minimize the data we ask for at signup:
+   - Mandatory: email.
+   - Optional: name (can be asked later, after first login).
+3. Do NOT require email verification before the user can:
+   - Start a free trial, or
+   - Proceed to checkout and pay.
+4. Implement automatic login immediately after signup / payment, without making the user sign in again.
+5. Remember logged-in state with secure cookies / tokens, so the user does not need to re-login unnecessarily.
+6. If using magic links, make the experience fast and clear:
+   - Show a clear message: “We’ve sent you a link; this will log you in with one click.”
+   - But for development/demo, allow a fallback quick login so we can test without sending real emails (e.g., console log / dummy link).
+
+### Payment Flow (Low Friction)
+1. Integrate Stripe (or similar) with the simplest possible checkout:
+   - Use hosted checkout page with **minimal required fields**.
+   - Enable major payment methods (cards, possibly Apple Pay / Google Pay if easy).
+2. Flow:
+   - If user is not logged in and clicks “Buy now”:
+     - Show a **single combined step**: enter email → immediately redirect to checkout.
+     - After successful payment, create the user account automatically (if not existing) and log them in.
+   - If user is already logged in:
+     - Clicking “Buy now” goes straight to Stripe Checkout.
+3. After successful payment:
+   - Save subscription / purchase info in the database.
+   - Redirect user to a clean “Welcome” / “Access your content” page.
+   - Make sure no extra confirmation or manual refresh is needed.
+4. Handle:
+   - Subscription renewal (webhook for payment succeeded).
+   - Graceful handling of failed payments.
+5. Implement a **simple middleware** that:
+   - Checks if the user has an active subscription.
+   - Redirects to the pricing/checkout page if access is missing.
+
+### UX & Conversion Optimization
+Implement and code:
+- Clear single “Call to Action” (e.g., “Start now” / “Get access in 1 minute”).
+- Short, reassuring copy next to form fields:
+  - “No password to remember” (if passwordless).
+  - “You can cancel anytime.”
+  - “Secure payments via Stripe.”
+- Visual progress clarity:
+  - Ideally 2 steps max: “Account → Payment → Done”.
+  - Show this explicitly with a small progress indicator.
+- Show trust elements near payment (locks, “SSL secure”, “stripe.com” domain on checkout).
+- Reduce cognitive load:
+  - Avoid long forms.
+  - Avoid forced profile completion during signup.
+  - Ask for optional data only after the user has access.
+
+### Security & Privacy
+- Use secure password handling if passwords are used (hashing, no plain text).
+- Properly store and protect API keys (Stripe secret key, JWT secret, etc.) using environment variables.
+- Validate incoming webhook requests from Stripe.
+- Do not log sensitive payment data.
+
+### What you must deliver
+1. Fully working code in this Replit project:
+   - Auth routes (signup/login/logout).
+   - Payment routes and checkout.
+   - Webhook endpoint to handle successful payments and update user access.
+   - Protected route example (page only for paying users).
+2. Clear README in the project root explaining:
+   - How to configure environment variables.
+   - How to run the app locally.
+   - How to test the signup + payment + access flow step-by-step.
+3. Example test users or test steps using Stripe test mode.
+
+### Implementation Style
+- Write clean, commented code.
+- Use clear function and file names.
+- Make reasonable assumptions when needed and document them in comments or in the README.
+- Optimize for real-world use: I want to be able to deploy this with minimal changes.

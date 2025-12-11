@@ -126,13 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Nieprawidłowe dane logowania" });
       }
 
-      if (!user.emailVerified) {
-        return res.status(401).json({ 
-          error: "Konto nie zostało zweryfikowane. Sprawdź e-mail.",
-          code: "EMAIL_NOT_VERIFIED"
-        });
-      }
-
+      // Allow login even without email verification (for payment flow)
       // Set session
       req.session.userId = user.id;
       
@@ -160,7 +154,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             firstName: user.firstName,
             lastName: user.lastName,
             role: user.role,
-            locale: user.locale
+            locale: user.locale,
+            emailVerified: user.emailVerified
           }
         });
       });
