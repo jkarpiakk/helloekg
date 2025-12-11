@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { Check, CreditCard, Smartphone } from "lucide-react";
+import { Check, CreditCard, Smartphone, Loader2 } from "lucide-react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useToast } from "@/hooks/use-toast";
 import type { Plan } from "@/types";
 
 interface PricingSectionProps {
@@ -56,6 +59,40 @@ const planFeatures: Record<number, PlanExtras> = {
 export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [guestEmail, setGuestEmail] = useState("");
+
+  const guestCheckoutMutation = useMutation({
+    mutationFn: async ({ email, planId }: { email: string; planId: string }) => {
+      const response = await apiRequest("POST", "/api/stripe/guest-checkout", { email, planId });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się rozpocząć płatności",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGuestCheckout = (planId: string) => {
+    if (!guestEmail || !guestEmail.includes("@")) {
+      toast({
+        title: "Podaj email",
+        description: "Wprowadź poprawny adres email",
+        variant: "destructive",
+      });
+      return;
+    }
+    guestCheckoutMutation.mutate({ email: guestEmail, planId });
+  };
 
   const { data: plans, isLoading } = useQuery({
     queryKey: ["/api/plans"],
@@ -161,18 +198,52 @@ export default function PricingSection({ onOpenAuth }: PricingSectionProps) {
                       </Link>
                     </Button>
                   ) : (
-                    <Button 
-                      className={`w-full min-h-[44px] rounded-xl active:scale-[0.97] transition-transform text-sm sm:text-base ${
-                        extras.isPopular 
-                          ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-app-lg' 
-                          : ''
-                      }`}
-                      variant={extras.isPopular ? "default" : "outline"}
-                      onClick={onOpenAuth}
-                      data-testid={`select-plan-${plan.durationDays}`}
-                    >
-                      {t("pricing.cta")}
-                    </Button>
+                    <div className="space-y-3">
+                      {selectedPlanId === plan.id ? (
+                        <>
+                          <Input
+                            type="email"
+                            placeholder="Twój adres email"
+                            value={guestEmail}
+                            onChange={(e) => setGuestEmail(e.target.value)}
+                            className="w-full min-h-[44px] rounded-xl text-sm sm:text-base"
+                            data-testid={`email-input-${plan.durationDays}`}
+                          />
+                          <Button 
+                            className={`w-full min-h-[44px] rounded-xl active:scale-[0.97] transition-transform text-sm sm:text-base ${
+                              extras.isPopular 
+                                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-app-lg' 
+                                : ''
+                            }`}
+                            variant={extras.isPopular ? "default" : "outline"}
+                            onClick={() => handleGuestCheckout(plan.id)}
+                            disabled={guestCheckoutMutation.isPending}
+                            data-testid={`checkout-plan-${plan.durationDays}`}
+                          >
+                            {guestCheckoutMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : null}
+                            Przejdź do płatności
+                          </Button>
+                          <p className="text-xs text-muted-foreground text-center">
+                            Konto zostanie utworzone automatycznie
+                          </p>
+                        </>
+                      ) : (
+                        <Button 
+                          className={`w-full min-h-[44px] rounded-xl active:scale-[0.97] transition-transform text-sm sm:text-base ${
+                            extras.isPopular 
+                              ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-app-lg' 
+                              : ''
+                          }`}
+                          variant={extras.isPopular ? "default" : "outline"}
+                          onClick={() => setSelectedPlanId(plan.id)}
+                          data-testid={`select-plan-${plan.durationDays}`}
+                        >
+                          {t("pricing.cta")}
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>

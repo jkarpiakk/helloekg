@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, XCircle } from "lucide-react";
@@ -12,14 +12,20 @@ export default function PaymentSuccess() {
   const [, setLocation] = useLocation();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [error, setError] = useState<string | null>(null);
+  const [isNewAccount, setIsNewAccount] = useState(false);
 
   const confirmPaymentMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await apiRequest("POST", "/api/stripe/payment-success", { sessionId });
+      // Use finalize-payment endpoint which handles guest account creation + auto-login
+      const response = await apiRequest("POST", "/api/stripe/finalize-payment", { sessionId });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setStatus('success');
+      setIsNewAccount(data.isNewAccount);
+      // Invalidate auth cache to reflect logged-in state
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
       setTimeout(() => {
         setLocation("/dashboard");
       }, 3000);
@@ -64,11 +70,19 @@ export default function PaymentSuccess() {
                 <CheckCircle className="w-10 h-10 text-chart-2" />
               </div>
               <h1 className="text-2xl font-bold text-foreground mb-2">
-                Płatność zakończona sukcesem!
+                {isNewAccount ? "Witaj w EKG Academy!" : "Płatność zakończona sukcesem!"}
               </h1>
               <p className="text-muted-foreground mb-6">
-                Twój dostęp został aktywowany. Za chwilę zostaniesz przekierowany do panelu.
+                {isNewAccount 
+                  ? "Twoje konto zostało utworzone i dostęp aktywowany. Za chwilę przejdziesz do panelu nauki."
+                  : "Twój dostęp został aktywowany. Za chwilę zostaniesz przekierowany do panelu."
+                }
               </p>
+              {isNewAccount && (
+                <p className="text-sm text-muted-foreground mb-4 bg-muted/50 rounded-lg p-3">
+                  💡 Sprawdź email - wyślemy Ci link do ustawienia hasła
+                </p>
+              )}
               <Button asChild className="w-full">
                 <Link href="/dashboard">Przejdź do panelu</Link>
               </Button>
