@@ -133,8 +133,8 @@ export default function BlogManager() {
   // Delete blog post mutation
   const deletePostMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/admin/blog-posts/${id}`);
-      return response.json();
+      await apiRequest("DELETE", `/api/admin/blog-posts/${id}`);
+      return { success: true };
     },
     onSuccess: () => {
       toast({
@@ -156,7 +156,8 @@ export default function BlogManager() {
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "draft" | "published" }) => {
       const response = await apiRequest("PATCH", `/api/admin/blog-posts/${id}/status`, { status });
-      return response.json();
+      const text = await response.text();
+      return text ? JSON.parse(text) : { success: true };
     },
     onSuccess: () => {
       toast({
