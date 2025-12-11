@@ -29,8 +29,8 @@ const registerSchema = z.object({
   email: z.string().email("Nieprawidłowy adres e-mail"),
   password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
   confirmPassword: z.string(),
-  firstName: z.string().min(2, "Imię musi mieć co najmniej 2 znaki"),
-  lastName: z.string().min(2, "Nazwisko musi mieć co najmniej 2 znaki"),
+  firstName: z.string().optional().default(""),
+  lastName: z.string().optional().default(""),
   profession: z.string().optional(),
   termsAccepted: z.boolean().refine(val => val === true, "Musisz zaakceptować regulamin"),
   privacyAccepted: z.boolean().refine(val => val === true, "Musisz zaakceptować politykę prywatności"),
@@ -214,34 +214,6 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       <CardContent>
         <Form {...registerForm}>
           <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={registerForm.control}
-                name="firstName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("auth.firstName")}</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Jan" {...field} data-testid="register-firstName" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={registerForm.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("auth.lastName")}</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Kowalski" {...field} data-testid="register-lastName" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
             <FormField
               control={registerForm.control}
               name="email"
@@ -254,23 +226,6 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                       placeholder="email@example.com"
                       {...field}
                       data-testid="register-email"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={registerForm.control}
-              name="profession"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("auth.profession")} (opcjonalnie)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Student medycyny"
-                      {...field}
-                      data-testid="register-profession"
                     />
                   </FormControl>
                   <FormMessage />
