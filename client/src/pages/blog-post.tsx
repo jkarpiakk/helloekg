@@ -48,11 +48,13 @@ export default function BlogPostPage() {
 
   // Fetch related articles (same tags, excluding current post)
   const { data: relatedPosts } = useQuery<BlogResponse>({
-    queryKey: ['/api/blog', { 
-      pageSize: 3, 
-      status: 'published',
-      tag: post?.tags?.[0] // Use first tag for related posts
-    }],
+    queryKey: ['/api/blog', 'related', post?.tags?.[0]],
+    queryFn: async () => {
+      const tag = post?.tags?.[0];
+      const response = await fetch(`/api/blog?pageSize=4&status=published${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`);
+      if (!response.ok) throw new Error('Failed to fetch related posts');
+      return response.json();
+    },
     enabled: !!post && Array.isArray(post.tags) && post.tags.length > 0,
     select: (data) => ({
       ...data,

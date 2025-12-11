@@ -43,6 +43,18 @@ export default function Blog() {
       q: searchQuery || undefined,
       status: 'published'
     }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('page', currentPage.toString());
+      params.set('pageSize', pageSize.toString());
+      params.set('status', 'published');
+      if (selectedTag) params.set('tag', selectedTag);
+      if (searchQuery) params.set('q', searchQuery);
+      
+      const response = await fetch(`/api/blog?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch blog posts');
+      return response.json();
+    },
     enabled: true,
   });
 
