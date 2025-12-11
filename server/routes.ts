@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: `${req.protocol}://${req.get('host')}/dashboard?payment=success`,
+        success_url: `${req.protocol}://${req.get('host')}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.protocol}://${req.get('host')}/?payment=cancelled`,
         metadata: {
           userId: req.user!.id,
@@ -295,6 +295,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { userId, planId, durationDays } = session.metadata;
         
         if (userId === req.user!.id) {
+          // Check if subscription was already created by webhook (idempotency)
+          const existingSubscription = await storage.getUserActiveSubscription(userId);
+          if (existingSubscription) {
+            console.log(`Subscription already exists for user ${userId}, skipping creation`);
+            return res.json({ 
+              success: true, 
+              subscription: { 
+                startDate: existingSubscription.startDate, 
+                endDate: existingSubscription.endDate 
+              } 
+            });
+          }
+
           const plan = await storage.getActivePlans().then(plans => 
             plans.find(p => p.id === planId)
           );

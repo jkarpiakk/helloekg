@@ -18,6 +18,7 @@ import Module3Lecture from "@/pages/module3-lecture";
 import Admin from "@/pages/admin";
 import Pricing from "@/pages/pricing";
 import Checkout from "@/pages/checkout";
+import PaymentSuccess from "@/pages/payment-success";
 import VerifyCertificate from "@/pages/verify-certificate";
 import CertificatePage from "@/pages/certificate";
 import CertificatePreviewPage from "@/pages/certificate-preview";
@@ -64,6 +65,7 @@ function AppContent() {
           <Route path="/admin" component={Admin} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/checkout" component={Checkout} />
+          <Route path="/payment-success" component={PaymentSuccess} />
           <Route path="/simulator" component={EKGSimulator} />
           <Route path="/certificate/preview" component={CertificatePreviewPage} />
           <Route path="/certificate/:certificateId" component={CertificatePage} />
