@@ -110,10 +110,13 @@ export default function VerifyEmail() {
             E-mail zweryfikowany!
           </h1>
           <p className="text-muted-foreground mb-6">
-            Twój adres e-mail został potwierdzony. Możesz teraz zalogować się do swojego konta.
+            Twój adres e-mail został potwierdzony. Zaloguj się i wybierz plan, aby uzyskać pełny dostęp do kursu.
           </p>
           <Button asChild className="w-full min-h-[48px] rounded-xl shadow-app-lg">
-            <Link href="/">Zaloguj się</Link>
+            <Link href="/pricing">Wybierz plan</Link>
+          </Button>
+          <Button asChild variant="ghost" className="w-full mt-2">
+            <Link href="/">Zaloguj się później</Link>
           </Button>
         </CardContent>
       </Card>
