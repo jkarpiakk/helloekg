@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
-import Stripe from "stripe";
 import express from "express";
 import path from "path";
 import bcrypt from "bcrypt";
@@ -29,14 +28,7 @@ import {
 import { db } from "./db";
 import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters, blogPosts } from "@shared/schema";
 import { eq, or, and, gte, desc, count, ilike, avg, sql } from "drizzle-orm";
-
-if (!process.env.STRIPE_SECRET_KEY) {
-  console.warn('Warning: STRIPE_SECRET_KEY not set. Payment functionality will not work.');
-}
-
-const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-08-27.basil",
-}) : null;
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 // Blog validation schemas
 const blogQuerySchema = z.object({
@@ -213,11 +205,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/create-payment-intent", requireAuth, async (req, res) => {
-    if (!stripe) {
-      return res.status(500).json({ error: "Stripe not configured" });
+  // Get Stripe publishable key for frontend
+  app.get("/api/stripe/config", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Stripe config error:", error);
+      res.status(500).json({ error: "Stripe nie jest skonfigurowany" });
     }
+  });
 
+  // Create Stripe Checkout session
+  app.post("/api/stripe/checkout", requireAuth, async (req, res) => {
     try {
       const { planId } = req.body;
       
@@ -229,47 +229,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Plan nie znaleziony" });
       }
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(parseFloat(plan.price) * 100), // Convert to cents
-        currency: plan.currency.toLowerCase(),
+      const stripe = await getUncachableStripeClient();
+      
+      // Create or get Stripe customer
+      let customerId: string | undefined;
+      const user = await storage.getUser(req.user!.id);
+      
+      if (user?.stripeCustomerId) {
+        customerId = user.stripeCustomerId;
+      } else {
+        const customer = await stripe.customers.create({
+          email: req.user!.email,
+          name: `${req.user!.firstName} ${req.user!.lastName}`,
+          metadata: { userId: req.user!.id }
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeCustomerId(req.user!.id, customer.id);
+      }
+
+      // Create checkout session with one-time payment
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: plan.currency.toLowerCase(),
+            product_data: {
+              name: plan.name,
+              description: `Dostęp na ${plan.durationDays} dni`,
+            },
+            unit_amount: Math.round(parseFloat(plan.price) * 100),
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${req.protocol}://${req.get('host')}/dashboard?payment=success`,
+        cancel_url: `${req.protocol}://${req.get('host')}/?payment=cancelled`,
         metadata: {
           userId: req.user!.id,
-          planId: plan.id
+          planId: plan.id,
+          durationDays: plan.durationDays.toString()
         }
       });
 
-      res.json({ clientSecret: paymentIntent.client_secret });
+      res.json({ url: session.url });
     } catch (error: any) {
-      console.error("Payment intent error:", error);
-      res.status(500).json({ error: "Błąd podczas tworzenia płatności" });
+      console.error("Checkout session error:", error);
+      res.status(500).json({ error: "Błąd podczas tworzenia sesji płatności" });
     }
   });
 
-  app.post("/api/webhooks/stripe", async (req, res) => {
-    if (!stripe) {
-      return res.status(500).json({ error: "Stripe not configured" });
-    }
-
+  // Handle successful payment (called after checkout.session.completed webhook)
+  app.post("/api/stripe/payment-success", requireAuth, async (req, res) => {
     try {
-      const sig = req.headers['stripe-signature'];
-      let event;
-
-      try {
-        event = stripe.webhooks.constructEvent(
-          req.body,
-          sig as string,
-          process.env.STRIPE_WEBHOOK_SECRET!
-        );
-      } catch (err: any) {
-        console.error("Webhook signature verification failed:", err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Brak ID sesji" });
       }
 
-      if (event.type === 'payment_intent.succeeded') {
-        const paymentIntent = event.data.object;
-        const { userId, planId } = paymentIntent.metadata;
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-        if (userId && planId) {
+      if (session.payment_status === 'paid' && session.metadata) {
+        const { userId, planId, durationDays } = session.metadata;
+        
+        if (userId === req.user!.id) {
           const plan = await storage.getActivePlans().then(plans => 
             plans.find(p => p.id === planId)
           );
@@ -277,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (plan) {
             const startDate = new Date();
             const endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + plan.durationDays);
+            endDate.setDate(endDate.getDate() + parseInt(durationDays || plan.durationDays.toString()));
 
             await storage.createSubscription({
               userId,
@@ -303,14 +328,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.error("Failed to send subscription email:", emailError);
               }
             }
+
+            return res.json({ success: true, subscription: { startDate, endDate } });
           }
         }
       }
 
-      res.json({ received: true });
+      res.status(400).json({ error: "Płatność nie została zrealizowana" });
     } catch (error) {
-      console.error("Webhook error:", error);
-      res.status(500).json({ error: "Webhook processing failed" });
+      console.error("Payment success error:", error);
+      res.status(500).json({ error: "Błąd podczas przetwarzania płatności" });
     }
   });
 
