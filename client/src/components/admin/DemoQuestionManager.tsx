@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import ReactQuill from "react-quill";
+import "react-quill/dist/quill.snow.css";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +28,25 @@ import {
 } from "./QuestionTypeEditors";
 import type { DemoQuestion, QuestionConfig } from "@shared/schema";
 import type { QuestionType } from "@/types";
+
+const demoQuillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    [{ 'color': [] }],
+    ['link'],
+    ['clean']
+  ],
+  clipboard: {
+    matchVisual: true,
+  },
+};
+
+const demoQuillFormats = [
+  'header', 'bold', 'italic', 'underline',
+  'list', 'bullet', 'color', 'link', 'indent', 'align'
+];
 
 const QUESTION_TYPE_LABELS: Record<QuestionType, { label: string; icon: any; description: string }> = {
   multiple_choice: { 
@@ -531,14 +552,17 @@ export default function DemoQuestionManager() {
 
           <div className="space-y-2">
             <Label htmlFor="question">Treść pytania</Label>
-            <Textarea
-              id="question"
-              value={formData.question}
-              onChange={(e) => setFormData({ ...formData, question: e.target.value })}
-              placeholder="Jaki rytm widoczny jest na poniższym zapisie EKG?"
-              rows={3}
-              data-testid="input-question"
-            />
+            <div data-testid="input-question">
+              <ReactQuill
+                theme="snow"
+                value={formData.question}
+                onChange={(value) => setFormData({ ...formData, question: value })}
+                modules={demoQuillModules}
+                formats={demoQuillFormats}
+                placeholder="Jaki rytm widoczny jest na poniższym zapisie EKG?"
+                style={{ minHeight: '120px' }}
+              />
+            </div>
           </div>
 
           <div className="border rounded-lg p-4 bg-muted/20">
@@ -547,14 +571,17 @@ export default function DemoQuestionManager() {
 
           <div className="space-y-2">
             <Label htmlFor="explanation">Wyjaśnienie (wyświetlane po odpowiedzi)</Label>
-            <Textarea
-              id="explanation"
-              value={formData.explanation}
-              onChange={(e) => setFormData({ ...formData, explanation: e.target.value })}
-              placeholder="Szczegółowe wyjaśnienie odpowiedzi..."
-              rows={4}
-              data-testid="input-explanation"
-            />
+            <div data-testid="input-explanation">
+              <ReactQuill
+                theme="snow"
+                value={formData.explanation}
+                onChange={(value) => setFormData({ ...formData, explanation: value })}
+                modules={demoQuillModules}
+                formats={demoQuillFormats}
+                placeholder="Szczegółowe wyjaśnienie odpowiedzi..."
+                style={{ minHeight: '150px' }}
+              />
+            </div>
           </div>
 
           {formData.questionType !== 'hotspot' && (
