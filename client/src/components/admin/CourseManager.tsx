@@ -12,7 +12,7 @@ import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Plus, Edit, Trash2, BookOpen, FileText, GripVertical, ArrowUp, ArrowDown, Presentation, EyeOff } from "lucide-react";
+import { Plus, Edit, Trash2, BookOpen, FileText, GripVertical, ArrowUp, ArrowDown, Presentation, EyeOff, Eye } from "lucide-react";
 import { LectureEditor } from "./LectureEditor";
 import {
   DndContext,
@@ -56,7 +56,7 @@ interface SectionFormData {
   prerequisiteSectionId?: string;
 }
 
-function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSection, onAddSection, onEditLecture }: {
+function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSection, onAddSection, onEditLecture, onToggleModuleVisibility, onToggleSectionVisibility }: {
   module: ModuleWithSections;
   onEdit: (module: Module) => void;
   onDelete: (id: string) => void;
@@ -64,6 +64,8 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
   onDeleteSection: (id: string) => void;
   onAddSection: (moduleId: string) => void;
   onEditLecture: (sectionId: string, sectionTitle: string) => void;
+  onToggleModuleVisibility: (id: string, isVisible: boolean) => void;
+  onToggleSectionVisibility: (id: string, isVisible: boolean) => void;
 }) {
   const {
     attributes,
@@ -111,6 +113,15 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
               <Button variant="outline" size="sm" onClick={() => onEdit(module)}>
                 <Edit className="h-3 w-3" />
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => onToggleModuleVisibility(module.id, !module.isVisible)}
+                title={module.isVisible !== false ? "Ukryj moduł" : "Pokaż moduł"}
+                className={module.isVisible === false ? "text-orange-600 border-orange-400" : ""}
+              >
+                {module.isVisible !== false ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+              </Button>
               <Button variant="destructive" size="sm" onClick={() => onDelete(module.id)}>
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -143,6 +154,15 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => onEditSection(section)}>
                       <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => onToggleSectionVisibility(section.id, section.isVisible === false)}
+                      title={section.isVisible !== false ? "Ukryj sekcję" : "Pokaż sekcję"}
+                      className={section.isVisible === false ? "text-orange-600" : ""}
+                    >
+                      {section.isVisible !== false ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => onDeleteSection(section.id)}>
                       <Trash2 className="h-3 w-3" />
@@ -325,6 +345,50 @@ export default function CourseManager() {
     },
   });
 
+  // Toggle module visibility mutation
+  const toggleModuleVisibilityMutation = useMutation({
+    mutationFn: async ({ id, isVisible }: { id: string; isVisible: boolean }) => {
+      const response = await apiRequest("PUT", `/api/admin/modules/${id}`, { isVisible });
+      return response.json();
+    },
+    onSuccess: (_, { isVisible }) => {
+      toast({
+        title: "Sukces",
+        description: isVisible ? "Moduł jest teraz widoczny" : "Moduł został ukryty",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/modules"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zmienić widoczności modułu",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Toggle section visibility mutation
+  const toggleSectionVisibilityMutation = useMutation({
+    mutationFn: async ({ id, isVisible }: { id: string; isVisible: boolean }) => {
+      const response = await apiRequest("PUT", `/api/admin/sections/${id}`, { isVisible });
+      return response.json();
+    },
+    onSuccess: (_, { isVisible }) => {
+      toast({
+        title: "Sukces",
+        description: isVisible ? "Sekcja jest teraz widoczna" : "Sekcja została ukryta",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/modules"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zmienić widoczności sekcji",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Reorder modules mutation
   const reorderModulesMutation = useMutation({
     mutationFn: async (moduleIds: string[]) => {
@@ -450,6 +514,8 @@ export default function CourseManager() {
                   setShowSectionDialog(true);
                 }}
                 onEditLecture={(sectionId, sectionTitle) => setEditingLecture({ sectionId, sectionTitle })}
+                onToggleModuleVisibility={(id, isVisible) => toggleModuleVisibilityMutation.mutate({ id, isVisible })}
+                onToggleSectionVisibility={(id, isVisible) => toggleSectionVisibilityMutation.mutate({ id, isVisible })}
               />
             ))}
           </div>
