@@ -167,7 +167,7 @@ export type QuestionConfig =
 export const questions = pgTable("questions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   sectionId: uuid("section_id").notNull().references(() => sections.id, { onDelete: "cascade" }),
-  title: varchar("title", { length: 300 }).notNull(),
+  title: varchar("title", { length: 300 }),
   bodyMd: text("body_md").notNull(),
   imageUrl: text("image_url"),
   imagePosition: varchar("image_position", { length: 10 }).default("above"), // "above" or "below" text

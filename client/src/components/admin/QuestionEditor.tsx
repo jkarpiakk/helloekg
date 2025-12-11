@@ -395,7 +395,7 @@ export default function QuestionEditor({
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="title">Tytuł pytania *</Label>
+                <Label htmlFor="title">Tytuł pytania (opcjonalny)</Label>
                 <Input
                   id="title"
                   value={formData.title}
