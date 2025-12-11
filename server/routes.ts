@@ -1851,6 +1851,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sections/:sectionId/chapters", requireActiveSubscription, async (req, res) => {
     try {
       const { sectionId } = req.params;
+      const userRole = req.user?.role || 'student';
+      const isAdmin = ['owner', 'reviewer', 'developer_admin'].includes(userRole);
+      
+      // Check if section and its module are visible (only for non-admin users)
+      if (!isAdmin) {
+        const sectionCheck = await db
+          .select({
+            sectionId: sections.id,
+            sectionVisible: sections.isVisible,
+            moduleVisible: modules.isVisible,
+          })
+          .from(sections)
+          .leftJoin(modules, eq(sections.moduleId, modules.id))
+          .where(eq(sections.id, sectionId))
+          .limit(1);
+        
+        if (sectionCheck.length === 0) {
+          return res.status(404).json({ error: "Sekcja nie znaleziona" });
+        }
+        
+        const { sectionVisible, moduleVisible } = sectionCheck[0];
+        if (sectionVisible === false || moduleVisible === false) {
+          return res.status(403).json({ error: "Ta treść jest obecnie niedostępna" });
+        }
+      }
       
       const chapters = await db
         .select({

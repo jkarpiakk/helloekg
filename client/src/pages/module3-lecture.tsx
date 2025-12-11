@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -19,6 +20,7 @@ import {
   Crosshair
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 
 // Dane wykładu dla Modułu 3: Odprowadzenia EKG
 const lectureData = {
@@ -215,13 +217,34 @@ export default function Module3Lecture() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [, setLocation] = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+
+  // Check if module 3 is visible (hidden modules won't appear in the list for students)
+  const { data: modules, isLoading: modulesLoading } = useQuery({
+    queryKey: ["/api/modules"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/modules");
+      return response.json();
+    },
+    enabled: isAuthenticated,
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
       setLocation("/?auth=login");
+      return;
     }
-  }, [isAuthenticated, setLocation]);
+    
+    // Check if module 3 is accessible (will be missing from list if hidden for students)
+    if (modules && !modulesLoading) {
+      const isAdmin = user?.role && ['owner', 'reviewer', 'developer_admin'].includes(user.role);
+      const module3Visible = modules.some((m: any) => m.title?.includes("Moduł 3") || m.title?.includes("Odprowadzenia"));
+      
+      if (!isAdmin && !module3Visible) {
+        setLocation("/modules");
+      }
+    }
+  }, [isAuthenticated, modules, modulesLoading, user, setLocation]);
 
   const progress = ((currentSection + 1) / lectureData.sections.length) * 100;
   const section = lectureData.sections[currentSection];
