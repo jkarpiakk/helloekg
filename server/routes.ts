@@ -285,6 +285,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Guest checkout - create account and checkout in one step
+  app.post("/api/stripe/guest-checkout", async (req, res) => {
+    try {
+      const { email, planId } = req.body;
+      
+      if (!email || !planId) {
+        return res.status(400).json({ error: "Email i plan są wymagane" });
+      }
+
+      const plan = await storage.getActivePlans().then(plans => 
+        plans.find(p => p.id === planId)
+      );
+      
+      if (!plan) {
+        return res.status(404).json({ error: "Plan nie znaleziony" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      
+      // Check if user exists
+      let user = await storage.getUserByEmail(email);
+      let customerId: string | undefined;
+      
+      if (user) {
+        // User exists - use their Stripe customer or create one
+        if (user.stripeCustomerId) {
+          customerId = user.stripeCustomerId;
+        } else {
+          const customer = await stripe.customers.create({
+            email: user.email,
+            name: user.firstName ? `${user.firstName} ${user.lastName}` : email,
+            metadata: { userId: user.id }
+          });
+          customerId = customer.id;
+          await storage.updateUserStripeCustomerId(user.id, customer.id);
+        }
+      } else {
+        // New guest - create Stripe customer with email only
+        const customer = await stripe.customers.create({
+          email: email,
+          metadata: { isGuest: 'true' }
+        });
+        customerId = customer.id;
+      }
+
+      // Create checkout session
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: plan.currency.toLowerCase(),
+            product_data: {
+              name: plan.name,
+              description: `Dostęp na ${plan.durationDays} dni`,
+            },
+            unit_amount: Math.round(parseFloat(plan.price) * 100),
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${req.protocol}://${req.get('host')}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.protocol}://${req.get('host')}/?payment=cancelled`,
+        metadata: {
+          email: email,
+          planId: plan.id,
+          durationDays: plan.durationDays.toString(),
+          userId: user?.id || '',
+          isGuest: user ? 'false' : 'true'
+        }
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Guest checkout error:", error);
+      res.status(500).json({ error: "Błąd podczas tworzenia sesji płatności" });
+    }
+  });
+
   // Create Stripe Checkout session
   app.post("/api/stripe/checkout", requireAuth, async (req, res) => {
     try {
