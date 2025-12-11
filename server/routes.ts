@@ -1282,7 +1282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoints for user management
-  app.get("/api/admin/users", requireReviewer, async (req, res) => {
+  app.get("/api/admin/users", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { search, role, status } = req.query;
       let query = db.select().from(users);
@@ -1324,7 +1324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/stats/users", requireReviewer, async (req, res) => {
+  app.get("/api/admin/stats/users", requireAuth, requireReviewer, async (req, res) => {
     try {
       const totalUsers = await db.select({ count: count() }).from(users);
       const activeSubscriptions = await db.select({ count: count() })
@@ -1349,7 +1349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/users", requireReviewer, async (req, res) => {
+  app.post("/api/admin/users", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { email, password, firstName, lastName, role = 'student' } = req.body;
       
@@ -1399,7 +1399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/users/:id", requireReviewer, async (req, res) => {
+  app.put("/api/admin/users/:id", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       const { role, status } = req.body;
