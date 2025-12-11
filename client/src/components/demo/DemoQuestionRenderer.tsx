@@ -420,6 +420,25 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
         </div>
 
         <div className="space-y-3 sm:space-y-4">
+          {/* Title if exists */}
+          {(currentQuestion as any).title && (
+            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground" data-testid="demo-question-title">
+              {(currentQuestion as any).title}
+            </h2>
+          )}
+          
+          {/* Image above text if imagePosition is "above" */}
+          {currentQuestion.imageUrl && questionType === 'multiple_choice' && ((currentQuestion as any).imagePosition === 'above' || !(currentQuestion as any).imagePosition) && (
+            <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 border border-border">
+              <img 
+                src={currentQuestion.imageUrl || afEcgImage} 
+                alt="Zapis EKG" 
+                className="w-full h-auto rounded"
+                data-testid="demo-ecg-image"
+              />
+            </div>
+          )}
+          
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
             <div 
               className="text-sm sm:text-base lg:text-lg font-semibold text-foreground prose prose-sm dark:prose-invert max-w-none [&>h2]:text-lg [&>h2]:font-bold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-semibold [&>p]:mt-2" 
@@ -439,7 +458,8 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
             )}
           </div>
           
-          {currentQuestion.imageUrl && questionType === 'multiple_choice' && (
+          {/* Image below text if imagePosition is "below" */}
+          {currentQuestion.imageUrl && questionType === 'multiple_choice' && (currentQuestion as any).imagePosition === 'below' && (
             <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 border border-border">
               <img 
                 src={currentQuestion.imageUrl || afEcgImage} 

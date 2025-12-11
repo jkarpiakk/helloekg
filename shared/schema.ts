@@ -517,12 +517,14 @@ export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
 // Demo question for homepage - supports all 6 question types
 export const demoQuestions = pgTable("demo_questions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title"), // Optional title/header for the question
   question: text("question").notNull(),
   // For multiple_choice type - legacy fields for backward compatibility
   options: json("options").$type<string[]>().default([]),
   correctIndex: integer("correct_index").default(0),
   explanation: text("explanation").notNull(),
   imageUrl: text("image_url"),
+  imagePosition: varchar("image_position", { length: 10 }).default("above"), // "above" or "below" text
   // New fields for all question types
   questionType: varchar("question_type", { length: 50 }).notNull().default("multiple_choice"),
   questionConfig: json("question_config").$type<QuestionConfig>(),

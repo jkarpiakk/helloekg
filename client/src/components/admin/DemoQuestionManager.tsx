@@ -145,11 +145,13 @@ const getDefaultConfig = (type: QuestionType): QuestionConfig | undefined => {
 };
 
 interface FormData {
+  title: string;
   question: string;
   options: string[];
   correctIndex: number;
   explanation: string;
   imageUrl: string;
+  imagePosition: "above" | "below";
   questionType: QuestionType;
   questionConfig?: QuestionConfig;
   displayOrder: number;
@@ -160,11 +162,13 @@ export default function DemoQuestionManager() {
   const [editingQuestion, setEditingQuestion] = useState<DemoQuestion | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
+    title: "",
     question: "",
     options: ["", "", "", ""],
     correctIndex: 0,
     explanation: "",
     imageUrl: "",
+    imagePosition: "above",
     questionType: "multiple_choice",
     questionConfig: undefined,
     displayOrder: 0,
@@ -248,11 +252,13 @@ export default function DemoQuestionManager() {
 
   const resetForm = () => {
     setFormData({
+      title: "",
       question: "",
       options: ["", "", "", ""],
       correctIndex: 0,
       explanation: "",
       imageUrl: "",
+      imagePosition: "above",
       questionType: "multiple_choice",
       questionConfig: undefined,
       displayOrder: 0,
@@ -264,11 +270,13 @@ export default function DemoQuestionManager() {
   const handleEdit = (question: DemoQuestion) => {
     setEditingQuestion(question);
     setFormData({
+      title: (question as any).title || "",
       question: question.question,
       options: question.options || ["", "", "", ""],
       correctIndex: question.correctIndex || 0,
       explanation: question.explanation,
       imageUrl: question.imageUrl || "",
+      imagePosition: ((question as any).imagePosition as "above" | "below") || "above",
       questionType: (question.questionType as QuestionType) || "multiple_choice",
       questionConfig: question.questionConfig as QuestionConfig | undefined,
       displayOrder: question.displayOrder || 0,
@@ -311,11 +319,13 @@ export default function DemoQuestionManager() {
     }
 
     const payload = {
+      title: formData.title || null,
       question: formData.question,
       options: formData.questionType === 'multiple_choice' ? formData.options : [],
       correctIndex: formData.questionType === 'multiple_choice' ? formData.correctIndex : 0,
       explanation: formData.explanation,
       imageUrl: formData.imageUrl || null,
+      imagePosition: formData.imagePosition,
       questionType: formData.questionType,
       questionConfig: formData.questionConfig,
       displayOrder: formData.displayOrder,
@@ -551,6 +561,17 @@ export default function DemoQuestionManager() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="title">Tytuł (opcjonalny nagłówek)</Label>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              placeholder="np. Przypadek kliniczny #1"
+              data-testid="input-title"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="question">Treść pytania</Label>
             <div data-testid="input-question">
               <ReactQuill
@@ -636,6 +657,38 @@ export default function DemoQuestionManager() {
                   </div>
                 )}
               </div>
+              
+              {formData.imageUrl && (
+                <div className="mt-3">
+                  <Label>Pozycja obrazka</Label>
+                  <div className="flex items-center gap-4 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="imagePosition"
+                        value="above"
+                        checked={formData.imagePosition === "above"}
+                        onChange={() => setFormData({ ...formData, imagePosition: "above" })}
+                        className="w-4 h-4"
+                        data-testid="radio-image-above"
+                      />
+                      <span className="text-sm">Nad tekstem</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="imagePosition"
+                        value="below"
+                        checked={formData.imagePosition === "below"}
+                        onChange={() => setFormData({ ...formData, imagePosition: "below" })}
+                        className="w-4 h-4"
+                        data-testid="radio-image-below"
+                      />
+                      <span className="text-sm">Pod tekstem</span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
