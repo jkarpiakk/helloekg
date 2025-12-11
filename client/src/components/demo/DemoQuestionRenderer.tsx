@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import type { DemoQuestion, QuestionConfig, DragDropConfig, FillBlankConfig, MatchingConfig, SortingConfig, HotspotConfig } from "@shared/schema";
 import type { QuestionType, AnswerData, DragDropAnswer, FillBlankAnswer, MatchingAnswer, SortingAnswer, HotspotAnswer } from "@/types";
 import afEcgImage from "@assets/af ecg_1757697444254.jpg";
+import DOMPurify from "dompurify";
 
 import DragDropQuestion from "@/components/quiz/questions/DragDropQuestion";
 import FillBlankQuestion from "@/components/quiz/questions/FillBlankQuestion";
@@ -419,10 +420,12 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
         </div>
 
         <div className="space-y-3 sm:space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-            <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground" data-testid="demo-question-text">
-              {currentQuestion.question}
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
+            <div 
+              className="text-sm sm:text-base lg:text-lg font-semibold text-foreground prose prose-sm dark:prose-invert max-w-none [&>h2]:text-lg [&>h2]:font-bold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-semibold [&>p]:mt-2" 
+              data-testid="demo-question-text"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion.question) }}
+            />
             {showResult && (
               <Button 
                 variant="outline" 
@@ -617,9 +620,11 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
                 <h3 className="font-semibold text-lg">Dlaczego tak jest?</h3>
               </div>
               <div className="p-5 bg-gradient-to-br from-primary/5 to-chart-2/5 rounded-xl border border-primary/20">
-                <p className="text-foreground leading-relaxed text-base sm:text-lg" data-testid="demo-result-explanation">
-                  {currentQuestion?.explanation}
-                </p>
+                <div 
+                  className="text-foreground leading-relaxed text-base sm:text-lg prose prose-sm dark:prose-invert max-w-none" 
+                  data-testid="demo-result-explanation"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion?.explanation || '') }}
+                />
               </div>
             </div>
 
