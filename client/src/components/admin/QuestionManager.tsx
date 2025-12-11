@@ -235,10 +235,11 @@ export default function QuestionManager() {
     
     const transformedData: any = {
       sectionId: data.sectionId,
-      title: data.questionText.substring(0, 100) || "Pytanie",
+      title: data.title?.trim() || null,
       bodyMd: data.questionText,
       explanationMd: data.explanation,
       imageUrl: data.imageUrl,
+      imagePosition: data.imagePosition || "above",
       difficulty: data.difficultyLevel,
       tags: data.tags,
       status: data.status,

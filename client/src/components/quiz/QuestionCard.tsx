@@ -112,8 +112,8 @@ export default function QuestionCard({
               )}
             </div>
             
-            {/* EKG Image - only for non-hotspot questions */}
-            {question.imageUrl && questionType !== 'hotspot' && (
+            {/* EKG Image - above question text (default) */}
+            {question.imageUrl && questionType !== 'hotspot' && ((question as any).imagePosition === 'above' || !(question as any).imagePosition) && (
               <div 
                 className="relative group cursor-pointer mb-5 sm:mb-6 touch-manipulation rounded-2xl overflow-hidden"
                 onClick={() => onImageClick(question.imageUrl!)}
@@ -140,6 +140,27 @@ export default function QuestionCard({
                 dangerouslySetInnerHTML={sanitizeHtml(question.bodyMd)}
                 data-testid="question-body"
               />
+            )}
+            
+            {/* EKG Image - below question text */}
+            {question.imageUrl && questionType !== 'hotspot' && (question as any).imagePosition === 'below' && (
+              <div 
+                className="relative group cursor-pointer mb-5 sm:mb-6 touch-manipulation rounded-2xl overflow-hidden"
+                onClick={() => onImageClick(question.imageUrl!)}
+                data-testid="question-image"
+              >
+                <img
+                  src={question.imageUrl}
+                  alt="Zapis EKG"
+                  className="w-full h-44 sm:h-52 md:h-60 lg:h-72 object-contain bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-border/50"
+                />
+                <div className="absolute inset-0 bg-black/0 active:bg-black/20 sm:group-hover:bg-black/10 motion-safe:transition-colors rounded-2xl flex items-center justify-center">
+                  <div className="opacity-0 active:opacity-100 sm:group-hover:opacity-100 motion-safe:transition-opacity bg-black/80 text-white px-4 py-2.5 rounded-xl text-base pointer-events-none flex items-center gap-2">
+                    <ZoomIn className="h-5 w-5" />
+                    <span>Powiększ</span>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
