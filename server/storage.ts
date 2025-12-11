@@ -645,10 +645,29 @@ export class DatabaseStorage implements IStorage {
       .from(blogPosts)
       .where(whereClause);
 
-    // Get items with pagination
+    // Get items with pagination and author data
     const items = await db
-      .select()
+      .select({
+        id: blogPosts.id,
+        title: blogPosts.title,
+        slug: blogPosts.slug,
+        excerpt: blogPosts.excerpt,
+        content: blogPosts.content,
+        featuredImage: blogPosts.featuredImage,
+        tags: blogPosts.tags,
+        status: blogPosts.status,
+        authorId: blogPosts.authorId,
+        seoMeta: blogPosts.seoMeta,
+        publishedAt: blogPosts.publishedAt,
+        createdAt: blogPosts.createdAt,
+        updatedAt: blogPosts.updatedAt,
+        author: {
+          firstName: users.firstName,
+          lastName: users.lastName
+        }
+      })
       .from(blogPosts)
+      .leftJoin(users, eq(blogPosts.authorId, users.id))
       .where(whereClause)
       .orderBy(
         sql`CASE WHEN ${blogPosts.publishedAt} IS NOT NULL THEN ${blogPosts.publishedAt} ELSE ${blogPosts.createdAt} END DESC`
@@ -657,7 +676,7 @@ export class DatabaseStorage implements IStorage {
       .offset(offset);
 
     return {
-      items,
+      items: items as any,
       total: countResult.count,
       page,
       pageSize

@@ -437,7 +437,7 @@ export default function BlogManager() {
                         <div className="flex items-center space-x-2">
                           <User className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm">
-                            {post.author.firstName} {post.author.lastName}
+                            {post.author ? `${post.author.firstName} ${post.author.lastName}` : 'Nieznany autor'}
                           </span>
                         </div>
                       </TableCell>
