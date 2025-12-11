@@ -29,11 +29,13 @@ type QuestionConfig = DragDropConfig | FillBlankConfig | MatchingConfig | Sortin
 
 interface QuestionFormData {
   sectionId: string;
+  title: string;
   questionText: string;
   explanation: string;
   answerOptions: string[];
   correctAnswerIndex: number;
   imageUrl?: string;
+  imagePosition: "above" | "below";
   difficultyLevel: "easy" | "medium" | "hard";
   tags: string[];
   order: number;
@@ -86,11 +88,13 @@ export default function QuestionEditor({
 }: QuestionEditorProps) {
   const [formData, setFormData] = useState<QuestionFormData>({
     sectionId: question?.sectionId || "",
+    title: question?.title || "",
     questionText: question?.bodyMd || "",
     explanation: question?.explanationMd || "",
     answerOptions: question?.answers?.map((a: any) => a.text) || ["", "", "", ""],
     correctAnswerIndex: question?.answers?.findIndex((a: any) => a.isCorrect) || 0,
     imageUrl: question?.imageUrl || "",
+    imagePosition: (question as any)?.imagePosition || "above",
     difficultyLevel: question?.difficulty as "easy" | "medium" | "hard" || "medium",
     tags: question?.tags || [],
     order: question?.order || 1,
@@ -391,7 +395,19 @@ export default function QuestionEditor({
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="questionText">Pytanie *</Label>
+                <Label htmlFor="title">Tytuł pytania *</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Np. Rozpoznaj rytm EKG"
+                  className="mt-1"
+                  data-testid="input-question-title"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="questionText">Treść pytania *</Label>
                 <ReactQuill
                   ref={questionQuillRef}
                   theme="snow"
@@ -457,6 +473,38 @@ export default function QuestionEditor({
                       </div>
                     )}
                   </div>
+                  
+                  {formData.imageUrl && (
+                    <div className="mt-3">
+                      <Label>Pozycja obrazka</Label>
+                      <div className="flex items-center gap-4 mt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="imagePosition"
+                            value="above"
+                            checked={formData.imagePosition === "above"}
+                            onChange={() => setFormData(prev => ({ ...prev, imagePosition: "above" }))}
+                            className="w-4 h-4"
+                            data-testid="radio-image-above"
+                          />
+                          <span className="text-sm">Nad pytaniem</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="imagePosition"
+                            value="below"
+                            checked={formData.imagePosition === "below"}
+                            onChange={() => setFormData(prev => ({ ...prev, imagePosition: "below" }))}
+                            className="w-4 h-4"
+                            data-testid="radio-image-below"
+                          />
+                          <span className="text-sm">Pod pytaniem</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

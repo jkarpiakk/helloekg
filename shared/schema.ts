@@ -170,6 +170,7 @@ export const questions = pgTable("questions", {
   title: varchar("title", { length: 300 }).notNull(),
   bodyMd: text("body_md").notNull(),
   imageUrl: text("image_url"),
+  imagePosition: varchar("image_position", { length: 10 }).default("above"), // "above" or "below" text
   answers: json("answers").$type<Array<{ text: string; isCorrect: boolean }>>().notNull(),
   explanationMd: text("explanation_md").notNull(),
   tags: json("tags").$type<string[]>().default([]),
