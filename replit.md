@@ -22,6 +22,24 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### December 11, 2025 - Streamlined Guest Checkout Flow
+
+#### Simplified Payment UX
+- **Guest Checkout**: Users can now pay without creating an account first - just enter email on pricing card and go to Stripe
+- **Auto Account Creation**: After successful payment, account is automatically created with email-verified status
+- **Auto Login**: Users are automatically logged in after payment completion
+- **Simplified Registration**: Registration form now only requires email and password (removed firstName, lastName, profession fields)
+
+#### API Endpoints
+- `POST /api/stripe/guest-checkout` - Creates Stripe checkout session for guests (email + planId → Stripe URL)
+- `POST /api/stripe/finalize-payment` - Called on payment-success page, auto-creates account if guest, logs user in
+
+#### UX Flow
+1. Guest clicks "Wybierz plan" on pricing card
+2. Email input appears on the card
+3. Enter email → Click "Przejdź do płatności" → Stripe Checkout
+4. After payment → Automatic account creation + login → Dashboard
+
 ### December 8, 2025 - Premium App Store Quality Design System (Full Application)
 
 #### App Store Quality Mobile + Desktop Experience
