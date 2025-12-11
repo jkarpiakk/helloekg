@@ -1592,6 +1592,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Grant/revoke subscription for user
+  app.post("/api/admin/users/:id/subscription", requireAuth, requireReviewer, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { action, durationMonths = 1 } = req.body; // action: "grant" or "revoke"
+      
+      const user = await storage.getUserById(id);
+      if (!user) {
+        return res.status(404).json({ error: "Użytkownik nie znaleziony" });
+      }
+
+      if (action === "grant") {
+        // Get or create a manual plan
+        let manualPlan = await db.select().from(plans).where(eq(plans.name, "Manual")).limit(1);
+        let planId: string;
+        
+        if (manualPlan.length === 0) {
+          const [newPlan] = await db.insert(plans).values({
+            name: "Manual",
+            description: "Subskrypcja przyznana ręcznie przez administratora",
+            price: "0",
+            durationMonths: 1,
+            features: ["Pełny dostęp do wszystkich materiałów"],
+            isPopular: false,
+          }).returning();
+          planId = newPlan.id;
+        } else {
+          planId = manualPlan[0].id;
+        }
+
+        // Deactivate any existing active subscriptions
+        await db.update(subscriptions)
+          .set({ status: "cancelled" })
+          .where(and(
+            eq(subscriptions.userId, id),
+            eq(subscriptions.status, "active")
+          ));
+
+        // Create new subscription
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + durationMonths);
+
+        const [newSubscription] = await db.insert(subscriptions).values({
+          userId: id,
+          planId: planId,
+          startDate: startDate,
+          endDate: endDate,
+          status: "active",
+          paymentProvider: "manual",
+        }).returning();
+
+        // Create audit log
+        await storage.createAuditLog({
+          actorId: req.user!.id,
+          action: "subscription_granted",
+          entityType: "subscription",
+          entityId: newSubscription.id,
+          diff: { userId: id, durationMonths },
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+
+        res.json({ success: true, subscription: newSubscription });
+      } else if (action === "revoke") {
+        // Revoke all active subscriptions
+        await db.update(subscriptions)
+          .set({ status: "cancelled", endDate: new Date() })
+          .where(and(
+            eq(subscriptions.userId, id),
+            eq(subscriptions.status, "active")
+          ));
+
+        // Create audit log
+        await storage.createAuditLog({
+          actorId: req.user!.id,
+          action: "subscription_revoked",
+          entityType: "user",
+          entityId: id,
+          diff: { userId: id },
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+
+        res.json({ success: true, message: "Subskrypcja została anulowana" });
+      } else {
+        res.status(400).json({ error: "Nieprawidłowa akcja. Użyj 'grant' lub 'revoke'" });
+      }
+    } catch (error: any) {
+      console.error("Error managing subscription:", error);
+      res.status(500).json({ error: "Błąd podczas zarządzania subskrypcją" });
+    }
+  });
+
   // Admin Support tickets endpoints
   app.get("/api/admin/support/tickets", requireReviewer, async (req, res) => {
     try {

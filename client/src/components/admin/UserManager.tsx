@@ -11,7 +11,7 @@ import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Search, Shield, Eye, Ban, CheckCircle, UserX, Mail, Edit, UserPlus } from "lucide-react";
+import { Search, Shield, Eye, Ban, CheckCircle, UserX, Mail, Edit, UserPlus, CreditCard } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -117,6 +117,29 @@ export default function UserManager() {
       toast({
         title: "Błąd",
         description: error.message || "Nie udało się zaktualizować roli użytkownika",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Manage subscription mutation
+  const manageSubscriptionMutation = useMutation({
+    mutationFn: async ({ userId, action, durationMonths }: { userId: string; action: "grant" | "revoke"; durationMonths?: number }) => {
+      const response = await apiRequest("POST", `/api/admin/users/${userId}/subscription`, { action, durationMonths });
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: "Sukces",
+        description: variables.action === "grant" ? "Subskrypcja została nadana" : "Subskrypcja została anulowana",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats/users"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zarządzać subskrypcją",
         variant: "destructive",
       });
     },
@@ -458,18 +481,35 @@ export default function UserManager() {
                           <Edit className="h-4 w-4" />
                         </Button>
                         {user.role !== "owner" && (
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => updateUserStatusMutation.mutate({ 
-                              userId: user.id, 
-                              status: user.emailVerified ? "suspended" : "verified" 
-                            })}
-                            disabled={updateUserStatusMutation.isPending}
-                            data-testid={`toggle-user-${user.id}`}
-                          >
-                            {user.emailVerified ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                          </Button>
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={() => manageSubscriptionMutation.mutate({ 
+                                userId: user.id, 
+                                action: "grant",
+                                durationMonths: 1
+                              })}
+                              disabled={manageSubscriptionMutation.isPending}
+                              title="Nadaj subskrypcję (1 miesiąc)"
+                              data-testid={`grant-subscription-${user.id}`}
+                            >
+                              <CreditCard className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => updateUserStatusMutation.mutate({ 
+                                userId: user.id, 
+                                status: user.emailVerified ? "suspended" : "verified" 
+                              })}
+                              disabled={updateUserStatusMutation.isPending}
+                              data-testid={`toggle-user-${user.id}`}
+                            >
+                              {user.emailVerified ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                            </Button>
+                          </>
                         )}
                       </div>
                     </td>
