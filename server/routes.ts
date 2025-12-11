@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { storage } from "./storage";
@@ -361,6 +362,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Guest checkout error:", error);
       res.status(500).json({ error: "Błąd podczas tworzenia sesji płatności" });
+    }
+  });
+
+  // Finalize payment - auto-create account for guests and log them in
+  app.post("/api/stripe/finalize-payment", async (req, res) => {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Brak ID sesji" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ error: "Płatność nie została zrealizowana" });
+      }
+
+      const { email, planId, durationDays, userId, isGuest } = session.metadata || {};
+      
+      if (!email || !planId) {
+        return res.status(400).json({ error: "Brakujące dane sesji" });
+      }
+
+      let user;
+      let isNewAccount = false;
+      
+      // Check if user already exists or was created
+      if (userId && userId !== '') {
+        user = await storage.getUser(userId);
+      }
+      
+      if (!user) {
+        // Check by email
+        user = await storage.getUserByEmail(email);
+      }
+      
+      if (!user) {
+        // Create new account for guest - generate random password
+        const randomPassword = crypto.randomBytes(32).toString('hex');
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+        
+        const [newUser] = await db.insert(users).values({
+          email: email,
+          password: hashedPassword,
+          firstName: '',
+          lastName: '',
+          role: 'student',
+          emailVerified: true, // Auto-verify since they paid
+          stripeCustomerId: session.customer as string || undefined,
+        }).returning();
+        
+        user = newUser;
+        isNewAccount = true;
+        
+        // Create audit log
+        await storage.createAuditLog({
+          actorId: user.id,
+          action: "user_registered_via_payment",
+          entityType: "user",
+          entityId: user.id,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        });
+      }
+
+      // Check if subscription already exists
+      const existingSubscription = await storage.getUserActiveSubscription(user.id);
+      let subscription;
+      
+      if (!existingSubscription) {
+        // Create subscription
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + parseInt(durationDays || '30'));
+
+        subscription = await storage.createSubscription({
+          userId: user.id,
+          planId,
+          startDate,
+          endDate,
+          status: "active",
+          paymentProvider: "stripe"
+        });
+
+        // Send confirmation email
+        const plan = await storage.getActivePlans().then(plans => 
+          plans.find(p => p.id === planId)
+        );
+        
+        if (plan) {
+          try {
+            await emailService.sendSubscriptionConfirmation(
+              user.email,
+              user.firstName || 'Użytkowniku',
+              plan.name,
+              endDate.toLocaleDateString('pl-PL')
+            );
+          } catch (emailError) {
+            console.error("Failed to send subscription email:", emailError);
+          }
+        }
+      } else {
+        subscription = existingSubscription;
+      }
+
+      // Auto-login the user
+      req.session.userId = user.id;
+      
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: "Błąd sesji" });
+        }
+
+        res.json({
+          success: true,
+          isNewAccount,
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            emailVerified: user.emailVerified
+          },
+          subscription: {
+            startDate: subscription.startDate,
+            endDate: subscription.endDate
+          }
+        });
+      });
+    } catch (error: any) {
+      console.error("Finalize payment error:", error);
+      res.status(500).json({ error: "Błąd podczas finalizacji płatności" });
     }
   });
 
