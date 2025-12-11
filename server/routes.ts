@@ -429,7 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Quiz endpoints
   // Get modules with sections and user progress
-  app.get("/api/modules", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.get("/api/modules", requireAuth, async (req, res) => {
     try {
       let allModules = await storage.getModules();
       const userProgress = await storage.getUserProgress(req.user!.id);
@@ -438,6 +438,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAdmin = ["owner", "admin", "reviewer"].includes(req.user!.role);
       if (!isAdmin) {
         allModules = allModules.filter(m => m.isVisible !== false);
+      }
+      
+      // Check if user has active subscription
+      const subscription = await storage.getUserActiveSubscription(req.user!.id);
+      const hasActiveSubscription = subscription && new Date(subscription.endDate) > new Date();
+      
+      // If no active subscription, only show demo module
+      if (!hasActiveSubscription && !isAdmin) {
+        allModules = allModules.filter(m => m.title.toLowerCase().includes('demo'));
       }
       
       // Build modules with sections and progress
