@@ -1611,11 +1611,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (manualPlan.length === 0) {
           const [newPlan] = await db.insert(plans).values({
             name: "Manual",
-            description: "Subskrypcja przyznana ręcznie przez administratora",
             price: "0",
-            durationMonths: 1,
-            features: ["Pełny dostęp do wszystkich materiałów"],
-            isPopular: false,
+            durationDays: 30,
+            currency: "PLN",
+            isActive: true,
           }).returning();
           planId = newPlan.id;
         } else {
