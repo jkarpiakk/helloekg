@@ -72,10 +72,10 @@ export default function BlogManager() {
   const { data: allTags } = useQuery({
     queryKey: ["/api/admin/blog-posts", "all-tags"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/admin/blog-posts?pageSize=1000");
+      const response = await apiRequest("GET", "/api/admin/blog-posts?pageSize=100");
       const data = await response.json() as BlogPostsResponse;
       const tags = new Set<string>();
-      data.data.forEach(post => {
+      data.items.forEach(post => {
         (post.tags || []).forEach(tag => tags.add(tag));
       });
       return Array.from(tags).sort();
