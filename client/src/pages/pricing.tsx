@@ -10,6 +10,7 @@ export default function Pricing() {
 
   const handleAuthSuccess = () => {
     setAuthMode(null);
+    setLocation("/dashboard");
   };
 
   return (

@@ -46,9 +46,7 @@ export default function Home() {
 
   const handleAuthSuccess = () => {
     setAuthMode(null);
-    const url = new URL(window.location.href);
-    url.searchParams.delete('auth');
-    window.history.replaceState({}, '', url.pathname);
+    setLocation("/dashboard");
   };
 
   const { data: demoQuestions } = useQuery({
