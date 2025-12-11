@@ -80,12 +80,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const { user, verificationToken } = await authService.registerUser(userDataFixed);
       
-      // Send verification email
+      // Send verification email via SendGrid
       const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/verify-email?token=${verificationToken}`;
-      const emailTemplate = emailService.getEmailVerificationTemplate(user.firstName, verificationUrl);
       
       try {
-        await emailService.sendEmail(user.email, emailTemplate);
+        await emailService.sendEmailVerification(user.email, user.firstName, verificationUrl);
       } catch (emailError) {
         console.error("Failed to send verification email:", emailError);
         // Continue with registration even if email fails
@@ -229,12 +228,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newToken = authService.generateToken();
       await storage.updateUser(user.id, { emailVerificationToken: newToken });
 
-      // Send verification email
+      // Send verification email via SendGrid
       const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/verify-email?token=${newToken}`;
-      const emailTemplate = emailService.getEmailVerificationTemplate(user.firstName, verificationUrl);
       
       try {
-        await emailService.sendEmail(user.email, emailTemplate);
+        await emailService.sendEmailVerification(user.email, user.firstName, verificationUrl);
       } catch (emailError) {
         console.error("Failed to resend verification email:", emailError);
         return res.status(500).json({ error: "Nie udało się wysłać e-maila" });
@@ -402,17 +400,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               paymentProvider: "stripe"
             });
 
-            // Send confirmation email
+            // Send confirmation email via SendGrid
             const user = await storage.getUser(userId);
             if (user) {
-              const emailTemplate = emailService.getSubscriptionConfirmationTemplate(
-                user.firstName,
-                plan.name,
-                endDate.toLocaleDateString('pl-PL')
-              );
-              
               try {
-                await emailService.sendEmail(user.email, emailTemplate);
+                await emailService.sendSubscriptionConfirmation(
+                  user.email,
+                  user.firstName,
+                  plan.name,
+                  endDate.toLocaleDateString('pl-PL')
+                );
               } catch (emailError) {
                 console.error("Failed to send subscription email:", emailError);
               }

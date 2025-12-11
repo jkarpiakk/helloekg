@@ -6,11 +6,20 @@ export interface EmailTemplate {
   text: string;
 }
 
+interface SendGridDynamicData {
+  [key: string]: string | number | boolean;
+}
+
 export class EmailService {
   private transporter: nodemailer.Transporter;
+  private useSendGrid: boolean;
+  private sendGridApiKey: string | undefined;
 
   constructor() {
-    // Configure with environment variables
+    this.sendGridApiKey = process.env.SENDGRID_API_KEY;
+    this.useSendGrid = !!this.sendGridApiKey;
+
+    // Fallback to nodemailer if no SendGrid key
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: parseInt(process.env.SMTP_PORT || "587"),
@@ -20,6 +29,37 @@ export class EmailService {
         pass: process.env.SMTP_PASS,
       },
     });
+  }
+
+  private async sendViaSendGrid(
+    to: string, 
+    templateId: string, 
+    dynamicData: SendGridDynamicData
+  ): Promise<void> {
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.sendGridApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{
+          to: [{ email: to }],
+          dynamic_template_data: dynamicData
+        }],
+        from: { 
+          email: process.env.FROM_EMAIL || 'noreply@ekgacademy.pl',
+          name: 'EKG Academy'
+        },
+        template_id: templateId
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('SendGrid error:', response.status, errorText);
+      throw new Error(`SendGrid error: ${response.status}`);
+    }
   }
 
   async sendEmail(to: string, template: EmailTemplate): Promise<void> {
@@ -34,6 +74,63 @@ export class EmailService {
     } catch (error) {
       console.error("Email sending failed:", error);
       throw new Error("Nie udało się wysłać e-maila");
+    }
+  }
+
+  async sendEmailVerification(to: string, firstName: string, verificationUrl: string): Promise<void> {
+    if (this.useSendGrid) {
+      await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
+        firstName,
+        verificationUrl,
+        subject: 'Potwierdź swój adres e-mail - EKG Academy'
+      });
+    } else {
+      const template = this.getEmailVerificationTemplate(firstName, verificationUrl);
+      await this.sendEmail(to, template);
+    }
+  }
+
+  async sendPasswordReset(to: string, firstName: string, resetUrl: string): Promise<void> {
+    if (this.useSendGrid) {
+      await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
+        firstName,
+        resetUrl,
+        subject: 'Reset hasła - EKG Academy',
+        isPasswordReset: true
+      });
+    } else {
+      const template = this.getPasswordResetTemplate(firstName, resetUrl);
+      await this.sendEmail(to, template);
+    }
+  }
+
+  async sendSubscriptionConfirmation(to: string, firstName: string, planName: string, endDate: string): Promise<void> {
+    if (this.useSendGrid) {
+      await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
+        firstName,
+        planName,
+        endDate,
+        subject: 'Potwierdzenie płatności - EKG Academy',
+        isSubscription: true
+      });
+    } else {
+      const template = this.getSubscriptionConfirmationTemplate(firstName, planName, endDate);
+      await this.sendEmail(to, template);
+    }
+  }
+
+  async sendCertificate(to: string, firstName: string, certificateId: string, verificationUrl: string): Promise<void> {
+    if (this.useSendGrid) {
+      await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
+        firstName,
+        certificateId,
+        verificationUrl,
+        subject: 'Gratulacje! Otrzymałeś certyfikat - EKG Academy',
+        isCertificate: true
+      });
+    } else {
+      const template = this.getCertificateTemplate(firstName, certificateId, verificationUrl);
+      await this.sendEmail(to, template);
     }
   }
 
