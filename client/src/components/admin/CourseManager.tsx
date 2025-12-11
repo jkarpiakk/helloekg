@@ -12,7 +12,7 @@ import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Plus, Edit, Trash2, BookOpen, FileText, GripVertical, ArrowUp, ArrowDown, Presentation, EyeOff, Eye } from "lucide-react";
+import { Plus, Edit, Trash2, BookOpen, FileText, GripVertical, ArrowUp, ArrowDown, Presentation, EyeOff } from "lucide-react";
 import { LectureEditor } from "./LectureEditor";
 import {
   DndContext,
@@ -116,11 +116,11 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => onToggleModuleVisibility(module.id, !module.isVisible)}
+                onClick={() => onToggleModuleVisibility(module.id, module.isVisible === false)}
                 title={module.isVisible !== false ? "Ukryj moduł" : "Pokaż moduł"}
-                className={module.isVisible === false ? "text-orange-600 border-orange-400" : ""}
+                className={module.isVisible === false ? "text-orange-600 border-orange-400 bg-orange-50 dark:bg-orange-950/30" : "text-muted-foreground"}
               >
-                {module.isVisible !== false ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                <EyeOff className="h-3 w-3" />
               </Button>
               <Button variant="destructive" size="sm" onClick={() => onDelete(module.id)}>
                 <Trash2 className="h-3 w-3" />
@@ -160,9 +160,9 @@ function SortableModule({ module, onEdit, onDelete, onEditSection, onDeleteSecti
                       size="sm" 
                       onClick={() => onToggleSectionVisibility(section.id, section.isVisible === false)}
                       title={section.isVisible !== false ? "Ukryj sekcję" : "Pokaż sekcję"}
-                      className={section.isVisible === false ? "text-orange-600" : ""}
+                      className={section.isVisible === false ? "text-orange-600 bg-orange-50 dark:bg-orange-950/30" : "text-muted-foreground"}
                     >
-                      {section.isVisible !== false ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                      <EyeOff className="h-3 w-3" />
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => onDeleteSection(section.id)}>
                       <Trash2 className="h-3 w-3" />
