@@ -67,6 +67,20 @@ export default function StudentDashboard() {
     },
   });
 
+  // Fetch modules to check visibility for lecture button
+  const { data: modules } = useQuery({
+    queryKey: ["/api/modules"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/modules");
+      return response.json();
+    },
+  });
+
+  // Check if Module 1 (Lecture) is visible - hidden modules won't appear in the list for students
+  const isModule1Visible = modules?.some((m: any) => 
+    m.title?.includes("Moduł 1") || m.title?.includes("Wprowadzenie")
+  ) ?? false;
+
   // Generate certificate mutation
   const generateCertificateMutation = useMutation({
     mutationFn: async () => {
@@ -144,7 +158,7 @@ export default function StudentDashboard() {
           {/* Quick Actions - Premium app-style tiles */}
           <div>
             <h2 className="text-section text-foreground mb-4">Szybkie akcje</h2>
-            <div className="grid grid-cols-3 gap-3">
+            <div className={`grid gap-3 ${isModule1Visible ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <Link href="/quiz" className="block">
                 <div className="action-tile rounded-2xl p-4 text-center touch-bounce shadow-app min-h-[100px] flex flex-col items-center justify-center" data-testid="action-continue">
                   <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center mb-2">
@@ -163,17 +177,19 @@ export default function StudentDashboard() {
                 </div>
               </Link>
               
-              <Link href="/lecture" className="block">
-                <div className="action-tile rounded-2xl p-4 text-center touch-bounce shadow-app min-h-[100px] flex flex-col items-center justify-center relative" data-testid="action-lecture">
-                  <div className="absolute -top-1 -right-1">
-                    <span className="bg-chart-2 text-chart-2-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">NEW</span>
+              {isModule1Visible && (
+                <Link href="/lecture" className="block">
+                  <div className="action-tile rounded-2xl p-4 text-center touch-bounce shadow-app min-h-[100px] flex flex-col items-center justify-center relative" data-testid="action-lecture">
+                    <div className="absolute -top-1 -right-1">
+                      <span className="bg-chart-2 text-chart-2-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">NEW</span>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-chart-2/20 flex items-center justify-center mb-2">
+                      <Heart className="h-6 w-6 text-chart-2" />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">Wykład</span>
                   </div>
-                  <div className="w-12 h-12 rounded-2xl bg-chart-2/20 flex items-center justify-center mb-2">
-                    <Heart className="h-6 w-6 text-chart-2" />
-                  </div>
-                  <span className="text-sm font-medium text-foreground">Wykład</span>
-                </div>
-              </Link>
+                </Link>
+              )}
             </div>
           </div>
           
@@ -394,19 +410,21 @@ export default function StudentDashboard() {
               {/* Quick Actions - Premium Tiles */}
               <div>
                 <h2 className="text-xl font-semibold text-foreground mb-4">Szybkie akcje</h2>
-                <div className="grid grid-cols-3 gap-4">
-                  <Link href="/lecture" className="block group">
-                    <div className="h-full p-6 bg-card border border-border rounded-2xl shadow-app hover:shadow-app-lg hover:border-primary/30 transition-all duration-300 cursor-pointer relative overflow-hidden">
-                      <div className="absolute top-3 right-3">
-                        <Badge className="bg-chart-2 text-chart-2-foreground border-0 text-xs px-2 py-0.5">NOWE</Badge>
+                <div className={`grid gap-4 ${isModule1Visible ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                  {isModule1Visible && (
+                    <Link href="/lecture" className="block group">
+                      <div className="h-full p-6 bg-card border border-border rounded-2xl shadow-app hover:shadow-app-lg hover:border-primary/30 transition-all duration-300 cursor-pointer relative overflow-hidden">
+                        <div className="absolute top-3 right-3">
+                          <Badge className="bg-chart-2 text-chart-2-foreground border-0 text-xs px-2 py-0.5">NOWE</Badge>
+                        </div>
+                        <div className="w-14 h-14 bg-gradient-to-br from-primary/20 to-chart-2/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                          <Heart className="h-7 w-7 text-primary" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-foreground mb-1">Interaktywny wykład</h3>
+                        <p className="text-sm text-muted-foreground">Podstawy EKG z wizualizacjami</p>
                       </div>
-                      <div className="w-14 h-14 bg-gradient-to-br from-primary/20 to-chart-2/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Heart className="h-7 w-7 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-foreground mb-1">Interaktywny wykład</h3>
-                      <p className="text-sm text-muted-foreground">Podstawy EKG z wizualizacjami</p>
-                    </div>
-                  </Link>
+                    </Link>
+                  )}
                   <Link href="/quiz" className="block group">
                     <div className="h-full p-6 bg-card border border-border rounded-2xl shadow-app hover:shadow-app-lg hover:border-primary/30 transition-all duration-300 cursor-pointer">
                       <div className="w-14 h-14 bg-primary/15 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
