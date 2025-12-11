@@ -624,7 +624,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     if (filters?.tag) {
-      conditions.push(sql`${blogPosts.tags} @> ${JSON.stringify([filters.tag])}`);
+      conditions.push(sql`${blogPosts.tags}::jsonb @> ${JSON.stringify([filters.tag])}::jsonb`);
     }
     
     if (filters?.q) {
