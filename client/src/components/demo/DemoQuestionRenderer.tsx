@@ -599,7 +599,10 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
             {/* Question recap */}
             <div className="p-4 bg-secondary/50 rounded-lg border border-border">
               <p className="text-sm text-muted-foreground mb-2">Pytanie:</p>
-              <p className="font-medium text-foreground">{currentQuestion?.question}</p>
+              <div
+                className="font-medium text-foreground prose prose-sm dark:prose-invert max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_p]:my-1 [&_strong]:font-bold [&_em]:italic [&_h1]:text-xl [&_h2]:text-lg [&_h3]:text-base"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion?.question || '') }}
+              />
             </div>
 
             {/* Result badge */}
@@ -641,7 +644,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
               </div>
               <div className="p-5 bg-gradient-to-br from-primary/5 to-chart-2/5 rounded-xl border border-primary/20">
                 <div 
-                  className="text-foreground leading-relaxed text-base sm:text-lg prose prose-sm dark:prose-invert max-w-none" 
+                  className="text-foreground leading-relaxed text-base sm:text-lg prose prose-sm dark:prose-invert max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_p]:my-2 [&_strong]:font-bold [&_em]:italic [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-1 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-primary/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground" 
                   data-testid="demo-result-explanation"
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion?.explanation || '') }}
                 />
