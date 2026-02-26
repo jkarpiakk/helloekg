@@ -272,9 +272,9 @@ export default function DemoQuestionManager() {
     setFormData({
       title: (question as any).title || "",
       question: question.question,
-      options: question.options || ["", "", "", ""],
-      correctIndex: question.correctIndex || 0,
-      explanation: question.explanation,
+      options: question.options && question.options.length > 0 ? question.options : ["", "", "", ""],
+      correctIndex: question.correctIndex ?? 0,
+      explanation: question.explanation || "",
       imageUrl: question.imageUrl || "",
       imagePosition: ((question as any).imagePosition as "above" | "below") || "above",
       questionType: (question.questionType as QuestionType) || "multiple_choice",
@@ -282,6 +282,9 @@ export default function DemoQuestionManager() {
       displayOrder: question.displayOrder || 0,
       isActive: question.isActive,
     });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 50);
   };
 
   const handleQuestionTypeChange = (newType: QuestionType) => {
@@ -575,9 +578,12 @@ export default function DemoQuestionManager() {
             <Label htmlFor="question">Treść pytania</Label>
             <div data-testid="input-question">
               <ReactQuill
+                key={`question-${editingQuestion?.id || 'new'}`}
                 theme="snow"
                 value={formData.question}
-                onChange={(value) => setFormData({ ...formData, question: value })}
+                onChange={(value) => {
+                  setFormData(prev => prev.question === value ? prev : { ...prev, question: value });
+                }}
                 modules={demoQuillModules}
                 formats={demoQuillFormats}
                 placeholder="Jaki rytm widoczny jest na poniższym zapisie EKG?"
@@ -594,9 +600,12 @@ export default function DemoQuestionManager() {
             <Label htmlFor="explanation">Wyjaśnienie (wyświetlane po odpowiedzi)</Label>
             <div data-testid="input-explanation">
               <ReactQuill
+                key={`explanation-${editingQuestion?.id || 'new'}`}
                 theme="snow"
                 value={formData.explanation}
-                onChange={(value) => setFormData({ ...formData, explanation: value })}
+                onChange={(value) => {
+                  setFormData(prev => prev.explanation === value ? prev : { ...prev, explanation: value });
+                }}
                 modules={demoQuillModules}
                 formats={demoQuillFormats}
                 placeholder="Szczegółowe wyjaśnienie odpowiedzi..."
@@ -769,7 +778,7 @@ export default function DemoQuestionManager() {
                               #{question.displayOrder || 0}
                             </Badge>
                           </div>
-                          <h3 className="font-medium mb-1 line-clamp-2">{question.question}</h3>
+                          <h3 className="font-medium mb-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: question.question }} />
                           <div className="text-sm text-muted-foreground space-y-1">
                             {qType === 'multiple_choice' && question.options && question.correctIndex !== null && (
                               <div>
