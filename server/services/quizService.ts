@@ -74,6 +74,8 @@ export interface ExamSession {
 export class QuizService {
   // Store exam sessions in memory (in production, use Redis or database)
   private examSessions: Map<string, ExamSession> = new Map();
+  private readonly EXAM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+  private examSessionTimestamps: Map<string, number> = new Map();
 
   // ======= ANSWER VALIDATION FUNCTIONS =======
 
@@ -291,6 +293,8 @@ export class QuizService {
     };
     
     this.examSessions.set(sessionId, session);
+    this.examSessionTimestamps.set(sessionId, Date.now());
+    this.cleanExpiredSessions();
     
     return {
       sessionId,
@@ -303,6 +307,13 @@ export class QuizService {
     
     if (!session) {
       throw new Error("Sesja egzaminu nie znaleziona");
+    }
+
+    const timestamp = this.examSessionTimestamps.get(sessionId);
+    if (timestamp && Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
+      this.examSessions.delete(sessionId);
+      this.examSessionTimestamps.delete(sessionId);
+      throw new Error("Sesja egzaminu wygasła. Rozpocznij egzamin od nowa.");
     }
     
     if (questionIndex >= session.questionIds.length) {
@@ -331,6 +342,13 @@ export class QuizService {
     
     if (!session) {
       throw new Error("Sesja egzaminu nie znaleziona");
+    }
+
+    const timestamp = this.examSessionTimestamps.get(sessionId);
+    if (timestamp && Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
+      this.examSessions.delete(sessionId);
+      this.examSessionTimestamps.delete(sessionId);
+      throw new Error("Sesja egzaminu wygasła. Rozpocznij egzamin od nowa.");
     }
     
     const question = await storage.getQuestionById(questionId);
@@ -418,6 +436,17 @@ export class QuizService {
 
   clearExamSession(sessionId: string): void {
     this.examSessions.delete(sessionId);
+    this.examSessionTimestamps.delete(sessionId);
+  }
+
+  private cleanExpiredSessions(): void {
+    const now = Date.now();
+    for (const [sessionId, timestamp] of this.examSessionTimestamps.entries()) {
+      if (now - timestamp > this.EXAM_SESSION_TTL_MS) {
+        this.examSessions.delete(sessionId);
+        this.examSessionTimestamps.delete(sessionId);
+      }
+    }
   }
 
   private shuffleArray<T>(array: T[]): T[] {
