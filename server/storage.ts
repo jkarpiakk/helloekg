@@ -565,13 +565,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSupportTickets(status?: string): Promise<SupportTicket[]> {
-    const query = db.select().from(supportTickets);
-    
     if (status) {
-      query.where(eq(supportTickets.status, status));
+      return db.select().from(supportTickets)
+        .where(eq(supportTickets.status, status))
+        .orderBy(desc(supportTickets.createdAt));
     }
-    
-    return query.orderBy(desc(supportTickets.createdAt));
+    return db.select().from(supportTickets)
+      .orderBy(desc(supportTickets.createdAt));
   }
 
   async updateSupportTicket(id: string, updates: Partial<InsertSupportTicket>): Promise<SupportTicket> {
