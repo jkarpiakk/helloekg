@@ -19,6 +19,8 @@ export const users = pgTable("users", {
   marketingConsent: boolean("marketing_consent").notNull().default(false),
   termsAccepted: boolean("terms_accepted").notNull().default(false),
   privacyAccepted: boolean("privacy_accepted").notNull().default(false),
+  passwordResetToken: varchar("password_reset_token", { length: 100 }),
+  passwordResetExpiry: timestamp("password_reset_expiry"),
   stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),

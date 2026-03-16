@@ -241,6 +241,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/auth/forgot-password", authRateLimit, async (req, res) => {
+    try {
+      const parsed = forgotPasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Podaj prawidłowy adres e-mail" });
+      }
+
+      const { email } = parsed.data;
+      const resetToken = await authService.initiatePasswordReset(email);
+
+      if (resetToken) {
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}`;
+        try {
+          const user = await storage.getUserByEmail(email);
+          if (user) {
+            await emailService.sendPasswordReset(user.email, user.firstName, resetUrl);
+          }
+        } catch (emailError) {
+          console.error("Failed to send password reset email:", emailError);
+        }
+      }
+
+      res.json({ message: "Jeśli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła" });
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "Wystąpił błąd. Spróbuj ponownie później" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", authRateLimit, async (req, res) => {
+    try {
+      const parsed = resetPasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Nieprawidłowe dane. Hasło musi mieć co najmniej 8 znaków" });
+      }
+
+      const { token, password } = parsed.data;
+      const result = await authService.resetPassword(token, password);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      if (result.userId) {
+        await storage.createAuditLog({
+          actorId: result.userId,
+          action: "password_reset",
+          entityType: "user",
+          entityId: result.userId,
+        });
+      }
+
+      res.json({ message: "Hasło zostało zmienione. Możesz się teraz zalogować" });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Wystąpił błąd. Spróbuj ponownie później" });
+    }
+  });
+
   app.post("/api/auth/logout", requireAuth, async (req, res) => {
     req.session.destroy((err) => {
       if (err) {

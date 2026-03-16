@@ -81,25 +81,35 @@ export class AuthService {
     if (!user) return null;
 
     const resetToken = this.generateToken();
-    
-    // Store reset token (would need additional table or field)
-    // For now, using the email verification token field
+    const expiry = new Date(Date.now() + 60 * 60 * 1000);
+
     await storage.updateUser(user.id, {
-      emailVerificationToken: resetToken
+      passwordResetToken: resetToken,
+      passwordResetExpiry: expiry,
     });
 
     return resetToken;
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<boolean> {
-    // Find user by reset token (simplified)
-    // This would need proper implementation with token expiry
+  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; userId?: string; error?: string }> {
+    const user = await storage.getUserByPasswordResetToken(token);
+    if (!user) {
+      return { success: false, error: "Nieprawidłowy token resetowania hasła" };
+    }
+
+    if (!user.passwordResetExpiry || new Date(user.passwordResetExpiry) < new Date()) {
+      return { success: false, error: "Token resetowania hasła wygasł" };
+    }
+
     const hashedPassword = await this.hashPassword(newPassword);
-    
-    // Update password and clear token
-    // Implementation needed
-    
-    return true; // Placeholder
+
+    await storage.updateUser(user.id, {
+      password: hashedPassword,
+      passwordResetToken: null,
+      passwordResetExpiry: null,
+    });
+
+    return { success: true, userId: user.id };
   }
 
   hasRole(user: User, role: string): boolean {

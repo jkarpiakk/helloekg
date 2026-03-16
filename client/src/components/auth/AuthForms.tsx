@@ -14,6 +14,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import type { LoginForm, RegisterForm } from "@/types";
 import logoImage from "@assets/logo ekg 2_1757715460574.png";
+import { apiRequest } from "@/lib/queryClient";
 
 interface AuthFormsProps {
   mode: "login" | "register";
@@ -42,9 +43,37 @@ const registerSchema = z.object({
 
 export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
   const { t } = useTranslation();
   const { login, register } = useAuth();
   const { toast } = useToast();
+
+  const forgotPasswordMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest("POST", "/api/auth/forgot-password", { email });
+      return res.json();
+    },
+    onSuccess: () => {
+      setForgotSent(true);
+    },
+    onError: (error: any) => {
+      let description = "Nie udało się wysłać linku";
+      try {
+        const jsonStart = error.message?.indexOf("{");
+        if (jsonStart >= 0) {
+          const parsed = JSON.parse(error.message.substring(jsonStart));
+          description = parsed.error || description;
+        }
+      } catch {}
+      toast({
+        title: "Błąd",
+        description,
+        variant: "destructive",
+      });
+    },
+  });
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -191,6 +220,67 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
               </Button>
             </form>
           </Form>
+
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              className="text-sm text-primary hover:underline"
+              onClick={() => { setShowForgotPassword(true); setForgotSent(false); setForgotEmail(""); }}
+              data-testid="forgot-password-link"
+            >
+              Zapomniałem hasła
+            </button>
+          </div>
+
+          {showForgotPassword && (
+            <div className="mt-4 p-4 border rounded-lg space-y-3">
+              {forgotSent ? (
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-green-600 font-medium">
+                    Jeśli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła.
+                  </p>
+                  <button
+                    type="button"
+                    className="text-sm text-muted-foreground hover:underline"
+                    onClick={() => setShowForgotPassword(false)}
+                  >
+                    Zamknij
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Podaj adres e-mail powiązany z Twoim kontem, a wyślemy Ci link do resetowania hasła.
+                  </p>
+                  <Input
+                    type="email"
+                    placeholder="email@example.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    data-testid="forgot-password-email"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      className="flex-1"
+                      disabled={!forgotEmail || forgotPasswordMutation.isPending}
+                      onClick={() => forgotPasswordMutation.mutate(forgotEmail)}
+                      data-testid="forgot-password-submit"
+                    >
+                      {forgotPasswordMutation.isPending ? "Wysyłanie..." : "Wyślij link"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowForgotPassword(false)}
+                    >
+                      Anuluj
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     );
