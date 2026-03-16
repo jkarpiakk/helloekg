@@ -310,7 +310,7 @@ export class QuizService {
     }
 
     const timestamp = this.examSessionTimestamps.get(sessionId);
-    if (timestamp && Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
+    if (!timestamp || Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
       this.examSessions.delete(sessionId);
       this.examSessionTimestamps.delete(sessionId);
       throw new Error("Sesja egzaminu wygasła. Rozpocznij egzamin od nowa.");
@@ -345,7 +345,7 @@ export class QuizService {
     }
 
     const timestamp = this.examSessionTimestamps.get(sessionId);
-    if (timestamp && Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
+    if (!timestamp || Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
       this.examSessions.delete(sessionId);
       this.examSessionTimestamps.delete(sessionId);
       throw new Error("Sesja egzaminu wygasła. Rozpocznij egzamin od nowa.");
@@ -421,6 +421,13 @@ export class QuizService {
     const session = this.examSessions.get(sessionId);
     
     if (!session) {
+      return null;
+    }
+
+    const timestamp = this.examSessionTimestamps.get(sessionId);
+    if (!timestamp || Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
+      this.examSessions.delete(sessionId);
+      this.examSessionTimestamps.delete(sessionId);
       return null;
     }
     
