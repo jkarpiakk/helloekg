@@ -59,7 +59,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       conString: process.env.DATABASE_URL,
       tableName: 'session',
       createTableIfMissing: true,
-    }) : undefined,
+    }) : (() => {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('DATABASE_URL is required in production for persistent sessions');
+      }
+      console.warn('WARNING: No DATABASE_URL — using in-memory session store. Sessions will not survive restarts.');
+      return undefined;
+    })(),
     secret: process.env.SESSION_SECRET || (() => {
       if (process.env.NODE_ENV === 'production') {
         throw new Error('SESSION_SECRET environment variable is required in production');
