@@ -2138,13 +2138,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (successfulAttempts[0]?.count || 0) / totalAttempts[0].count 
         : 0;
 
+      const revenueResult = await db
+        .select({ 
+          total: sql<number>`COALESCE(SUM(CAST(${plans.price} AS DECIMAL)), 0)`
+        })
+        .from(subscriptions)
+        .leftJoin(plans, eq(subscriptions.planId, plans.id))
+        .where(and(
+          eq(subscriptions.status, 'active'),
+          gte(subscriptions.createdAt, dateFilter)
+        ));
+
+      const monthlyRevenue = Number(revenueResult[0]?.total) || 0;
+
       res.json({
         totalUsers: totalUsers[0]?.count || 0,
         totalQuestions: totalQuestions[0]?.count || 0,
         totalAttempts: totalAttempts[0]?.count || 0,
         avgSuccessRate,
         activeSubscriptions: activeSubscriptions[0]?.count || 0,
-        monthlyRevenue: activeSubscriptions[0]?.count * 60 || 0, // Rough estimate
+        monthlyRevenue,
         newUsersThisMonth: newUsersThisMonth[0]?.count || 0,
         questionsAddedThisMonth: questionsAddedThisMonth[0]?.count || 0,
       });
