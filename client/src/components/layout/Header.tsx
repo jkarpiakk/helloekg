@@ -7,23 +7,54 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Menu, X, User, LogOut, Settings, BookOpen } from "lucide-react";
+import { Menu, X, User, LogOut, Settings, BookOpen, Trash2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/logo ekg 2_1757715460574.png";
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [location] = useLocation();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [location, setLocation] = useLocation();
   const { t } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
+  const { toast } = useToast();
 
   const handleLogout = async () => {
     try {
       await logout();
     } catch (error) {
       console.error("Logout failed:", error);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await apiRequest("DELETE", "/api/auth/account");
+      toast({ title: "Konto zostało usunięte." });
+      setShowDeleteDialog(false);
+      setLocation("/");
+      window.location.reload();
+    } catch (error) {
+      toast({ title: "Błąd podczas usuwania konta", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -88,6 +119,7 @@ export default function Header() {
             </select>
 
             {isAuthenticated ? (
+            <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="user-menu-trigger">
@@ -123,8 +155,40 @@ export default function Header() {
                     <LogOut className="mr-2 h-4 w-4" />
                     {t("auth.logout")}
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-red-600 focus:text-red-600 dark:text-red-400"
+                    data-testid="menu-delete-account"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Usuń konto
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Czy na pewno chcesz usunąć konto?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Ta operacja jest nieodwracalna. Wszystkie Twoje dane, postępy w nauce,
+                      certyfikaty i aktywne subskrypcje zostaną trwale usunięte.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>Anuluj</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting}
+                      className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                    >
+                      {isDeleting ? "Usuwanie..." : "Tak, usuń moje konto"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
             ) : (
               <>
                 <Button 

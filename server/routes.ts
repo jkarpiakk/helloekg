@@ -329,6 +329,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.delete("/api/auth/account", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+
+      await db.update(subscriptions)
+        .set({ status: "cancelled", endDate: new Date() })
+        .where(and(
+          eq(subscriptions.userId, userId),
+          eq(subscriptions.status, "active")
+        ));
+
+      await storage.createAuditLog({
+        actorId: userId,
+        action: "account_deleted",
+        entityType: "user",
+        entityId: userId,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      req.session.destroy(() => {});
+
+      await db.delete(users).where(eq(users.id, userId));
+
+      res.json({ message: "Konto zostało usunięte zgodnie z życzeniem." });
+    } catch (error: any) {
+      console.error("Account deletion error:", error);
+      res.status(500).json({ error: "Błąd podczas usuwania konta" });
+    }
+  });
+
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     res.json({
       user: {
