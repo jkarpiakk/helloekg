@@ -1719,7 +1719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Support endpoints
-  app.post("/api/support/tickets", async (req, res) => {
+  app.post("/api/support/tickets", apiRateLimit, async (req, res) => {
     try {
       const { subject, message } = req.body;
       
@@ -1998,7 +1998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Support tickets endpoints
-  app.get("/api/admin/support/tickets", requireReviewer, async (req, res) => {
+  app.get("/api/admin/support/tickets", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { status, search } = req.query;
       let query = db.select().from(supportTickets);
@@ -2031,7 +2031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/stats/support", requireReviewer, async (req, res) => {
+  app.get("/api/admin/stats/support", requireAuth, requireReviewer, async (req, res) => {
     try {
       const totalTickets = await db.select({ count: count() }).from(supportTickets);
       const openTickets = await db.select({ count: count() })
@@ -2053,7 +2053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/support/tickets/:id", requireReviewer, async (req, res) => {
+  app.put("/api/admin/support/tickets/:id", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       const { status, adminResponse } = req.body;
