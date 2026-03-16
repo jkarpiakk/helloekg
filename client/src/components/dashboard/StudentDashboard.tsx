@@ -40,7 +40,7 @@ export default function StudentDashboard() {
   });
 
   // Fetch subscription status
-  const { data: subscription } = useQuery({
+  const { data: subscriptionData } = useQuery({
     queryKey: ["/api/subscription/status"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/subscription/status");
@@ -48,6 +48,7 @@ export default function StudentDashboard() {
     },
     retry: false,
   });
+  const subscription = subscriptionData?.hasActiveSubscription ? subscriptionData.subscription : null;
 
   // Fetch certificate eligibility
   const { data: certificateEligibility } = useQuery({
