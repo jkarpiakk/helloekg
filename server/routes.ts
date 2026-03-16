@@ -334,6 +334,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/subscription/status", requireAuth, async (req, res) => {
+    try {
+      const subscription = await storage.getUserActiveSubscription(req.user!.id);
+      if (!subscription) {
+        return res.json({ hasActiveSubscription: false, subscription: null });
+      }
+      res.json({
+        hasActiveSubscription: true,
+        subscription: {
+          id: subscription.id,
+          planId: subscription.planId,
+          startDate: subscription.startDate,
+          endDate: subscription.endDate,
+          status: subscription.status,
+          paymentProvider: subscription.paymentProvider,
+        },
+      });
+    } catch (error) {
+      console.error("Subscription status error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania statusu subskrypcji" });
+    }
+  });
+
   // Get Stripe publishable key for frontend
   app.get("/api/stripe/config", async (req, res) => {
     try {
