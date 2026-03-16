@@ -1,0 +1,37 @@
+Zaimplementuj kompletny flow resetu hasła. Wykonaj następujące zmiany:
+
+1. W pliku `shared/schema.ts` dodaj dwa nowe pola do tabeli `users` (po polu `emailVerificationToken`):
+   - `passwordResetToken: varchar("password_reset_token", { length: 100 })`
+   - `passwordResetExpiry: timestamp("password_reset_expiry")`
+
+2. W pliku `server/auth.ts` zastąp placeholder w metodzie `resetPassword` prawdziwą implementacją:
+   - Znajdź użytkownika po `passwordResetToken` w bazie
+   - Sprawdź czy token nie wygasł (`passwordResetExpiry > new Date()`)
+   - Jeśli token nieważny: rzuć Error("Nieprawidłowy lub wygasły token")
+   - Jeśli ważny: zahashuj nowe hasło bcrypt z rounds=12, zapisz do bazy, wyczyść oba pola (token i expiry)
+   - Zwróć true jeśli sukces
+
+   Zaktualizuj też metodę `initiatePasswordReset`:
+   - Generuj token przez `this.generateToken()`
+   - Ustaw expiry na `new Date(Date.now() + 60 * 60 * 1000)` (1 godzina)
+   - Zapisz TYLKO do `passwordResetToken` i `passwordResetExpiry` — NIE nadpisuj `emailVerificationToken`
+   - Zwróć token
+
+3. W pliku `server/routes.ts` dodaj dwa nowe endpointy po bloku `/api/auth/resend-verification`:
+
+   POST `/api/auth/forgot-password` z `authRateLimit`:
+   - Pobierz email z body, zwaliduj przez `forgotPasswordSchema`
+   - Jeśli user nie istnieje: zwróć 200 z neutralną wiadomością (nie ujawniaj czy email istnieje)
+   - Wywołaj `authService.initiatePasswordReset(email)`
+   - Zbuduj URL: `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
+   - Wyślij email przez `emailService.sendPasswordReset(user.email, user.firstName, resetUrl)`
+   - Zawsze zwracaj 200 z: `{ message: "Jeśli konto istnieje, wysłaliśmy link do resetowania hasła" }`
+
+   POST `/api/auth/reset-password`:
+   - Zwaliduj body przez `resetPasswordSchema` (ma pola: token, password, confirmPassword)
+   - Wywołaj `authService.resetPassword(token, password)`
+   - Jeśli false/błąd: zwróć 400 z komunikatem błędu
+   - Jeśli sukces: zwróć 200 z `{ message: "Hasło zostało zmienione. Możesz się teraz zalogować." }`
+   - Dodaj audit log z action: "password_reset"
+
+4. Uruchom `npm run db:push` żeby zaaplikować zmiany schematu do bazy danych.
