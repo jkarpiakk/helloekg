@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import connectPg from "connect-pg-simple";
 import express from "express";
 import path from "path";
 import crypto from "crypto";
@@ -52,15 +53,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets')));
   
   // Session configuration
+  const PgSession = connectPg(session);
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'ekg-academy-secret-key-change-in-production',
+    store: process.env.DATABASE_URL ? new PgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: 'session',
+      createTableIfMissing: true,
+    }) : undefined,
+    secret: process.env.SESSION_SECRET || (() => {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('SESSION_SECRET environment variable is required in production');
+      }
+      console.warn('WARNING: Using default SESSION_SECRET. Set SESSION_SECRET env var for production.');
+      return 'dev-only-secret-not-for-production';
+    })(),
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true, // Always true - Replit uses HTTPS proxy
+      secure: true,
       httpOnly: true,
-      sameSite: 'none', // Required for iframe/cross-site (Replit webview)
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'none',
+      maxAge: 24 * 60 * 60 * 1000,
     }
   }));
 
