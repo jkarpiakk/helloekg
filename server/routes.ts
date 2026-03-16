@@ -504,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         // Create new account for guest - generate random password
         const randomPassword = crypto.randomBytes(32).toString('hex');
-        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+        const hashedPassword = await bcrypt.hash(randomPassword, 12);
         
         const [newUser] = await db.insert(users).values({
           email: email,
@@ -1829,7 +1829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 12);
 
       // Create user
       const [newUser] = await db
