@@ -1,4 +1,7 @@
 import { storage } from "../storage";
+import { db } from "../db";
+import { examSessions } from "@shared/schema";
+import { eq, lt } from "drizzle-orm";
 import { handleQuestionAnswer } from "./gamificationService";
 import type { 
   Question, 
@@ -72,10 +75,21 @@ export interface ExamSession {
 }
 
 export class QuizService {
-  // Store exam sessions in memory (in production, use Redis or database)
-  private examSessions: Map<string, ExamSession> = new Map();
+  // Exam sessions are persisted in the database (table: exam_sessions) so that
+  // in-progress exams survive server restarts.
   private readonly EXAM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
-  private examSessionTimestamps: Map<string, number> = new Map();
+
+  // Loads a non-expired exam session from the DB.
+  // Deletes the record and returns null if it has expired or does not exist.
+  private async loadExamSession(sessionId: string): Promise<ExamSession | null> {
+    const [row] = await db.select().from(examSessions).where(eq(examSessions.sessionId, sessionId));
+    if (!row) return null;
+    if (new Date(row.expiresAt).getTime() < Date.now()) {
+      await db.delete(examSessions).where(eq(examSessions.sessionId, sessionId));
+      return null;
+    }
+    return row.data as ExamSession;
+  }
 
   // ======= ANSWER VALIDATION FUNCTIONS =======
 
@@ -283,7 +297,7 @@ export class QuizService {
     const shuffled = this.shuffleArray(allQuestions);
     const selectedQuestions = shuffled.slice(0, Math.min(count, allQuestions.length));
     
-    // Create session
+    // Create session (persisted to DB)
     const sessionId = `${userId}_${Date.now()}`;
     const session: ExamSession = {
       questionIds: selectedQuestions.map(q => q.id),
@@ -292,9 +306,13 @@ export class QuizService {
       answers: []
     };
     
-    this.examSessions.set(sessionId, session);
-    this.examSessionTimestamps.set(sessionId, Date.now());
-    this.cleanExpiredSessions();
+    await db.insert(examSessions).values({
+      sessionId,
+      userId,
+      data: session,
+      expiresAt: new Date(Date.now() + this.EXAM_SESSION_TTL_MS)
+    });
+    await this.cleanExpiredSessions();
     
     return {
       sessionId,
@@ -303,17 +321,10 @@ export class QuizService {
   }
 
   async getExamQuestion(sessionId: string, questionIndex: number): Promise<QuizQuestion | null> {
-    const session = this.examSessions.get(sessionId);
+    const session = await this.loadExamSession(sessionId);
     
     if (!session) {
-      throw new Error("Sesja egzaminu nie znaleziona");
-    }
-
-    const timestamp = this.examSessionTimestamps.get(sessionId);
-    if (!timestamp || Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
-      this.examSessions.delete(sessionId);
-      this.examSessionTimestamps.delete(sessionId);
-      throw new Error("Sesja egzaminu wygasła. Rozpocznij egzamin od nowa.");
+      throw new Error("Sesja egzaminu nie znaleziona lub wygasła. Rozpocznij egzamin od nowa.");
     }
     
     if (questionIndex >= session.questionIds.length) {
@@ -338,17 +349,10 @@ export class QuizService {
     userId: string,
     answerData?: AnswerData
   ): Promise<QuizResult> {
-    const session = this.examSessions.get(sessionId);
+    const session = await this.loadExamSession(sessionId);
     
     if (!session) {
-      throw new Error("Sesja egzaminu nie znaleziona");
-    }
-
-    const timestamp = this.examSessionTimestamps.get(sessionId);
-    if (!timestamp || Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
-      this.examSessions.delete(sessionId);
-      this.examSessionTimestamps.delete(sessionId);
-      throw new Error("Sesja egzaminu wygasła. Rozpocznij egzamin od nowa.");
+      throw new Error("Sesja egzaminu nie znaleziona lub wygasła. Rozpocznij egzamin od nowa.");
     }
     
     const question = await storage.getQuestionById(questionId);
@@ -386,6 +390,9 @@ export class QuizService {
     
     session.currentIndex++;
     
+    // Persist updated session state to DB
+    await db.update(examSessions).set({ data: session }).where(eq(examSessions.sessionId, sessionId));
+    
     // Save attempt to database (for statistics)
     await storage.createAttempt({
       userId,
@@ -417,17 +424,10 @@ export class QuizService {
     };
   }
 
-  getExamSummary(sessionId: string): { totalQuestions: number; correctAnswers: number; totalTime: number } | null {
-    const session = this.examSessions.get(sessionId);
+  async getExamSummary(sessionId: string): Promise<{ totalQuestions: number; correctAnswers: number; totalTime: number } | null> {
+    const session = await this.loadExamSession(sessionId);
     
     if (!session) {
-      return null;
-    }
-
-    const timestamp = this.examSessionTimestamps.get(sessionId);
-    if (!timestamp || Date.now() - timestamp > this.EXAM_SESSION_TTL_MS) {
-      this.examSessions.delete(sessionId);
-      this.examSessionTimestamps.delete(sessionId);
       return null;
     }
     
@@ -441,19 +441,12 @@ export class QuizService {
     };
   }
 
-  clearExamSession(sessionId: string): void {
-    this.examSessions.delete(sessionId);
-    this.examSessionTimestamps.delete(sessionId);
+  async clearExamSession(sessionId: string): Promise<void> {
+    await db.delete(examSessions).where(eq(examSessions.sessionId, sessionId));
   }
 
-  private cleanExpiredSessions(): void {
-    const now = Date.now();
-    for (const [sessionId, timestamp] of this.examSessionTimestamps.entries()) {
-      if (now - timestamp > this.EXAM_SESSION_TTL_MS) {
-        this.examSessions.delete(sessionId);
-        this.examSessionTimestamps.delete(sessionId);
-      }
-    }
+  private async cleanExpiredSessions(): Promise<void> {
+    await db.delete(examSessions).where(lt(examSessions.expiresAt, new Date()));
   }
 
   private shuffleArray<T>(array: T[]): T[] {

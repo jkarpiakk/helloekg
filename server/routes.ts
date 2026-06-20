@@ -1026,7 +1026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "sessionId jest wymagane" });
       }
 
-      const summary = quizService.getExamSummary(sessionId as string);
+      const summary = await quizService.getExamSummary(sessionId as string);
 
       if (!summary) {
         return res.status(404).json({ error: "Sesja egzaminu nie znaleziona" });

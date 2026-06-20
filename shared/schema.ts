@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, json, decimal, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, json, jsonb, decimal, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -25,6 +25,16 @@ export const users = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Exam sessions (persisted so in-progress exams survive server restarts)
+export const examSessions = pgTable("exam_sessions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: text("session_id").unique().notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  data: jsonb("data").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
 });
 
 // Subscription plans

@@ -1,1 +1,2 @@
 - [Guest checkout webhook activation](guest-checkout-webhook.md) — Stripe webhook only activates subs when session metadata has userId; create guest account before redirect, not after.
+- [drizzle-kit push prompt](drizzle-kit-push-prompt.md) — `push --force` hangs on create-vs-rename prompt (ignores piped stdin); create similarly-named tables via raw SQL instead.
