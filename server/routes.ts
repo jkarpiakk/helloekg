@@ -332,6 +332,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/auth/account", requireAuth, async (req, res) => {
     try {
       const userId = req.user!.id;
+      const userEmail = req.user!.email;
+      const userFirstName = req.user!.firstName;
 
       await db.update(subscriptions)
         .set({ status: "cancelled", endDate: new Date() })
@@ -349,9 +351,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get('User-Agent')
       });
 
-      req.session.destroy(() => {});
-
       await db.delete(users).where(eq(users.id, userId));
+
+      try {
+        await emailService.sendEmail(userEmail, {
+          subject: "Potwierdzenie usunięcia konta — EKG Academy",
+          html: `<p>Cześć ${userFirstName || ''},</p><p>Twoje konto w EKG Academy zostało usunięte zgodnie z Twoim żądaniem. Wszystkie Twoje dane osobowe zostały trwale usunięte z naszych systemów.</p><p>Zespół EKG Academy</p>`,
+          text: "Twoje konto w EKG Academy zostało usunięte zgodnie z Twoim żądaniem. Wszystkie Twoje dane osobowe zostały trwale usunięte z naszych systemów."
+        });
+      } catch (emailError) {
+        console.error("Failed to send account deletion confirmation email:", emailError);
+      }
+
+      req.session.destroy(() => {});
 
       res.json({ message: "Konto zostało usunięte zgodnie z życzeniem." });
     } catch (error: any) {
@@ -455,12 +467,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateUserStripeCustomerId(user.id, customer.id);
         }
       } else {
-        // New guest - create Stripe customer with email only
-        const customer = await stripe.customers.create({
-          email: email,
-          metadata: { isGuest: 'true' }
-        });
-        customerId = customer.id;
+        // New guest - create account FIRST so the webhook can activate the
+        // subscription even if the browser is closed after payment.
+        const randomPassword = crypto.randomBytes(32).toString('hex');
+        const passwordHash = await bcrypt.hash(randomPassword, 12);
+
+        let newUser;
+        try {
+          newUser = await storage.createUser({
+            email,
+            password: passwordHash,
+            firstName: email.split('@')[0],
+            lastName: '',
+            emailVerified: true,
+            role: 'student'
+          });
+
+          await storage.createAuditLog({
+            actorId: newUser.id,
+            action: 'user_registered_via_guest_checkout',
+            entityType: 'user',
+            entityId: newUser.id,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent')
+          });
+        } catch (createError) {
+          // Race: a concurrent request may have created this account first.
+          // Fall back to the existing user instead of returning a false 500.
+          const existing = await storage.getUserByEmail(email);
+          if (!existing) throw createError;
+          newUser = existing;
+        }
+
+        user = newUser;
+
+        if (newUser.stripeCustomerId) {
+          customerId = newUser.stripeCustomerId;
+        } else {
+          const customer = await stripe.customers.create({
+            email: email,
+            metadata: { userId: newUser.id }
+          });
+          customerId = customer.id;
+          await storage.updateUserStripeCustomerId(newUser.id, customer.id);
+        }
       }
 
       // Create checkout session
@@ -485,8 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: email,
           planId: plan.id,
           durationDays: plan.durationDays.toString(),
-          userId: user?.id || '',
-          isGuest: user ? 'false' : 'true'
+          userId: user.id
         }
       });
 
@@ -2124,7 +2173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics endpoints
-  app.get("/api/admin/analytics/stats", requireReviewer, async (req, res) => {
+  app.get("/api/admin/analytics/stats", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { range } = req.query;
       
@@ -2198,7 +2247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/analytics/performance", requireReviewer, async (req, res) => {
+  app.get("/api/admin/analytics/performance", requireAuth, requireReviewer, async (req, res) => {
     try {
       // Get average quiz completion time
       const avgCompletionTime = await db.select({ 
@@ -2253,7 +2302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Lecture chapters endpoints for admins
-  app.get("/api/admin/sections/:sectionId/chapters", requireAuth, async (req, res) => {
+  app.get("/api/admin/sections/:sectionId/chapters", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { sectionId } = req.params;
       const chapters = await db
@@ -2281,7 +2330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/sections/:sectionId/chapters", requireAuth, async (req, res) => {
+  app.post("/api/admin/sections/:sectionId/chapters", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { sectionId } = req.params;
       const { title, contentMd, analogy, keyPoints, visual, visualContent, order } = req.body;
@@ -2319,7 +2368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/chapters/:id", requireAuth, async (req, res) => {
+  app.put("/api/admin/chapters/:id", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       const { title, contentMd, analogy, keyPoints, visual, visualContent, order, isPublished } = req.body;
@@ -2362,7 +2411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/admin/chapters/:id", requireAuth, async (req, res) => {
+  app.delete("/api/admin/chapters/:id", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
 

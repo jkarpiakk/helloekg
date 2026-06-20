@@ -1,0 +1,1 @@
+- [Guest checkout webhook activation](guest-checkout-webhook.md) — Stripe webhook only activates subs when session metadata has userId; create guest account before redirect, not after.
