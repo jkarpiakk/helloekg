@@ -48,6 +48,7 @@ async function initStripe() {
 
 await initStripe();
 
+// Managed webhook (stripe-replit-sync handles signature verification internally)
 app.post(
   '/api/stripe/webhook/:uuid',
   express.raw({ type: 'application/json' }),
@@ -73,6 +74,47 @@ app.post(
     } catch (error: any) {
       console.error('Webhook error:', error.message);
       res.status(400).json({ error: 'Webhook processing error' });
+    }
+  }
+);
+
+// Manual webhook — configure this URL in the Stripe Dashboard.
+// Verifies the Stripe-Signature header using the STRIPE_WEBHOOK_SECRET secret.
+// Endpoint URL: https://<your-domain>/api/stripe/webhook/manual
+app.post(
+  '/api/stripe/webhook/manual',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error('STRIPE_WEBHOOK_SECRET is not set — manual webhook is disabled');
+      return res.status(500).json({ error: 'Webhook not configured' });
+    }
+
+    const signature = req.headers['stripe-signature'];
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
+
+    try {
+      const { getUncachableStripeClient } = await import('./stripeClient');
+      const stripe = await getUncachableStripeClient();
+      const sig = Array.isArray(signature) ? signature[0] : signature;
+
+      // constructEvent throws if the signature is invalid — reject with 400.
+      const event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
+
+      console.log(`Manual webhook received: ${event.type}`);
+
+      if (event.type === 'checkout.session.completed') {
+        await WebhookHandlers.handleCheckoutCompleted(event.data.object);
+      }
+
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error('Manual webhook error:', error.message);
+      // Return 400 for invalid signatures so Stripe retries the event.
+      res.status(400).json({ error: 'Invalid webhook signature or processing error' });
     }
   }
 );

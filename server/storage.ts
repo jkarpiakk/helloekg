@@ -21,6 +21,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
   getUserByPasswordResetToken(token: string): Promise<User | undefined>;
+  invalidateUserSessions(userId: string): Promise<void>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
@@ -145,6 +146,12 @@ export class DatabaseStorage implements IStorage {
   async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.passwordResetToken, token));
     return user || undefined;
+  }
+
+  async invalidateUserSessions(userId: string): Promise<void> {
+    // Delete all sessions belonging to this user from the connect-pg-simple session table.
+    // The sess column is JSONB and contains {"userId":"...", "cookie":{...}}.
+    await db.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${userId}`);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {

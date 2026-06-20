@@ -706,9 +706,13 @@ export const loginSchema = z.object({
   password: z.string().min(8),
 });
 
-export const registerSchema = insertUserSchema.extend({
-  password: z.string().min(8),
-  confirmPassword: z.string().min(8),
+export const registerSchema = z.object({
+  email: z.string().email("Podaj prawidłowy adres e-mail"),
+  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
+  confirmPassword: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
+  marketingConsent: z.boolean().optional().default(false),
+  termsAccepted: z.boolean().optional().default(false),
+  privacyAccepted: z.boolean().optional().default(false),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Hasła nie pasują do siebie",
   path: ["confirmPassword"],

@@ -66,20 +66,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.warn('WARNING: No DATABASE_URL — using in-memory session store. Sessions will not survive restarts.');
       return undefined;
     })(),
-    secret: process.env.SESSION_SECRET || (() => {
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error('SESSION_SECRET environment variable is required in production');
+    secret: (() => {
+      const s = process.env.SESSION_SECRET;
+      if (!s) {
+        throw new Error(
+          "FATAL: SESSION_SECRET is not set.\n" +
+          "Add it in the Replit Secrets tab (padlock icon in the sidebar).\n" +
+          "Generate a value with: node -e \"console.log(require('crypto').randomBytes(64).toString('hex'))\""
+        );
       }
-      console.warn('WARNING: Using default SESSION_SECRET. Set SESSION_SECRET env var for production.');
-      return 'dev-only-secret-not-for-production';
+      return s;
     })(),
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      sameSite: 'none',
-      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     }
   }));
 
@@ -91,49 +95,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userData = registerSchema.parse(req.body);
       
+      // Only email + password required; fill in defaults for remaining required DB fields
       const userDataFixed = {
-        ...userData,
-        profession: userData.profession || undefined,
+        email: userData.email,
+        password: userData.password,
+        firstName: "",
+        lastName: "",
         marketingConsent: userData.marketingConsent ?? false,
         termsAccepted: userData.termsAccepted ?? false,
-        privacyAccepted: userData.privacyAccepted ?? false
+        privacyAccepted: userData.privacyAccepted ?? false,
       };
-      const { user, verificationToken } = await authService.registerUser(userDataFixed);
-      
-      // Send verification email via SendGrid
-      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/verify-email?token=${verificationToken}`;
-      
+
+      let user: any;
+      let verificationToken: string;
+      try {
+        ({ user, verificationToken } = await authService.registerUser(userDataFixed));
+      } catch (err: any) {
+        if (err.message?.includes("już istnieje")) {
+          // Return the same response as a successful registration — do not reveal
+          // whether the e-mail address is already registered.
+          return res.status(201).json({
+            message: "Konto zostało utworzone. Sprawdź e-mail w celu weryfikacji.",
+          });
+        }
+        throw err;
+      }
+
+      const verificationUrl = `${process.env.FRONTEND_URL || "http://localhost:5000"}/verify-email?token=${verificationToken}`;
       try {
         await emailService.sendEmailVerification(user.email, user.firstName, verificationUrl);
       } catch (emailError) {
         console.error("Failed to send verification email:", emailError);
-        // Continue with registration even if email fails
       }
 
-      // Create audit log
       await storage.createAuditLog({
         actorId: user.id,
         action: "user_registered",
         entityType: "user",
         entityId: user.id,
         ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
+        userAgent: req.get("User-Agent"),
       });
 
       res.status(201).json({
         message: "Konto zostało utworzone. Sprawdź e-mail w celu weryfikacji.",
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName
-        }
+        user: { id: user.id, email: user.email },
       });
     } catch (error: any) {
-      console.error("Registration error:", error);
-      res.status(400).json({ 
-        error: error.message || "Błąd podczas rejestracji" 
-      });
+      console.error("Registration error:", error.message);
+      res.status(400).json({ error: "Błąd podczas rejestracji" });
     }
   });
 
@@ -310,6 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           entityType: "user",
           entityId: result.userId,
         });
+        // Sessions are already invalidated inside authService.resetPassword
       }
 
       res.json({ message: "Hasło zostało zmienione. Możesz się teraz zalogować" });

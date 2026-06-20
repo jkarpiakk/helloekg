@@ -191,6 +191,45 @@ export class EmailService {
     };
   }
 
+  async sendGuestPaymentConfirmation(
+    to: string,
+    planName: string,
+    endDate: string,
+    setPasswordUrl: string
+  ): Promise<void> {
+    const template = this.getGuestPaymentConfirmationTemplate(planName, endDate, setPasswordUrl);
+    await this.sendEmail(to, template);
+  }
+
+  getGuestPaymentConfirmationTemplate(
+    planName: string,
+    endDate: string,
+    setPasswordUrl: string
+  ): EmailTemplate {
+    return {
+      subject: "Płatność potwierdzona — ustaw hasło do EKG Academy",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #059669;">Płatność potwierdzona!</h1>
+          <p>Dziękujemy za zakup! Twój dostęp do EKG Academy został aktywowany.</p>
+          <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <h3 style="margin-top:0;">Szczegóły subskrypcji:</h3>
+            <p><strong>Plan:</strong> ${planName}</p>
+            <p><strong>Aktywny do:</strong> ${endDate}</p>
+          </div>
+          <p>Aby zalogować się i rozpocząć naukę, musisz najpierw ustawić hasło do swojego konta:</p>
+          <a href="${setPasswordUrl}"
+             style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:white;text-decoration:none;border-radius:6px;margin:16px 0;">
+            Ustaw hasło i zaloguj się
+          </a>
+          <p style="color:#6b7280;font-size:14px;">Link jest ważny przez 1 godzinę. Jeśli nie dokonywałeś/aś tej płatności, skontaktuj się z nami.</p>
+          <p>Pozdrawiamy,<br>Zespół EKG Academy</p>
+        </div>
+      `,
+      text: `Płatność potwierdzona! Plan: ${planName}, aktywny do: ${endDate}. Ustaw hasło: ${setPasswordUrl}`,
+    };
+  }
+
   getCertificateTemplate(firstName: string, certificateId: string, verificationUrl: string): EmailTemplate {
     return {
       subject: "Gratulacje! Otrzymałeś certyfikat - EKG Academy",

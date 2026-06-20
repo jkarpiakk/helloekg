@@ -1,11 +1,15 @@
 import bcrypt from "bcrypt";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
 
 export interface AuthSession {
   userId: string;
   user: User;
+}
+
+function hashToken(plaintext: string): string {
+  return createHash("sha256").update(plaintext).digest("hex");
 }
 
 export class AuthService {
@@ -18,7 +22,7 @@ export class AuthService {
   }
 
   generateToken(): string {
-    return randomBytes(32).toString('hex');
+    return randomBytes(32).toString("hex");
   }
 
   async authenticateUser(email: string, password: string): Promise<User | null> {
@@ -41,19 +45,14 @@ export class AuthService {
     termsAccepted: boolean;
     privacyAccepted: boolean;
   }): Promise<{ user: User; verificationToken: string }> {
-    // Check if user already exists
     const existingUser = await storage.getUserByEmail(userData.email);
     if (existingUser) {
       throw new Error("Użytkownik z tym adresem e-mail już istnieje");
     }
 
-    // Hash password
     const hashedPassword = await this.hashPassword(userData.password);
-    
-    // Generate verification token
     const verificationToken = this.generateToken();
 
-    // Create user
     const user = await storage.createUser({
       ...userData,
       password: hashedPassword,
@@ -67,10 +66,9 @@ export class AuthService {
     const user = await storage.getUserByVerificationToken(token);
     if (!user) return null;
 
-    // Mark email as verified and clear token
     const updatedUser = await storage.updateUser(user.id, {
       emailVerified: true,
-      emailVerificationToken: null
+      emailVerificationToken: null,
     });
 
     return updatedUser;
@@ -80,19 +78,26 @@ export class AuthService {
     const user = await storage.getUserByEmail(email);
     if (!user) return null;
 
-    const resetToken = this.generateToken();
-    const expiry = new Date(Date.now() + 60 * 60 * 1000);
+    // Generate plaintext token (goes in the email link), store only its hash
+    const plainToken = this.generateToken();
+    const tokenHash = hashToken(plainToken);
+    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes
 
     await storage.updateUser(user.id, {
-      passwordResetToken: resetToken,
+      passwordResetToken: tokenHash,
       passwordResetExpiry: expiry,
     });
 
-    return resetToken;
+    return plainToken; // Only the plaintext leaves this function
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; userId?: string; error?: string }> {
-    const user = await storage.getUserByPasswordResetToken(token);
+  async resetPassword(
+    token: string,
+    newPassword: string
+  ): Promise<{ success: boolean; userId?: string; error?: string }> {
+    // Look up by the hash of the incoming token
+    const tokenHash = hashToken(token);
+    const user = await storage.getUserByPasswordResetToken(tokenHash);
     if (!user) {
       return { success: false, error: "Nieprawidłowy token resetowania hasła" };
     }
@@ -103,11 +108,15 @@ export class AuthService {
 
     const hashedPassword = await this.hashPassword(newPassword);
 
+    // Clear the token and set the new password
     await storage.updateUser(user.id, {
       password: hashedPassword,
       passwordResetToken: null,
       passwordResetExpiry: null,
     });
+
+    // Invalidate all existing sessions so old sessions can no longer be used
+    await storage.invalidateUserSessions(user.id);
 
     return { success: true, userId: user.id };
   }

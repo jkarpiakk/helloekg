@@ -1,2 +1,6 @@
 - [Guest checkout webhook activation](guest-checkout-webhook.md) — Stripe webhook only activates subs when session metadata has userId; create guest account before redirect, not after.
 - [drizzle-kit push prompt](drizzle-kit-push-prompt.md) — `push --force` hangs on create-vs-rename prompt (ignores piped stdin); create similarly-named tables via raw SQL instead.
+- [Session & cookie hardening](session-cookie-hardening.md) — SESSION_SECRET must exist or app throws at startup; cookies httpOnly, secure prod-only, sameSite:lax, 7-day maxAge.
+- [Password reset token hashing](password-reset-token-hashing.md) — plaintext token sent in email, SHA-256 hash stored in DB; resetPassword() also calls invalidateUserSessions().
+- [Audit log field names](audit-log-fields.md) — actorId must be a real user UUID (FK), fields are entityType + entityId (no targetType/details/actorId='system').
+- [Stripe webhook guest email](stripe-webhook-email.md) — After checkout.session.completed, detect guest via audit log action user_registered_via_guest_checkout; guests get set-password link, registered users get confirmation.
