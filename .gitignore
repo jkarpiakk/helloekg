@@ -4,3 +4,8 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+cookies.txt
+*_cookies.txt
+*.png
+!attached_assets/**/*.png
+!client/**/*.png
