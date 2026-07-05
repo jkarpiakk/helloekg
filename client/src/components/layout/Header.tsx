@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Menu, X, User, LogOut, Settings, BookOpen } from "lucide-react";
-import logoImage from "@assets/logo ekg 2_1757715460574.png";
+import { Logo } from "@/components/brand/Logo";
+import { ThemeToggle } from "@/components/brand/ThemeToggle";
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -35,14 +36,9 @@ export default function Header() {
     <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 sm:space-x-3" data-testid="logo-link">
-            <img 
-              src={logoImage} 
-              alt="EKG Academy" 
-              className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20"
-            />
-            <span className="text-base sm:text-lg md:text-xl font-bold text-foreground">EKG Academy</span>
+          {/* Logo — helloEKG "żywy znak" */}
+          <Link href="/" className="flex items-center" data-testid="logo-link" aria-label="helloEKG — strona główna">
+            <Logo variant="A" animated size={30} bpm={72} />
           </Link>
 
           {/* Desktop Navigation */}
@@ -86,6 +82,8 @@ export default function Header() {
               <option value="en" disabled>🇬🇧 EN (wkrótce)</option>
               <option value="es" disabled>🇪🇸 ES (wkrótce)</option>
             </select>
+
+            <ThemeToggle />
 
             {isAuthenticated ? (
               <DropdownMenu>

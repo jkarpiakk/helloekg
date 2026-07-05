@@ -56,7 +56,7 @@ export default function SEO({
     setMetaTag('og:type', article ? 'article' : 'website');
     setMetaTag('og:image', image);
     setMetaTag('og:url', canonical || window.location.href);
-    setMetaTag('og:site_name', 'EKG Academy');
+    setMetaTag('og:site_name', 'helloEKG');
     setMetaTag('og:locale', 'pl_PL');
 
     // Twitter Card meta tags
@@ -102,11 +102,11 @@ export default function SEO({
         "description": description,
         "author": {
           "@type": "Person",
-          "name": author || "EKG Academy"
+          "name": author || "helloEKG"
         },
         "publisher": {
           "@type": "Organization",
-          "name": "EKG Academy",
+          "name": "helloEKG",
           "logo": {
             "@type": "ImageObject",
             "url": `${window.location.origin}/logo.png`

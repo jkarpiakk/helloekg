@@ -70,7 +70,7 @@ export default function PaymentSuccess() {
                 <CheckCircle className="w-10 h-10 text-chart-2" />
               </div>
               <h1 className="text-2xl font-bold text-foreground mb-2">
-                {isNewAccount ? "Witaj w EKG Academy!" : "Płatność zakończona sukcesem!"}
+                {isNewAccount ? "Witaj w helloEKG!" : "Płatność zakończona sukcesem!"}
               </h1>
               <p className="text-muted-foreground mb-6">
                 {isNewAccount 

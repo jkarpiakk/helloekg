@@ -78,7 +78,7 @@ export default function VerifyCertificate({ params }: VerifyCertificateProps) {
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-foreground">Certyfikat EKG Academy</h2>
+                    <h2 className="text-2xl font-bold text-foreground">Certyfikat helloEKG</h2>
                     <p className="text-muted-foreground">Profesjonalna nauka interpretacji EKG</p>
                   </div>
                   <Badge className={`px-4 py-2 ${

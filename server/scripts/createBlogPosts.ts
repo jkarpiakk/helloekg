@@ -302,7 +302,7 @@ Kluczowe zasady:
 
 ---
 
-**Chcesz opanować interpretację EKG na poziomie eksperta?** Dołącz do naszej [EKG Academy](/) i naucz się rozpoznawać wszystkie rodzaje arytmii, zawałów i zaburzeń przewodzenia. Interaktywne przypadki kliniczne, quizy i certyfikat profesjonalny!`,
+**Chcesz opanować interpretację EKG na poziomie eksperta?** Dołącz do naszej [helloEKG](/) i naucz się rozpoznawać wszystkie rodzaje arytmii, zawałów i zaburzeń przewodzenia. Interaktywne przypadki kliniczne, quizy i certyfikat profesjonalny!`,
     featuredImage: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=800&h=400&fit=crop",
     tags: ["Podstawy EKG", "Edukacja medyczna"],
     seoMeta: {
@@ -826,7 +826,7 @@ Kluczowe zasady:
 
 ---
 
-**Chcesz zostać ekspertem w rozpoznawaniu bloków przewodzenia?** Dołącz do [EKG Academy](/) i opanuj interpretację wszystkich zaburzeń przewodzenia. Interaktywne przypadki, algorytmy diagnostyczne i certyfikat specjalisty czekają na Ciebie!`,
+**Chcesz zostać ekspertem w rozpoznawaniu bloków przewodzenia?** Dołącz do [helloEKG](/) i opanuj interpretację wszystkich zaburzeń przewodzenia. Interaktywne przypadki, algorytmy diagnostyczne i certyfikat specjalisty czekają na Ciebie!`,
     featuredImage: "https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?w=800&h=400&fit=crop",
     tags: ["Zaburzenia przewodzenia", "Podstawy EKG"],
     seoMeta: {

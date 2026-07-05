@@ -262,7 +262,7 @@ export default function StudentDashboard() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Certyfikat</h3>
-                <p className="text-sm text-muted-foreground">EKG Academy</p>
+                <p className="text-sm text-muted-foreground">helloEKG</p>
               </div>
             </div>
             
@@ -515,7 +515,7 @@ export default function StudentDashboard() {
                     <div className="flex items-center gap-4 p-4 stat-card-teal rounded-xl">
                       <CheckCircle className="h-6 w-6 text-chart-2 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-base font-medium text-foreground">EKG Academy</p>
+                        <p className="text-base font-medium text-foreground">helloEKG</p>
                         <p className="text-sm text-muted-foreground">{new Date(myCertificates[0].issuedAt).toLocaleDateString('pl-PL')}</p>
                       </div>
                       <Link href={`/certificate/${myCertificates[0].certificateId}`}>

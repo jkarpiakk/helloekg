@@ -132,7 +132,7 @@ export default function BlogPostPage() {
     return (
       <div className="min-h-screen bg-background">
         <SEO
-          title={isNotFound ? "Artykuł nie znaleziony | EKG Academy Blog" : "Błąd | EKG Academy Blog"}
+          title={isNotFound ? "Artykuł nie znaleziony | helloEKG Blog" : "Błąd | helloEKG Blog"}
           description={isNotFound ? "Szukany artykuł nie istnieje lub został usunięty." : "Wystąpił błąd podczas ładowania artykułu."}
         />
         
@@ -171,7 +171,7 @@ export default function BlogPostPage() {
     return null;
   }
 
-  const seoTitle = post.seoMeta?.title || `${post.title} | EKG Academy Blog`;
+  const seoTitle = post.seoMeta?.title || `${post.title} | helloEKG Blog`;
   const seoDescription = post.seoMeta?.description || post.excerpt;
 
   return (
@@ -184,7 +184,7 @@ export default function BlogPostPage() {
         publishedTime={post.publishedAt ? new Date(post.publishedAt).toISOString() : new Date(post.createdAt).toISOString()}
         modifiedTime={new Date(post.updatedAt).toISOString()}
         tags={Array.isArray(post.tags) ? post.tags : []}
-        author="EKG Academy"
+        author="helloEKG"
         canonical={`/blog/${post.slug}`}
       />
 
@@ -232,7 +232,7 @@ export default function BlogPostPage() {
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1" data-testid="article-author">
                 <User className="h-4 w-4" />
-                <span>EKG Academy</span>
+                <span>helloEKG</span>
               </div>
               <div className="flex items-center gap-1" data-testid="article-date">
                 <Calendar className="h-4 w-4" />

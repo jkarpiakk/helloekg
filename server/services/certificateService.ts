@@ -93,7 +93,7 @@ export class CertificateService {
     // - Certificate ID
     // - Date of issue
     // - QR code with verification URL
-    // - EKG Academy branding
+    // - helloEKG branding
     // - Score achieved
     
     return pdfUrl;

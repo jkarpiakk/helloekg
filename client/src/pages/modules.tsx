@@ -300,7 +300,7 @@ export default function Modules() {
           <div className="text-center">
             <h3 className="text-xl font-bold mb-2">Zakończ wszystkie moduły</h3>
             <p className="text-muted-foreground mb-4">
-              Aby otrzymać certyfikat ukończenia kursu EKG Academy
+              Aby otrzymać certyfikat ukończenia kursu helloEKG
             </p>
             <div className="flex justify-center gap-6 text-sm">
               {modules && (

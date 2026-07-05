@@ -121,7 +121,7 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
           <div className="flex items-center justify-center mb-4">
             <img 
               src={logoImage} 
-              alt="EKG Academy" 
+              alt="helloEKG" 
               className="h-20 w-20"
             />
           </div>
@@ -202,7 +202,7 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
         <div className="flex items-center justify-center mb-4">
           <img 
             src={logoImage} 
-            alt="EKG Academy" 
+            alt="helloEKG" 
             className="h-20 w-20"
           />
         </div>

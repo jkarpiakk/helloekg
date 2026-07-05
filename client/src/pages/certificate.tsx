@@ -90,7 +90,7 @@ export default function CertificatePage() {
             </div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Certyfikat Ukończenia</h1>
             <div className="w-32 h-1 bg-blue-600 mx-auto mb-4"></div>
-            <p className="text-xl text-gray-700">EKG Academy</p>
+            <p className="text-xl text-gray-700">helloEKG</p>
           </div>
 
           {/* Main Content */}

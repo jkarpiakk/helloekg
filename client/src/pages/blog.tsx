@@ -98,7 +98,7 @@ export default function Blog() {
   return (
     <div className="min-h-screen bg-background">
       <SEO
-        title="Blog - EKG Academy | Nauka interpretacji EKG"
+        title="Blog - helloEKG | Nauka interpretacji EKG"
         description="Najnowsze artykuły o EKG, interpretacji zapisów, przypadkach klinicznych i medycynie. Ekspertka wiedza dla studentów medycyny i lekarzy."
         canonical="/blog"
       />
@@ -118,7 +118,7 @@ export default function Blog() {
           <div className="text-center">
             <h1 className="text-4xl lg:text-5xl font-bold text-foreground mb-4">
               <BookOpen className="h-12 w-12 mx-auto mb-4 text-primary" />
-              Blog EKG Academy
+              Blog helloEKG
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Odkryj najnowsze artykuły o interpretacji EKG, przypadkach klinicznych i praktycznych aspektach kardiologii
@@ -308,7 +308,7 @@ export default function Blog() {
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-1">
                             <User className="h-4 w-4" />
-                            <span>EKG Academy</span>
+                            <span>helloEKG</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />

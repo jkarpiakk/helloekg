@@ -54,8 +54,8 @@ const plTranslations: I18nKeys = {
     termsAccepted: "Akceptuję regulamin",
     privacyAccepted: "Akceptuję politykę prywatności",
     marketingConsent: "Wyrażam zgodę na marketing",
-    loginTitle: "Zaloguj się do EKG Academy",
-    registerTitle: "Dołącz do EKG Academy",
+    loginTitle: "Zaloguj się do helloEKG",
+    registerTitle: "Dołącz do helloEKG",
     loginButton: "Zaloguj się",
     registerButton: "Utwórz konto",
     alreadyHaveAccount: "Masz już konto?",
@@ -161,7 +161,7 @@ const plTranslations: I18nKeys = {
   },
   certificate: {
     verification: "Weryfikacja Certyfikatu",
-    checkAuthenticity: "Sprawdź autentyczność certyfikatu EKG Academy",
+    checkAuthenticity: "Sprawdź autentyczność certyfikatu helloEKG",
     verified: "Zweryfikowany",
     certificateData: "Dane certyfikatu",
     certificateId: "ID Certyfikatu:",
@@ -176,7 +176,7 @@ const plTranslations: I18nKeys = {
     studyTime: "Czas nauki:",
     qrCode: "Kod QR certyfikatu",
     scanToVerify: "Zeskanuj aby szybko zweryfikować autentyczność",
-    issued: "Ten certyfikat został wydany przez EKG Academy i jest ważny.",
+    issued: "Ten certyfikat został wydany przez helloEKG i jest ważny.",
     contact: "Dla dodatkowej weryfikacji skontaktuj się z nami pod adresem verify@ekgacademy.pl"
   },
   admin: {
