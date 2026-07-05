@@ -77,18 +77,25 @@ export class WebhookHandlers {
 
       console.log(`Subscription created for user ${userId}, expires ${endDate.toISOString()}`);
 
-      await storage.createAuditLog({
-        actorId: 'system',
-        action: 'subscription_activated',
-        targetType: 'subscription',
-        details: {
-          userId,
-          planId,
-          planName: plan.name,
-          sessionId: session.id,
-          endDate: endDate.toISOString()
-        }
-      });
+      // Audit logging must never fail payment processing (the subscription is
+      // already committed above). Swallow errors so Stripe doesn't retry a paid
+      // event just because the audit row couldn't be written.
+      try {
+        await storage.createAuditLog({
+          actorId: 'system',
+          action: 'subscription_activated',
+          targetType: 'subscription',
+          details: {
+            userId,
+            planId,
+            planName: plan.name,
+            sessionId: session.id,
+            endDate: endDate.toISOString()
+          }
+        });
+      } catch (auditError) {
+        console.error('Audit log for subscription activation failed (non-fatal):', auditError);
+      }
 
     } catch (error) {
       console.error('Error processing checkout completion:', error);

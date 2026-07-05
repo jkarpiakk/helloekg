@@ -264,15 +264,9 @@ export class QuizService {
   }
 
   async initializeExam(userId: string, count: number): Promise<{ sessionId: string; totalQuestions: number }> {
-    // Get all published questions from all sections
-    const sections = await storage.getSections();
-    let allQuestions: Question[] = [];
-    
-    for (const section of sections) {
-      const sectionQuestions = await storage.getQuestionsBySection(section.id, "published");
-      allQuestions.push(...sectionQuestions);
-    }
-    
+    // Get all published questions in a single query (avoids N+1 across sections).
+    const allQuestions = await storage.getAllQuestions("published");
+
     if (allQuestions.length === 0) {
       throw new Error("Brak dostępnych pytań w bazie danych");
     }

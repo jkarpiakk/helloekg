@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, json, decimal, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, json, decimal, uuid, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -49,7 +49,10 @@ export const subscriptions = pgTable("subscriptions", {
   invoiceUrl: text("invoice_url"),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("subscriptions_user_id_idx").on(table.userId),
+  index("subscriptions_status_idx").on(table.status),
+]);
 
 // Course modules
 export const modules = pgTable("modules", {
@@ -76,7 +79,9 @@ export const sections = pgTable("sections", {
   prerequisiteSectionId: uuid("prerequisite_section_id"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("sections_module_id_idx").on(table.moduleId),
+]);
 
 // Lecture chapters for each section
 export const lectureChapters = pgTable("lecture_chapters", {
@@ -93,7 +98,9 @@ export const lectureChapters = pgTable("lecture_chapters", {
   createdBy: uuid("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("lecture_chapters_section_id_idx").on(table.sectionId),
+]);
 
 // ======= QUESTION TYPE CONFIGURATIONS =======
 
@@ -187,7 +194,11 @@ export const questions = pgTable("questions", {
   questionType: varchar("question_type", { length: 30 }).notNull().default("multiple_choice"),
   questionConfig: json("question_config").$type<QuestionConfig>(),
   mediaAssets: json("media_assets").$type<QuestionMediaAssets>(),
-});
+}, (table) => [
+  index("questions_section_id_idx").on(table.sectionId),
+  index("questions_status_idx").on(table.status),
+  index("questions_section_status_idx").on(table.sectionId, table.status),
+]);
 
 // Answer data types for different question types
 export interface MultipleChoiceAnswer {
@@ -243,7 +254,11 @@ export const attempts = pgTable("attempts", {
   // NEW: Structured answer data for all question types
   answerData: json("answer_data").$type<AnswerData>(),
   partialScore: decimal("partial_score", { precision: 5, scale: 2 }), // For questions with partial scoring (matching, fill-blank)
-});
+}, (table) => [
+  index("attempts_user_id_idx").on(table.userId),
+  index("attempts_question_id_idx").on(table.questionId),
+  index("attempts_user_question_idx").on(table.userId, table.questionId),
+]);
 
 // User progress per section
 export const progress = pgTable("progress", {
@@ -254,7 +269,10 @@ export const progress = pgTable("progress", {
   lastActivity: timestamp("last_activity").notNull().default(sql`CURRENT_TIMESTAMP`),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("progress_user_id_idx").on(table.userId),
+  index("progress_user_section_idx").on(table.userId, table.sectionId),
+]);
 
 // Certificates
 export const certificates = pgTable("certificates", {
@@ -266,7 +284,9 @@ export const certificates = pgTable("certificates", {
   issuedAt: timestamp("issued_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   expiresAt: timestamp("expires_at"),
   isValid: boolean("is_valid").notNull().default(true),
-});
+}, (table) => [
+  index("certificates_user_id_idx").on(table.userId),
+]);
 
 // Support tickets
 export const supportTickets = pgTable("support_tickets", {

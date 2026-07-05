@@ -13,7 +13,7 @@ import {
   type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, count, avg, sql, or, ilike, isNull } from "drizzle-orm";
+import { eq, and, desc, asc, count, avg, sql, or, ilike, isNull, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User management
@@ -241,13 +241,26 @@ export class DatabaseStorage implements IStorage {
 
   async getModulesWithSections(): Promise<(Module & { sections: Section[] })[]> {
     const allModules = await this.getModules();
-    const modulesWithSections = await Promise.all(
-      allModules.map(async (module) => {
-        const moduleSections = await this.getSectionsByModule(module.id);
-        return { ...module, sections: moduleSections };
-      })
-    );
-    return modulesWithSections;
+    if (allModules.length === 0) return [];
+
+    // Batch: fetch all sections for these modules in a single query (avoids N+1).
+    const allSections = await db
+      .select()
+      .from(sections)
+      .where(inArray(sections.moduleId, allModules.map(m => m.id)))
+      .orderBy(asc(sections.order));
+
+    const sectionsByModule = new Map<string, Section[]>();
+    for (const section of allSections) {
+      const list = sectionsByModule.get(section.moduleId);
+      if (list) list.push(section);
+      else sectionsByModule.set(section.moduleId, [section]);
+    }
+
+    return allModules.map(module => ({
+      ...module,
+      sections: sectionsByModule.get(module.id) ?? [],
+    }));
   }
 
   async createModule(module: InsertModule): Promise<Module> {
@@ -269,12 +282,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async reorderModules(moduleIds: string[]): Promise<void> {
-    for (let i = 0; i < moduleIds.length; i++) {
-      await db
-        .update(modules)
-        .set({ order: i + 1, updatedAt: sql`CURRENT_TIMESTAMP` })
-        .where(eq(modules.id, moduleIds[i]));
-    }
+    if (moduleIds.length === 0) return;
+    // Atomic: all-or-nothing so a mid-way failure can't leave ordering corrupted.
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < moduleIds.length; i++) {
+        await tx
+          .update(modules)
+          .set({ order: i + 1, updatedAt: sql`CURRENT_TIMESTAMP` })
+          .where(eq(modules.id, moduleIds[i]));
+      }
+    });
   }
 
   async createSection(section: InsertSection): Promise<Section> {
@@ -296,12 +313,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async reorderSections(sectionIds: string[], moduleId: string): Promise<void> {
-    for (let i = 0; i < sectionIds.length; i++) {
-      await db
-        .update(sections)
-        .set({ order: i + 1, updatedAt: sql`CURRENT_TIMESTAMP` })
-        .where(eq(sections.id, sectionIds[i]));
-    }
+    if (sectionIds.length === 0) return;
+    // Atomic: all-or-nothing so a mid-way failure can't leave ordering corrupted.
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < sectionIds.length; i++) {
+        await tx
+          .update(sections)
+          .set({ order: i + 1, updatedAt: sql`CURRENT_TIMESTAMP` })
+          .where(eq(sections.id, sectionIds[i]));
+      }
+    });
   }
 
   async getQuestionsBySection(sectionId: string, status?: string): Promise<Question[]> {

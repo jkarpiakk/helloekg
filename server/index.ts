@@ -7,6 +7,11 @@ import { WebhookHandlers } from "./webhookHandlers";
 
 const app = express();
 
+// Behind Replit's proxy the real client IP is in X-Forwarded-For. Without this,
+// req.ip is the proxy IP for everyone — making the per-IP rate limiter effectively
+// global and breaking secure-cookie/audit-IP accuracy. Trust one proxy hop.
+app.set('trust proxy', 1);
+
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
 
