@@ -27,6 +27,28 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Split vendor libs into cacheable chunks. three stays reachable only
+        // via its dynamic import (Hero3DHeart), so naming it here doesn't pull
+        // it into the initial graph.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("three")) return "three";
+          if (id.includes("@radix-ui")) return "radix";
+          if (id.includes("@tanstack")) return "tanstack";
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/scheduler/") ||
+            id.includes("wouter")
+          ) {
+            return "react-vendor";
+          }
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     fs: {

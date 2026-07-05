@@ -6,27 +6,30 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import { authService } from "./lib/auth";
 import { LoadingSpinner } from "./components/ui/loading-spinner";
+import { lazy, Suspense } from "react";
+import { Loader } from "@/components/brand/Loader";
 
-// Pages
+// Pages — eager: Home is the LCP landing, NotFound is tiny.
 import Home from "@/pages/home";
-import Quiz from "@/pages/quiz";
-import Dashboard from "@/pages/dashboard";
-import Modules from "@/pages/modules";
-import Lecture from "@/pages/lecture";
-import Module3Lecture from "@/pages/module3-lecture";
-// import DynamicLecture from "@/pages/dynamic-lecture";
-import Admin from "@/pages/admin";
-import Pricing from "@/pages/pricing";
-import Checkout from "@/pages/checkout";
-import PaymentSuccess from "@/pages/payment-success";
-import VerifyEmail from "@/pages/verify-email";
-import VerifyCertificate from "@/pages/verify-certificate";
-import CertificatePage from "@/pages/certificate";
-import CertificatePreviewPage from "@/pages/certificate-preview";
-import EKGSimulator from "@/pages/ekg-simulator";
-import Blog from "@/pages/blog";
-import BlogPost from "@/pages/blog-post";
 import NotFound from "@/pages/not-found";
+
+// Pages — lazy: split out of the initial bundle, loaded on navigation.
+const Quiz = lazy(() => import("@/pages/quiz"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const Modules = lazy(() => import("@/pages/modules"));
+const Lecture = lazy(() => import("@/pages/lecture"));
+const Module3Lecture = lazy(() => import("@/pages/module3-lecture"));
+const Admin = lazy(() => import("@/pages/admin"));
+const Pricing = lazy(() => import("@/pages/pricing"));
+const Checkout = lazy(() => import("@/pages/checkout"));
+const PaymentSuccess = lazy(() => import("@/pages/payment-success"));
+const VerifyEmail = lazy(() => import("@/pages/verify-email"));
+const VerifyCertificate = lazy(() => import("@/pages/verify-certificate"));
+const CertificatePage = lazy(() => import("@/pages/certificate"));
+const CertificatePreviewPage = lazy(() => import("@/pages/certificate-preview"));
+const EKGSimulator = lazy(() => import("@/pages/ekg-simulator"));
+const Blog = lazy(() => import("@/pages/blog"));
+const BlogPost = lazy(() => import("@/pages/blog-post"));
 
 // Layout
 import Header from "@/components/layout/Header";
@@ -53,6 +56,13 @@ function AppContent() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-background">
+              <Loader size={48} />
+            </div>
+          }
+        >
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/quiz" component={Quiz} />
@@ -74,6 +84,7 @@ function AppContent() {
           <Route path="/verify/:certificateId" component={VerifyCertificate} />
           <Route component={NotFound} />
         </Switch>
+        </Suspense>
       </main>
       <Footer />
     </div>
