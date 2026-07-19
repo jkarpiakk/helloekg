@@ -24,7 +24,7 @@ const QUESTION_TYPE_INFO: Record<QuestionType, { label: string; icon: React.Comp
   multiple_choice: { 
     label: "ABCD", 
     icon: ListChecks,
-    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+    color: "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary"
   },
   drag_drop: { 
     label: "Przeciągnij", 
@@ -196,13 +196,13 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
           const isSelected = selectedAnswer === index;
           const optionIsCorrect = index === (currentQuestion.correctIndex || 0);
           
-          let buttonClass = "w-full p-3 sm:p-4 border border-border rounded-lg cursor-pointer transition-all duration-200 text-left text-sm sm:text-base";
-          
+          let buttonClass = "w-full min-h-[44px] p-3 sm:p-4 border border-border rounded-[10px] cursor-pointer transition-all duration-200 text-left text-sm sm:text-base";
+
           if (showResult) {
             if (optionIsCorrect) {
-              buttonClass += " bg-green-100 border-green-500 text-green-800 dark:bg-green-900/30 dark:border-green-600 dark:text-green-300";
+              buttonClass += " border-[#0B7E54] bg-[rgba(62,230,168,0.06)] text-foreground";
             } else if (isSelected) {
-              buttonClass += " bg-red-100 border-red-500 text-red-800 dark:bg-red-900/30 dark:border-red-600 dark:text-red-300";
+              buttonClass += " border-[#223040] text-foreground";
             }
           } else {
             buttonClass += " hover:bg-secondary/50 hover:border-primary/50";
@@ -222,10 +222,10 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
                   {option}
                 </div>
                 {showResult && optionIsCorrect && (
-                  <Check className="h-5 w-5 text-green-600" />
+                  <Check className="h-5 w-5 text-[#0B7E54] dark:text-primary" />
                 )}
                 {showResult && isSelected && !optionIsCorrect && (
-                  <X className="h-5 w-5 text-red-600" />
+                  <X className="h-5 w-5 text-destructive" />
                 )}
               </div>
             </button>
@@ -474,15 +474,15 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
 
           {showResult && (
             <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-              <div className={`p-3 sm:p-4 rounded-lg border ${
-                isCorrect 
-                  ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
-                  : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+              <div className={`p-3 sm:p-4 rounded-[10px] border ${
+                isCorrect
+                  ? 'bg-[rgba(62,230,168,0.06)] border-[#0B7E54]'
+                  : 'bg-destructive/5 border-[#223040]'
               }`} data-testid="demo-result-panel">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      isCorrect ? 'bg-green-500' : 'bg-red-500'
+                      isCorrect ? 'bg-[#0B7E54]' : 'bg-destructive'
                     }`}>
                       {isCorrect ? (
                         <Check className="h-5 w-5 text-white" />
@@ -492,7 +492,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
                     </div>
                     <div>
                       <p className={`font-bold text-base sm:text-lg ${
-                        isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+                        isCorrect ? 'text-[#0B7E54] dark:text-primary' : 'text-destructive'
                       }`} data-testid="demo-result-status">
                         {isCorrect ? "Brawo! Poprawna odpowiedź!" : "Niepoprawna odpowiedź"}
                       </p>
@@ -608,9 +608,9 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
             {/* Result badge */}
             <div className="flex items-center gap-3">
               <div className={`px-4 py-2 rounded-full font-semibold flex items-center gap-2 ${
-                isCorrect 
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
-                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                isCorrect
+                  ? 'bg-[rgba(62,230,168,0.1)] text-[#0B7E54] dark:text-primary'
+                  : 'bg-destructive/10 text-destructive'
               }`}>
                 {isCorrect ? (
                   <>
@@ -628,9 +628,9 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
 
             {/* Correct answer for multiple choice */}
             {!isCorrect && questionType === 'multiple_choice' && currentQuestion?.options && (
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <p className="text-sm text-green-600 dark:text-green-400 mb-1">Prawidłowa odpowiedź:</p>
-                <p className="font-semibold text-green-700 dark:text-green-300">
+              <div className="p-4 bg-[rgba(62,230,168,0.06)] rounded-[10px] border border-[#0B7E54]">
+                <p className="text-sm text-[#0B7E54] dark:text-primary mb-1">Prawidłowa odpowiedź:</p>
+                <p className="font-semibold text-[#0B7E54] dark:text-primary">
                   {String.fromCharCode(65 + (currentQuestion.correctIndex || 0))}. {currentQuestion.options[currentQuestion.correctIndex || 0]}
                 </p>
               </div>
