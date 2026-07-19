@@ -9,7 +9,8 @@ import { useEffect, useRef } from "react";
  *   P 0–15% | pauza AV/PQ 15–24% | QRS 24–34% | T 45–60% | reszta: spoczynek
  */
 
-const CYCLE_SECONDS = 60 / 72;
+// Musi być identyczne z CYCLE_SECONDS w Hero3DHeart — obie animacje dzielą zegar
+const CYCLE_SECONDS = 2.6;
 
 /** Wychylenie zapisu w danej fazie cyklu (0..1), w jednostkach względnych. */
 function ekgAmplitude(phase: number): number {
@@ -51,7 +52,7 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
     // ile cykli mieści się w kadrze — stała skala czasu niezależna od szerokości
-    const SECONDS_ON_SCREEN = CYCLE_SECONDS * 4;
+    const SECONDS_ON_SCREEN = CYCLE_SECONDS * 3;
 
     const resize = () => {
       const parent = canvas.parentElement;

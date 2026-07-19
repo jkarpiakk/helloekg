@@ -21,8 +21,12 @@ import { useEffect, useRef, useState } from "react";
 
 const MODEL_URL = "/models/heart.glb";
 
-// Cykl 72 BPM = 60/72 ≈ 0,8333 s
-const CYCLE_SECONDS = 60 / 72;
+// Tempo WIZUALNE cyklu (fala aktywacji + puls). Fizjologiczne 72 BPM (0,83 s) jest
+// wizualnie za szybkie, by prześledzić SA → AV → QRS → T, więc cykl jest zwolniony
+// ~3× dla czytelności dydaktycznej. Pasek EKG używa tej samej stałej → pełna synchronizacja.
+const CYCLE_SECONDS = 2.6;
+// Obrót serca — spokojny, żeby fala była czytelna (rad/s)
+const ROTATION_SPEED = 0.14;
 
 type Props = { size?: number; className?: string };
 
@@ -217,8 +221,13 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
 
         float excitation(float s, float phase) {
           float tA = activationTime(s);
-          float g = cyclicGap(phase, tA);
-          float wave = exp(-(g * g) / (2.0 * 0.016 * 0.016));
+          // Asymetria: szybkie narastanie, wolniejszy zanik — front fali zostawia
+          // czytelny ogon zamiast stroboskopowego mignięcia
+          float signed = phase - tA;
+          if (signed < -0.5) signed += 1.0;
+          if (signed > 0.5) signed -= 1.0;
+          float sigma = signed < 0.0 ? 0.022 : 0.075;
+          float wave = exp(-(signed * signed) / (2.0 * sigma * sigma));
 
           // Węzeł AV: jasny punkt TRWA przez całe opóźnienie PQ — sedno dydaktyczne
           if (s >= 0.30 && s < 0.40) {
@@ -257,7 +266,8 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
             vColor = mix(aColor, vec3(0.243, 0.902, 0.659), e * 0.85);
             vAlpha = clamp(uRest + e * 0.45, 0.0, 0.92);
             vec4 mv = modelViewMatrix * vec4(position, 1.0);
-            gl_PointSize = uSize * uViewport / -mv.z * (1.0 + e * 0.6);
+            // Delikatna modulacja rozmiaru — mocniejsza czytała się jako drganie punktów
+            gl_PointSize = uSize * uViewport / -mv.z * (1.0 + e * 0.22);
             gl_Position = projectionMatrix * mv;
           }
         `,
@@ -278,53 +288,9 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       grp.scale.set(1.18, 1.18, 1.18);
       scene.add(grp);
 
-      // ————— B5: świecące okablowanie Hisa-Purkinjego (drzewko wewnątrz serca)
-      const wirePts: number[] = [];
-      const wireS: number[] = [];
-      const addBranch = (from: any, to: any, sFrom: number, sTo: number, segs = 12) => {
-        for (let i = 0; i < segs; i++) {
-          const a = i / segs;
-          const b = (i + 1) / segs;
-          const pa = from.clone().lerp(to, a);
-          const pb = from.clone().lerp(to, b);
-          wirePts.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
-          wireS.push(sFrom + (sTo - sFrom) * a, sFrom + (sTo - sFrom) * b);
-        }
-      };
-      addBranch(SA, AV, 0.02, 0.30);        // szlaki międzywęzłowe
-      addBranch(AV, HIS, 0.34, 0.42);       // węzeł AV → pęczek Hisa
-      addBranch(HIS, RBB, 0.42, 0.47);      // odnoga prawa
-      addBranch(HIS, LBB, 0.42, 0.47);      // odnoga lewa
-      addBranch(RBB, APEX, 0.47, 0.55);     // ku koniuszkowi
-      addBranch(LBB, APEX, 0.47, 0.55);
-      // sieć Purkinjego — sweep w górę po ścianach obu komór
-      addBranch(APEX, V(0.62, -0.10, 0.10), 0.55, 0.92);
-      addBranch(APEX, V(-0.42, -0.06, 0.06), 0.55, 0.92);
-      addBranch(APEX, V(0.14, -0.05, -0.34), 0.55, 0.88);
-
-      const wireGeo = new THREE.BufferGeometry();
-      wireGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(wirePts), 3));
-      wireGeo.setAttribute("aS", new THREE.BufferAttribute(new Float32Array(wireS), 1));
-      const wireMat = new THREE.ShaderMaterial({
-        uniforms,
-        transparent: true,
-        depthWrite: false,
-        vertexShader: `
-          attribute float aS;
-          uniform float uPhase;
-          varying float vAlpha;
-          ${PHASE_GLSL}
-          void main() {
-            vAlpha = 0.10 + excitation(aS, uPhase) * 0.9;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: `
-          varying float vAlpha;
-          void main() { gl_FragColor = vec4(0.243, 0.902, 0.659, vAlpha); }
-        `,
-      });
-      grp.add(new THREE.LineSegments(wireGeo, wireMat));
+      // Uwaga: świadomie BEZ rysowanego okablowania Hisa-Purkinjego. Polilinie wewnątrz
+      // chmury czytały się jako obce kreski przecinające bryłę serca. Trasa przewodzenia
+      // jest widoczna wyłącznie przez sekwencję rozświetlania cząsteczek.
 
       setReady(true);
 
@@ -332,9 +298,10 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       // Zegar absolutny (performance.now), a nie liczony od montażu — dzięki temu
       // HeroEKGStrip trafia w tę samą fazę cyklu bez przekazywania stanu.
       const mechanical = (phase: number) => {
-        // Elektryka (QRS od 24%) lekko wyprzedza mechanikę — skurcz startuje ~26%
-        const a = Math.exp(-Math.pow((phase - 0.26) / 0.045, 2)) * 0.06;
-        const b = Math.exp(-Math.pow((phase - 0.40) / 0.06, 2)) * 0.035;
+        // Elektryka (QRS od 24%) lekko wyprzedza mechanikę — skurcz startuje ~26%.
+        // Okna szersze niż w pierwszej wersji: skurcz ma płynąć, nie szarpać.
+        const a = Math.exp(-Math.pow((phase - 0.27) / 0.075, 2)) * 0.06;
+        const b = Math.exp(-Math.pow((phase - 0.44) / 0.10, 2)) * 0.035;
         return a + b;
       };
 
@@ -349,7 +316,7 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
           const t = now / 1000;
           const phase = (t % CYCLE_SECONDS) / CYCLE_SECONDS;
           uniforms.uPhase.value = phase;
-          grp.rotation.y = t * 0.32;
+          grp.rotation.y = t * ROTATION_SPEED;
           const s = 1.18 * (1 + mechanical(phase));
           grp.scale.set(s, s, s);
           renderer.render(scene, camera);
@@ -369,8 +336,6 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
         cancelAnimationFrame(frameId);
         geo.dispose();
         mat.dispose();
-        wireGeo.dispose();
-        wireMat.dispose();
         renderer.dispose();
       };
     })();
