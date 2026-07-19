@@ -100,9 +100,32 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-border mt-6 sm:mt-8 pt-6 sm:pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs sm:text-sm text-muted-foreground text-center md:text-left">
-            © 2026 helloEKG. Wszystkie prawa zastrzeżone.
-          </p>
+          <div className="text-center md:text-left space-y-1">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              © 2026 helloEKG. Wszystkie prawa zastrzeżone.
+            </p>
+            {/* Atrybucja wymagana licencją CC BY 4.0 modelu serca 3D */}
+            <p className="text-xs text-muted-foreground" data-testid="heart-model-attribution">
+              Model serca 3D:{" "}
+              <a
+                href="https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors underline underline-offset-2"
+              >
+                Pigcraft
+              </a>
+              ,{" "}
+              <a
+                href="https://creativecommons.org/licenses/by/4.0/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors underline underline-offset-2"
+              >
+                CC BY 4.0
+              </a>
+            </p>
+          </div>
           <div className="flex items-center space-x-4">
             <a
               href="#"

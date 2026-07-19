@@ -17,6 +17,7 @@ import type { DemoQuestion } from "@shared/schema";
 
 // Serce 3D ładowane leniwie (three.js poza głównym bundle), nie blokuje LCP
 const Hero3DHeart = lazy(() => import("@/components/Hero3DHeart"));
+const HeroEKGStrip = lazy(() => import("@/components/HeroEKGStrip"));
 
 const FALLBACK_DEMO_QUESTIONS: DemoQuestion[] = [{
   id: 'fallback-1',
@@ -71,8 +72,6 @@ export default function Home() {
       <section className="relative py-12 sm:py-16 lg:py-32 overflow-hidden">
         {/* Medical pattern background */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/10"></div>
-        <div className="absolute inset-0 opacity-5 ekg-pattern"></div>
-        
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 items-center">
             {/* Hero Content */}
@@ -142,10 +141,16 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Serce 3D — tylko w hero (nie miniaturyzować do ikon) */}
-              <div className="flex justify-center lg:justify-start" data-testid="hero-3d-heart">
-                <Suspense fallback={<div style={{ width: 320, height: 320 }} aria-hidden="true" />}>
-                  <Hero3DHeart size={320} />
+              {/* Serce 3D — tylko w hero (nie miniaturyzować do ikon), pod nim
+                  zsynchronizowany zapis P-QRS-T w tym samym rytmie 72 BPM */}
+              <div className="space-y-1" data-testid="hero-3d-heart">
+                <div className="flex justify-center lg:justify-start">
+                  <Suspense fallback={<div style={{ width: 320, height: 320 }} aria-hidden="true" />}>
+                    <Hero3DHeart size={320} />
+                  </Suspense>
+                </div>
+                <Suspense fallback={<div style={{ height: 64 }} aria-hidden="true" />}>
+                  <HeroEKGStrip />
                 </Suspense>
               </div>
             </div>
