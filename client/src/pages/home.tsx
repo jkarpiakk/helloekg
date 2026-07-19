@@ -14,6 +14,7 @@ import { EKGDivider } from "@/components/ui/ekg-divider";
 import { Play, Info, Users, Award, Star, GraduationCap, BookOpen, Heart } from "lucide-react";
 import { Link } from "wouter";
 import type { DemoQuestion } from "@shared/schema";
+import afEcgImage from "@assets/af ecg_1757697444254.jpg";
 
 // Serce 3D ładowane leniwie (three.js poza głównym bundle), nie blokuje LCP
 const Hero3DHeart = lazy(() => import("@/components/Hero3DHeart"));
@@ -22,12 +23,16 @@ const HeroEKGStrip = lazy(() => import("@/components/HeroEKGStrip"));
 const FALLBACK_DEMO_QUESTIONS: DemoQuestion[] = [{
   id: 'fallback-1',
   title: null,
-  imagePosition: null,
+  // Pytanie mówi „na poniższym zapisie", więc zapis idzie POD treść pytania
+  imagePosition: 'below',
   question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
   options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
   correctIndex: 1,
   explanation: "Wyobraź sobie orkiestrę bez dyrygenta! W normalnym rytmie wszyscy muzycy słuchają jednego dyrygenta i grają w takcie. Ale w migotaniu przedsionków nagle dziesiątki muzyków zaczyna grać swoje własne melodie jednocześnie - jeden gra walca, drugi tango, trzeci rock. Powstaje kompletny chaos! Przedsionki 'migocą' od tych wszystkich sprzecznych sygnałów, a komory próbują nadążyć za tym chaosem - stąd ten nieregularny, nieprzewidywalny rytm, jakby serce 'potykało się' przy każdym uderzeniu.",
-  imageUrl: null,
+  // Pytanie odwołuje się do „poniższego zapisu EKG", więc zapis musi być widoczny.
+  // Renderer pokazuje obrazek tylko gdy imageUrl jest niepuste — przy null pytanie
+  // wisiało bez zapisu, o który pyta.
+  imageUrl: afEcgImage,
   questionType: 'multiple_choice',
   questionConfig: null,
   displayOrder: 0,

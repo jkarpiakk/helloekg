@@ -430,7 +430,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
           
           {/* Image above text if imagePosition is "above" */}
           {currentQuestion.imageUrl && questionType === 'multiple_choice' && ((currentQuestion as any).imagePosition === 'above' || !(currentQuestion as any).imagePosition) && (
-            <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 border border-border">
+            <div className="bg-white rounded-[10px] p-2 sm:p-3 border border-border">
               <img 
                 src={currentQuestion.imageUrl || afEcgImage} 
                 alt="Zapis EKG" 
@@ -462,7 +462,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
           
           {/* Image below text if imagePosition is "below" */}
           {currentQuestion.imageUrl && questionType === 'multiple_choice' && (currentQuestion as any).imagePosition === 'below' && (
-            <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 border border-border">
+            <div className="bg-white rounded-[10px] p-2 sm:p-3 border border-border">
               <img 
                 src={currentQuestion.imageUrl || afEcgImage} 
                 alt="Zapis EKG" 
