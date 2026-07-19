@@ -75,19 +75,41 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
     const centerY = height / 2;
     const amp = height * 0.36;
 
-    const drawFrame = (elapsed: number) => {
+    // Wychylenie dla kolumny piksela, liczone z nadpróbkowaniem.
+    //
+    // Bez tego zapis MIGOCZE: załamek R jest bardzo wąski (kilka pikseli), więc przy
+    // jednej próbce na kolumnę jego szczyt raz trafiał w próbkę, a raz nie i amplituda
+    // skakała z klatki na klatkę. Bierzemy skrajne wychylenie z kilku podpróbek, dzięki
+    // czemu szczyt jest reprezentowany zawsze, niezależnie od podpikselowego przesunięcia.
+    const SUBSAMPLES = 4;
+    const yAt = (x: number, elapsed: number) => {
+      let extreme = 0;
+      for (let s = 0; s < SUBSAMPLES; s++) {
+        const xs = x + s / SUBSAMPLES;
+        const tAtX = elapsed - ((width - xs) / width) * SECONDS_ON_SCREEN;
+        const phase = ((tAtX % CYCLE_SECONDS) + CYCLE_SECONDS) % CYCLE_SECONDS / CYCLE_SECONDS;
+        const v = ekgAmplitude(phase);
+        if (Math.abs(v) > Math.abs(extreme)) extreme = v;
+      }
+      return centerY - extreme * amp;
+    };
+
+    const drawFrame = (rawElapsed: number) => {
+      // Przesuwaj zapis skokami o pełny piksel. Płynne przesuwanie o ułamki piksela
+      // sprawiało, że cała krzywa drgała pionowo między klatkami.
+      const pxPerSecond = width / SECONDS_ON_SCREEN;
+      const elapsed = Math.round(rawElapsed * pxPerSecond) / pxPerSecond;
+
       ctx.clearRect(0, 0, width, height);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
 
       // Ślad — cały zapis widoczny w przygaszonej zieleni
       ctx.strokeStyle = traceColor;
       ctx.lineWidth = 1;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
       ctx.beginPath();
       for (let x = 0; x <= width; x++) {
-        const tAtX = elapsed - ((width - x) / width) * SECONDS_ON_SCREEN;
-        const phase = ((tAtX % CYCLE_SECONDS) + CYCLE_SECONDS) % CYCLE_SECONDS / CYCLE_SECONDS;
-        const y = centerY - ekgAmplitude(phase) * amp;
+        const y = yAt(x, elapsed);
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
@@ -99,9 +121,7 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
       ctx.beginPath();
       const headFrom = Math.max(0, width - Math.round((width / SECONDS_ON_SCREEN) * CYCLE_SECONDS));
       for (let x = headFrom; x <= width; x++) {
-        const tAtX = elapsed - ((width - x) / width) * SECONDS_ON_SCREEN;
-        const phase = ((tAtX % CYCLE_SECONDS) + CYCLE_SECONDS) % CYCLE_SECONDS / CYCLE_SECONDS;
-        const y = centerY - ekgAmplitude(phase) * amp;
+        const y = yAt(x, elapsed);
         if (x === headFrom) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
