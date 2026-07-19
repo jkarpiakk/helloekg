@@ -665,7 +665,7 @@ export default function QuestionManager() {
                 <div>
                   <h3 className="font-semibold text-sm text-muted-foreground mb-2">Wyjaśnienie:</h3>
                   <div 
-                    className="prose dark:prose-invert max-w-none p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg"
+                    className="prose dark:prose-invert max-w-none p-3 bg-secondary/60 rounded-lg"
                     dangerouslySetInnerHTML={sanitizeMarkdown(previewQuestion.explanationMd)}
                   />
                 </div>

@@ -266,11 +266,11 @@ export default function SortingQuestion({
       )}
 
       {showResult && result?.correctAnswer?.type === 'sorting' && (
-        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
+        <div className="p-4 bg-[rgba(62,230,168,0.06)] border border-[#0B7E54]/60 rounded-xl">
+          <p className="text-sm font-semibold text-[#0B7E54] dark:text-primary mb-2">
             Prawidłowa kolejność:
           </p>
-          <ol className="list-decimal list-inside text-base text-blue-700 dark:text-blue-300 space-y-1">
+          <ol className="list-decimal list-inside text-base text-foreground space-y-1">
             {result.correctAnswer.order.map((itemId: string) => {
               const item = getItemById(itemId);
               return (

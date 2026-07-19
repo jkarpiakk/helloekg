@@ -265,7 +265,7 @@ const VisualLectureEditor = ({ sectionId, sectionTitle, chapter, onSave, onCance
                 color: element.style.color || '#000000',
                 textAlign: element.style.textAlign || 'left',
                 cursor: 'move',
-                outline: selectedElement === element.id ? '2px solid #3b82f6' : 'none',
+                outline: selectedElement === element.id ? '2px solid #3EE6A8' : 'none',
                 background: selectedElement === element.id ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                 padding: '8px',
                 borderRadius: '4px'
@@ -644,7 +644,7 @@ export function LectureEditor({ sectionId, sectionTitle }: LectureEditorProps) {
                   </div>
                   
                   {chapter.analogy && (
-                    <p className="text-sm text-blue-600 mb-2" data-testid={`chapter-analogy-${chapter.id}`}>
+                    <p className="text-sm text-primary mb-2" data-testid={`chapter-analogy-${chapter.id}`}>
                       💡 {chapter.analogy}
                     </p>
                   )}

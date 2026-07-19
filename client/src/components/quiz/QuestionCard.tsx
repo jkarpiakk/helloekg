@@ -22,7 +22,7 @@ const questionTypeInfo: Record<QuestionType, { label: string; icon: JSX.Element;
   multiple_choice: {
     label: "Wybór odpowiedzi",
     icon: <Type className="h-3 w-3" />,
-    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+    color: "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary"
   },
   drag_drop: {
     label: "Przeciągnij i upuść",

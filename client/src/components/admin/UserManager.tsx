@@ -176,7 +176,7 @@ export default function UserManager() {
 
   const getRoleBadge = (role: string) => {
     const colors = {
-      student: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+      student: "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary",
       reviewer: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200", 
       admin: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
       owner: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",

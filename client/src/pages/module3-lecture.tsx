@@ -276,9 +276,9 @@ export default function Module3Lecture() {
     const visualComponents = {
       "camera-system": (
         <div className="flex items-center justify-center space-x-4 text-6xl">
-          <Camera className="h-16 w-16 text-blue-500" />
+          <Camera className="h-16 w-16 text-primary" />
           <Heart className="h-20 w-20 text-red-500 animate-pulse" />
-          <Camera className="h-16 w-16 text-blue-500" />
+          <Camera className="h-16 w-16 text-primary" />
         </div>
       ),
       "camera-planes": (
@@ -288,7 +288,7 @@ export default function Module3Lecture() {
             <p className="text-sm">Płaszczyzna pozioma (V1-V6)</p>
           </div>
           <div className="space-y-2">
-            <Crosshair className="h-12 w-12 text-blue-500 mx-auto" />
+            <Crosshair className="h-12 w-12 text-primary mx-auto" />
             <p className="text-sm">Płaszczyzna czołowa (I,II,III,aVR,aVL,aVF)</p>
           </div>
         </div>
@@ -301,7 +301,7 @@ export default function Module3Lecture() {
           </div>
           <ArrowRight className="h-8 w-8 text-green-500" />
           <div className="text-center">
-            <div className="w-8 h-8 bg-blue-500 rounded-full mx-auto mb-2"></div>
+            <div className="w-8 h-8 bg-primary rounded-full mx-auto mb-2"></div>
             <p className="text-xs">Lewa ręka</p>
           </div>
         </div>
@@ -310,7 +310,7 @@ export default function Module3Lecture() {
         <div className="flex items-center justify-center">
           <div className="relative">
             <Heart className="h-16 w-16 text-red-500" />
-            <Eye className="h-8 w-8 text-blue-500 absolute -bottom-2 -right-2" />
+            <Eye className="h-8 w-8 text-primary absolute -bottom-2 -right-2" />
             <Badge className="absolute -top-6 left-1/2 transform -translate-x-1/2" variant="outline">
               Najlepszy widok
             </Badge>
@@ -324,7 +324,7 @@ export default function Module3Lecture() {
             <p className="text-xs">Rytm (II)</p>
           </div>
           <div className="space-y-2">
-            <Crosshair className="h-8 w-8 text-blue-500 mx-auto" />
+            <Crosshair className="h-8 w-8 text-primary mx-auto" />
             <p className="text-xs">Oś (I, aVF)</p>
           </div>
           <div className="space-y-2">

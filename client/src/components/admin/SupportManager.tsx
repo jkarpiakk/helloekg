@@ -104,7 +104,7 @@ export default function SupportManager() {
 
   const getPriorityBadge = (priority: string) => {
     const colors = {
-      low: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+      low: "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary",
       medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
       high: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
     };
@@ -377,7 +377,7 @@ export default function SupportManager() {
                 {selectedTicket.adminResponse && (
                   <div>
                     <label className="text-sm font-medium">Poprzednia odpowiedź:</label>
-                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="mt-2 p-3 bg-secondary/60 rounded-lg">
                       <p className="text-sm">{selectedTicket.adminResponse}</p>
                     </div>
                   </div>

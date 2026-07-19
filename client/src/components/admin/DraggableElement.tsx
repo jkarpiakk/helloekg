@@ -71,7 +71,7 @@ export function DraggableElement({
     textAlign: element.style.textAlign || 'left',
     cursor: isDragging ? 'grabbing' : 'pointer',
     userSelect: isEditing ? 'text' : 'none',
-    outline: isSelected ? '2px solid #3b82f6' : 'none',
+    outline: isSelected ? '2px solid #3EE6A8' : 'none',
     background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
   };
 
@@ -156,7 +156,7 @@ export function DraggableElement({
         <div
           {...attributes}
           {...listeners}
-          className="absolute -top-6 -right-6 w-6 h-6 bg-blue-500 text-white rounded flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute -top-6 -right-6 w-6 h-6 bg-primary text-primary-foreground rounded flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
           data-testid={`drag-handle-${element.id}`}
         >
           <Move3D className="w-3 h-3" />
@@ -168,7 +168,7 @@ export function DraggableElement({
 
       {/* Selection indicator */}
       {isSelected && (
-        <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-blue-400 rounded" />
+        <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-primary/70 rounded" />
       )}
     </div>
   );
