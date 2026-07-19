@@ -14,7 +14,7 @@ import { quizService } from "./services/quizService";
 import { certificateService } from "./services/certificateService";
 import * as gamificationService from "./services/gamificationService";
 import { requireAuth, requireAdmin, requireReviewer, requireActiveSubscription } from "./middleware/auth";
-import { authRateLimit, apiRateLimit } from "./middleware/rateLimit";
+import { authRateLimit, apiRateLimit, paymentRateLimit } from "./middleware/rateLimit";
 import {
   loginSchema,
   registerSchema,
@@ -48,7 +48,28 @@ const statusUpdateSchema = z.object({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit environment
   app.set('trust proxy', 1);
-  
+
+  // ── Health / readiness endpoints ──────────────────────────────────────────
+  // These are intentionally placed BEFORE session, auth, and rate-limit
+  // middleware so they are always fast and always reachable.
+
+  // Liveness: the process is alive
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
+
+  // Readiness: process is alive AND can reach the database.
+  // Uses storage.getActivePlans() — the same Drizzle path proven by /api/plans.
+  app.get("/ready", async (_req, res) => {
+    try {
+      await storage.getActivePlans();
+      res.status(200).json({ status: "ok", db: "ok" });
+    } catch (err: any) {
+      console.error("[ready] DB check failed:", err.message);
+      res.status(503).json({ status: "error", db: "unavailable" });
+    }
+  });
+
   // Serve static files from attached_assets
   app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets')));
   
@@ -156,37 +177,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Nieprawidłowe dane logowania" });
       }
 
-      // Allow login even without email verification (for payment flow)
-      // Set session
-      req.session.userId = user.id;
-      
-      // Save session explicitly before responding
-      req.session.save(async (err) => {
-        if (err) {
-          console.error("Session save error:", err);
+      // Regenerate session ID before storing credentials (prevents session fixation)
+      req.session.regenerate((regenErr) => {
+        if (regenErr) {
+          console.error("Session regenerate error:", regenErr);
           return res.status(500).json({ error: "Błąd sesji" });
         }
 
-        // Create audit log
-        await storage.createAuditLog({
-          actorId: user.id,
-          action: "user_login",
-          entityType: "user",
-          entityId: user.id,
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent')
-        });
+        req.session.userId = user.id;
 
-        res.json({
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            locale: user.locale,
-            emailVerified: user.emailVerified
+        req.session.save(async (err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            return res.status(500).json({ error: "Błąd sesji" });
           }
+
+          // Create audit log
+          await storage.createAuditLog({
+            actorId: user.id,
+            action: "user_login",
+            entityType: "user",
+            entityId: user.id,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent')
+          });
+
+          res.json({
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              role: user.role,
+              locale: user.locale,
+              emailVerified: user.emailVerified
+            }
+          });
         });
       });
     } catch (error: any) {
@@ -442,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Guest checkout - create account and checkout in one step
-  app.post("/api/stripe/guest-checkout", async (req, res) => {
+  app.post("/api/stripe/guest-checkout", paymentRateLimit, async (req, res) => {
     try {
       const { email, planId } = req.body;
       
@@ -557,8 +583,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Finalize payment - auto-create account for guests and log them in
-  app.post("/api/stripe/finalize-payment", async (req, res) => {
+  // Finalize payment - auto-create account for guests
+  app.post("/api/stripe/finalize-payment", paymentRateLimit, async (req, res) => {
     try {
       const { sessionId } = req.body;
       
@@ -661,31 +687,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subscription = existingSubscription;
       }
 
-      // Auto-login the user
-      req.session.userId = user.id;
-      
-      req.session.save((err) => {
-        if (err) {
-          console.error("Session save error:", err);
-          return res.status(500).json({ error: "Błąd sesji" });
+      res.json({
+        success: true,
+        isNewAccount,
+        email: user.email,
+        subscription: {
+          startDate: subscription.startDate,
+          endDate: subscription.endDate
         }
-
-        res.json({
-          success: true,
-          isNewAccount,
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            emailVerified: user.emailVerified
-          },
-          subscription: {
-            startDate: subscription.startDate,
-            endDate: subscription.endDate
-          }
-        });
       });
     } catch (error: any) {
       console.error("Finalize payment error:", error);
@@ -1793,12 +1802,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Object entity serving endpoint  
-  app.get("/objects/:objectPath(*)", async (req, res) => {
+  // Object entity serving endpoint
+  app.get("/objects/:objectPath(*)", requireAuth, async (req, res) => {
     try {
       const { ObjectStorageService, ObjectNotFoundError } = await import("./objectStorage");
       const objectStorageService = new ObjectStorageService();
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+
+      const allowed = await objectStorageService.canAccessObjectEntity({
+        userId: req.user!.id,
+        objectFile,
+      });
+      if (!allowed) {
+        return res.status(403).json({ error: "Brak uprawnień do tego pliku" });
+      }
+
       objectStorageService.downloadObject(objectFile, res);
     } catch (error: any) {
       console.error("Error checking object access:", error);
@@ -1873,7 +1891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const allUsers = await query.orderBy(desc(users.createdAt));
-      res.json(allUsers);
+      res.json(allUsers.map(({ password: _pw, ...u }) => u));
     } catch (error: any) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Błąd podczas pobierania użytkowników" });
@@ -1955,13 +1973,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/users/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.put("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { role, status } = req.body;
-      
+
+      // Block self-role change
+      if (req.user!.id === id && role !== undefined) {
+        return res.status(403).json({ error: "Nie możesz zmieniać własnej roli" });
+      }
+
+      const ALLOWED_ROLES = ["owner", "admin", "reviewer", "support", "student"] as const;
       const updateData: any = {};
-      if (role) updateData.role = role;
+      if (role !== undefined) {
+        if (!ALLOWED_ROLES.includes(role)) {
+          return res.status(400).json({ error: "Nieprawidłowa rola użytkownika" });
+        }
+        updateData.role = role;
+      }
       if (status) {
         if (status === 'verified') updateData.emailVerified = true;
         if (status === 'suspended') updateData.emailVerified = false;
@@ -1988,7 +2017,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get('User-Agent')
       });
 
-      res.json(updatedUser);
+      const { password: _pw, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
     } catch (error: any) {
       console.error("Error updating user:", error);
       res.status(500).json({ error: "Błąd podczas aktualizacji użytkownika" });

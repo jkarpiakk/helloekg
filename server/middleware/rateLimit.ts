@@ -1,64 +1,105 @@
 import type { Request, Response, NextFunction } from "express";
+import { pool } from "../db";
 
-interface RateLimitStore {
-  [key: string]: {
-    count: number;
-    resetTime: number;
-  };
+let tableReady = false;
+
+async function ensureTable(): Promise<void> {
+  if (tableReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rate_limit_store (
+      key        TEXT    PRIMARY KEY,
+      count      INTEGER NOT NULL DEFAULT 0,
+      reset_time BIGINT  NOT NULL
+    )
+  `);
+  // Periodically clean up expired rows (best-effort, not critical)
+  pool.query(
+    "DELETE FROM rate_limit_store WHERE reset_time < $1",
+    [Date.now()]
+  ).catch(() => {});
+  tableReady = true;
 }
 
-const store: RateLimitStore = {};
-
-// Clean up expired entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(store).forEach(key => {
-    if (store[key].resetTime < now) {
-      delete store[key];
-    }
-  });
-}, 5 * 60 * 1000);
-
+/**
+ * PostgreSQL-backed rate limiter.
+ * State is shared across all process instances, so limits are correctly
+ * enforced in multi-instance deployments without Redis or any new service.
+ */
 export function createRateLimit(options: {
   windowMs: number;
   max: number;
   message?: string;
+  keyPrefix?: string;
 }) {
-  const { windowMs, max, message = "Zbyt wiele żądań. Spróbuj ponownie później." } = options;
+  const {
+    windowMs,
+    max,
+    message = "Zbyt wiele żądań. Spróbuj ponownie później.",
+    keyPrefix = "rl",
+  } = options;
 
-  return (req: Request, res: Response, next: NextFunction) => {
-    const key = `${req.ip}:${req.path}`;
-    const now = Date.now();
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await ensureTable();
 
-    if (!store[key] || store[key].resetTime < now) {
-      store[key] = {
-        count: 1,
-        resetTime: now + windowMs
-      };
-      return next();
+      const now = Date.now();
+      const resetTime = now + windowMs;
+      // Use a normalised path (strip query string) as part of the key
+      const normPath = req.path.split("?")[0];
+      const key = `${keyPrefix}:${req.ip}:${normPath}`;
+
+      const result = await pool.query<{ count: number; reset_time: string }>(
+        `INSERT INTO rate_limit_store (key, count, reset_time)
+         VALUES ($1, 1, $2)
+         ON CONFLICT (key) DO UPDATE SET
+           count      = CASE WHEN rate_limit_store.reset_time < $3
+                              THEN 1
+                              ELSE rate_limit_store.count + 1 END,
+           reset_time = CASE WHEN rate_limit_store.reset_time < $3
+                              THEN $2
+                              ELSE rate_limit_store.reset_time END
+         RETURNING count, reset_time`,
+        [key, resetTime, now]
+      );
+
+      const { count, reset_time } = result.rows[0];
+      const retryAfterSec = Math.ceil((Number(reset_time) - now) / 1000);
+
+      res.setHeader("X-RateLimit-Limit", max);
+      res.setHeader("X-RateLimit-Remaining", Math.max(0, max - count));
+      res.setHeader("X-RateLimit-Reset", Math.ceil(Number(reset_time) / 1000));
+
+      if (count > max) {
+        res.setHeader("Retry-After", retryAfterSec);
+        return res.status(429).json({ error: message, retryAfter: retryAfterSec });
+      }
+
+      next();
+    } catch (err) {
+      // If the DB is unavailable, fail open to avoid blocking all traffic
+      console.error("[rateLimit] DB error, failing open:", err);
+      next();
     }
-
-    store[key].count++;
-
-    if (store[key].count > max) {
-      return res.status(429).json({
-        error: message,
-        retryAfter: Math.ceil((store[key].resetTime - now) / 1000)
-      });
-    }
-
-    next();
   };
 }
 
 export const authRateLimit = createRateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
-  message: "Zbyt wiele prób logowania. Spróbuj ponownie za 15 minut."
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: "Zbyt wiele prób logowania. Spróbuj ponownie za 15 minut.",
+  keyPrefix: "auth",
 });
 
 export const apiRateLimit = createRateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // 100 requests per minute
-  message: "Zbyt wiele żądań API. Spróbuj ponownie za minutę."
+  windowMs: 60 * 1000,
+  max: 100,
+  message: "Zbyt wiele żądań API. Spróbuj ponownie za minutę.",
+  keyPrefix: "api",
+});
+
+export const paymentRateLimit = createRateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: "Zbyt wiele prób płatności. Spróbuj ponownie za godzinę.",
+  keyPrefix: "pay",
 });
