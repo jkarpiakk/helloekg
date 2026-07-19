@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,13 @@ import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart }
 import { Link } from "wouter";
 import type { DemoQuestion } from "@shared/schema";
 
+// Serce 3D ładowane leniwie (three.js poza głównym bundle), nie blokuje LCP
+const Hero3DHeart = lazy(() => import("@/components/Hero3DHeart"));
+
 const FALLBACK_DEMO_QUESTIONS: DemoQuestion[] = [{
   id: 'fallback-1',
+  title: null,
+  imagePosition: null,
   question: "Jaki rytm widoczny jest na poniższym zapisie EKG?",
   options: ["Rytm zatokowy prawidłowy", "Migotanie przedsionków", "Blok AV III stopnia", "Częstoskurcz komorowy"],
   correctIndex: 1,
@@ -135,6 +140,13 @@ export default function Home() {
                   <Star className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2" />
                   <span>{t("hero.stats.rating")}</span>
                 </div>
+              </div>
+
+              {/* Serce 3D — tylko w hero (nie miniaturyzować do ikon) */}
+              <div className="flex justify-center lg:justify-start" data-testid="hero-3d-heart">
+                <Suspense fallback={<div style={{ width: 320, height: 320 }} aria-hidden="true" />}>
+                  <Hero3DHeart size={320} />
+                </Suspense>
               </div>
             </div>
 
