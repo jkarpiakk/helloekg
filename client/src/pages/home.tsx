@@ -11,7 +11,7 @@ import AuthForms from "@/components/auth/AuthForms";
 import PricingSection from "@/components/payment/PricingSection";
 import DemoQuestionRenderer from "@/components/demo/DemoQuestionRenderer";
 import { EKGDivider } from "@/components/ui/ekg-divider";
-import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart } from "lucide-react";
+import { Play, Info, Users, Award, Star, GraduationCap, BookOpen, Heart } from "lucide-react";
 import { Link } from "wouter";
 import type { DemoQuestion } from "@shared/schema";
 
@@ -162,10 +162,6 @@ export default function Home() {
                 onRegisterClick={() => setAuthMode("register")}
               />
               
-              {/* Floating success element */}
-              <div className="hidden sm:flex absolute -top-4 -right-4 w-16 h-16 sm:w-20 sm:h-20 bg-chart-2 rounded-full items-center justify-center shadow-lg">
-                <Check className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
-              </div>
             </div>
           </div>
         </div>
