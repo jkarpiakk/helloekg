@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { CheckCircle, Mail } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import logoImage from "@assets/logo ekg 2_1757715460574.png";
+import Logo from "@/components/layout/Logo";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Podaj prawidłowy adres e-mail"),
@@ -64,7 +64,7 @@ export default function ForgotPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <img src={logoImage} alt="EKG Academy" className="h-20 w-20" />
+            <Logo markSize={56} />
           </div>
           <CardTitle className="text-2xl text-center">Odzyskaj hasło</CardTitle>
           <CardDescription className="text-center">

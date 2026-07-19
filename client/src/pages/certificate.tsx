@@ -84,13 +84,13 @@ export default function CertificatePage() {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
-              <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center">
+              <div className="w-20 h-20 bg-[#0B7E54] rounded-full flex items-center justify-center">
                 <Award className="h-12 w-12 text-white" />
               </div>
             </div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Certyfikat Ukończenia</h1>
-            <div className="w-32 h-1 bg-blue-600 mx-auto mb-4"></div>
-            <p className="text-xl text-gray-700">EKG Academy</p>
+            <div className="w-32 h-1 bg-[#0B7E54] mx-auto mb-4"></div>
+            <p className="text-xl text-gray-700">helloEKG</p>
           </div>
 
           {/* Main Content */}
@@ -100,8 +100,8 @@ export default function CertificatePage() {
               {user?.firstName} {user?.lastName}
             </h2>
             <p className="text-lg text-gray-600 mb-4">ukończył z wynikiem</p>
-            <div className="inline-block bg-blue-50 border-2 border-blue-600 rounded-lg px-8 py-3 mb-6">
-              <p className="text-4xl font-bold text-blue-600">{score}%</p>
+            <div className="inline-block bg-[#3EE6A8]/10 border-2 border-[#0B7E54] rounded-lg px-8 py-3 mb-6">
+              <p className="text-4xl font-bold text-[#0B7E54]">{score}%</p>
             </div>
             <p className="text-lg text-gray-600 mb-2">kurs</p>
             <h3 className="text-2xl font-semibold text-gray-900 mb-8">

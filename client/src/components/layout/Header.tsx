@@ -24,7 +24,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Menu, X, User, LogOut, Settings, BookOpen, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import logoImage from "@assets/logo ekg 2_1757715460574.png";
+import Logo from "@/components/layout/Logo";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -67,13 +68,8 @@ export default function Header() {
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 sm:space-x-3" data-testid="logo-link">
-            <img 
-              src={logoImage} 
-              alt="EKG Academy" 
-              className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20"
-            />
-            <span className="text-base sm:text-lg md:text-xl font-bold text-foreground">EKG Academy</span>
+          <Link href="/" className="flex items-center" data-testid="logo-link">
+            <Logo markSize={36} />
           </Link>
 
           {/* Desktop Navigation */}
@@ -117,6 +113,8 @@ export default function Header() {
               <option value="en" disabled>🇬🇧 EN (wkrótce)</option>
               <option value="es" disabled>🇪🇸 ES (wkrótce)</option>
             </select>
+
+            <ThemeToggle />
 
             {isAuthenticated ? (
             <>

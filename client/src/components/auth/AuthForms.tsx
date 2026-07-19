@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import type { LoginForm, RegisterForm } from "@/types";
-import logoImage from "@assets/logo ekg 2_1757715460574.png";
+import Logo from "@/components/layout/Logo";
 import { apiRequest } from "@/lib/queryClient";
 
 interface AuthFormsProps {
@@ -148,11 +148,7 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       <Card className="w-full max-w-md mx-auto">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <img 
-              src={logoImage} 
-              alt="EKG Academy" 
-              className="h-20 w-20"
-            />
+            <Logo markSize={56} />
           </div>
           <CardTitle className="text-2xl text-center">{t("auth.loginTitle")}</CardTitle>
           <CardDescription className="text-center">
@@ -290,11 +286,7 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-center mb-4">
-          <img 
-            src={logoImage} 
-            alt="EKG Academy" 
-            className="h-20 w-20"
-          />
+          <Logo markSize={56} />
         </div>
         <CardTitle className="text-2xl text-center">{t("auth.registerTitle")}</CardTitle>
         <CardDescription className="text-center">

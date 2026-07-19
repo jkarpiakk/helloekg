@@ -41,13 +41,13 @@ export default function CertificatePreviewPage() {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
-              <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center">
+              <div className="w-20 h-20 bg-[#0B7E54] rounded-full flex items-center justify-center">
                 <Award className="h-12 w-12 text-white" />
               </div>
             </div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Certyfikat Ukończenia</h1>
-            <div className="w-32 h-1 bg-blue-600 mx-auto mb-4"></div>
-            <p className="text-xl text-gray-700">EKG Academy</p>
+            <div className="w-32 h-1 bg-[#0B7E54] mx-auto mb-4"></div>
+            <p className="text-xl text-gray-700">helloEKG</p>
           </div>
 
           {/* Main Content */}
@@ -57,8 +57,8 @@ export default function CertificatePreviewPage() {
               {previewData.firstName} {previewData.lastName}
             </h2>
             <p className="text-lg text-gray-600 mb-4">ukończył z wynikiem</p>
-            <div className="inline-block bg-blue-50 border-2 border-blue-600 rounded-lg px-8 py-3 mb-6">
-              <p className="text-4xl font-bold text-blue-600">{previewData.score}%</p>
+            <div className="inline-block bg-[#3EE6A8]/10 border-2 border-[#0B7E54] rounded-lg px-8 py-3 mb-6">
+              <p className="text-4xl font-bold text-[#0B7E54]">{previewData.score}%</p>
             </div>
             <p className="text-lg text-gray-600 mb-2">kurs</p>
             <h3 className="text-2xl font-semibold text-gray-900 mb-8">
@@ -104,8 +104,8 @@ export default function CertificatePreviewPage() {
         </div>
 
         {/* Info */}
-        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-          <p className="text-sm text-blue-900 dark:text-blue-100">
+        <div className="mt-6 p-4 bg-[#3EE6A8]/[0.06] rounded-lg border border-[#223040]">
+          <p className="text-sm text-muted-foreground">
             ℹ️ To jest podgląd demonstracyjny certyfikatu. Prawdziwe certyfikaty są generowane automatycznie 
             po ukończeniu kursu z wynikiem minimum 80%. Użytkownicy mogą je wydrukować lub zapisać jako PDF.
           </p>

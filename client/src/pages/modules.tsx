@@ -95,7 +95,7 @@ export default function Modules() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed": return "text-green-600 bg-green-100 border-green-200";
-      case "in-progress": return "text-blue-600 bg-blue-100 border-blue-200";
+      case "in-progress": return "text-[#0B7E54] dark:text-[#3EE6A8] bg-[#3EE6A8]/10 border-[#3EE6A8]/30";
       case "locked": return "text-gray-400 bg-gray-100 border-gray-200";
       default: return "text-primary bg-primary/10 border-primary/20";
     }
@@ -228,7 +228,7 @@ export default function Modules() {
                               section.completionPercentage === 100
                                 ? "bg-green-100 text-green-600"
                                 : section.completionPercentage > 0
-                                  ? "bg-blue-100 text-blue-600"
+                                  ? "bg-[#3EE6A8]/10 text-[#0B7E54] dark:text-[#3EE6A8]"
                                   : isAccessible
                                     ? "bg-gray-100 text-gray-600"
                                     : "bg-gray-50 text-gray-400"

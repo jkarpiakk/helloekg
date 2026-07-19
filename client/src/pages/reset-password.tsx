@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import logoImage from "@assets/logo ekg 2_1757715460574.png";
+import Logo from "@/components/layout/Logo";
 
 const resetPasswordFormSchema = z.object({
   password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
@@ -119,7 +119,7 @@ export default function ResetPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <img src={logoImage} alt="EKG Academy" className="h-20 w-20" />
+            <Logo markSize={56} />
           </div>
           <CardTitle className="text-2xl text-center">Ustaw nowe hasło</CardTitle>
           <CardDescription className="text-center">

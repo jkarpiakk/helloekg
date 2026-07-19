@@ -10,6 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import AuthForms from "@/components/auth/AuthForms";
 import PricingSection from "@/components/payment/PricingSection";
 import DemoQuestionRenderer from "@/components/demo/DemoQuestionRenderer";
+import { EKGDivider } from "@/components/ui/ekg-divider";
 import { Play, Info, Users, Award, Star, GraduationCap, Check, BookOpen, Heart } from "lucide-react";
 import { Link } from "wouter";
 import type { DemoQuestion } from "@shared/schema";
@@ -152,6 +153,10 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
+        <EKGDivider />
+      </div>
 
       {/* How It Works Section */}
       <section id="how-it-works" className="py-12 sm:py-16 lg:py-20 bg-secondary/30">

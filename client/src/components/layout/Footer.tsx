@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Facebook, Twitter, Linkedin, Instagram } from "lucide-react";
-import logoImage from "@assets/logo ekg 2_1757715460574.png";
+import Logo from "@/components/layout/Logo";
 
 export default function Footer() {
   return (
@@ -9,13 +9,8 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
           {/* Company info */}
           <div className="space-y-4 col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center space-x-2 sm:space-x-3">
-              <img 
-                src={logoImage} 
-                alt="EKG Academy" 
-                className="h-10 w-10 sm:h-16 sm:w-16"
-              />
-              <span className="text-base sm:text-lg font-bold text-foreground">EKG Academy</span>
+            <Link href="/" className="flex items-center">
+              <Logo markSize={32} />
             </Link>
             <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
               Profesjonalna platforma do nauki interpretacji EKG dla studentów medycyny i profesjonalistów.
@@ -106,7 +101,7 @@ export default function Footer() {
 
         <div className="border-t border-border mt-6 sm:mt-8 pt-6 sm:pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs sm:text-sm text-muted-foreground text-center md:text-left">
-            © 2024 EKG Academy. Wszystkie prawa zastrzeżone.
+            © 2026 helloEKG. Wszystkie prawa zastrzeżone.
           </p>
           <div className="flex items-center space-x-4">
             <a
