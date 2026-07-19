@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { 
   Check, X, GraduationCap, ChevronLeft, ChevronRight, 
   ListChecks, Puzzle, TextCursor, Link2, ArrowUpDown, Target,
-  Lightbulb, Sparkles
+  Lightbulb
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import type { DemoQuestion, QuestionConfig, DragDropConfig, FillBlankConfig, MatchingConfig, SortingConfig, HotspotConfig } from "@shared/schema";
@@ -20,37 +20,18 @@ import MatchingQuestion from "@/components/quiz/questions/MatchingQuestion";
 import SortingQuestion from "@/components/quiz/questions/SortingQuestion";
 import HotspotQuestion from "@/components/quiz/questions/HotspotQuestion";
 
+/**
+ * Etykiety typów pytań. Brand book §2 dopuszcza wyłącznie paletę marki, więc
+ * kolorowe plakietki (fiolet, bursztyn, róż, pomarańcz) zostały usunięte —
+ * typ pytania to etykieta mono w zieleni akcentu, bez tła.
+ */
 const QUESTION_TYPE_INFO: Record<QuestionType, { label: string; icon: React.ComponentType<{className?: string}>; color: string }> = {
-  multiple_choice: { 
-    label: "ABCD", 
-    icon: ListChecks,
-    color: "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary"
-  },
-  drag_drop: { 
-    label: "Przeciągnij", 
-    icon: Puzzle,
-    color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-  },
-  fill_blank: { 
-    label: "Uzupełnij", 
-    icon: TextCursor,
-    color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-  },
-  matching: { 
-    label: "Dopasuj", 
-    icon: Link2,
-    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-  },
-  sorting: { 
-    label: "Uporządkuj", 
-    icon: ArrowUpDown,
-    color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
-  },
-  hotspot: { 
-    label: "Zaznacz", 
-    icon: Target,
-    color: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200"
-  }
+  multiple_choice: { label: "ABCD", icon: ListChecks, color: "text-primary" },
+  drag_drop: { label: "Przeciągnij", icon: Puzzle, color: "text-primary" },
+  fill_blank: { label: "Uzupełnij", icon: TextCursor, color: "text-primary" },
+  matching: { label: "Dopasuj", icon: Link2, color: "text-primary" },
+  sorting: { label: "Uporządkuj", icon: ArrowUpDown, color: "text-primary" },
+  hotspot: { label: "Zaznacz", icon: Target, color: "text-primary" },
 };
 
 interface DemoQuestionRendererProps {
@@ -196,16 +177,24 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
           const isSelected = selectedAnswer === index;
           const optionIsCorrect = index === (currentQuestion.correctIndex || 0);
           
-          let buttonClass = "w-full min-h-[44px] p-3 sm:p-4 border border-border rounded-[10px] cursor-pointer transition-all duration-200 text-left text-sm sm:text-base";
+          // §7: kontrolki radius 10px, touch ≥44px, border neutralny.
+          // Poprawna = obwódka #0B7E54 + tinta 6% + „✓", NIGDY pełne wypełnienie.
+          // `border-input` zamiast zaszytego #223040: ta wartość to linia motywu
+          // CIEMNEGO, na bieli wychodziła ciężka. Token daje #223040 na ciemnym
+          // i #E2E8E5 na jasnym, zgodnie z paletą §2.
+          let buttonClass =
+            "w-full min-h-[44px] px-4 py-3 border rounded-[10px] cursor-pointer transition-colors duration-200 text-left text-[15px] leading-relaxed";
 
           if (showResult) {
             if (optionIsCorrect) {
               buttonClass += " border-[#0B7E54] bg-[rgba(62,230,168,0.06)] text-foreground";
             } else if (isSelected) {
-              buttonClass += " border-[#223040] text-foreground";
+              buttonClass += " border-input text-muted-foreground";
+            } else {
+              buttonClass += " border-input text-muted-foreground";
             }
           } else {
-            buttonClass += " hover:bg-secondary/50 hover:border-primary/50";
+            buttonClass += " border-input hover:border-primary/60 hover:bg-primary/[0.04]";
           }
           
           return (
@@ -216,9 +205,15 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
               disabled={showResult}
               data-testid={`demo-option-${index}`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <span className="font-semibold mr-2 sm:mr-3">{String.fromCharCode(65 + index)}.</span>
+                  {/* Oznaczenie odpowiedzi jako etykieta mono (§3) */}
+                  <span
+                    className="font-mono text-xs text-muted-foreground mr-3"
+                    style={{ letterSpacing: "0.14em" }}
+                  >
+                    {String.fromCharCode(65 + index)}
+                  </span>
                   {option}
                 </div>
                 {showResult && optionIsCorrect && (
@@ -261,7 +256,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     if (questionConfig.type === 'drag_drop') {
       const config = getConfig() as DragDropConfig;
       if (!config.sources || !config.targets) {
-        return <div className="text-amber-600 text-sm">Brak konfiguracji drag & drop</div>;
+        return <div className="text-destructive text-sm">Brak konfiguracji drag & drop</div>;
       }
       return (
         <div className="space-y-4">
@@ -288,7 +283,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     if (questionConfig.type === 'fill_blank') {
       const config = getConfig() as FillBlankConfig;
       if (!config.blanks || !config.template) {
-        return <div className="text-amber-600 text-sm">Brak konfiguracji uzupełniania luk</div>;
+        return <div className="text-destructive text-sm">Brak konfiguracji uzupełniania luk</div>;
       }
       return (
         <div className="space-y-4">
@@ -315,7 +310,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     if (questionConfig.type === 'matching') {
       const config = getConfig() as MatchingConfig;
       if (!config.leftColumn || !config.rightColumn || !config.correctPairs) {
-        return <div className="text-amber-600 text-sm">Brak konfiguracji dopasowywania</div>;
+        return <div className="text-destructive text-sm">Brak konfiguracji dopasowywania</div>;
       }
       return (
         <div className="space-y-4">
@@ -342,7 +337,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     if (questionConfig.type === 'sorting') {
       const config = getConfig() as SortingConfig;
       if (!config.items || !config.correctOrder) {
-        return <div className="text-amber-600 text-sm">Brak konfiguracji sortowania</div>;
+        return <div className="text-destructive text-sm">Brak konfiguracji sortowania</div>;
       }
       return (
         <div className="space-y-4">
@@ -369,7 +364,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
     if (questionConfig.type === 'hotspot') {
       const config = getConfig() as HotspotConfig;
       if (!config.hotspots || !config.imageUrl) {
-        return <div className="text-amber-600 text-sm">Brak konfiguracji zaznaczania obszarów</div>;
+        return <div className="text-destructive text-sm">Brak konfiguracji zaznaczania obszarów</div>;
       }
       return (
         <div className="space-y-4">
@@ -397,23 +392,29 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
   };
 
   return (
-    <Card className="shadow-app-lg rounded-2xl p-3 sm:p-4 lg:p-6 relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-1.5 sm:h-2 bg-gradient-to-r from-primary to-chart-2"></div>
-      
+    /* Karta wg brand booka §7: border 1px hairline, radius 12px, BEZ cienia
+       (spec: „Cienie: brak — płaskie powierzchnie"). Usunięty gradientowy pasek
+       u góry — zieleń ma znaczyć impuls, nie służyć za tapetę. */
+    <Card className="rounded-xl border border-border bg-card p-4 sm:p-5 lg:p-6 relative">
       <div className="space-y-4 sm:space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs sm:text-sm text-muted-foreground">
-              Pytanie {currentIndex + 1} z {questions.length}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {/* Etykieta mono: wersaliki, tracking 0,16em (§3) */}
+            <span className="text-label text-[11px] text-muted-foreground" style={{ letterSpacing: "0.16em" }}>
+              Pytanie {currentIndex + 1} / {questions.length}
             </span>
-            <Badge variant="secondary" className={`flex items-center gap-1 text-xs ${typeInfo.color}`}>
+            <span
+              className={`text-label text-[11px] inline-flex items-center gap-1.5 ${typeInfo.color}`}
+              style={{ letterSpacing: "0.16em" }}
+            >
               <Icon className="h-3 w-3" />
               <span className="hidden sm:inline">{typeInfo.label}</span>
-            </Badge>
+            </span>
           </div>
-          <div className="w-16 sm:w-24 h-1.5 sm:h-2 bg-secondary rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-primary rounded-full transition-all duration-300"
+          {/* Pasek postępu wg §5: tor #1E4536, wypełnienie #3EE6A8, 4px, radius 2px */}
+          <div className="w-16 sm:w-24 h-1 rounded-[2px] bg-[#1E4536] overflow-hidden shrink-0">
+            <div
+              className="h-full rounded-[2px] bg-[#3EE6A8] transition-all duration-300"
               style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
             ></div>
           </div>
@@ -440,16 +441,17 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
           )}
           
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
-            <div 
-              className="text-sm sm:text-base lg:text-lg font-semibold text-foreground prose prose-sm dark:prose-invert max-w-none [&>h2]:text-lg [&>h2]:font-bold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-semibold [&>p]:mt-2" 
+            {/* Pytanie: Space Grotesk 500, skala H3 20/1.3 (§3) */}
+            <div
+              className="font-heading text-base sm:text-lg lg:text-xl font-medium leading-snug text-foreground prose prose-sm dark:prose-invert max-w-none [&>h2]:text-lg [&>h2]:font-semibold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-medium [&>p]:mt-2"
               data-testid="demo-question-text"
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion.question) }}
             />
             {showResult && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="secondary"
                 size="sm"
-                className="w-full sm:w-auto min-h-[40px] rounded-xl active:scale-[0.97] transition-transform text-xs sm:text-sm"
+                className="w-full sm:w-auto shrink-0 text-xs sm:text-sm"
                 onClick={resetDemo}
                 data-testid="reset-demo-button"
               >
@@ -474,38 +476,40 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
 
           {showResult && (
             <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
-              <div className={`p-3 sm:p-4 rounded-[10px] border ${
+              <div className={`p-4 rounded-[10px] border ${
                 isCorrect
                   ? 'bg-[rgba(62,230,168,0.06)] border-[#0B7E54]'
-                  : 'bg-destructive/5 border-[#223040]'
+                  : 'border-input'
               }`} data-testid="demo-result-panel">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      isCorrect ? 'bg-[#0B7E54]' : 'bg-destructive'
-                    }`}>
-                      {isCorrect ? (
-                        <Check className="h-5 w-5 text-white" />
-                      ) : (
-                        <X className="h-5 w-5 text-white" />
-                      )}
-                    </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    {/* Znacznik bez wypełnionego koła — płaska forma zgodnie z §7 */}
+                    {isCorrect ? (
+                      <Check className="h-5 w-5 shrink-0 mt-0.5 text-[#0B7E54] dark:text-primary" />
+                    ) : (
+                      <X className="h-5 w-5 shrink-0 mt-0.5 text-muted-foreground" />
+                    )}
                     <div>
-                      <p className={`font-bold text-base sm:text-lg ${
-                        isCorrect ? 'text-[#0B7E54] dark:text-primary' : 'text-destructive'
+                      {/* Ton §8: błąd to nauka, nie karcenie */}
+                      <p className={`font-heading text-base font-medium ${
+                        isCorrect ? 'text-[#0B7E54] dark:text-primary' : 'text-foreground'
                       }`} data-testid="demo-result-status">
-                        {isCorrect ? "Brawo! Poprawna odpowiedź!" : "Niepoprawna odpowiedź"}
+                        {isCorrect ? "Dobrze." : "Nie tym razem. Tu błędy nic nie kosztują."}
                       </p>
                       {!isCorrect && questionType === 'multiple_choice' && currentQuestion.options && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground mt-1">
                           Prawidłowa: {currentQuestion.options[currentQuestion.correctIndex || 0]}
                         </p>
                       )}
                     </div>
                   </div>
+                  {/* Wariant secondary: §7 dopuszcza JEDEN zielony przycisk na widok
+                      (jest nim CTA rejestracji niżej). Bursztyn i pomarańcz nie
+                      występują w palecie marki — usunięte. */}
                   <Button
+                    variant="secondary"
                     onClick={() => setShowExplanationModal(true)}
-                    className="min-h-[44px] bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg rounded-xl active:scale-[0.97] transition-transform text-xs sm:text-sm"
+                    className="shrink-0 text-xs sm:text-sm"
                     data-testid="open-explanation-modal"
                   >
                     <Lightbulb className="h-4 w-4 mr-1 sm:mr-2" />
@@ -516,17 +520,18 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
               </div>
               
               {!isAuthenticated && (
-                <div className="bg-gradient-to-r from-primary/10 to-chart-2/10 border border-primary/30 rounded-lg p-3 sm:p-4">
-                  <div className="text-center space-y-2 sm:space-y-3">
-                    <p className="text-xs sm:text-sm font-semibold text-foreground">
-                      Chcesz nauczyć się więcej? 500+ podobnych pytań czeka!
+                /* Bez gradientu tła — §2: zieleń nigdy jako tapeta. Zostaje hairline. */
+                <div className="border border-border rounded-xl p-4">
+                  <div className="text-center space-y-3">
+                    <p className="font-heading text-sm sm:text-base font-medium text-foreground">
+                      500 pytań czeka. To było jedno z nich.
                     </p>
-                    <Button 
+                    <Button
                       onClick={onRegisterClick}
-                      className="w-full min-h-[44px] bg-primary hover:bg-primary/90 text-sm sm:text-base rounded-xl active:scale-[0.97] transition-transform shadow-app"
+                      className="w-full text-sm sm:text-base"
                       data-testid="demo-register-cta"
                     >
-                      <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                      <GraduationCap className="h-4 w-4 mr-2" />
                       Rozpocznij naukę
                     </Button>
                     <p className="text-xs text-muted-foreground">
@@ -587,18 +592,18 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
       <Dialog open={showExplanationModal} onOpenChange={setShowExplanationModal}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-3 text-xl sm:text-2xl">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-                <Lightbulb className="h-6 w-6 text-white" />
-              </div>
-              <span>Wyjaśnienie odpowiedzi</span>
+            <DialogTitle className="flex items-center gap-3 font-heading text-xl sm:text-2xl font-medium">
+              <Lightbulb className="h-6 w-6 text-primary shrink-0" />
+              <span>Dlaczego tak jest?</span>
             </DialogTitle>
           </DialogHeader>
           
           <div className="space-y-6 py-4">
             {/* Question recap */}
-            <div className="p-4 bg-secondary/50 rounded-lg border border-border">
-              <p className="text-sm text-muted-foreground mb-2">Pytanie:</p>
+            <div className="p-4 rounded-[10px] border border-border">
+              <p className="text-label text-[11px] text-muted-foreground mb-2" style={{ letterSpacing: "0.16em" }}>
+                Pytanie
+              </p>
               <div
                 className="font-medium text-foreground prose prose-sm dark:prose-invert max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_p]:my-1 [&_strong]:font-bold [&_em]:italic [&_h1]:text-xl [&_h2]:text-lg [&_h3]:text-base"
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion?.question || '') }}
@@ -607,22 +612,11 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
 
             {/* Result badge */}
             <div className="flex items-center gap-3">
-              <div className={`px-4 py-2 rounded-full font-semibold flex items-center gap-2 ${
-                isCorrect
-                  ? 'bg-[rgba(62,230,168,0.1)] text-[#0B7E54] dark:text-primary'
-                  : 'bg-destructive/10 text-destructive'
-              }`}>
-                {isCorrect ? (
-                  <>
-                    <Check className="h-5 w-5" />
-                    Poprawna odpowiedź!
-                  </>
-                ) : (
-                  <>
-                    <X className="h-5 w-5" />
-                    Niepoprawna odpowiedź
-                  </>
-                )}
+              <div className={`text-label text-[11px] inline-flex items-center gap-2 ${
+                isCorrect ? 'text-[#0B7E54] dark:text-primary' : 'text-muted-foreground'
+              }`} style={{ letterSpacing: "0.16em" }}>
+                {isCorrect ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                {isCorrect ? "Odpowiedź poprawna" : "Odpowiedź błędna"}
               </div>
             </div>
 
@@ -638,11 +632,7 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
 
             {/* Main explanation */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-primary">
-                <Sparkles className="h-5 w-5" />
-                <h3 className="font-semibold text-lg">Dlaczego tak jest?</h3>
-              </div>
-              <div className="p-5 bg-gradient-to-br from-primary/5 to-chart-2/5 rounded-xl border border-primary/20">
+              <div className="p-5 rounded-xl border border-border">
                 <div 
                   className="text-foreground leading-relaxed text-base sm:text-lg prose prose-sm dark:prose-invert max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_p]:my-2 [&_strong]:font-bold [&_em]:italic [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-1 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-primary/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground" 
                   data-testid="demo-result-explanation"
@@ -653,13 +643,13 @@ export default function DemoQuestionRenderer({ questions, onRegisterClick }: Dem
 
             {/* CTA for non-authenticated users */}
             {!isAuthenticated && (
-              <div className="mt-6 p-5 bg-gradient-to-r from-primary/10 to-chart-2/10 rounded-xl border border-primary/30">
+              <div className="mt-6 p-5 rounded-xl border border-border">
                 <div className="text-center space-y-3">
-                  <p className="font-semibold text-foreground text-lg">
-                    🎓 Chcesz nauczyć się więcej?
+                  <p className="font-heading font-medium text-foreground text-lg">
+                    Tak wygląda każde pytanie w kursie.
                   </p>
                   <p className="text-muted-foreground">
-                    Dołącz do kursu i uzyskaj dostęp do 500+ pytań z wyjaśnieniami!
+                    500 pytań, każde z wyjaśnieniem. 16 godzin. Zero wkuwania.
                   </p>
                   <Button 
                     onClick={() => {
