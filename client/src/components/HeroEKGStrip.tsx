@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useTheme } from "@/hooks/use-theme";
 
 /**
  * Pasek EKG pod hero — rysuje P-QRS-T w tym samym rytmie 72 BPM co fala pobudzenia
@@ -39,6 +40,7 @@ type Props = { className?: string; height?: number };
 
 export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,6 +49,10 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
     if (!ctx) return;
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Na bieli jasnozielony impuls znika — akcentem jasnego motywu jest #0B7E54
+    const isLight = theme === "light";
+    const traceColor = isLight ? "#93B8A8" : "#1E4536";
+    const pulseColor = isLight ? "#0B7E54" : "#3EE6A8";
     let frameId = 0;
     let width = 0;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -73,7 +79,7 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
       ctx.clearRect(0, 0, width, height);
 
       // Ślad — cały zapis widoczny w przygaszonej zieleni
-      ctx.strokeStyle = "#1E4536";
+      ctx.strokeStyle = traceColor;
       ctx.lineWidth = 1;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -88,7 +94,7 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
       ctx.stroke();
 
       // Impuls — jasna zieleń na ostatnim odcinku, tam gdzie „teraz" biegnie zapis
-      ctx.strokeStyle = "#3EE6A8";
+      ctx.strokeStyle = pulseColor;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       const headFrom = Math.max(0, width - Math.round((width / SECONDS_ON_SCREEN) * CYCLE_SECONDS));
@@ -118,7 +124,7 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);
     };
-  }, [height]);
+  }, [height, theme]);
 
   return (
     <div className={className} aria-hidden="true">

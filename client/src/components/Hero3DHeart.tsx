@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTheme } from "@/hooks/use-theme";
 
 /**
  * Hero3DHeart — anatomiczne serce jako chmura cząsteczek z falą pobudzenia
@@ -33,6 +34,7 @@ type Props = { size?: number; className?: string };
 export default function Hero3DHeart({ size = 360, className = "" }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [ready, setReady] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     let disposed = false;
@@ -60,6 +62,7 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
 
       // ————— Źródło punktów: realny .glb, a w razie jego braku geometria proceduralna
       let raw: Float32Array | null = null;
+      let rawNormals: Float32Array | null = null;
       try {
         const head = await fetch(MODEL_URL, { method: "HEAD" });
         if (head.ok) {
@@ -73,19 +76,31 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
             if (o.isMesh && o.geometry) meshes.push(o);
           });
           if (meshes.length) {
+            // Model trzymamy bez normalnych (inaczej weld nie scala wierzchołków i plik
+            // puchnie z 0,8 MB do 7 MB). Liczymy je tutaj — sampler potrzebuje ich,
+            // żeby zwracać normalną powierzchni, na której opiera się cieniowanie.
+            for (const m of meshes) {
+              if (!m.geometry.getAttribute("normal")) m.geometry.computeVertexNormals();
+            }
             // Próbkowanie z powierzchni mesha, proporcjonalnie do jego powierzchni
             const samplers = meshes.map((m) => new MeshSurfaceSampler(m).build());
             const out = new Float32Array(COUNT * 3);
+            const outN = new Float32Array(COUNT * 3);
             const p = new THREE.Vector3();
+            const nrm = new THREE.Vector3();
             for (let i = 0; i < COUNT; i++) {
               const mi = i % samplers.length;
-              samplers[mi].sample(p);
+              samplers[mi].sample(p, nrm);
               meshes[mi].localToWorld(p);
               out[i * 3] = p.x;
               out[i * 3 + 1] = p.y;
               out[i * 3 + 2] = p.z;
+              outN[i * 3] = nrm.x;
+              outN[i * 3 + 1] = nrm.y;
+              outN[i * 3 + 2] = nrm.z;
             }
             raw = out;
+            rawNormals = outN;
           }
         }
       } catch {
@@ -136,6 +151,24 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
         positions[i * 3] = (raw[i * 3 + o1] - c1) * k;
         positions[i * 3 + 1] = (raw[i * 3 + longAxis] - cLong) * k * dir;
         positions[i * 3 + 2] = (raw[i * 3 + o2] - c2) * k;
+      }
+
+      // Normalne przechodzą przez tę samą zamianę osi co pozycje (bez przesunięcia i skali)
+      const normals = new Float32Array(COUNT * 3);
+      for (let i = 0; i < COUNT; i++) {
+        if (rawNormals) {
+          normals[i * 3] = rawNormals[i * 3 + o1];
+          normals[i * 3 + 1] = rawNormals[i * 3 + longAxis] * dir;
+          normals[i * 3 + 2] = rawNormals[i * 3 + o2];
+        } else {
+          // Geometria proceduralna nie ma normalnych — przybliżamy je kierunkiem
+          // od osi serca na zewnątrz, co dla bryły obrotowej jest wystarczające
+          const nx = positions[i * 3], ny = positions[i * 3 + 1] * 0.35, nz = positions[i * 3 + 2];
+          const len2 = Math.hypot(nx, ny, nz) || 1;
+          normals[i * 3] = nx / len2;
+          normals[i * 3 + 1] = ny / len2;
+          normals[i * 3 + 2] = nz / len2;
+        }
       }
 
       // ————— Kotwice układu bodźcoprzewodzącego wyprowadzone Z GEOMETRII, nie zgadnięte.
@@ -233,10 +266,14 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
         if (d > maxVentDist) maxVentDist = d;
       }
 
-      const cDark = new THREE.Color("#175A42");
-      const cMid = new THREE.Color("#2BB380");
-      const cLight = new THREE.Color("#3EE6A8");
-      const cAorta = new THREE.Color("#66F2C4");
+      // Paleta zależna od motywu. Na jasnym tle jasna zieleń #3EE6A8 znika (kontrast
+      // poniżej AA — brand book zabrania jej na jasnym), więc gradient schodzi
+      // w ciemniejsze zielenie z akcentem #0B7E54.
+      const isLight = theme === "light";
+      const cDark = new THREE.Color(isLight ? "#06251A" : "#175A42");
+      const cMid = new THREE.Color(isLight ? "#0B7E54" : "#3AC98E");
+      const cLight = new THREE.Color(isLight ? "#12A971" : "#5CF2BC");
+      const cAorta = new THREE.Color(isLight ? "#14B87C" : "#8CFFD6");
       const col = new THREE.Color();
 
       for (let i = 0; i < COUNT; i++) {
@@ -285,6 +322,7 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       geo.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
       geo.setAttribute("aS", new THREE.BufferAttribute(sArr, 1));
       geo.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+      geo.setAttribute("aNormal", new THREE.BufferAttribute(normals, 3));
 
       // ————— Fala aktywacji liczona w shaderze (jeden uniform czasu, atrybut `s` per cząsteczka)
       // uWave = 0 → fala pobudzenia WYŁĄCZONA: zostaje sam obrót i puls mechaniczny.
@@ -294,12 +332,14 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
 
       const uniforms = {
         uPhase: { value: 0 },
-        uSize: { value: 0.021 },
+        uSize: { value: 0.030 },
         // bez fali chmura musi być jasna sama z siebie; z falą jest przygaszona,
         // żeby pobudzenie było wyraźnie widoczne
-        uRest: { value: SHOW_CONDUCTION_WAVE ? 0.55 : 0.92 },
+        uRest: { value: SHOW_CONDUCTION_WAVE ? 0.62 : 1.0 },
         uWave: { value: SHOW_CONDUCTION_WAVE ? 1 : 0 },
         uViewport: { value: size * Math.min(window.devicePixelRatio, 2) },
+        // 1 = motyw jasny: punkty w głębi rozjaśniają się ku tłu zamiast ciemnieć
+        uIsLight: { value: isLight ? 1 : 0 },
       };
 
       // Wspólny kod fazy dla chmury i okablowania:
@@ -355,29 +395,66 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
           attribute vec3 aColor;
           attribute float aS;
           attribute float aSize;
+          attribute vec3 aNormal;
           uniform float uPhase;
           uniform float uSize;
           uniform float uRest;
           uniform float uWave;
           uniform float uViewport;
+          uniform float uIsLight;
           varying vec3 vColor;
           varying float vAlpha;
           ${PHASE_GLSL}
           void main() {
             float e = excitation(aS, uPhase) * uWave;
             vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            vec3 n = normalize(normalMatrix * aNormal);
+            vec3 viewDir = normalize(-mv.xyz);
 
-            // Cieniowanie w głąb: punkty dalsze od kamery ciemnieją i lekko zanikają,
-            // dzięki czemu chmura czyta się jako bryła, a nie płaska plama.
+            // Światło kluczowe z góry-lewej-przodu. To ono rzeźbi anatomię: komory,
+            // przedsionki i naczynia dostają różne jasności zależnie od nachylenia.
+            float key = max(dot(n, normalize(vec3(-0.45, 0.65, 0.85))), 0.0);
+            // Wypełnienie z przeciwnej strony, żeby cienie nie były głuche
+            float fill = max(dot(n, normalize(vec3(0.7, -0.25, 0.35))), 0.0) * 0.35;
+            // Rim — podkreśla krawędź bryły i oddziela ją od tła
+            float rim = pow(1.0 - max(dot(n, viewDir), 0.0), 2.2);
+
+            // Punkty odwrócone tyłem wygaszamy, inaczej przednia i tylna ściana
+            // nakładają się w jednolitą kaszę i struktury znikają
+            float facing = smoothstep(-0.35, 0.25, dot(n, viewDir));
+
+            // Wysokie wypełnienie ambient: przy chmurze punktów głębokie cienie
+            // czytają się jako dziury, a nie jako bryła
+            float lambert = 0.62 + key * 0.75 + fill;
             float depth = clamp((-mv.z - 3.2) / 2.4, 0.0, 1.0);
-            float shade = mix(1.0, 0.34, depth);
 
-            // Rozświetlenie ku jasnej zieleni marki, poza tym kolor bazowy
-            vColor = mix(aColor * shade, vec3(0.243, 0.902, 0.659), e * 0.85);
-            vAlpha = clamp((uRest + e * 0.45) * mix(1.0, 0.55, depth), 0.0, 0.95);
+            vec3 base;
+            float a;
+            if (uIsLight > 0.5) {
+              // Jasny motyw: głębi NIE wolno kodować jasnością. Tło jest już maksymalnie
+              // jasne, więc rozjaśnianie ku niemu kasuje punkt (zmierzone 1,11:1 — znika),
+              // przez co bryła traci tylną ścianę. Punkty zostają ciemne w całym zakresie
+              // głębi, a dystans niesie rozmiar (niżej) i lekki spadek krycia.
+              base = aColor * (0.80 + key * 0.35);
+              base = mix(base, vec3(0.55, 0.68, 0.62), depth * 0.20);
+              base = mix(base, vec3(0.04, 0.36, 0.24), rim * 0.45);
+              a = uRest * mix(1.0, 0.78, depth) * mix(0.45, 1.0, facing);
+            } else {
+              base = aColor * lambert;
+              base += vec3(0.243, 0.902, 0.659) * rim * 0.45;
+              base = mix(base, base * 0.55, depth);
+              a = uRest * mix(1.0, 0.62, depth) * mix(0.30, 1.0, facing);
+            }
 
-            // Rozmiar: bazowe zróżnicowanie per punkt + delikatny przyrost przy pobudzeniu
-            gl_PointSize = uSize * aSize * uViewport / -mv.z * (1.0 + e * 0.22);
+            // Rozświetlenie falą pobudzenia (gdy włączona)
+            vColor = mix(base, vec3(0.36, 1.0, 0.76), e * 0.9);
+            vAlpha = clamp(a + e * 0.45, 0.0, 1.0);
+
+            // Rozmiar: bazowe zróżnicowanie per punkt + delikatny przyrost przy pobudzeniu.
+            // Na jasnym motywie rozmiar przejmuje rolę nośnika głębi — punkty w głębi
+            // są mniejsze zamiast bledsze, bo bledsze po prostu znikają na bieli.
+            float depthSize = mix(1.0, mix(1.0, 0.55, depth), uIsLight);
+            gl_PointSize = uSize * aSize * depthSize * uViewport / -mv.z * (1.0 + e * 0.22);
             gl_Position = projectionMatrix * mv;
           }
         `,
@@ -457,7 +534,7 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       disposed = true;
       cleanup();
     };
-  }, [size]);
+  }, [size, theme]);
 
   return (
     <div

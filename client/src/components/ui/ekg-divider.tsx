@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTheme } from "@/hooks/use-theme";
 
 // Ścieżka linii EKG z brand booka helloEKG — morfologia STAŁA, element identyfikacji
 // marki. Nie modyfikować, nie upraszczać, nie generować własnych wariantów.
@@ -19,6 +20,13 @@ function useReducedMotion() {
 
 export function EKGDivider({ className = "" }: { className?: string }) {
   const reducedMotion = useReducedMotion();
+  const { theme } = useTheme();
+
+  // Na jasnym tle impuls #3EE6A8 ma kontrast poniżej AA i praktycznie znika —
+  // brand book dopuszcza tam wyłącznie ciemniejszy akcent #0B7E54.
+  const isLight = theme === "light";
+  const traceColor = isLight ? "#93B8A8" : "#1E4536";
+  const pulseColor = isLight ? "#0B7E54" : "#3EE6A8";
 
   return (
     <div className={`ekg-divider ${className}`} aria-hidden="true">
@@ -32,7 +40,7 @@ export function EKGDivider({ className = "" }: { className?: string }) {
         <path
           d={EKG_LINE_PATH}
           fill="none"
-          stroke="#1E4536"
+          stroke={traceColor}
           strokeWidth={1}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -42,7 +50,7 @@ export function EKGDivider({ className = "" }: { className?: string }) {
           <path
             d={EKG_LINE_PATH}
             fill="none"
-            stroke="#3EE6A8"
+            stroke={pulseColor}
             strokeWidth={1.6}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -52,7 +60,7 @@ export function EKGDivider({ className = "" }: { className?: string }) {
           <path
             d={EKG_LINE_PATH}
             fill="none"
-            stroke="#3EE6A8"
+            stroke={pulseColor}
             strokeWidth={1.6}
             strokeLinecap="round"
             strokeLinejoin="round"
