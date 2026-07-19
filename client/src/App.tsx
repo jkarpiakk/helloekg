@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -14,10 +15,7 @@ import Home from "@/pages/home";
 import Quiz from "@/pages/quiz";
 import Dashboard from "@/pages/dashboard";
 import Modules from "@/pages/modules";
-import Lecture from "@/pages/lecture";
-import Module3Lecture from "@/pages/module3-lecture";
 // import DynamicLecture from "@/pages/dynamic-lecture";
-import Admin from "@/pages/admin";
 import Pricing from "@/pages/pricing";
 import Checkout from "@/pages/checkout";
 import PaymentSuccess from "@/pages/payment-success";
@@ -25,16 +23,51 @@ import VerifyEmail from "@/pages/verify-email";
 import ResetPassword from "@/pages/reset-password";
 import ForgotPassword from "@/pages/forgot-password";
 import VerifyCertificate from "@/pages/verify-certificate";
-import CertificatePage from "@/pages/certificate";
-import CertificatePreviewPage from "@/pages/certificate-preview";
-import EKGSimulator from "@/pages/ekg-simulator";
 import Blog from "@/pages/blog";
 import BlogPost from "@/pages/blog-post";
 import NotFound from "@/pages/not-found";
 
+// Ciężkie widoki poza głównym bundle (React.lazy + Suspense)
+const Lecture = lazy(() => import("@/pages/lecture"));
+const Module3Lecture = lazy(() => import("@/pages/module3-lecture"));
+const Admin = lazy(() => import("@/pages/admin"));
+const CertificatePage = lazy(() => import("@/pages/certificate"));
+const CertificatePreviewPage = lazy(() => import("@/pages/certificate-preview"));
+const EKGSimulator = lazy(() => import("@/pages/ekg-simulator"));
+
 // Layout
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+
+// Loader zgodny z marką: sygnet H z szybszym impulsem jako fallback Suspense
+const LOADER_H_PATH =
+  "M4,50 L18,50 L26,14 L34,86 L40,50 L60,50 L66,14 L74,86 L80,50 L96,50";
+
+function RouteLoader() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center" role="status" aria-label="Ładowanie">
+      <svg width={56} height={56} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path
+          d={LOADER_H_PATH}
+          stroke="#1E4536"
+          strokeWidth={7}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d={LOADER_H_PATH}
+          stroke="#3EE6A8"
+          strokeWidth={7}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="90 450"
+          className="logo-pulse-path"
+          style={{ animationDuration: "1.4s" }}
+        />
+      </svg>
+    </div>
+  );
+}
 
 function AppContent() {
   const { data: user, isLoading } = useQuery({
@@ -56,6 +89,7 @@ function AppContent() {
     <div className="min-h-screen bg-background">
       <Header />
       <main>
+        <Suspense fallback={<RouteLoader />}>
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/quiz" component={Quiz} />
@@ -79,6 +113,7 @@ function AppContent() {
           <Route path="/verify/:certificateId" component={VerifyCertificate} />
           <Route component={NotFound} />
         </Switch>
+        </Suspense>
       </main>
       <Footer />
     </div>
