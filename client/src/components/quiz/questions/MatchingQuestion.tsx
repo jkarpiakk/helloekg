@@ -76,8 +76,8 @@ export default function MatchingQuestion({
     if (showResult) {
       const isCorrect = result?.feedback?.correctItems?.includes(leftId);
       const isIncorrect = result?.feedback?.incorrectItems?.includes(leftId);
-      if (isCorrect) return `${baseClass} border-green-500 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200 shadow-md shadow-green-500/20`;
-      if (isIncorrect) return `${baseClass} border-red-500 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 shadow-md shadow-red-500/20`;
+      if (isCorrect) return `${baseClass} border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06] text-foreground`;
+      if (isIncorrect) return `${baseClass} border-[#223040] bg-transparent text-foreground`;
       return `${baseClass} border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400`;
     }
     

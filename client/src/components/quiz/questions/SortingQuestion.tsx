@@ -68,13 +68,13 @@ function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, is
   let positionBgClass = "bg-slate-700 text-white";
   
   if (isCorrect) {
-    borderClass = "border-green-500";
-    bgClass = "bg-green-50 dark:bg-green-950/30";
-    positionBgClass = "bg-green-500 text-white";
+    borderClass = "border-[#0B7E54] dark:border-[#3EE6A8]";
+    bgClass = "bg-[#3EE6A8]/[0.06]";
+    positionBgClass = "bg-[#3EE6A8]/10 text-[#0B7E54] dark:text-[#3EE6A8] border border-[#0B7E54] dark:border-[#3EE6A8]";
   } else if (isIncorrect) {
-    borderClass = "border-red-500";
-    bgClass = "bg-red-50 dark:bg-red-950/30";
-    positionBgClass = "bg-red-500 text-white";
+    borderClass = "border-[#223040]";
+    bgClass = "bg-transparent";
+    positionBgClass = "bg-transparent text-muted-foreground border border-[#223040]";
   }
 
   return (

@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import { authService } from "./lib/auth";
 import { LoadingSpinner } from "./components/ui/loading-spinner";
+import { ThemeProvider } from "@/hooks/use-theme";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Pages
 import Home from "@/pages/home";
@@ -35,7 +37,6 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
 function AppContent() {
-  // Load current user on app start
   const { data: user, isLoading } = useQuery({
     queryKey: ["/api/auth/me"],
     queryFn: () => authService.getCurrentUser(),
@@ -86,12 +87,18 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <AppContent />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <ErrorBoundary>
+              <AppContent />
+            </ErrorBoundary>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

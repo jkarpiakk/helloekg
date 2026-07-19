@@ -66,9 +66,9 @@ export default function FillBlankQuestion({
       let inputClass = "inline-block w-28 sm:w-36 md:w-40 mx-1 my-1 text-center font-medium border-2 transition-all duration-200";
       if (showResult) {
         if (isCorrect) {
-          inputClass += " border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 shadow-sm shadow-green-500/20";
+          inputClass += " border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06] text-foreground";
         } else if (isIncorrect) {
-          inputClass += " border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 shadow-sm shadow-red-500/20";
+          inputClass += " border-[#223040] bg-transparent text-foreground";
         }
       } else {
         inputClass += " border-border hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -99,7 +99,7 @@ export default function FillBlankQuestion({
             <>
               <X className="h-5 w-5 text-red-600 dark:text-red-400" data-testid={`blank-incorrect-${blank.id}`} />
               {correctAnswer && (
-                <span className="text-xs text-green-700 dark:text-green-400 font-semibold ml-1 px-1.5 py-0.5 bg-green-100 dark:bg-green-900/40 rounded">
+                <span className="text-xs text-[#0B7E54] dark:text-[#3EE6A8] font-semibold ml-1 px-1.5 py-0.5 bg-[#3EE6A8]/[0.06] rounded">
                   {correctAnswer}
                 </span>
               )}

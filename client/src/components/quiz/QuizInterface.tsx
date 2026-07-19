@@ -240,7 +240,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         <div className="max-w-2xl w-full">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-app-lg p-5 sm:p-6 lg:p-8 text-center motion-safe:animate-slide-up border border-border/50 dark:border-slate-700/50">
             <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl mx-auto mb-6 flex items-center justify-center ${
-              passed ? "bg-green-500/15 text-green-500 shadow-glow-success" : "bg-red-500/15 text-red-500"
+              passed ? "bg-[#3EE6A8]/[0.06] text-[#0B7E54] dark:text-[#3EE6A8] border border-[#0B7E54] dark:border-[#3EE6A8]" : "bg-transparent text-muted-foreground border border-[#223040]"
             }`}>
               <span className="text-4xl sm:text-5xl font-bold">{Math.round(successRate)}%</span>
             </div>
@@ -262,13 +262,13 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                 <div className="text-sm text-slate-600 dark:text-slate-400">Pytań</div>
               </div>
               <div className="stat-card-teal p-4 sm:p-5 rounded-2xl shadow-app">
-                <div className="text-2xl sm:text-3xl font-bold text-green-500 mb-1">
+                <div className="text-2xl sm:text-3xl font-bold text-[#0B7E54] dark:text-[#3EE6A8] mb-1">
                   {examSummary.correctAnswers}
                 </div>
                 <div className="text-sm text-muted-foreground">Poprawnych</div>
               </div>
               <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl shadow-app border border-red-200 dark:border-red-900/50">
-                <div className="text-2xl sm:text-3xl font-bold text-red-500 mb-1">
+                <div className="text-2xl sm:text-3xl font-bold text-muted-foreground mb-1">
                   {examSummary.totalQuestions - examSummary.correctAnswers}
                 </div>
                 <div className="text-sm text-slate-600 dark:text-slate-400">Błędnych</div>

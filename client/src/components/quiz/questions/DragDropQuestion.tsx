@@ -68,11 +68,11 @@ function DraggableItem({ dragId, content, imageUrl, disabled, isCorrect, isIncor
   let bgClass = "bg-white dark:bg-slate-800";
   
   if (isCorrect) {
-    borderClass = "border-green-500";
-    bgClass = "bg-green-50 dark:bg-green-950/30";
+    borderClass = "border-[#0B7E54] dark:border-[#3EE6A8]";
+    bgClass = "bg-[#3EE6A8]/[0.06]";
   } else if (isIncorrect) {
-    borderClass = "border-red-500";
-    bgClass = "bg-red-50 dark:bg-red-950/30";
+    borderClass = "border-[#223040]";
+    bgClass = "bg-transparent";
   }
 
   return (
@@ -128,9 +128,9 @@ function DropZone({ id, label, isOver, hasItem, isCorrect, isIncorrect, children
     containerClass = "border-2 border-dashed border-primary bg-primary/10 ring-2 ring-primary/30";
   } else if (hasItem) {
     if (isCorrect) {
-      containerClass = "border-2 border-solid border-green-500 bg-green-50 dark:bg-green-950/30";
+      containerClass = "border-2 border-solid border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06]";
     } else if (isIncorrect) {
-      containerClass = "border-2 border-solid border-red-500 bg-red-50 dark:bg-red-950/30";
+      containerClass = "border-2 border-solid border-[#223040]";
     } else {
       containerClass = "border-2 border-solid border-primary/50 bg-white dark:bg-slate-800";
     }
@@ -345,9 +345,9 @@ export default function DragDropQuestion({
                 );
               })}
               {availableSources.length === 0 && !showResult && (
-                <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl text-center">
+                <div className="p-4 bg-[#3EE6A8]/[0.06] border border-[#0B7E54] dark:border-[#3EE6A8] rounded-xl text-center">
                   <Check className="h-5 w-5 text-green-600 dark:text-green-400 mx-auto mb-1" />
-                  <p className="text-sm text-green-700 dark:text-green-300 font-medium">Wszystkie elementy rozmieszczone</p>
+                  <p className="text-sm text-[#0B7E54] dark:text-[#3EE6A8] font-medium">Wszystkie elementy rozmieszczone</p>
                 </div>
               )}
             </div>

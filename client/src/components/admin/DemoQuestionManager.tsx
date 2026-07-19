@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -778,7 +779,7 @@ export default function DemoQuestionManager() {
                               #{question.displayOrder || 0}
                             </Badge>
                           </div>
-                          <h3 className="font-medium mb-1 line-clamp-2" dangerouslySetInnerHTML={{ __html: question.question }} />
+                          <h3 className="font-medium mb-1 line-clamp-2" dangerouslySetInnerHTML={sanitizeHtml(question.question)} />
                           <div className="text-sm text-muted-foreground space-y-1">
                             {qType === 'multiple_choice' && question.options && question.correctIndex !== null && (
                               <div>

@@ -252,7 +252,7 @@ export default function HotspotQuestion({
             return (
               <div
                 key={`label-${hotspot.id}`}
-                className="absolute text-xs font-medium text-green-700 dark:text-green-400 bg-white/90 dark:bg-slate-900/90 px-2 py-0.5 rounded"
+                className="absolute text-xs font-medium text-[#0B7E54] dark:text-[#3EE6A8] bg-white/90 dark:bg-slate-900/90 px-2 py-0.5 rounded"
                 style={{
                   left: `${labelX}%`,
                   top: `${labelY}%`,
@@ -295,12 +295,12 @@ export default function HotspotQuestion({
       {showResult && (
         <div className="flex items-center gap-4 text-sm p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" data-testid="hotspot-legend">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-green-500/30 border-2 border-green-500 shadow-sm" />
-            <span className="font-medium text-green-700 dark:text-green-400">Prawidłowy obszar</span>
+            <div className="w-5 h-5 rounded bg-[#3EE6A8]/[0.06] border-2 border-[#0B7E54] dark:border-[#3EE6A8] shadow-sm" />
+            <span className="font-medium text-[#0B7E54] dark:text-[#3EE6A8]">Prawidłowy obszar</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-red-500/30 border-2 border-red-500 shadow-sm" />
-            <span className="font-medium text-red-700 dark:text-red-400">Błędne zaznaczenie</span>
+            <div className="w-5 h-5 rounded bg-transparent border-2 border-[#223040] shadow-sm" />
+            <span className="font-medium text-muted-foreground">Błędne zaznaczenie</span>
           </div>
         </div>
       )}

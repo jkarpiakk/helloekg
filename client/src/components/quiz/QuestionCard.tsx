@@ -78,12 +78,12 @@ export default function QuestionCard({
 
     if (selectedAnswer === index) {
       return quizResult?.isCorrect 
-        ? `${baseClass} correct border-green-500 bg-green-500 text-white shadow-glow-success`
-        : `${baseClass} incorrect border-red-500 bg-red-500 text-white shadow-lg shadow-red-500/30`;
+        ? `${baseClass} correct border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06] text-foreground`
+        : `${baseClass} incorrect border-[#223040] bg-transparent text-foreground`;
     }
 
     if (quizResult && index === quizResult.correctIndex) {
-      return `${baseClass} correct border-green-500 bg-green-500 text-white shadow-glow-success`;
+      return `${baseClass} correct border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06] text-foreground`;
     }
 
     return `${baseClass} border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 opacity-60`;
@@ -190,7 +190,10 @@ export default function QuestionCard({
                     <span className="font-bold text-base mr-3 w-7 shrink-0">
                       {String.fromCharCode(65 + index)}.
                     </span>
-                    <span className="text-base leading-snug">{answer.text}</span>
+                    <span className="text-base leading-snug flex-1">{answer.text}</span>
+                    {showExplanation && quizResult && index === quizResult.correctIndex && (
+                      <Check className="h-5 w-5 shrink-0 ml-2 text-[#0B7E54] dark:text-[#3EE6A8]" />
+                    )}
                   </div>
                 </div>
               ))}
@@ -203,47 +206,42 @@ export default function QuestionCard({
       {showExplanation && quizResult && (
         <Card className={`shadow-app-lg border-2 overflow-hidden rounded-2xl motion-safe:animate-slide-up ${
           quizResult.isCorrect 
-            ? 'border-green-500 bg-gradient-to-br from-green-50 via-white to-green-50/50 dark:from-green-950/20 dark:via-background dark:to-green-950/10' 
-            : 'border-red-500 bg-gradient-to-br from-red-50 via-white to-red-50/50 dark:from-red-950/20 dark:via-background dark:to-red-950/10'
+            ? 'border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06]' 
+            : 'border-[#223040] bg-transparent'
         }`} data-testid="explanation-panel">
-          <div className={`h-1.5 w-full ${quizResult.isCorrect ? 'bg-gradient-to-r from-green-400 to-green-600' : 'bg-gradient-to-r from-red-400 to-red-600'}`} />
           <CardContent className="p-4 sm:p-5 md:p-7">
             <div className="flex items-start gap-4">
-              <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+              <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center flex-shrink-0 border ${
                 quizResult.isCorrect 
-                  ? 'bg-gradient-to-br from-green-400 to-green-600 shadow-glow-success' 
-                  : 'bg-gradient-to-br from-red-400 to-red-600 shadow-lg shadow-red-500/30'
+                  ? 'border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/10' 
+                  : 'border-[#223040] bg-transparent'
               }`}>
                 {quizResult.isCorrect ? (
-                  <Check className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-white stroke-[3]" />
+                  <Check className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-[#0B7E54] dark:text-[#3EE6A8] stroke-[3]" />
                 ) : (
-                  <X className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-white stroke-[3]" />
+                  <X className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-muted-foreground stroke-[3]" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className={`text-lg sm:text-xl md:text-2xl font-extrabold mb-3 ${
+                <h4 className={`text-lg sm:text-xl md:text-2xl font-heading font-semibold mb-3 ${
                   quizResult.isCorrect 
-                    ? 'text-green-700 dark:text-green-400' 
-                    : 'text-red-700 dark:text-red-400'
+                    ? 'text-[#0B7E54] dark:text-[#3EE6A8]' 
+                    : 'text-foreground'
                 }`} data-testid="result-title">
                   {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
                 </h4>
                 <div 
-                  className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-xl shadow-app border border-slate-200 dark:border-slate-600"
+                  className="bg-card p-4 sm:p-5 rounded-xl shadow-app border border-border"
                   data-testid="explanation-content"
                 >
                   <div 
-                    className="prose prose-base sm:prose-lg max-w-none prose-slate dark:prose-invert [&>*]:text-slate-800 dark:[&>*]:text-slate-100 [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>strong]:text-slate-900 dark:[&>strong]:text-white [&>strong]:font-bold"
+                    className="prose prose-base sm:prose-lg max-w-none prose-slate dark:prose-invert [&>*]:text-foreground [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>strong]:font-bold"
                     dangerouslySetInnerHTML={sanitizeMarkdown(quizResult.explanation)}
                   />
                 </div>
                 <div className="mt-4 flex items-center flex-wrap gap-2">
-                  <Badge variant="outline" className={`text-sm py-1.5 px-3 rounded-xl ${
-                    quizResult.isCorrect 
-                      ? 'border-green-300 dark:border-green-700 text-green-700 dark:text-green-400' 
-                      : 'border-red-300 dark:border-red-700 text-red-700 dark:text-red-400'
-                  }`}>
-                    ⏱️ {Math.round(quizResult.timeMs / 1000)}s
+                  <Badge variant="outline" className="text-label text-xs py-1.5 px-3 rounded-xl border-border text-muted-foreground">
+                    {Math.round(quizResult.timeMs / 1000)}S
                   </Badge>
                 </div>
               </div>

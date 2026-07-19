@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Plus, Upload, Edit, Eye, Trash2, Check, X, EyeOff } from "lucide-react";
 import type { QuestionWithStats } from "@/types";
+import { sanitizeHtml, sanitizeMarkdown } from "@/lib/sanitize";
 import QuestionEditor from "./QuestionEditor";
 import ImportModal from "./ImportModal";
 import type { Module, Section } from "@shared/schema";
@@ -621,7 +622,7 @@ export default function QuestionManager() {
                 <h3 className="font-semibold text-sm text-muted-foreground mb-2">Pytanie:</h3>
                 <div 
                   className="prose dark:prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: previewQuestion.bodyMd }}
+                  dangerouslySetInnerHTML={sanitizeMarkdown(previewQuestion.bodyMd)}
                 />
               </div>
 
@@ -665,7 +666,7 @@ export default function QuestionManager() {
                   <h3 className="font-semibold text-sm text-muted-foreground mb-2">Wyjaśnienie:</h3>
                   <div 
                     className="prose dark:prose-invert max-w-none p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg"
-                    dangerouslySetInnerHTML={{ __html: previewQuestion.explanationMd }}
+                    dangerouslySetInnerHTML={sanitizeMarkdown(previewQuestion.explanationMd)}
                   />
                 </div>
               )}
