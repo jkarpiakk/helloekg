@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 
+// Serce 3D (three.js ładowany dynamicznie wewnątrz komponentu)
+const Hero3DHeart = lazy(() => import("@/components/Hero3DHeart"));
+
 interface EKGPreset {
   name: string;
   bpm: number;
@@ -20,114 +23,12 @@ interface EKGPreset {
 }
 
 const PRESETS: EKGPreset[] = [
-  { name: 'Rytm zatokowy', bpm: 75, rhythm: 'normal', description: 'Prawidłowy rytm serca', color: 'bg-green-500' },
-  { name: 'Bradykardia', bpm: 45, rhythm: 'bradycardia', description: 'Zwolniona akcja serca', color: 'bg-blue-500' },
+  { name: 'Rytm zatokowy', bpm: 75, rhythm: 'normal', description: 'Prawidłowy rytm serca', color: 'bg-primary' },
+  { name: 'Bradykardia', bpm: 45, rhythm: 'bradycardia', description: 'Zwolniona akcja serca', color: 'bg-chart-2' },
   { name: 'Tachykardia', bpm: 140, rhythm: 'svt', description: 'Przyspieszona akcja serca', color: 'bg-orange-500' },
   { name: 'Migotanie przedsionków', bpm: 110, rhythm: 'afib', description: 'Nieregularny rytm', color: 'bg-yellow-500' },
   { name: 'VTach', bpm: 180, rhythm: 'vtach', description: 'Częstoskurcz komorowy', color: 'bg-red-500' },
 ];
-
-// CSS 3D Anatomical Heart Component
-function CSS3DHeart({ heartBeat, rhythm }: { heartBeat: boolean; rhythm: string }) {
-  return (
-    <div className="relative w-full h-full flex items-center justify-center" style={{ perspective: '1000px' }}>
-      <div 
-        className="relative transition-transform duration-500 animate-heart-rotate"
-        style={{ 
-          transform: 'rotateX(-10deg) rotateY(20deg)',
-          transformStyle: 'preserve-3d',
-        }}
-      >
-        {/* Left Ventricle */}
-        <div 
-          className={`absolute left-[-40px] top-[60px] w-[80px] h-[120px] rounded-b-full transition-all duration-200`}
-          style={{
-            background: 'linear-gradient(135deg, #c41e3a 0%, #8b0000 100%)',
-            transform: heartBeat ? 'scale(0.9)' : 'scale(1)',
-            boxShadow: '0 10px 30px rgba(196, 30, 58, 0.5)',
-            transformStyle: 'preserve-3d',
-          }}
-        >
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-950/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
-            Lewa komora
-          </div>
-        </div>
-
-        {/* Right Ventricle */}
-        <div 
-          className={`absolute left-[30px] top-[70px] w-[70px] h-[110px] rounded-b-full transition-all duration-200`}
-          style={{
-            background: 'linear-gradient(135deg, #d73447 0%, #a52a2a 100%)',
-            transform: heartBeat ? 'scale(0.9) translateZ(-20px)' : 'scale(1) translateZ(-20px)',
-            boxShadow: '0 10px 25px rgba(215, 52, 71, 0.4)',
-          }}
-        >
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-900/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
-            Prawa komora
-          </div>
-        </div>
-
-        {/* Left Atrium */}
-        <div 
-          className={`absolute left-[-35px] top-[20px] w-[70px] h-[60px] rounded-t-full transition-all duration-150`}
-          style={{
-            background: 'linear-gradient(135deg, #e74c3c 0%, #c41e3a 100%)',
-            transform: heartBeat ? 'scale(0.95)' : 'scale(1)',
-            boxShadow: '0 -5px 20px rgba(231, 76, 60, 0.4)',
-          }}
-        >
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-red-800/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
-            Lewy przedsionek
-          </div>
-        </div>
-
-        {/* Right Atrium */}
-        <div 
-          className={`absolute left-[35px] top-[25px] w-[65px] h-[58px] rounded-t-full transition-all duration-150`}
-          style={{
-            background: 'linear-gradient(135deg, #ec7063 0%, #d73447 100%)',
-            transform: heartBeat ? 'scale(0.95) translateZ(-15px)' : 'scale(1) translateZ(-15px)',
-            boxShadow: '0 -5px 15px rgba(236, 112, 99, 0.4)',
-          }}
-        >
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-red-700/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10">
-            Prawy przedsionek
-          </div>
-        </div>
-
-        {/* Aorta */}
-        <div 
-          className="absolute left-[-50px] top-[-20px] w-[15px] h-[50px] rounded-t-lg"
-          style={{
-            background: 'linear-gradient(180deg, #b71c1c 0%, #8b0000 100%)',
-            transform: 'rotate(15deg)',
-            boxShadow: '0 5px 15px rgba(183, 28, 28, 0.4)',
-          }}
-        />
-
-        {/* Superior Vena Cava */}
-        <div 
-          className="absolute left-[80px] top-[-10px] w-[12px] h-[40px] rounded-t-lg"
-          style={{
-            background: 'linear-gradient(180deg, #3949ab 0%, #283593 100%)',
-            transform: 'rotate(-10deg) translateZ(-10px)',
-            boxShadow: '0 5px 12px rgba(57, 73, 171, 0.4)',
-          }}
-        />
-
-        {/* Pulmonary Artery */}
-        <div 
-          className="absolute left-[20px] top-[-5px] w-[14px] h-[35px] rounded-t-lg"
-          style={{
-            background: 'linear-gradient(180deg, #5e35b1 0%, #4527a0 100%)',
-            transform: 'rotate(-25deg)',
-            boxShadow: '0 5px 12px rgba(94, 53, 177, 0.4)',
-          }}
-        />
-      </div>
-    </div>
-  );
-}
 
 export default function EKGSimulator() {
   const { isAuthenticated } = useAuth();
@@ -147,6 +48,9 @@ export default function EKGSimulator() {
   const beatIntervalRef = useRef<number>();
   const timeRef = useRef(0);
   const lastBeatRef = useRef(0);
+  // Współczynnik nieregularności AFib losowany raz na uderzenie (nie per klatka)
+  const afibFactorRef = useRef(1);
+  const lastFrameTimeRef = useRef<number | null>(null);
   const heartBeatRef = useRef(false);
   const pauseTimeOffsetRef = useRef(0);
   const lastPauseTimeRef = useRef(0);
@@ -172,16 +76,19 @@ export default function EKGSimulator() {
 
   // Generate EKG waveform points
   const generateEKGPoint = (t: number, rhythm: string): number => {
-    // For AFib, add irregular beat timing
+    // For AFib, add irregular beat timing (współczynnik trzymany w ref do następnego uderzenia)
     const baseInterval = (60 / bpm) * 1000;
-    const beatInterval = rhythm === 'afib' 
-      ? baseInterval * (0.7 + Math.random() * 0.6) // Irregular timing 70-130% of base
+    const beatInterval = rhythm === 'afib'
+      ? baseInterval * afibFactorRef.current // Irregular timing 70-130% of base
       : baseInterval;
-    
+
     const timeSinceBeat = t - lastBeatRef.current;
-    
+
     if (timeSinceBeat > beatInterval) {
       lastBeatRef.current = t;
+      if (rhythm === 'afib') {
+        afibFactorRef.current = 0.7 + Math.random() * 0.6;
+      }
       beatIntervalRef.current = beatInterval;
       // Update state for 3D heart sync
       setLastBeatSimTime(t);
@@ -239,17 +146,15 @@ export default function EKGSimulator() {
     const centerY = height / 2;
     const points: number[] = [];
 
-    const draw = () => {
-      if (!isPlaying) return;
-
-      // Clear canvas
-      ctx.fillStyle = '#0a0a0a';
+    const drawGrid = () => {
+      // Clear canvas — tło zgodne z marką
+      ctx.fillStyle = '#0B0F14';
       ctx.fillRect(0, 0, width, height);
 
-      // Draw grid
-      ctx.strokeStyle = '#1a3a1a';
+      // Draw grid — siatka w kolorze śladu EKG
+      ctx.strokeStyle = '#1E4536';
       ctx.lineWidth = 1;
-      
+
       // Vertical lines
       for (let x = 0; x < width; x += 20) {
         ctx.beginPath();
@@ -257,7 +162,7 @@ export default function EKGSimulator() {
         ctx.lineTo(x, height);
         ctx.stroke();
       }
-      
+
       // Horizontal lines
       for (let y = 0; y < height; y += 20) {
         ctx.beginPath();
@@ -265,9 +170,60 @@ export default function EKGSimulator() {
         ctx.lineTo(width, y);
         ctx.stroke();
       }
+    };
 
-      // Generate new point
-      timeRef.current += 16; // ~60fps
+    const drawTrace = (pts: number[], highlight: boolean) => {
+      // Linia zapisu #3EE6A8; podświetlenie uderzenia — biel #F2F6F4 (czerwień tylko dla błędów)
+      ctx.strokeStyle = highlight ? '#F2F6F4' : '#3EE6A8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      pts.forEach((point, i) => {
+        const x = width - pts.length + i;
+        const y = centerY - point * 50;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+
+      ctx.stroke();
+    };
+
+    // prefers-reduced-motion: statyczny, reprezentatywny fragment zapisu zamiast animacji
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      drawGrid();
+      const staticPoints: number[] = [];
+      const msPerPx = 4; // ~4 ms zapisu na piksel — kilka pełnych ewolucji w kadrze
+      const beatInterval = (60 / bpm) * 1000;
+      for (let x = 0; x < width; x++) {
+        const t = x * msPerPx;
+        const phase = ((t % beatInterval) / beatInterval) * 2 * Math.PI;
+        if (rhythm === 'afib') {
+          staticPoints.push(Math.sin(phase) * 0.3 + Math.sin(t * 0.9) * 0.1 + (phase > 3 && phase < 3.5 ? Math.sin(phase * 5) * 2 : 0));
+        } else if (rhythm === 'vtach') {
+          staticPoints.push(Math.sin(phase * 3) * 1.5);
+        } else {
+          staticPoints.push(generateNormalEKG(phase));
+        }
+      }
+      drawTrace(staticPoints, false);
+      return;
+    }
+
+    const draw = (now: number) => {
+      if (!isPlaying) return;
+
+      drawGrid();
+
+      // Delta-time: realny przyrost czasu między klatkami zamiast stałych 16 ms
+      const last = lastFrameTimeRef.current;
+      const delta = last === null ? 16.7 : Math.min(now - last, 100);
+      lastFrameTimeRef.current = now;
+
+      timeRef.current += delta;
       setCurrentSimTime(timeRef.current);
       const newPoint = generateEKGPoint(timeRef.current, rhythm);
       points.push(newPoint);
@@ -278,26 +234,13 @@ export default function EKGSimulator() {
       }
 
       // Draw EKG line - use ref to avoid stale closure
-      ctx.strokeStyle = heartBeatRef.current ? '#ff0000' : '#00ff00';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-
-      points.forEach((point, i) => {
-        const x = width - points.length + i;
-        const y = centerY - point * 50;
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-
-      ctx.stroke();
+      drawTrace(points, heartBeatRef.current);
 
       animationRef.current = requestAnimationFrame(draw);
     };
 
-    draw();
+    lastFrameTimeRef.current = null;
+    animationRef.current = requestAnimationFrame(draw);
 
     return () => {
       if (animationRef.current) {
@@ -391,10 +334,10 @@ export default function EKGSimulator() {
                     ref={canvasRef}
                     width={800}
                     height={300}
-                    className="w-full border border-border rounded-lg bg-black"
+                    className="w-full border border-border rounded-lg bg-[#0B0F14]"
                   />
                   <div className="absolute top-4 left-4 flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded-full transition-all ${heartBeat ? 'bg-red-500 scale-125' : 'bg-red-500/30'}`} />
+                    <div className={`w-4 h-4 rounded-full transition-all ${heartBeat ? 'bg-primary scale-125' : 'bg-primary/30'}`} />
                     <span className="text-white font-mono text-sm">
                       {rhythm === 'normal' ? 'NSR' : 
                        rhythm === 'afib' ? 'AFib' :
@@ -436,8 +379,10 @@ export default function EKGSimulator() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-[400px] bg-gradient-to-b from-slate-950 to-slate-900 rounded-lg overflow-hidden border border-border">
-                  <CSS3DHeart heartBeat={heartBeat} rhythm={rhythm} />
+                <div className="h-[400px] bg-gradient-to-b from-background to-card rounded-lg overflow-hidden border border-border flex items-center justify-center">
+                  <Suspense fallback={<div style={{ width: 280, height: 280 }} aria-hidden="true" />}>
+                    <Hero3DHeart size={280} />
+                  </Suspense>
                 </div>
                 <div className="mt-4 space-y-2">
                   <div className="text-center">
@@ -468,7 +413,7 @@ export default function EKGSimulator() {
                     </div>
                   </div>
                   <p className="text-center text-xs text-muted-foreground mt-2">
-                    💡 Obracaj model myszą, przybliżaj kółkiem
+                    💡 Model obraca się automatycznie i pulsuje w rytmie 72 BPM
                   </p>
                 </div>
               </CardContent>
