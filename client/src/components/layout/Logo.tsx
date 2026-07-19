@@ -53,7 +53,7 @@ export default function Logo({ className = "", markSize = 40, showWordmark = tru
               strokeWidth={7}
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeDasharray="60 300"
+              strokeDasharray="180 360"
               className="logo-pulse-path"
             />
           </>

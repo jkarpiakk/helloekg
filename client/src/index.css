@@ -173,24 +173,17 @@
   object-fit: contain;
 }
 
-/* Medical theme enhancements */
-.ekg-pattern {
-  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 100"><path d="M0,50 L200,50 L210,20 L220,80 L230,10 L240,90 L250,50 L450,50 L460,30 L470,70 L480,20 L490,80 L500,50 L1000,50" stroke="%233EE6A8" stroke-width="2" fill="none"/></svg>');
-  background-repeat: repeat-x;
-  background-size: 200px 20px;
-  opacity: 0.1;
-}
-
 /* EKG divider - subtle pulse separator, used sparingly */
 .ekg-divider {
   width: 100%;
-  height: 24px;
+  height: 44px;
   display: block;
 }
 
+/* Kanoniczny „żywy znak": okres dash 180+360=540, offset 180 → -360, 2.5s = 72 BPM */
 @keyframes logo-pulse-dash {
-  0% { stroke-dashoffset: 360; }
-  100% { stroke-dashoffset: 0; }
+  0% { stroke-dashoffset: 180; }
+  100% { stroke-dashoffset: -360; }
 }
 
 .logo-pulse-path {
@@ -247,20 +240,6 @@
   .print-only {
     display: block !important;
   }
-}
-
-/* 3D Heart rotation animation */
-@keyframes heart-rotate {
-  0% {
-    transform: rotateX(-10deg) rotateY(20deg);
-  }
-  100% {
-    transform: rotateX(-10deg) rotateY(380deg);
-  }
-}
-
-.animate-heart-rotate {
-  animation: heart-rotate 20s linear infinite;
 }
 
 /* Hide scrollbar for horizontal scroll containers */
