@@ -1,17 +1,16 @@
 import { useEffect, useRef } from "react";
 import { useTheme } from "@/hooks/use-theme";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { CYCLE_SECONDS, cyclePhase } from "@/lib/heart-rhythm";
 
 /**
- * Pasek EKG pod hero — rysuje P-QRS-T w tym samym rytmie 72 BPM co fala pobudzenia
- * w Hero3DHeart. Zegar jest wspólny (performance.now() modulo długość cyklu), więc
- * obie animacje są zsynchronizowane bez przekazywania stanu między komponentami.
+ * Pasek EKG pod hero — rysuje P-QRS-T w tym samym rytmie co puls serca 3D.
+ * Zegar jest wspólny (performance.now modulo CYCLE_SECONDS z @/lib/heart-rhythm),
+ * więc obie animacje są w fazie bez przekazywania stanu między komponentami.
  *
  * Fazy odpowiadają dokładnie tym z shadera serca:
  *   P 0–15% | pauza AV/PQ 15–24% | QRS 24–34% | T 45–60% | reszta: spoczynek
  */
-
-// Musi być identyczne z CYCLE_SECONDS w Hero3DHeart — obie animacje dzielą zegar
-const CYCLE_SECONDS = 2.6;
 
 /** Wychylenie zapisu w danej fazie cyklu (0..1), w jednostkach względnych. */
 function ekgAmplitude(phase: number): number {
@@ -41,6 +40,7 @@ type Props = { className?: string; height?: number };
 export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { theme } = useTheme();
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -48,7 +48,6 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // Na bieli jasnozielony impuls znika — akcentem jasnego motywu jest #0B7E54
     const isLight = theme === "light";
     const traceColor = isLight ? "#93B8A8" : "#1E4536";
@@ -68,9 +67,11 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
       canvas.style.width = "100%";
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Przypisanie do canvas.width czyści bufor. W trybie animowanym najbliższa
+      // klatka i tak przerysuje, ale przy prefers-reduced-motion pętli nie ma —
+      // bez tego pasek zostawał trwale pusty po zmianie szerokości okna.
+      if (reduced) drawFrame(SECONDS_ON_SCREEN);
     };
-    resize();
-    window.addEventListener("resize", resize);
 
     const centerY = height / 2;
     const amp = height * 0.36;
@@ -87,8 +88,7 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
       for (let s = 0; s < SUBSAMPLES; s++) {
         const xs = x + s / SUBSAMPLES;
         const tAtX = elapsed - ((width - xs) / width) * SECONDS_ON_SCREEN;
-        const phase = ((tAtX % CYCLE_SECONDS) + CYCLE_SECONDS) % CYCLE_SECONDS / CYCLE_SECONDS;
-        const v = ekgAmplitude(phase);
+        const v = ekgAmplitude(cyclePhase(tAtX));
         if (Math.abs(v) > Math.abs(extreme)) extreme = v;
       }
       return centerY - extreme * amp;
@@ -128,6 +128,10 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
       ctx.stroke();
     };
 
+    // Dopiero tutaj — `resize` wywołuje `drawFrame`, więc musi być po jego definicji
+    resize();
+    window.addEventListener("resize", resize);
+
     if (reduced) {
       // prefers-reduced-motion: statyczny, reprezentatywny fragment zapisu
       drawFrame(SECONDS_ON_SCREEN);
@@ -144,7 +148,7 @@ export default function HeroEKGStrip({ className = "", height = 64 }: Props) {
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);
     };
-  }, [height, theme]);
+  }, [height, theme, reduced]);
 
   return (
     <div className={className} aria-hidden="true">

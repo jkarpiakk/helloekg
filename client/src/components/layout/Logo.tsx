@@ -1,4 +1,5 @@
-import { useEffect, useId, useState } from "react";
+import { useId } from "react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 interface LogoProps {
   className?: string;
@@ -9,18 +10,6 @@ interface LogoProps {
 
 const H_PATH =
   "M4,50 L18,50 L26,14 L34,86 L40,50 L60,50 L66,14 L74,86 L80,50 L96,50";
-
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return reduced;
-}
 
 export default function Logo({ className = "", markSize = 40, showWordmark = true, animated = true }: LogoProps) {
   const reducedMotion = useReducedMotion();

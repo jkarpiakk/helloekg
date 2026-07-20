@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useLocation } from "wouter";
 import { 
-  Heart, Activity, Zap, Play, Pause, RotateCcw, 
+  Activity, Zap, Play, Pause, RotateCcw, 
   Volume2, VolumeX, ArrowLeft, Sparkles 
 } from "lucide-react";
 import { Link } from "wouter";
@@ -25,9 +26,9 @@ interface EKGPreset {
 const PRESETS: EKGPreset[] = [
   { name: 'Rytm zatokowy', bpm: 75, rhythm: 'normal', description: 'Prawidłowy rytm serca', color: 'bg-primary' },
   { name: 'Bradykardia', bpm: 45, rhythm: 'bradycardia', description: 'Zwolniona akcja serca', color: 'bg-chart-2' },
-  { name: 'Tachykardia', bpm: 140, rhythm: 'svt', description: 'Przyspieszona akcja serca', color: 'bg-orange-500' },
-  { name: 'Migotanie przedsionków', bpm: 110, rhythm: 'afib', description: 'Nieregularny rytm', color: 'bg-yellow-500' },
-  { name: 'VTach', bpm: 180, rhythm: 'vtach', description: 'Częstoskurcz komorowy', color: 'bg-red-500' },
+  { name: 'Tachykardia', bpm: 140, rhythm: 'svt', description: 'Przyspieszona akcja serca', color: 'bg-chart-4' },
+  { name: 'Migotanie przedsionków', bpm: 110, rhythm: 'afib', description: 'Nieregularny rytm', color: 'bg-chart-5' },
+  { name: 'VTach', bpm: 180, rhythm: 'vtach', description: 'Częstoskurcz komorowy', color: 'bg-destructive' },
 ];
 
 export default function EKGSimulator() {
@@ -41,11 +42,16 @@ export default function EKGSimulator() {
   const [rhythm, setRhythm] = useState<'normal' | 'afib' | 'vtach' | 'bradycardia' | 'svt'>('normal');
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [heartBeat, setHeartBeat] = useState(false);
-  const [currentSimTime, setCurrentSimTime] = useState(0);
-  const [lastBeatSimTime, setLastBeatSimTime] = useState(0);
-  const [currentBeatInterval, setCurrentBeatInterval] = useState((60/75) * 1000);
-  
+  // Uwaga: nie trzymamy tu czasu symulacji ani parametrów uderzenia w stanie Reacta.
+  // Zasilały one dawny komponent CSS3DHeart; po jego usunięciu nikt ich nie czytał,
+  // a setter w pętli rysującej wymuszał pełny re-render strony 60 razy na sekundę.
+
+  const prefersReducedMotion = useReducedMotion();
+
   const beatIntervalRef = useRef<number>();
+  // Uchwyt na wygaszenie podświetlenia uderzenia — czyszczony przy odmontowaniu,
+  // żeby nie zostawiać wiszącego timera po opuszczeniu strony
+  const beatFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeRef = useRef(0);
   const lastBeatRef = useRef(0);
   // Współczynnik nieregularności AFib losowany raz na uderzenie (nie per klatka)
@@ -90,12 +96,10 @@ export default function EKGSimulator() {
         afibFactorRef.current = 0.7 + Math.random() * 0.6;
       }
       beatIntervalRef.current = beatInterval;
-      // Update state for 3D heart sync
-      setLastBeatSimTime(t);
-      setCurrentBeatInterval(beatInterval);
       heartBeatRef.current = true;
       setHeartBeat(true);
-      setTimeout(() => {
+      if (beatFlashRef.current) clearTimeout(beatFlashRef.current);
+      beatFlashRef.current = setTimeout(() => {
         heartBeatRef.current = false;
         setHeartBeat(false);
       }, 100);
@@ -192,7 +196,6 @@ export default function EKGSimulator() {
     };
 
     // prefers-reduced-motion: statyczny, reprezentatywny fragment zapisu zamiast animacji
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
       drawGrid();
       const staticPoints: number[] = [];
@@ -224,7 +227,6 @@ export default function EKGSimulator() {
       lastFrameTimeRef.current = now;
 
       timeRef.current += delta;
-      setCurrentSimTime(timeRef.current);
       const newPoint = generateEKGPoint(timeRef.current, rhythm);
       points.push(newPoint);
 
@@ -246,9 +248,13 @@ export default function EKGSimulator() {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
+      if (beatFlashRef.current) {
+        clearTimeout(beatFlashRef.current);
+        beatFlashRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, bpm, rhythm]); // Removed heartBeat to prevent animation restart
+  }, [isPlaying, bpm, rhythm, prefersReducedMotion]); // Removed heartBeat to prevent animation restart
 
   const applyPreset = (preset: EKGPreset) => {
     setBpm(preset.bpm);

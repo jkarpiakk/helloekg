@@ -36,7 +36,9 @@
   /* Brand tokens (theme-invariant) */
   --brand-accent: 158 77% 57%;         /* #3EE6A8 */
   --brand-accent-foreground: 155 46% 5%;
-  --brand-trace: 157 40% 19%;          /* #1E4536 */
+  /* Ślad impulsu na JASNYM tle. #1E4536 z motywu ciemnego byłoby tu prawie czarną
+     kreską — tor ma być subtelny, więc jasny motyw dostaje własną wartość. */
+  --brand-trace: 150 18% 86%;          /* #D5E3DD */
   --brand-error: 0 72% 59%;            /* #E24B4A */
   --brand-line-strong: 212 31% 19%;    /* #223040 */
 

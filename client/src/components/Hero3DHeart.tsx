@@ -1,40 +1,64 @@
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/hooks/use-theme";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { CYCLE_SECONDS, cyclePhase } from "@/lib/heart-rhythm";
 
 /**
- * Hero3DHeart — anatomiczne serce jako chmura cząsteczek z falą pobudzenia
- * biegnącą drogą układu bodźcoprzewodzącego (SA → przedsionki → pauza AV →
- * Hisa → odnogi → Purkinje), zsynchronizowaną z 72 BPM w sekwencji P → PQ → QRS → T.
+ * Hero3DHeart — anatomiczne serce jako chmura cząsteczek, obracające się
+ * i pulsujące skurczem dwufazowym w rytmie wspólnym z paskiem EKG pod hero.
+ *
+ * Punkty próbkowane są z powierzchni realnego modelu anatomicznego
+ * (client/public/models/heart.glb — „Anatomically Correct Human Heart",
+ * Pigcraft, CC BY 4.0; atrybucja w stopce). Gdy pliku brakuje, komponent
+ * schodzi do geometrii proceduralnej i sygnalizuje to w konsoli.
  *
  * three.js, GLTFLoader i MeshSurfaceSampler ładowane wyłącznie dynamicznie —
  * nigdy nie trafiają do głównego bundle.
  *
- * ⚠️ TODO (brand book §6, B1): model źródłowy „Anatomically Correct Human Heart"
- * (Pigcraft, CC BY 4.0, Sketchfab) wymaga zalogowanego konta Sketchfab do pobrania,
- * więc NIE MA GO jeszcze w repo. Do czasu wgrania pliku pod MODEL_URL komponent
- * próbkuje geometrię proceduralną (anatomiczne przybliżenie: komory, przedsionki,
- * łuk aorty). Po wrzuceniu skompresowanego .glb (<1,5 MB) do client/public/models/
- * ścieżka GLB uruchomi się automatycznie — kod poniżej jej nie potrzebuje zmieniać.
- * Kotwice układu przewodzącego są zdefiniowane we frakcjach znormalizowanego
- * bounding boxa, więc zadziałają dla obu źródeł, ale po podpięciu realnego .glb
- * warto je dostroić wzrokowo do konkretnej anatomii modelu.
+ * Fala pobudzenia (SA → przedsionki → pauza AV → Hisa → odnogi → Purkinje)
+ * jest zaimplementowana, ale WYŁĄCZONA stałą SHOW_CONDUCTION_WAVE — patrz
+ * komentarz przy niej. Przy wyłączonej fali cała mapa aktywacji jest pomijana,
+ * żeby nie płacić za obliczenia, których shader i tak nie użyje.
  */
 
 const MODEL_URL = "/models/heart.glb";
 
-// Tempo WIZUALNE cyklu (fala aktywacji + puls). Fizjologiczne 72 BPM (0,83 s) jest
-// wizualnie za szybkie, by prześledzić SA → AV → QRS → T, więc cykl jest zwolniony
-// ~3× dla czytelności dydaktycznej. Pasek EKG używa tej samej stałej → pełna synchronizacja.
-const CYCLE_SECONDS = 2.6;
-// Obrót serca — spokojny, żeby fala była czytelna (rad/s)
+// Obrót serca — spokojny, żeby bryła była czytelna (rad/s)
 const ROTATION_SPEED = 0.14;
 
-type Props = { size?: number; className?: string };
+// Fala pobudzenia: 1 = sekwencja P → pauza AV → QRS → T, 0 = sam obrót i puls.
+// Wyłączona na życzenie — cała logika mapy aktywacji zostaje w kodzie i wraca
+// po zmianie tej stałej na true.
+const SHOW_CONDUCTION_WAVE = false;
 
-export default function Hero3DHeart({ size = 360, className = "" }: Props) {
+type Props = {
+  size?: number;
+  className?: string;
+  /**
+   * Czy koniuszek serca leży po stronie MINIMUM najdłuższej osi modelu.
+   *
+   * Automatyczne rozpoznanie po zwężeniu przekroju zawodzi: pęk wielkich naczyń
+   * przy podstawie zwęża się podobnie jak koniuszek, więc heurystyka odwracała
+   * serce do góry nogami. Domyślna wartość jest dobrana do modelu w repo oraz do
+   * geometrii proceduralnej (obie mają koniuszek przy minimum). Przy podmianie
+   * modelu na inny wystarczy przekazać `apexTowardAxisMin={false}` zamiast
+   * edytować komponent.
+   */
+  apexTowardAxisMin?: boolean;
+};
+
+export default function Hero3DHeart({
+  size = 360,
+  className = "",
+  apexTowardAxisMin = true,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [ready, setReady] = useState(false);
   const { theme } = useTheme();
+  const reducedMotion = useReducedMotion();
+  // Uchwyt do uniformów palety — pozwala przemalować chmurę przy zmianie motywu
+  // BEZ przebudowywania geometrii (ponowne parsowanie .glb i próbkowanie 20 000 punktów).
+  const paletteRef = useRef<((isLight: boolean) => void) | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -47,20 +71,13 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       if (!canvas || disposed) return;
 
       const isMobile = window.matchMedia("(max-width: 768px)").matches;
-      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       // Gęstość: 4900 pkt ze specyfikacji dawało zbyt rzadką, „dziurawą" bryłę przy
       // próbkowaniu realnej anatomii — chmura musi się zlepiać w kształt serca.
       const COUNT = isMobile ? 9000 : 20000;
 
-      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.setSize(size, size, false);
-
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-      camera.position.set(0, 0.15, 4.6);
-
-      // ————— Źródło punktów: realny .glb, a w razie jego braku geometria proceduralna
+      // ————— Źródło punktów: realny .glb, a w razie jego braku geometria proceduralna.
+      // Ładowanie idzie PRZED utworzeniem renderera: kontekst WebGL powstawał wcześniej
+      // niż te awaity i wyciekał, gdy komponent odmontowano w trakcie pobierania modelu.
       let raw: Float32Array | null = null;
       let rawNormals: Float32Array | null = null;
       try {
@@ -110,6 +127,18 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       const sampledFromModel = raw !== null;
       if (!raw) raw = buildProceduralHeart(COUNT);
 
+      // Renderer dopiero TERAZ — po wszystkich awaitach. Dzięki temu nie istnieje
+      // okno, w którym kontekst WebGL żyje, a `cleanup` jest jeszcze pustą funkcją.
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(size, size, false);
+      // Zwolnienie kontekstu rejestrujemy natychmiast po jego utworzeniu.
+      cleanup = () => renderer.dispose();
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+      camera.position.set(0, 0.15, 4.6);
+
       // ————— Wyprostowanie modelu: długa oś anatomiczna (podstawa→koniuszek) ma iść wzdłuż Y,
       // koniuszkiem w dół. Model z Sketchfaba leży na boku (jego długa oś to Z), a inne
       // modele mogą być zorientowane jeszcze inaczej — dlatego oś wykrywamy z geometrii,
@@ -132,19 +161,13 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       const o2 = (longAxis + 2) % 3;
 
       // Kierunek osi: koniuszek ma być na dole (y = -1), podstawa z naczyniami na górze.
-      //
-      // Automatyczne wykrywanie koniuszka po zwężeniu przekroju NIE DZIAŁA na tym modelu:
-      // pęk wielkich naczyń przy podstawie też się zwęża, więc heurystyka wskazywała
-      // zły koniec i serce stawało na głowie. Kierunek jest więc ustawiony wprost.
-      // Przy podmianie modelu na inny może wymagać odwrócenia znaku.
-      const APEX_TOWARD_AXIS_MIN = true;
-
+      // Sterowane propem `apexTowardAxisMin` — uzasadnienie przy definicji propa.
       const lo = ext[longAxis].min, hi = ext[longAxis].max, len = hi - lo;
       const cLong = (lo + hi) / 2;
       const c1 = (ext[o1].min + ext[o1].max) / 2;
       const c2 = (ext[o2].min + ext[o2].max) / 2;
       const k = 2 / Math.max(len, 1e-6);
-      const dir = APEX_TOWARD_AXIS_MIN ? 1 : -1;
+      const dir = apexTowardAxisMin ? 1 : -1;
 
       const positions = new Float32Array(COUNT * 3);
       for (let i = 0; i < COUNT; i++) {
@@ -171,7 +194,12 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
         }
       }
 
-      // ————— Kotwice układu bodźcoprzewodzącego wyprowadzone Z GEOMETRII, nie zgadnięte.
+      // ————— Mapa aktywacji (atrybut `aS`). Liczona TYLKO gdy fala jest włączona:
+      // przy uWave = 0 shader mnoży jej wynik przez zero, a koszt to dwa pełne
+      // sortowania 20 000 elementów i kilka przebiegów po całej chmurze.
+      const sArr = new Float32Array(COUNT);
+      if (SHOW_CONDUCTION_WAVE) {
+      // Kotwice układu bodźcoprzewodzącego wyprowadzone Z GEOMETRII, nie zgadnięte.
       // Dzięki temu leżą na realnej anatomii modelu, a nie obok niej.
       const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
       const ATRIA_FLOOR = 0.35;               // powyżej tej wysokości punkty traktujemy jako przedsionki
@@ -241,10 +269,8 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       const avNodeSet = nearestSet(AV, nodeCount);
       const hisSet = nearestSet(HIS, Math.round(nodeCount * 0.7));
 
-      // ————— Parametr `s`: położenie punktu wzdłuż ścieżki aktywacji (liczone raz, przy inicjalizacji)
+      // Parametr `s`: położenie punktu wzdłuż ścieżki aktywacji
       //   0.00–0.30 przedsionki | 0.30–0.40 węzeł AV | 0.40–0.50 Hisa/odnogi | 0.50–1.00 miokardium komór
-      const sArr = new Float32Array(COUNT);
-      const colors = new Float32Array(COUNT * 3);
       const pv = new THREE.Vector3();
 
       // maksymalny dystans od SA w obrębie przedsionków — do normalizacji fali przedsionkowej
@@ -266,19 +292,9 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
         if (d > maxVentDist) maxVentDist = d;
       }
 
-      // Paleta zależna od motywu. Na jasnym tle jasna zieleń #3EE6A8 znika (kontrast
-      // poniżej AA — brand book zabrania jej na jasnym), więc gradient schodzi
-      // w ciemniejsze zielenie z akcentem #0B7E54.
-      const isLight = theme === "light";
-      const cDark = new THREE.Color(isLight ? "#06251A" : "#175A42");
-      const cMid = new THREE.Color(isLight ? "#0B7E54" : "#3AC98E");
-      const cLight = new THREE.Color(isLight ? "#12A971" : "#5CF2BC");
-      const cAorta = new THREE.Color(isLight ? "#14B87C" : "#8CFFD6");
-      const col = new THREE.Color();
-
       for (let i = 0; i < COUNT; i++) {
-        const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
-        pv.set(x, y, z);
+        const y = positions[i * 3 + 1];
+        pv.set(positions[i * 3], y, positions[i * 3 + 2]);
 
         if (avNodeSet.has(i)) {
           sArr[i] = 0.30 + Math.random() * 0.10;       // węzeł AV — przytrzymanie w fazie PQ
@@ -294,19 +310,17 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
           const along = Math.min(dTree / maxVentDist, 1);
           sArr[i] = 0.50 + along * 0.50;
         }
+      }
+      } // koniec bloku SHOW_CONDUCTION_WAVE
 
-        // Kolor: gradient po wysokości koniuszek → podstawa; aorta osobno
-        const isAorta = y > 0.92;
-        if (isAorta) {
-          col.copy(cAorta);
-        } else {
-          const r = Math.max(0, Math.min(1, (y + 1) / 2));
-          col.copy(cDark).lerp(cMid, Math.min(r * 2, 1));
-          if (r > 0.5) col.lerp(cLight, (r - 0.5) * 2);
-        }
-        colors[i * 3] = col.r;
-        colors[i * 3 + 1] = col.g;
-        colors[i * 3 + 2] = col.b;
+      // ————— Kolor jako PARAMETR, nie gotowa barwa. Atrybut niesie tylko położenie
+      // punktu na gradiencie (0 = koniuszek, 1 = podstawa; wartość ujemna = aorta),
+      // a konkretne barwy siedzą w uniformach. Dzięki temu zmiana motywu to podmiana
+      // czterech uniformów zamiast ponownego parsowania modelu i próbkowania 20 000 punktów.
+      const grad = new Float32Array(COUNT);
+      for (let i = 0; i < COUNT; i++) {
+        const y = positions[i * 3 + 1];
+        grad[i] = y > 0.92 ? -1 : Math.max(0, Math.min(1, (y + 1) / 2));
       }
 
       // Zróżnicowany rozmiar punktów — jednolita kropka czytała się jak szum,
@@ -319,17 +333,12 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
 
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      geo.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
+      geo.setAttribute("aGrad", new THREE.BufferAttribute(grad, 1));
       geo.setAttribute("aS", new THREE.BufferAttribute(sArr, 1));
       geo.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
       geo.setAttribute("aNormal", new THREE.BufferAttribute(normals, 3));
 
       // ————— Fala aktywacji liczona w shaderze (jeden uniform czasu, atrybut `s` per cząsteczka)
-      // uWave = 0 → fala pobudzenia WYŁĄCZONA: zostaje sam obrót i puls mechaniczny.
-      // Ustaw na 1, żeby wrócić do rozświetlania sekwencją P → pauza AV → QRS → T
-      // (cała logika mapy aktywacji jest policzona i gotowa, tylko wygaszona).
-      const SHOW_CONDUCTION_WAVE = false;
-
       const uniforms = {
         uPhase: { value: 0 },
         uSize: { value: 0.030 },
@@ -338,8 +347,32 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
         uRest: { value: SHOW_CONDUCTION_WAVE ? 0.62 : 1.0 },
         uWave: { value: SHOW_CONDUCTION_WAVE ? 1 : 0 },
         uViewport: { value: size * Math.min(window.devicePixelRatio, 2) },
-        // 1 = motyw jasny: punkty w głębi rozjaśniają się ku tłu zamiast ciemnieć
-        uIsLight: { value: isLight ? 1 : 0 },
+        // 1 = motyw jasny: głębia idzie rozmiarem punktu, nie jasnością
+        uIsLight: { value: 0 },
+        // Paleta gradientu — podmieniana przy zmianie motywu bez przebudowy geometrii
+        uCDark: { value: new THREE.Color() },
+        uCMid: { value: new THREE.Color() },
+        uCLight: { value: new THREE.Color() },
+        uCAorta: { value: new THREE.Color() },
+      };
+
+      /**
+       * Ustawia paletę pod motyw. Na jasnym tle jasna zieleń #3EE6A8 ma kontrast
+       * 1,5:1 i znika — brand book §2 zabrania jej na jasnych tłach, więc gradient
+       * schodzi w ciemniejsze zielenie z akcentem #0B7E54.
+       */
+      const applyPalette = (light: boolean) => {
+        uniforms.uIsLight.value = light ? 1 : 0;
+        uniforms.uCDark.value.set(light ? "#06251A" : "#175A42");
+        uniforms.uCMid.value.set(light ? "#0B7E54" : "#3AC98E");
+        uniforms.uCLight.value.set(light ? "#12A971" : "#5CF2BC");
+        uniforms.uCAorta.value.set(light ? "#14B87C" : "#8CFFD6");
+      };
+      applyPalette(theme === "light");
+      // Udostępniamy na zewnątrz, żeby efekt motywu mógł przemalować bez rebuildu
+      paletteRef.current = (light: boolean) => {
+        applyPalette(light);
+        if (reducedMotion) renderer.render(scene, camera);
       };
 
       // Wspólny kod fazy dla chmury i okablowania:
@@ -392,7 +425,7 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
         transparent: true,
         depthWrite: false,
         vertexShader: `
-          attribute vec3 aColor;
+          attribute float aGrad;
           attribute float aS;
           attribute float aSize;
           attribute vec3 aNormal;
@@ -402,10 +435,25 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
           uniform float uWave;
           uniform float uViewport;
           uniform float uIsLight;
+          uniform vec3 uCDark;
+          uniform vec3 uCMid;
+          uniform vec3 uCLight;
+          uniform vec3 uCAorta;
           varying vec3 vColor;
           varying float vAlpha;
           ${PHASE_GLSL}
           void main() {
+            // Barwa z gradientu: aGrad < 0 oznacza aortę, w przeciwnym razie
+            // 0 = koniuszek, 1 = podstawa. Paleta przychodzi uniformami, więc
+            // zmiana motywu nie wymaga odbudowy bufora kolorów.
+            vec3 aColor;
+            if (aGrad < 0.0) {
+              aColor = uCAorta;
+            } else {
+              aColor = mix(uCDark, uCMid, min(aGrad * 2.0, 1.0));
+              aColor = mix(aColor, uCLight, max(aGrad - 0.5, 0.0) * 2.0);
+            }
+
             float e = excitation(aS, uPhase) * uWave;
             vec4 mv = modelViewMatrix * vec4(position, 1.0);
             vec3 n = normalize(normalMatrix * aNormal);
@@ -484,9 +532,9 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
 
       setReady(true);
 
-      // ————— Pętla: rotacja 0,32 rad/s + skurcz mechaniczny 72 BPM (dwufazowy +6% / +3,5%)
-      // Zegar absolutny (performance.now), a nie liczony od montażu — dzięki temu
-      // HeroEKGStrip trafia w tę samą fazę cyklu bez przekazywania stanu.
+      // ————— Pętla: obrót ROTATION_SPEED rad/s + skurcz dwufazowy (+6% / +3,5%)
+      // w cyklu CYCLE_SECONDS. Zegar absolutny (performance.now), a nie liczony
+      // od montażu — dzięki temu HeroEKGStrip trafia w tę samą fazę bez przekazywania stanu.
       const mechanical = (phase: number) => {
         // Elektryka (QRS od 24%) lekko wyprzedza mechanikę — skurcz startuje ~26%.
         // Okna szersze niż w pierwszej wersji: skurcz ma płynąć, nie szarpać.
@@ -495,16 +543,17 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
         return a + b;
       };
 
-      if (reduced) {
-        // prefers-reduced-motion: statyczne serce z podświetloną trasą przewodzenia,
-        // bez pętli animacji — zatrzymane w fazie QRS, gdy widać całe drzewko
-        uniforms.uPhase.value = 0.30;
+      if (reducedMotion) {
+        // prefers-reduced-motion: pojedyncza klatka, bez pętli. Wygląd jest ten sam
+        // co animowany (fala jest wyłączona globalnie), tylko zatrzymany w spoczynku
+        // i obrócony tak, by bryła czytała się z widoku trzy czwarte.
+        uniforms.uPhase.value = 0;
         grp.rotation.y = 0.4;
         renderer.render(scene, camera);
       } else {
         const loop = (now: number) => {
           const t = now / 1000;
-          const phase = (t % CYCLE_SECONDS) / CYCLE_SECONDS;
+          const phase = cyclePhase(t);
           uniforms.uPhase.value = phase;
           grp.rotation.y = t * ROTATION_SPEED;
           const s = 1.18 * (1 + mechanical(phase));
@@ -524,6 +573,7 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
 
       cleanup = () => {
         cancelAnimationFrame(frameId);
+        paletteRef.current = null;
         geo.dispose();
         mat.dispose();
         renderer.dispose();
@@ -534,14 +584,26 @@ export default function Hero3DHeart({ size = 360, className = "" }: Props) {
       disposed = true;
       cleanup();
     };
-  }, [size, theme]);
+    // `theme` celowo POZA zależnościami — zmiana motywu przemalowuje chmurę
+    // uniformami w efekcie niżej, zamiast odbudowywać całą geometrię.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size, apexTowardAxisMin, reducedMotion]);
+
+  // Przemalowanie przy zmianie motywu — bez dotykania geometrii
+  useEffect(() => {
+    paletteRef.current?.(theme === "light");
+  }, [theme]);
 
   return (
     <div
       className={className}
       style={{ position: "relative", width: size, height: size }}
       role="img"
-      aria-label="Serce jako chmura punktów z falą pobudzenia biegnącą układem bodźcoprzewodzącym"
+      aria-label={
+        SHOW_CONDUCTION_WAVE
+          ? "Anatomiczne serce jako chmura punktów z falą pobudzenia biegnącą układem bodźcoprzewodzącym"
+          : "Anatomiczne serce jako obracająca się chmura punktów, pulsująca w rytmie skurczu"
+      }
     >
       {/* Statyczny placeholder do czasu załadowania modelu — hero nie blokuje LCP */}
       <div

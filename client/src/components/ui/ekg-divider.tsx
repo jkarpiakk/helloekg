@@ -1,22 +1,10 @@
-import { useEffect, useState } from "react";
 import { useTheme } from "@/hooks/use-theme";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 // Ścieżka linii EKG z brand booka helloEKG — morfologia STAŁA, element identyfikacji
 // marki. Nie modyfikować, nie upraszczać, nie generować własnych wariantów.
 const EKG_LINE_PATH =
   "M0,26 L80,26 L92,20 L104,26 L150,26 L160,6 L170,42 L180,26 L240,26 L258,16 L276,26 L400,26 L412,20 L424,26 L470,26 L480,6 L490,42 L500,26 L560,26 L578,16 L596,26 L720,26 L732,20 L744,26 L790,26 L800,6 L810,42 L820,26 L880,26 L898,16 L916,26 L1040,26 L1052,20 L1064,26 L1110,26 L1120,6 L1130,42 L1140,26 L1200,26";
-
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return reduced;
-}
 
 export function EKGDivider({ className = "" }: { className?: string }) {
   const reducedMotion = useReducedMotion();

@@ -1,27 +1,36 @@
-# Model serca 3D — brakujący plik
+# Model serca 3D
 
-`Hero3DHeart` próbkuje cząsteczki z pliku `/models/heart.glb`. **Tego pliku nie ma jeszcze w repo.**
+`heart.glb` w tym katalogu zasila komponent `Hero3DHeart` — punkty chmury są próbkowane
+z powierzchni tego mesha przez `MeshSurfaceSampler`.
 
-## Dlaczego go brakuje
+## Pochodzenie i licencja
 
-Model „Anatomically Correct Human Heart" (Pigcraft, CC BY 4.0) hostowany jest na Sketchfabie,
-gdzie pobranie nawet darmowego modelu wymaga zalogowanego konta. Zautomatyzowane pobranie nie
-było możliwe, więc plik musi wgrać człowiek.
+„Anatomically Correct Human Heart" autorstwa **Pigcraft**, licencja **CC BY 4.0**:
+https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a
 
-## Jak uzupełnić
+Atrybucja wymagana licencją jest w stopce aplikacji (`client/src/components/layout/Footer.tsx`).
+Nie usuwaj jej przy zmianach w stopce.
 
-1. Zaloguj się na https://sketchfab.com i pobierz model w formacie glTF/GLB:
-   https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a
-2. Skompresuj do < 1,5 MB, np. przez gltf-transform:
-   `npx @gltf-transform/cli optimize wejscie.glb heart.glb --compress draco --texture-compress webp`
-   (model ma ~1 mln trójkątów — warto też `--simplify 0.3`; do próbkowania powierzchni
-   gęsta siatka nie jest potrzebna)
-3. Wrzuć wynik jako `client/public/models/heart.glb`.
+## Jak powstał ten plik (69 MB → 806 kB)
 
-Nic więcej nie trzeba zmieniać: komponent sprawdza obecność pliku i automatycznie przełącza się
-z geometrii proceduralnej na próbkowanie `MeshSurfaceSampler` z realnego mesha.
+Oryginał ze Sketchfaba ma ~1 mln trójkątów i komplet tekstur. Do próbkowania powierzchni
+potrzebne są wyłącznie pozycje wierzchołków, więc reszta poszła precz:
 
-## Atrybucja
+1. **Najpierw** usuń wszystkie atrybuty poza `POSITION` oraz materiały i tekstury.
+   To kluczowa kolejność — dopóki wierzchołki są rozdzielone przez UV i normalne,
+   `weld` nie ma czego scalić, a `simplify` nie schodzi do zadanego współczynnika.
+2. Potem `weld` (tolerancja 0.0001) i `simplify` do ~5% trójkątów (error 0.05).
+3. Zapis bez kompresji — po odchudzeniu plik mieści się w budżecie 1,5 MB, dzięki czemu
+   **nie trzeba serwować dekodera Draco ani meshopt**.
 
-Wymagana licencją i już obecna w stopce aplikacji (`client/src/components/layout/Footer.tsx`):
-„Model serca 3D: Pigcraft, CC BY 4.0".
+Normalne do cieniowania liczone są w przeglądarce (`computeVertexNormals`) — trzymanie ich
+w pliku ponownie rozdziela wierzchołki i rozdmuchuje go do ~7 MB.
+
+## Podmiana modelu
+
+Komponent wykrywa najdłuższą oś z geometrii i normalizuje bryłę, ale **zwrotu osi nie zgaduje**:
+pęk wielkich naczyń przy podstawie zwęża się podobnie jak koniuszek, więc automat mylił końce
+i stawiał serce na głowie. Jeśli nowy model ma koniuszek po stronie maksimum najdłuższej osi,
+przekaż `apexTowardAxisMin={false}` — bez edytowania komponentu.
+
+Gdy pliku zabraknie, `Hero3DHeart` schodzi do geometrii proceduralnej i zgłasza to w konsoli.
