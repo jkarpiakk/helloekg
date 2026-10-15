@@ -197,6 +197,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserActiveSubscription(userId: string): Promise<Subscription | undefined> {
+    // Beta: każde konto ma pełny dostęp bez płatności
+    if (process.env.BETA_OPEN_ACCESS === "1") {
+      const now = new Date();
+      return {
+        id: `beta-${userId}`,
+        userId,
+        planId: "beta",
+        status: "active",
+        startDate: now,
+        endDate: new Date(now.getTime() + 365 * 24 * 3600 * 1000),
+        paymentProvider: "beta",
+      } as unknown as Subscription;
+    }
     const [subscription] = await db
       .select()
       .from(subscriptions)

@@ -93,6 +93,14 @@ app.post(
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Grafiki kursu zaimportowane ze studia (paczka eksportu → katalog na dysku)
+if (process.env.CONTENT_ASSETS_DIR) {
+  app.use(
+    "/content-assets",
+    express.static(process.env.CONTENT_ASSETS_DIR, { maxAge: "7d", immutable: true, fallthrough: false })
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Correlation ID — attach a unique request ID to every request/response
 // ---------------------------------------------------------------------------
@@ -132,6 +140,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // ---------------------------------------------------------------------------
 function initStripe(): void {
   if (!config.databaseUrl) return;
+  // Poza Replitem nie ma konektora Stripe — płatności wyłączone (np. beta na VPS).
+  if (!process.env.REPLIT_CONNECTORS_HOSTNAME) {
+    console.log("Stripe disabled (no Replit connector)");
+    return;
+  }
 
   (async () => {
     try {
