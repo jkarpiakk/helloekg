@@ -14,8 +14,10 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "dark";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "dark" || stored === "light") return stored;
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "dark" || stored === "light") return stored;
+  } catch { /* tryb prywatny */ }
   return "dark";
 }
 
@@ -24,9 +26,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
+    // Zmiana motywu przechodzi płynnie — bez nagłego skoku jasności (pomijane przy pierwszym renderze)
+    const animate = root.dataset.themeReady === "1";
+    if (animate) root.classList.add("theme-transition");
     root.classList.toggle("dark", theme === "dark");
+    root.dataset.themeReady = "1";
+    const t = animate ? window.setTimeout(() => root.classList.remove("theme-transition"), 320) : 0;
     root.style.colorScheme = theme;
-    window.localStorage.setItem(STORAGE_KEY, theme);
+    try { window.localStorage.setItem(STORAGE_KEY, theme); } catch { /* tryb prywatny */ }
+    return () => window.clearTimeout(t);
   }, [theme]);
 
   const setTheme = (next: Theme) => setThemeState(next);

@@ -16,13 +16,13 @@ const Progress = React.forwardRef<
       // Kolory przez tokeny, NIE zaszyte na sztywno — to prymityw współdzielony przez
       // cały produkt, a #3EE6A8 na jasnym tle ma kontrast 1,5:1 i jest zabroniony (§2).
       // `--brand-trace` i `--primary` mają osobne wartości dla obu motywów.
-      "relative h-1 w-full overflow-hidden rounded-[2px] bg-[hsl(var(--brand-trace))]",
+      "relative h-1 w-full overflow-hidden rounded-[2px] bg-[var(--puls-dark)]",
       className
     )}
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 bg-primary transition-all"
+      className="h-full w-full flex-1 rounded-[2px] bg-[var(--puls)] transition-transform duration-500 ease-[cubic-bezier(.2,.7,.2,1)]"
       style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
     />
   </ProgressPrimitive.Root>

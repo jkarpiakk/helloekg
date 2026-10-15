@@ -9,13 +9,15 @@ import { authService } from "./lib/auth";
 import { LoadingSpinner } from "./components/ui/loading-spinner";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MotionConfig } from "framer-motion";
+import { spring } from "@/lib/motion";
 
 // Pages
 import Home from "@/pages/home";
 import Quiz from "@/pages/quiz";
 import Dashboard from "@/pages/dashboard";
 import Modules from "@/pages/modules";
-// import DynamicLecture from "@/pages/dynamic-lecture";
+
 import Pricing from "@/pages/pricing";
 import Checkout from "@/pages/checkout";
 import PaymentSuccess from "@/pages/payment-success";
@@ -29,6 +31,7 @@ import NotFound from "@/pages/not-found";
 
 // Ciężkie widoki poza głównym bundle (React.lazy + Suspense)
 const Lecture = lazy(() => import("@/pages/lecture"));
+const DynamicLecture = lazy(() => import("@/pages/dynamic-lecture"));
 const Module3Lecture = lazy(() => import("@/pages/module3-lecture"));
 const Admin = lazy(() => import("@/pages/admin"));
 const CertificatePage = lazy(() => import("@/pages/certificate"));
@@ -95,9 +98,9 @@ function AppContent() {
           <Route path="/quiz" component={Quiz} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/modules" component={Modules} />
+          <Route path="/lecture/:sectionId" component={DynamicLecture} />
           <Route path="/lecture" component={Lecture} />
           <Route path="/module3-lecture" component={Module3Lecture} />
-          {/* <Route path="/lecture/:sectionId" component={DynamicLecture} /> */}
           <Route path="/blog" component={Blog} />
           <Route path="/blog/:slug" component={BlogPost} />
           <Route path="/admin" component={Admin} />
@@ -124,6 +127,8 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
+        {/* Wszystkie animacje framer-motion: sprężyna bez odbicia; „Ogranicz ruch” respektowane globalnie */}
+        <MotionConfig reducedMotion="user" transition={spring}>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <Toaster />
@@ -132,6 +137,7 @@ function App() {
             </ErrorBoundary>
           </TooltipProvider>
         </QueryClientProvider>
+        </MotionConfig>
       </ThemeProvider>
     </ErrorBoundary>
   );
