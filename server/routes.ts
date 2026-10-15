@@ -2523,7 +2523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public endpoints for lecture chapters
-  app.get("/api/sections/:sectionId/chapters", requireActiveSubscription, async (req, res) => {
+  app.get("/api/sections/:sectionId/chapters", requireAuth, requireActiveSubscription, async (req, res) => {
     try {
       const { sectionId } = req.params;
       const userRole = req.user?.role || 'student';
