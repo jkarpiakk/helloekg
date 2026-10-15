@@ -1,355 +1,370 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowRight, Check, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import QuizInterface from "@/components/quiz/QuizInterface";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useTranslation } from "@/lib/i18n";
-import { ArrowLeft, BookOpen, Clock, Target } from "lucide-react";
-import { Link } from "wouter";
-import type { SectionWithProgress } from "@/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ProgressLine } from "@/components/dashboard/ProgressCard";
+import { rise, stagger } from "@/lib/motion";
+
+type Mode = "learn" | "review" | "exam";
+type ExamCount = 10 | 20 | 40;
+const EXAM_COUNTS: ExamCount[] = [10, 20, 40];
+
+interface CourseSection {
+  id: string;
+  title: string;
+  order: number;
+  isLocked?: boolean;
+  completionPercentage: number;
+  /** Opublikowane pytania w sekcji (brak pola = starszy serwer, traktujemy jak „są”) */
+  questionCount?: number;
+}
+
+interface CourseModule {
+  id: string;
+  title: string;
+  order: number;
+  isLocked?: boolean;
+  completionPercentage: number;
+  sections: CourseSection[];
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+function plural(n: number, one: string, few: string, many: string) {
+  if (n === 1) return one;
+  const d = n % 10;
+  const dd = n % 100;
+  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
+}
+
+const cleanTitle = (title: string) => title.replace(/^\s*moduł\s*\d+\s*[:.–—-]\s*/i, "");
+
+const MODE_COPY: Record<Mode, { label: string; lead: string }> = {
+  learn: {
+    label: "Nauka",
+    lead: "Wybierz temat. Po każdej odpowiedzi od razu zobaczysz, czy masz rację, i dlaczego.",
+  },
+  review: {
+    label: "Powtórka",
+    lead: "Wracasz do pytań, które wcześniej sprawiły ci trudność — aż zaczną wchodzić same.",
+  },
+  exam: {
+    label: "Egzamin",
+    lead: "Losowe pytania z całego kursu, jak na egzaminie. Wynik zobaczysz na końcu.",
+  },
+};
 
 export default function Quiz() {
   const [, setLocation] = useLocation();
-  const [selectedSection, setSelectedSection] = useState<string | null>(null);
-  const [quizMode, setQuizMode] = useState<"learn" | "review" | "exam">("learn");
-  const [showExamDialog, setShowExamDialog] = useState(false);
-  const [examQuestionCount, setExamQuestionCount] = useState<10 | 20 | 40>(20);
+  const search = useSearch();
   const { isAuthenticated } = useAuth();
-  const { t } = useTranslation();
 
-  // Set initial values from URL on mount
+  // Adres jest jedynym źródłem prawdy o tym, co się teraz dzieje:
+  //   /quiz?sectionId=X        → quiz tej sekcji (stary parametr ?section= też działa)
+  //   /quiz?mode=review        → powtórka
+  //   /quiz?mode=exam          → wybór liczby pytań, potem /quiz?mode=exam&count=N
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const urlMode = params.get("mode");
+  const sectionId = params.get("sectionId") ?? params.get("section");
+  const countParam = Number(params.get("count"));
+  const examCount = EXAM_COUNTS.includes(countParam as ExamCount) ? (countParam as ExamCount) : null;
+
+  const runningMode: Mode | null =
+    urlMode === "review" ? "review" : urlMode === "exam" ? (examCount ? "exam" : null) : sectionId ? "learn" : null;
+
+  const [pickerMode, setPickerMode] = useState<Mode>(urlMode === "exam" ? "exam" : urlMode === "review" ? "review" : "learn");
+  const [showExamDialog, setShowExamDialog] = useState(urlMode === "exam" && !examCount);
+  const [dialogCount, setDialogCount] = useState<ExamCount>(20);
+
+  // Zmiana adresu przy otwartym ekranie (np. z nawigacji) — wybór trybu idzie za nim
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sectionParam = urlParams.get('section');
-    const modeParam = urlParams.get('mode') as "learn" | "review" | "exam" | null;
-    
-    if (sectionParam) setSelectedSection(sectionParam);
-    if (modeParam) setQuizMode(modeParam);
-  }, []); // Run only once on mount
+    if (urlMode === "exam" && !examCount) {
+      setPickerMode("exam");
+      setShowExamDialog(true);
+    }
+  }, [urlMode, examCount]);
 
-  // Fetch sections with progress
-  const { data: sections, isLoading } = useQuery({
-    queryKey: ["/api/sections"],
+  useEffect(() => {
+    if (!isAuthenticated) setLocation("/?auth=login");
+  }, [isAuthenticated, setLocation]);
+
+  const { data: modules, isLoading } = useQuery({
+    queryKey: ["/api/modules"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/sections");
-      return response.json() as Promise<SectionWithProgress[]>;
+      const response = await apiRequest("GET", "/api/modules");
+      return response.json() as Promise<CourseModule[]>;
     },
     enabled: isAuthenticated,
+    refetchOnMount: "always",
   });
 
-  // Fetch review queue for review mode
-  const { data: reviewQueue } = useQuery({
+  const {
+    data: reviewQueue,
+    isLoading: reviewLoading,
+    isError: reviewError,
+  } = useQuery({
     queryKey: ["/api/review-queue"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/review-queue");
-      return response.json();
+      return response.json() as Promise<{ questionIds?: string[] }>;
     },
-    enabled: isAuthenticated && quizMode === "review",
-    staleTime: Infinity, // Prevent automatic refetch
+    enabled: isAuthenticated && pickerMode === "review" && !runningMode,
+    staleTime: 0,
   });
 
-  // Redirect if not authenticated
-  if (!isAuthenticated) {
-    setLocation("/?auth=login");
-    return null;
-  }
+  const sorted = useMemo(
+    () =>
+      (modules ?? [])
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .map((m) => ({ ...m, sections: m.sections.slice().sort((a, b) => a.order - b.order) })),
+    [modules],
+  );
 
-  // Show loading while fetching data
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
+  // W wyborze tematu tylko sekcje, w których naprawdę są pytania
+  const withQuestions = useMemo(
+    () =>
+      sorted
+        .map((m, mi) => ({
+          ...m,
+          no: mi + 1,
+          sections: m.sections.filter((s) => s.questionCount === undefined || s.questionCount > 0),
+        }))
+        .filter((m) => m.sections.length > 0),
+    [sorted],
+  );
 
-  // Show quiz interface if:
-  // - section is selected for learn mode
-  // - review mode is active
-  // - exam mode with question count selected
-  const shouldShowQuiz = 
-    (selectedSection && quizMode === "learn") || 
-    quizMode === "review" ||
-    (quizMode === "exam" && examQuestionCount && !showExamDialog);
-  
-  if (shouldShowQuiz) {
+  if (!isAuthenticated) return null;
+
+  if (runningMode) {
+    const moduleId = sectionId ? sorted.find((m) => m.sections.some((s) => s.id === sectionId))?.id : undefined;
     return (
       <QuizInterface
-        sectionId={quizMode === "review" || quizMode === "exam" ? undefined : (selectedSection || undefined)}
-        mode={quizMode}
-        examQuestionCount={quizMode === "exam" ? examQuestionCount : undefined}
+        key={`${runningMode}-${sectionId ?? ""}-${examCount ?? ""}`}
+        sectionId={runningMode === "learn" ? sectionId || undefined : undefined}
+        mode={runningMode}
+        examQuestionCount={runningMode === "exam" ? examCount ?? undefined : undefined}
         onExit={() => {
-          setSelectedSection(null);
-          setQuizMode("learn");
-          setExamQuestionCount(20);
-          setShowExamDialog(false);
-          setLocation("/quiz");
+          if (runningMode === "learn") setLocation(moduleId ? `/modules#m-${moduleId}` : "/modules");
+          else setLocation("/dashboard");
         }}
       />
     );
   }
 
-  // Show section selection
+  const chooseMode = (mode: Mode) => {
+    setPickerMode(mode);
+    if (mode === "exam") setShowExamDialog(true);
+    // Adres bez parametrów — odświeżenie nie uruchomi niczego samo
+    if (search) setLocation("/quiz", { replace: true });
+  };
+
+  const queueSize = reviewQueue?.questionIds?.length ?? 0;
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card border-b border-border">
-        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" asChild data-testid="back-to-dashboard">
-                <Link href="/dashboard">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Wróć do panelu
-                </Link>
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Wybierz tryb nauki</h1>
-                <p className="text-muted-foreground">Kontynuuj naukę EKG w wybranym trybie</p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="wrap wrap--narrow pt-12 pb-24 sm:pt-16">
+      <header className="grid gap-4 mb-8">
+        <p className="label">Pytania</p>
+        <h1 className="h1">Sprawdź się</h1>
+        <p className="lead">{MODE_COPY[pickerMode].lead}</p>
+      </header>
+
+      <div className="chips mb-10" role="group" aria-label="Tryb pytań">
+        {(Object.keys(MODE_COPY) as Mode[]).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            className="chip min-h-[44px]"
+            aria-pressed={pickerMode === mode}
+            onClick={() => chooseMode(mode)}
+            data-testid={`quiz-mode-${mode}`}
+          >
+            {MODE_COPY[mode].label}
+          </button>
+        ))}
       </div>
 
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Mode Selection */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <Card 
-            className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 ${
-              quizMode === "learn" ? "border-primary bg-primary/5" : ""
-            }`}
-            onClick={() => setQuizMode("learn")}
-            data-testid="quiz-mode-learn"
-          >
-            <CardHeader className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="h-8 w-8 text-primary" />
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={pickerMode} initial="hidden" animate="show" exit={{ opacity: 0, transition: { duration: 0.12 } }} variants={rise}>
+          {pickerMode === "learn" &&
+            (isLoading ? (
+              <div className="min-h-[30vh] grid place-items-center">
+                <LoadingSpinner size="lg" />
               </div>
-              <CardTitle>Tryb nauki</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center">
-                Ucz się nowych zagadnień z natychmiastowym feedbackiem
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 ${
-              quizMode === "review" ? "border-chart-3 bg-chart-3/5" : ""
-            }`}
-            onClick={() => setQuizMode("review")}
-            data-testid="quiz-mode-review"
-          >
-            <CardHeader className="text-center">
-              <div className="w-16 h-16 bg-chart-3/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="h-8 w-8 text-chart-3" />
-              </div>
-              <CardTitle>Powtórka błędów</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center">
-                Powtórz pytania, które sprawiły Ci trudność
-              </p>
-              {reviewQueue && (
-                <Badge variant="outline" className="mt-2 mx-auto block w-fit">
-                  {reviewQueue.questionIds?.length || 0} pytań do powtórzenia
-                </Badge>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 ${
-              quizMode === "exam" ? "border-chart-4 bg-chart-4/5" : ""
-            }`}
-            onClick={() => {
-              setQuizMode("exam");
-              setShowExamDialog(true);
-            }}
-            data-testid="quiz-mode-exam"
-          >
-            <CardHeader className="text-center">
-              <div className="w-16 h-16 bg-chart-4/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="h-8 w-8 text-chart-4" />
-              </div>
-              <CardTitle>Egzamin próbny</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground text-center">
-                Sprawdź swoją wiedzę w trybie egzaminacyjnym
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Review mode message when no questions available */}
-        {quizMode === "review" && reviewQueue && reviewQueue.questionIds?.length === 0 && (
-          <Card className="max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle className="text-center">Brak pytań do powtórzenia</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center text-muted-foreground">
-                Nie masz jeszcze błędnych odpowiedzi do powtórzenia. Kontynuuj naukę w trybie standardowym!
-              </p>
-              <div className="flex justify-center mt-4">
-                <Button onClick={() => setQuizMode("learn")} data-testid="button-switch-to-learn">
-                  Przejdź do trybu nauki
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Exam Question Count Dialog */}
-        <Dialog open={showExamDialog} onOpenChange={setShowExamDialog}>
-          <DialogContent data-testid="exam-dialog">
-            <DialogHeader>
-              <DialogTitle>Egzamin próbny</DialogTitle>
-              <DialogDescription>
-                Wybierz liczbę pytań dla egzaminu próbnego. Pytania zostaną wylosowane z całej bazy.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="grid grid-cols-3 gap-4 my-6">
-              {[10, 20, 40].map((count) => (
-                <Card
-                  key={count}
-                  className={`cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 ${
-                    examQuestionCount === count ? "border-primary bg-primary/5" : ""
-                  }`}
-                  onClick={() => setExamQuestionCount(count as 10 | 20 | 40)}
-                  data-testid={`exam-count-${count}`}
-                >
-                  <CardContent className="p-6 text-center">
-                    <div className="text-3xl font-bold text-foreground mb-2">{count}</div>
-                    <div className="text-sm text-muted-foreground">pytań</div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setShowExamDialog(false);
-                  setQuizMode("learn");
-                }}
-                data-testid="exam-cancel"
-              >
-                Anuluj
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={() => setShowExamDialog(false)}
-                data-testid="exam-start"
-              >
-                Rozpocznij egzamin
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Section Selection - only show for learn mode */}
-        {quizMode === "learn" && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-foreground">Wybierz moduł</h2>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sections?.map((section, index) => {
-              const isLocked = section.isLocked && section.completionPercentage < 100;
-              const isCompleted = section.completionPercentage >= 100;
-              
-              return (
-                <Card 
-                  key={section.id}
-                  className={`transition-all hover:shadow-lg ${
-                    isLocked 
-                      ? "opacity-50 cursor-not-allowed" 
-                      : "cursor-pointer hover:-translate-y-1"
-                  }`}
-                  onClick={() => !isLocked && setSelectedSection(section.id)}
-                  data-testid={`section-${section.id}`}
-                >
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                        isCompleted 
-                          ? "bg-chart-2/10" 
-                          : section.completionPercentage > 0 
-                            ? "bg-primary/10" 
-                            : "bg-muted"
-                      }`}>
-                        {isLocked ? (
-                          <div className="w-6 h-6 bg-muted-foreground rounded" />
-                        ) : (
-                          <BookOpen className={`h-6 w-6 ${
-                            isCompleted 
-                              ? "text-chart-2" 
-                              : section.completionPercentage > 0 
-                                ? "text-primary" 
-                                : "text-muted-foreground"
-                          }`} />
-                        )}
-                      </div>
-                      {isCompleted && (
-                        <Badge className="bg-chart-2/10 text-chart-2">
-                          Ukończono
-                        </Badge>
-                      )}
+            ) : withQuestions.length === 0 ? (
+              <p className="muted border-t border-[var(--line)] pt-8">Nie masz jeszcze dostępu do żadnego tematu.</p>
+            ) : (
+              <motion.div className="grid gap-12" variants={stagger(0.04)} initial="hidden" animate="show">
+                {withQuestions.map((module) => (
+                  <motion.section key={module.id} variants={rise} aria-labelledby={`qm-${module.id}`}>
+                    <div className="flex items-baseline gap-3 mb-3">
+                      <span className="label label--g num">{pad(module.no)}</span>
+                      <h2 id={`qm-${module.id}`} className="h3">
+                        {cleanTitle(module.title)}
+                      </h2>
                     </div>
-                    <CardTitle className={isLocked ? "text-muted-foreground" : ""}>
-                      {section.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {section.description && (
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {section.description}
-                      </p>
-                    )}
-                    
-                    {isLocked ? (
-                      <p className="text-sm text-muted-foreground">
-                        Ukończ poprzedni moduł aby odblokować
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Postęp</span>
-                          <span className="font-mono">{Math.round(section.completionPercentage)}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${section.completionPercentage}%` }}
-                          />
-                        </div>
-                        {section.lastActivity && (
-                          <p className="text-xs text-muted-foreground">
-                            Ostatnia aktywność: {new Date(section.lastActivity).toLocaleDateString('pl-PL')}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    <ul className="rows">
+                      {module.sections.map((section, si) => {
+                        const pct = Math.round(section.completionPercentage || 0);
+                        const locked = Boolean(module.isLocked || (section.isLocked && pct < 100));
+                        const content = (
+                          <>
+                            <span className="row__n">
+                              {pct >= 100 ? (
+                                <span className="inline-flex text-[var(--puls)]">
+                                  <Check className="h-4 w-4" aria-hidden="true" />
+                                  <span className="sr-only">Ukończone</span>
+                                </span>
+                              ) : (
+                                pad(si + 1)
+                              )}
+                            </span>
+                            <span className="row__t gap-2">
+                              <b className="!text-[1.0625rem] sm:!text-[1.1875rem] !leading-snug">{section.title}</b>
+                              <span className="!text-[14px]">
+                                {locked ? (
+                                  "Zablokowane — ukończ poprzedni temat"
+                                ) : (
+                                  <>
+                                    {section.questionCount !== undefined && (
+                                      <>
+                                        {section.questionCount} {plural(section.questionCount, "pytanie", "pytania", "pytań")}
+                                        <span aria-hidden="true"> · </span>
+                                      </>
+                                    )}
+                                    <span className="num">{pct}%</span>
+                                  </>
+                                )}
+                              </span>
+                              {!locked && <ProgressLine value={pct} label={`Postęp: ${section.title}`} className="max-w-[260px]" />}
+                            </span>
+                            <span />
+                            <ChevronRight className="h-4 w-4 text-[var(--txt3)] transition-colors group-hover:text-[var(--txt)]" aria-hidden="true" />
+                          </>
+                        );
+                        return (
+                          <li key={section.id} className="contents">
+                            {locked ? (
+                              <div className="row py-4 sm:py-5 opacity-50" aria-disabled="true">
+                                {content}
+                              </div>
+                            ) : (
+                              <Link
+                                href={`/quiz?sectionId=${section.id}`}
+                                className="row group py-4 sm:py-5"
+                                data-testid={`section-${section.id}`}
+                              >
+                                {content}
+                              </Link>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </motion.section>
+                ))}
+              </motion.div>
+            ))}
+
+          {pickerMode === "review" && (
+            <section className="border-t border-[var(--line)] pt-8 grid gap-6 justify-items-start" aria-label="Powtórka">
+              {reviewLoading ? (
+                <LoadingSpinner size="lg" />
+              ) : reviewError ? (
+                <p className="muted">Nie udało się sprawdzić kolejki powtórek. Odśwież stronę i spróbuj jeszcze raz.</p>
+              ) : queueSize > 0 ? (
+                <>
+                  <div className="grid gap-1">
+                    <p className="num text-[clamp(2.5rem,2rem+2vw,3.5rem)] leading-none text-[var(--txt)]" data-testid="review-count">
+                      {queueSize}
+                    </p>
+                    <p className="muted">
+                      {queueSize === 1 ? "pytanie czeka" : "pytań czeka"} na powtórkę
+                    </p>
+                  </div>
+                  <Button onClick={() => setLocation("/quiz?mode=review")} data-testid="button-start-review">
+                    Zacznij powtórkę
+                    <ArrowRight aria-hidden="true" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="muted max-w-[34em]">
+                    Nie masz pytań do powtórki. Każde pytanie, na które odpowiesz źle, trafi tutaj.
+                  </p>
+                  <Button variant="outline" onClick={() => chooseMode("learn")} data-testid="button-switch-to-learn">
+                    Wybierz temat
+                  </Button>
+                </>
+              )}
+            </section>
+          )}
+
+          {pickerMode === "exam" && (
+            <section className="border-t border-[var(--line)] pt-8 grid gap-6 justify-items-start" aria-label="Egzamin próbny">
+              <p className="muted max-w-[34em]">
+                Wybierz, ile pytań chcesz rozwiązać: 10 to szybki sprawdzian, 40 to pełna próba.
+              </p>
+              <Button onClick={() => setShowExamDialog(true)} data-testid="button-open-exam">
+                Wybierz liczbę pytań
+              </Button>
+            </section>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      <Dialog open={showExamDialog} onOpenChange={setShowExamDialog}>
+        <DialogContent data-testid="exam-dialog">
+          <DialogHeader>
+            <DialogTitle>Egzamin próbny</DialogTitle>
+            <DialogDescription>Pytania losujemy z całego kursu. Ile chcesz rozwiązać?</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-3 gap-3 my-2" role="group" aria-label="Liczba pytań">
+            {EXAM_COUNTS.map((count) => (
+              <button
+                key={count}
+                type="button"
+                className="chip justify-center min-h-[64px] flex-col gap-1"
+                aria-pressed={dialogCount === count}
+                onClick={() => setDialogCount(count)}
+                data-testid={`exam-count-${count}`}
+              >
+                <span className="num text-[1.5rem] leading-none text-[var(--txt)]">{count}</span>
+                <span className="text-[12px]">pytań</span>
+              </button>
+            ))}
           </div>
-        </div>
-        )}
-      </div>
+
+          <DialogFooter className="gap-3 sm:gap-3">
+            <Button variant="outline" onClick={() => setShowExamDialog(false)} data-testid="exam-cancel">
+              Anuluj
+            </Button>
+            <Button
+              onClick={() => {
+                setShowExamDialog(false);
+                setLocation(`/quiz?mode=exam&count=${dialogCount}`);
+              }}
+              data-testid="exam-start"
+            >
+              Rozpocznij egzamin
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

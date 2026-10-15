@@ -1,26 +1,11 @@
-import { useState, useCallback } from "react";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragStartEvent,
-  DragOverlay,
-  MeasuringStrategy,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Check, X } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
+import { Check, ChevronDown, ChevronUp, GripVertical, X } from "lucide-react";
+import { rubberband, spring, springSnappy } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import type { SortingConfig, AnswerData, QuizResult } from "@/types";
+import { DRAG_THRESHOLD, pushSample, releaseVelocity, withVelocity, vt, type Sample } from "./gesture";
+import PartialScore from "./PartialScore";
 
 interface SortingQuestionProps {
   config: SortingConfig;
@@ -31,111 +16,23 @@ interface SortingQuestionProps {
 }
 
 function getItemText(item: { id: string; text?: string; content?: string }): string {
-  if (typeof item.content === 'string') return item.content;
-  if (typeof item.text === 'string') return item.text;
+  if (typeof item.content === "string") return item.content;
+  if (typeof item.text === "string") return item.text;
   return item.id;
 }
 
-interface SortableItemProps {
-  id: string;
-  content: string;
-  imageUrl?: string;
-  position: number;
-  disabled: boolean;
-  isCorrect?: boolean;
-  isIncorrect?: boolean;
+function arrayMove<T>(arr: T[], from: number, to: number): T[] {
+  const next = arr.slice();
+  const [it] = next.splice(from, 1);
+  next.splice(to, 0, it);
+  return next;
 }
 
-function SortableItem({ id, content, imageUrl, position, disabled, isCorrect, isIncorrect }: SortableItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id, disabled });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 1000 : 1,
-  };
-
-  let borderClass = "border-slate-300 dark:border-slate-600";
-  let bgClass = "bg-white dark:bg-slate-800";
-  let positionBgClass = "bg-slate-700 text-white";
-  
-  if (isCorrect) {
-    borderClass = "border-[#0B7E54] dark:border-[#3EE6A8]";
-    bgClass = "bg-[#3EE6A8]/[0.06]";
-    positionBgClass = "bg-[#3EE6A8]/10 text-[#0B7E54] dark:text-[#3EE6A8] border border-[#0B7E54] dark:border-[#3EE6A8]";
-  } else if (isIncorrect) {
-    borderClass = "border-[#223040]";
-    bgClass = "bg-transparent";
-    positionBgClass = "bg-transparent text-muted-foreground border border-[#223040]";
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      data-testid={`sortable-item-${id}`}
-      className={`
-        flex items-center gap-3 p-4 rounded-xl border-2 shadow-sm
-        ${borderClass} ${bgClass}
-        ${disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"}
-        touch-manipulation select-none
-      `}
-      {...attributes}
-      {...listeners}
-    >
-      <div className={`flex items-center justify-center w-8 h-8 rounded-full ${positionBgClass} text-sm font-bold shadow-sm flex-shrink-0`}>
-        {position}
-      </div>
-      {!disabled && (
-        <GripVertical className="h-5 w-5 text-slate-400 flex-shrink-0" />
-      )}
-      {imageUrl && (
-        <img 
-          src={imageUrl} 
-          alt={content} 
-          className="w-12 h-12 object-cover rounded-lg border border-slate-200 dark:border-slate-600"
-        />
-      )}
-      <span className="text-base flex-1 font-medium text-slate-900 dark:text-white">{content}</span>
-      {isCorrect && <Check className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />}
-      {isIncorrect && <X className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />}
-    </div>
-  );
-}
-
-interface DragOverlayItemProps {
-  content: string;
-  imageUrl?: string;
-  position: number;
-}
-
-function DragOverlayItem({ content, imageUrl, position }: DragOverlayItemProps) {
-  return (
-    <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-white dark:bg-slate-800 shadow-2xl cursor-grabbing">
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white text-sm font-bold shadow-sm flex-shrink-0">
-        {position}
-      </div>
-      <GripVertical className="h-5 w-5 text-primary flex-shrink-0" />
-      {imageUrl && (
-        <img 
-          src={imageUrl} 
-          alt={content} 
-          className="w-12 h-12 object-cover rounded-lg"
-        />
-      )}
-      <span className="text-base font-medium text-slate-900 dark:text-white">{content}</span>
-    </div>
-  );
-}
-
+/**
+ * Sortowanie: wiersz chwycony po 10 px śledzi palec 1:1 w pionie (w poziomie i za krańcami listy
+ * — gumowo), sąsiedzi rozstępują się sprężyną, a po puszczeniu wiersz wpada na swoje miejsce
+ * z prędkością gestu. Strzałki przy wierszu to alternatywa dla dotyku i klawiatury.
+ */
 export default function SortingQuestion({
   config,
   onChange,
@@ -143,139 +40,275 @@ export default function SortingQuestion({
   showResult,
   result,
 }: SortingQuestionProps) {
+  const reduce = useReducedMotion();
   const [items, setItems] = useState<string[]>(() => {
-    const shuffled = [...config.items.map(i => i.id)];
+    const shuffled = [...config.items.map((i) => i.id)];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled;
   });
-  
   const [activeId, setActiveId] = useState<string | null>(null);
+  const listRef = useRef<HTMLOListElement>(null);
+  const rowEls = useRef(new Map<string, HTMLLIElement>());
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
+  const dragScale = useMotionValue(1);
+  const g = useRef<{
+    id: string;
+    sx: number;
+    sy: number;
+    by: number;
+    top: number;
+    pid: number;
+    active: boolean;
+    /** Przestawiono — czekamy, aż układ się odświeży, zanim policzymy kolejne miejsce */
+    pending: boolean;
+    hist: Sample[];
+  } | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  const getItemById = (itemId: string) => config.items.find((i) => i.id === itemId);
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  }, []);
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = items.indexOf(active.id as string);
-    const newIndex = items.indexOf(over.id as string);
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newItems = arrayMove(items, oldIndex, newIndex);
-    setItems(newItems);
-
-    const answerData: AnswerData = {
-      type: 'sorting',
-      order: newItems,
-    };
-    onChange(answerData);
-  }, [items, onChange]);
-
-  const handleDragCancel = useCallback(() => {
-    setActiveId(null);
-  }, []);
-
-  const getItemById = (itemId: string) => {
-    return config.items.find(i => i.id === itemId);
+  const commit = (next: string[]) => {
+    setItems(next);
+    onChange({ type: "sorting", order: next });
   };
 
-  const activeItem = activeId ? getItemById(activeId) : null;
-  const activeIndex = activeId ? items.indexOf(activeId) : -1;
+  // Po przestawieniu w trakcie gestu wiersz zmienia miejsce w układzie — przesunięcie
+  // kompensujemy, żeby dalej był dokładnie pod palcem
+  useLayoutEffect(() => {
+    const d = g.current;
+    if (!d || !d.active) return;
+    const el = rowEls.current.get(d.id);
+    if (!el) return;
+    d.pending = false;
+    const delta = el.offsetTop - d.top;
+    if (delta !== 0) {
+      d.top = el.offsetTop;
+      d.by -= delta;
+      dragY.set(dragY.get() - delta);
+    }
+  }, [items, dragY]);
+
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  // Ruch i puszczenie słuchamy na oknie: wiersze zmieniają kolejność w DOM w trakcie gestu,
+  // a przeniesienie węzła mogłoby zerwać przechwycenie wskaźnika.
+  const onMove = (e: PointerEvent) => {
+    const d = g.current;
+    const list = listRef.current;
+    if (!d || e.pointerId !== d.pid || !list) return;
+    pushSample(d.hist, { t: e.timeStamp, x: e.clientX, y: e.clientY });
+    const dx = e.clientX - d.sx;
+    const dy = e.clientY - d.sy;
+    if (!d.active) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      d.active = true;
+      setActiveId(d.id);
+      animate(dragScale, 1.02, vt(springSnappy));
+    }
+    e.preventDefault();
+    const el = rowEls.current.get(d.id);
+    if (!el) return;
+    // Pion 1:1, za krańcami listy gumowo; poziom tylko lekko, gumowo
+    const minY = -el.offsetTop;
+    const maxY = list.clientHeight - el.offsetTop - el.offsetHeight;
+    const raw = d.by + dy;
+    const yy = raw < minY ? minY + rubberband(raw - minY, 160) : raw > maxY ? maxY + rubberband(raw - maxY, 160) : raw;
+    dragY.set(yy);
+    dragX.set(rubberband(dx, 80));
+
+    if (d.pending) return;
+    // Nowe miejsce: ile pozostałych wierszy ma środek powyżej środka przeciąganego
+    const current = itemsRef.current;
+    const center = el.offsetTop + yy + el.offsetHeight / 2;
+    let target = 0;
+    current.forEach((id) => {
+      if (id === d.id) return;
+      const r = rowEls.current.get(id);
+      if (r && r.offsetTop + r.offsetHeight / 2 < center) target++;
+    });
+    const from = current.indexOf(d.id);
+    if (target !== from) {
+      const next = arrayMove(current, from, target);
+      itemsRef.current = next;
+      d.pending = true;
+      setItems(next);
+    }
+  };
+
+  const onUp = (e: PointerEvent) => {
+    const d = g.current;
+    if (!d || e.pointerId !== d.pid) return;
+    g.current = null;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
+    if (!d.active) return;
+    const v = releaseVelocity(d.hist, { t: e.timeStamp, x: e.clientX, y: e.clientY });
+    onChange({ type: "sorting", order: itemsRef.current });
+    const done = () => setActiveId((cur) => (cur === d.id && !g.current ? null : cur));
+    if (reduce) {
+      dragX.set(0);
+      dragY.set(0);
+      dragScale.set(1);
+      done();
+      return;
+    }
+    animate(dragX, 0, withVelocity(0));
+    animate(dragScale, 1, vt(springSnappy));
+    animate(dragY, 0, { ...withVelocity(v.vy), onComplete: done });
+  };
+
+  const onPointerDown = (id: string) => (e: React.PointerEvent<HTMLLIElement>) => {
+    if (disabled || e.button !== 0 || g.current) return;
+    const el = rowEls.current.get(id);
+    if (!el) return;
+    if (activeId && activeId !== id) return;
+    dragX.stop();
+    dragY.stop();
+    const continuing = activeId === id; // złapany ponownie w trakcie powrotu
+    g.current = {
+      id,
+      sx: e.clientX,
+      sy: e.clientY,
+      by: continuing ? dragY.get() : 0,
+      top: el.offsetTop,
+      pid: e.pointerId,
+      active: false,
+      pending: false,
+      hist: [{ t: e.timeStamp, x: e.clientX, y: e.clientY }],
+    };
+    if (!continuing) {
+      dragX.set(0);
+      dragY.set(0);
+    }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* gest działa i bez przechwycenia */
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+
+  const nudge = (index: number, dir: -1 | 1) => {
+    const to = index + dir;
+    if (to < 0 || to >= items.length) return;
+    commit(arrayMove(items, index, to));
+  };
 
   return (
-    <div className="space-y-6">
-      <p className="text-base text-slate-700 dark:text-slate-300">
-        Ułóż elementy we właściwej kolejności przeciągając je
-      </p>
+    <div className="grid gap-5">
+      <ol ref={listRef} className="relative grid gap-2.5" data-testid="sorting-items" aria-label="Kolejność">
+        {items.map((itemId, index) => {
+          const item = getItemById(itemId);
+          if (!item) return null;
+          const isCorrect = showResult && result?.feedback?.correctItems?.includes(itemId);
+          const isIncorrect = showResult && result?.feedback?.incorrectItems?.includes(itemId);
+          const isActive = activeId === itemId;
+          const text = getItemText(item);
+          return (
+            <motion.li
+              key={itemId}
+              ref={(el: HTMLLIElement | null) => {
+                if (el) rowEls.current.set(itemId, el);
+                else rowEls.current.delete(itemId);
+              }}
+              layout={isActive ? false : "position"}
+              transition={spring}
+              style={isActive ? { x: dragX, y: dragY, scale: dragScale, zIndex: 40 } : { zIndex: 1 }}
+              onPointerDown={onPointerDown(itemId)}
+              data-testid={`sortable-item-${itemId}`}
+              className={cn(
+                "relative grid select-none grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-3.5 rounded-[10px] border bg-[var(--panel)] py-2 pl-4 pr-1.5 text-[15px] leading-snug transition-[border-color,background-color,color] duration-200",
+                disabled ? "cursor-default" : "cursor-grab touch-none active:cursor-grabbing",
+                isCorrect && "border-[var(--puls-deep)] bg-[var(--tint)]",
+                isIncorrect && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)] text-[var(--txt2)]",
+                !isCorrect && !isIncorrect && (isActive ? "border-[var(--txt3)]" : "border-[var(--line2)] hover:border-[var(--txt3)]"),
+              )}
+            >
+              <span
+                className={cn(
+                  "grid h-[30px] w-[30px] place-items-center rounded-[8px] border font-mono text-[12px] font-medium",
+                  isCorrect ? "border-[var(--puls-deep)] text-[var(--puls)]" : "border-[var(--line2)] text-[var(--txt2)]",
+                )}
+              >
+                {index + 1}
+              </span>
+              <span className="flex min-h-[40px] min-w-0 items-center gap-3">
+                {item.imageUrl && (
+                  <img
+                    src={item.imageUrl}
+                    alt=""
+                    draggable={false}
+                    className="h-10 w-10 shrink-0 rounded-[8px] border border-[var(--line)] object-cover"
+                  />
+                )}
+                <span className="min-w-0">{text}</span>
+              </span>
+              <span className="flex items-center">
+                {isCorrect && <Check className="mx-2.5 h-4 w-4 text-[var(--puls)]" aria-label="Dobre miejsce" />}
+                {isIncorrect && <X className="mx-2.5 h-4 w-4 text-[var(--alarm)]" aria-label="Złe miejsce" />}
+                {!disabled && (
+                  <>
+                    <button
+                      type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => nudge(index, -1)}
+                      disabled={index === 0}
+                      aria-label={`Przesuń „${text}” wyżej`}
+                      className="grid h-11 w-9 place-items-center rounded-[8px] text-[var(--txt3)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => nudge(index, 1)}
+                      disabled={index === items.length - 1}
+                      aria-label={`Przesuń „${text}” niżej`}
+                      className="grid h-11 w-9 place-items-center rounded-[8px] text-[var(--txt3)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    <GripVertical className="mx-1 h-4 w-4 text-[var(--txt3)]" aria-hidden />
+                  </>
+                )}
+              </span>
+            </motion.li>
+          );
+        })}
+      </ol>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-        measuring={{
-          droppable: {
-            strategy: MeasuringStrategy.Always,
-          },
-        }}
-      >
-        <SortableContext items={items} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2" data-testid="sorting-items">
-            {items.map((itemId, index) => {
-              const item = getItemById(itemId);
-              if (!item) return null;
-
-              const isCorrect = result?.feedback?.correctItems?.includes(itemId);
-              const isIncorrect = result?.feedback?.incorrectItems?.includes(itemId);
-              const itemText = getItemText(item);
-
-              return (
-                <SortableItem
-                  key={itemId}
-                  id={itemId}
-                  content={itemText}
-                  imageUrl={item.imageUrl}
-                  position={index + 1}
-                  disabled={disabled}
-                  isCorrect={isCorrect}
-                  isIncorrect={isIncorrect}
-                />
-              );
-            })}
-          </div>
-        </SortableContext>
-
-        <DragOverlay>
-          {activeItem && activeIndex >= 0 && (
-            <DragOverlayItem
-              content={getItemText(activeItem)}
-              imageUrl={activeItem.imageUrl}
-              position={activeIndex + 1}
-            />
-          )}
-        </DragOverlay>
-      </DndContext>
-
-      {showResult && result?.partialScore !== undefined && result.partialScore < 1 && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-          <p className="text-base text-amber-800 dark:text-amber-200">
-            Poprawne pozycje: {Math.round(result.partialScore * 100)}% 
-            ({result.feedback?.correctItems?.length || 0} z {config.items.length})
-          </p>
-        </div>
+      {!disabled && (
+        <p className="text-[14px] text-[var(--txt2)]">
+          Przeciągnij wiersz albo użyj strzałek, aby ułożyć elementy od pierwszego do ostatniego.
+        </p>
       )}
 
-      {showResult && result?.correctAnswer?.type === 'sorting' && (
-        <div className="p-4 bg-[rgba(62,230,168,0.06)] border border-[#0B7E54]/60 rounded-xl">
-          <p className="text-sm font-semibold text-[#0B7E54] dark:text-primary mb-2">
-            Prawidłowa kolejność:
-          </p>
-          <ol className="list-decimal list-inside text-base text-foreground space-y-1">
-            {result.correctAnswer.order.map((itemId: string) => {
+      {showResult && result?.partialScore !== undefined && result.partialScore < 1 && (
+        <PartialScore
+          score={result.partialScore}
+          correct={result.feedback?.correctItems?.length}
+          total={config.items.length}
+          noun="na dobrym miejscu"
+        />
+      )}
+
+      {showResult && result?.correctAnswer?.type === "sorting" && (
+        <div className="grid gap-3 border-t border-[var(--line)] pt-4">
+          <p className="label">Poprawna kolejność</p>
+          <ol className="grid gap-1.5">
+            {result.correctAnswer.order.map((itemId: string, i: number) => {
               const item = getItemById(itemId);
               return (
-                <li key={itemId} className="font-medium">
-                  {item ? getItemText(item) : itemId}
+                <li key={itemId} className="grid grid-cols-[30px_minmax(0,1fr)] items-baseline gap-3.5 text-[15px] text-[var(--txt)]">
+                  <span className="font-mono text-[12px] text-[var(--label)]">{String(i + 1).padStart(2, "0")}</span>
+                  <span>{item ? getItemText(item) : itemId}</span>
                 </li>
               );
             })}

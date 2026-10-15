@@ -1,328 +1,307 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { motion } from "framer-motion";
+import { Check, ChevronRight, Lock } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Button } from "@/components/ui/button";
+import { ProgressLine } from "@/components/dashboard/ProgressCard";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import {
-  BookOpen,
-  Lock,
-  ChevronRight,
-  CheckCircle2,
-  Clock,
-  Play,
-  Users,
-  Heart,
-  Activity,
-  Zap,
-  Target,
-  TrendingUp,
-  Award
-} from "lucide-react";
+import { rise, stagger } from "@/lib/motion";
 
 interface ModuleSection {
   id: string;
   title: string;
-  description: string;
+  description?: string | null;
   order: number;
+  isLocked?: boolean;
   completionPercentage: number;
-  lastActivity?: string;
+  lastActivity?: string | null;
+  /** Opublikowane pytania w sekcji */
+  questionCount?: number;
+  /** Opublikowane rozdziały wykładu w sekcji */
+  chapterCount?: number;
 }
 
 interface CourseModule {
   id: string;
   title: string;
-  description: string;
+  description?: string | null;
   order: number;
-  isLocked: boolean;
+  isLocked?: boolean;
   completionPercentage: number;
   sections: ModuleSection[];
 }
 
-const moduleIcons = {
-  1: Heart,
-  2: Activity,
-  3: Zap,
-  4: TrendingUp,
-  5: Target,
-  6: Award,
-  7: Users
-};
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** „Moduł 3: Zawał serca” → „Zawał serca” — numer i tak stoi obok */
+const cleanTitle = (title: string) => title.replace(/^\s*moduł\s*\d+\s*[:.–—-]\s*/i, "");
+
+function plural(n: number, one: string, few: string, many: string) {
+  if (n === 1) return one;
+  const d = n % 10;
+  const dd = n % 100;
+  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
+}
+
+/** Co naprawdę jest w sekcji: „Wykład · 10 rozdziałów · 20 pytań” */
+function sectionContent(s: ModuleSection) {
+  const ch = s.chapterCount ?? 0;
+  const q = s.questionCount ?? 0;
+  const parts: string[] = [];
+  if (ch > 0) parts.push(ch === 1 ? "Wykład" : `Wykład · ${ch} ${plural(ch, "rozdział", "rozdziały", "rozdziałów")}`);
+  if (q > 0) parts.push(`${q} ${plural(q, "pytanie", "pytania", "pytań")}`);
+  return parts.join(" · ");
+}
+
+/**
+ * Postęp modułu liczony tylko z sekcji z pytaniami — postęp to odsetek opanowanych pytań,
+ * więc sekcja z samym wykładem zaniżałaby wynik na zawsze.
+ */
+function moduleProgress(sections: ModuleSection[]) {
+  const withQ = sections.filter((s) => (s.questionCount ?? 0) > 0);
+  if (!withQ.length) return null;
+  return withQ.reduce((acc, s) => acc + (s.completionPercentage || 0), 0) / withQ.length;
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export default function Modules() {
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
+  const [openIds, setOpenIds] = useState<Set<string>>(() => {
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    return hash.startsWith("#m-") ? new Set([hash.slice(3)]) : new Set();
+  });
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setLocation("/?auth=login");
-    }
+    if (!isAuthenticated) setLocation("/?auth=login");
   }, [isAuthenticated, setLocation]);
 
-  // Fetch modules with sections and progress
-  const { data: modules, isLoading } = useQuery({
+  const { data: modules, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/modules"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/modules");
       return response.json() as Promise<CourseModule[]>;
     },
     enabled: isAuthenticated,
+    // Postęp zmienia się po każdym quizie — przy wejściu na ekran zawsze dociągnij świeży
+    refetchOnMount: "always",
   });
 
-  if (!isAuthenticated) {
-    return <div>Ładowanie...</div>;
-  }
+  const sorted = useMemo(
+    () =>
+      (modules ?? [])
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .map((m) => ({ ...m, sections: m.sections.slice().sort((a, b) => a.order - b.order) })),
+    [modules],
+  );
+
+  // Wejście z linku #m-… (np. z panelu postępu): przewiń do otwartego modułu
+  useEffect(() => {
+    if (!sorted.length) return;
+    const hash = window.location.hash;
+    if (!hash.startsWith("#m-")) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" });
+  }, [sorted.length]);
+
+  const toggle = (id: string, open: boolean) =>
+    setOpenIds((prev) => {
+      if (prev.has(id) === open) return prev;
+      const next = new Set(prev);
+      if (open) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  if (!isAuthenticated) return null;
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-[60vh] grid place-items-center">
         <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  const getModuleStatus = (module: CourseModule) => {
-    if (module.completionPercentage === 100) return "completed";
-    if (module.completionPercentage > 0) return "in-progress";
-    if (module.isLocked) return "locked";
-    return "available";
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "text-green-600 bg-green-100 border-green-200";
-      case "in-progress": return "text-[#0B7E54] dark:text-[#3EE6A8] bg-[#3EE6A8]/10 border-[#3EE6A8]/30";
-      case "locked": return "text-gray-400 bg-gray-100 border-gray-200";
-      default: return "text-primary bg-primary/10 border-primary/20";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "completed": return "Ukończony";
-      case "in-progress": return "W trakcie";
-      case "locked": return "Zablokowany";
-      default: return "Dostępny";
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <BookOpen className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Moduły Kursu EKG</h1>
-              <p className="text-muted-foreground">
-                Kompleksowy program nauczania interpretacji EKG
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="wrap pt-12 pb-24 sm:pt-16">
+      <header className="grid gap-4 mb-10 sm:mb-14">
+        <p className="label">Kurs EKG{sorted.length ? ` · ${sorted.length} ${plural(sorted.length, "moduł", "moduły", "modułów")}` : ""}</p>
+        <h1 className="h1">Kurs</h1>
+        <p className="lead">
+          Otwórz moduł, przeczytaj wykład i od razu sprawdź się w pytaniach. Postęp liczymy z twoich odpowiedzi.
+        </p>
+      </header>
 
-        {/* Modules Grid */}
-        <div className="space-y-6">
-          {modules?.map((module) => {
-            const status = getModuleStatus(module);
-            const IconComponent = moduleIcons[module.order as keyof typeof moduleIcons] || BookOpen;
-            const isAccessible = !module.isLocked;
+      {isError && (
+        <div className="grid gap-4 justify-items-start py-8 border-t border-[var(--line)]">
+          <p className="muted">Nie udało się wczytać kursu. Sprawdź połączenie i spróbuj jeszcze raz.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Spróbuj ponownie</Button>
+        </div>
+      )}
+
+      {!isError && sorted.length === 0 && (
+        <p className="muted py-8 border-t border-[var(--line)]">
+          Nie masz jeszcze dostępu do żadnego modułu.
+        </p>
+      )}
+
+      {sorted.length > 0 && (
+        <motion.div
+          className="border-t border-[var(--line)]"
+          variants={stagger(0.04)}
+          initial="hidden"
+          animate="show"
+        >
+          {sorted.map((module, mi) => {
+            const progress = moduleProgress(module.sections);
+            const count = module.sections.length;
+            const lectures = module.sections.filter((s) => (s.chapterCount ?? 0) > 0).length;
+            const questions = module.sections.reduce((acc, s) => acc + (s.questionCount ?? 0), 0);
+            const metaParts: string[] = [];
+            if (lectures) metaParts.push(`${lectures} ${plural(lectures, "wykład", "wykłady", "wykładów")}`);
+            if (questions) metaParts.push(`${questions} ${plural(questions, "pytanie", "pytania", "pytań")}`);
+            if (progress !== null) metaParts.push(`${Math.round(progress)}%`);
+            const meta = module.isLocked ? "Zablokowany" : metaParts.join(" · ") || "Wkrótce";
+            const isOpen = openIds.has(module.id);
 
             return (
-              <Card 
-                key={module.id} 
-                className={`overflow-hidden transition-all duration-300 ${
-                  isAccessible 
-                    ? "hover:shadow-lg cursor-pointer border-border" 
-                    : "opacity-60 border-gray-200"
-                }`}
+              <motion.details
+                key={module.id}
+                id={`m-${module.id}`}
+                variants={rise}
+                open={isOpen}
+                onToggle={(e) => toggle(module.id, (e.currentTarget as HTMLDetailsElement).open)}
+                className="border-b border-[var(--line)] scroll-mt-24"
+                data-testid={`module-${module.id}`}
               >
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                        isAccessible ? "bg-primary/10" : "bg-gray-100"
-                      }`}>
-                        {status === "locked" ? (
-                          <Lock className="h-6 w-6 text-gray-400" />
-                        ) : (
-                          <IconComponent className={`h-6 w-6 ${
-                            isAccessible ? "text-primary" : "text-gray-400"
-                          }`} />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <CardTitle className="text-xl">{module.title}</CardTitle>
-                          <Badge className={getStatusColor(status)}>
-                            {getStatusText(status)}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            Moduł {module.order}
-                          </Badge>
-                        </div>
-                        <p className="text-muted-foreground text-sm leading-relaxed">
-                          {module.description}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {isAccessible && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setLocation(`/module/${module.id}`)}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  {isAccessible && (
-                    <div className="mt-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Postęp</span>
-                        <span className="text-sm text-muted-foreground">
-                          {Math.round(module.completionPercentage)}%
-                        </span>
-                      </div>
-                      <Progress value={module.completionPercentage} className="h-2" />
-                    </div>
-                  )}
-                </CardHeader>
+                <summary
+                  className="list-none [&::-webkit-details-marker]:hidden cursor-pointer grid grid-cols-[36px_minmax(0,1fr)_28px] sm:grid-cols-[48px_minmax(0,1fr)_auto_28px] items-center gap-4 py-6 transition-transform duration-[120ms] ease-out active:scale-[.995] select-none"
+                >
+                  <span className="label label--g num">{pad(mi + 1)}</span>
+                  <span className="row__t">
+                    <b>{cleanTitle(module.title)}</b>
+                    {module.description && <span>{module.description}</span>}
+                    <span className="label sm:hidden mt-1">{meta}</span>
+                  </span>
+                  <span className="label hidden sm:inline-flex items-center gap-2">
+                    {module.isLocked && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
+                    {meta}
+                  </span>
+                  <span className="module-i">
+                    {module.isLocked ? <Lock aria-hidden="true" /> : <PlusIcon />}
+                  </span>
+                </summary>
 
-                <CardContent className="pt-0">
-                  {/* Sections List */}
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-sm text-muted-foreground">
-                      Sekcje ({module.sections.length})
-                    </h4>
-                    <div className="grid md:grid-cols-2 gap-3">
-                      {module.sections.map((section, index) => (
-                        <div
+                <div className="pb-6 sm:pl-16">
+                  {module.isLocked ? (
+                    <p className="muted pb-2">Ukończ poprzedni moduł, żeby odblokować ten.</p>
+                  ) : count === 0 ? (
+                    <p className="muted pb-2">W tym module nie ma jeszcze materiałów.</p>
+                  ) : (
+                    <ul className="rows [&>li:last-child]:border-b-0">
+                      {module.sections.map((section, si) => (
+                        <SectionRow
                           key={section.id}
-                          className={`p-3 rounded-lg border transition-colors ${
-                            isAccessible 
-                              ? "hover:bg-secondary/50 border-border cursor-pointer" 
-                              : "border-gray-200 cursor-not-allowed"
-                          }`}
-                          onClick={() => {
-                            if (isAccessible) {
-                              // Special handling for Module 3 - go to lecture instead of quiz
-                              if (module.order === 3) {
-                                setLocation(`/module3-lecture`);
-                              } else {
-                                setLocation(`/quiz?section=${section.id}`);
-                              }
-                            }
-                          }}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                              section.completionPercentage === 100
-                                ? "bg-green-100 text-green-600"
-                                : section.completionPercentage > 0
-                                  ? "bg-[#3EE6A8]/10 text-[#0B7E54] dark:text-[#3EE6A8]"
-                                  : isAccessible
-                                    ? "bg-gray-100 text-gray-600"
-                                    : "bg-gray-50 text-gray-400"
-                            }`}>
-                              {section.completionPercentage === 100 ? (
-                                <CheckCircle2 className="h-4 w-4" />
-                              ) : (
-                                index + 1
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h5 className="font-medium text-sm truncate">{section.title}</h5>
-                              {section.description && (
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {section.description}
-                                </p>
-                              )}
-                            </div>
-                            {section.completionPercentage > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                {Math.round(section.completionPercentage)}%
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                          index={si + 1}
+                          section={section}
+                        />
                       ))}
-                    </div>
-                  </div>
-
-                  {/* Module Actions */}
-                  {isAccessible && (
-                    <div className="flex items-center gap-3 mt-6 pt-4 border-t border-border">
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          // Special handling for Module 3 - go to lecture instead of quiz
-                          if (module.order === 3) {
-                            setLocation(`/module3-lecture`);
-                          } else {
-                            setLocation(`/module/${module.id}`);
-                          }
-                        }}
-                        className="flex-1"
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        {module.completionPercentage > 0 ? "Kontynuuj" : "Rozpocznij"}
-                      </Button>
-                      
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>~{module.sections.length * 15} min</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          <span>{module.sections.length} sekcji</span>
-                        </div>
-                      </div>
-                    </div>
+                    </ul>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </motion.details>
             );
           })}
-        </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
 
-        {/* Course Summary */}
-        <div className="mt-12 bg-gradient-to-r from-primary/10 to-chart-2/10 rounded-xl p-6">
-          <div className="text-center">
-            <h3 className="text-xl font-bold mb-2">Zakończ wszystkie moduły</h3>
-            <p className="text-muted-foreground mb-4">
-              Aby otrzymać certyfikat ukończenia kursu EKG Academy
-            </p>
-            <div className="flex justify-center gap-6 text-sm">
-              {modules && (
+function SectionRow({ index, section }: { index: number; section: ModuleSection }) {
+  const pct = Math.round(section.completionPercentage || 0);
+  const hasLecture = (section.chapterCount ?? 0) > 0;
+  const hasQuestions = (section.questionCount ?? 0) > 0;
+  const isEmpty = !hasLecture && !hasQuestions;
+  const done = hasQuestions && pct >= 100;
+  const lectureHref = `/lecture/${section.id}`;
+  const quizHref = `/quiz?sectionId=${section.id}`;
+  // Wykład ma pierwszeństwo; sekcja z samymi pytaniami prowadzi prosto do quizu
+  const primaryHref = hasLecture ? lectureHref : quizHref;
+  const content = sectionContent(section);
+
+  return (
+    <li
+      className={`row group relative py-4 sm:py-5 grid-cols-[32px_minmax(0,1fr)_auto] sm:grid-cols-[48px_minmax(0,1fr)_auto_28px] ${
+        isEmpty ? "active:scale-100" : ""
+      }`}
+      data-testid={`section-${section.id}`}
+    >
+      <span className="row__n">
+        {done ? (
+          <span className="text-[var(--puls)] inline-flex">
+            <Check className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">Ukończone</span>
+          </span>
+        ) : (
+          pad(index)
+        )}
+      </span>
+      <span className="row__t gap-2">
+        {isEmpty ? (
+          <b className="!text-[1.0625rem] sm:!text-[1.1875rem] !leading-snug text-[var(--txt3)]">{section.title}</b>
+        ) : (
+          <Link
+            href={primaryHref}
+            className="text-[var(--txt)] no-underline after:absolute after:inset-0 after:content-[''] rounded-sm"
+            data-testid={`section-link-${section.id}`}
+          >
+            <b className="!text-[1.0625rem] sm:!text-[1.1875rem] !leading-snug">{section.title}</b>
+          </Link>
+        )}
+        <span className="!text-[14px] flex flex-wrap items-center gap-x-2">
+          {isEmpty ? (
+            <span>Materiały w przygotowaniu</span>
+          ) : (
+            <>
+              <span>{content}</span>
+              {hasQuestions && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <Award className="h-4 w-4 text-chart-2" />
-                    <span>{modules.length} modułów</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-chart-3" />
-                    <span>{modules.reduce((acc, m) => acc + m.sections.length, 0)} sekcji</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-chart-4" />
-                    <span>~{modules.reduce((acc, m) => acc + m.sections.length, 0) * 15} minut</span>
-                  </div>
+                  <span aria-hidden="true">·</span>
+                  <span className="num">{pct}%</span>
                 </>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </>
+          )}
+        </span>
+        {hasQuestions && <ProgressLine value={pct} label={`Postęp: ${section.title}`} className="max-w-[260px]" />}
+      </span>
+      <span className="relative z-10">
+        {hasLecture && hasQuestions && (
+          <Link href={quizHref} className="chip min-h-[44px]" data-testid={`section-quiz-${section.id}`}>
+            Pytania
+          </Link>
+        )}
+      </span>
+      {isEmpty ? (
+        <span className="hidden sm:block" />
+      ) : (
+        <ChevronRight
+          className="hidden sm:block h-4 w-4 text-[var(--txt3)] transition-colors group-hover:text-[var(--txt)]"
+          aria-hidden="true"
+        />
+      )}
+    </li>
   );
 }

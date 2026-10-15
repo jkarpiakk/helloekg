@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Input } from "@/components/ui/input";
 import { Check, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { FillBlankConfig, AnswerData, QuizResult } from "@/types";
+import PartialScore from "./PartialScore";
 
 interface FillBlankQuestionProps {
   config: FillBlankConfig;
@@ -9,6 +10,21 @@ interface FillBlankQuestionProps {
   disabled: boolean;
   showResult: boolean;
   result?: QuizResult;
+}
+
+type Blank = FillBlankConfig["blanks"][0];
+
+/**
+ * Sprawdzenie formy po wyjściu z pola — tylko wizualnie, nie ocenia odpowiedzi.
+ * Mówi, co zrobić (np. „Wpisz liczbę”), nie zdradza poprawnej wartości.
+ */
+function formatProblem(blank: Blank, value: string): string | null {
+  const v = value.trim();
+  if (!v) return null;
+  if (blank.validationType === "numeric_range" && Number.isNaN(Number(v.replace(",", ".")))) {
+    return "Wpisz liczbę, np. 80";
+  }
+  return null;
 }
 
 export default function FillBlankQuestion({
@@ -19,13 +35,15 @@ export default function FillBlankQuestion({
   result,
 }: FillBlankQuestionProps) {
   const [values, setValues] = useState<Map<string, string>>(new Map());
+  const [problems, setProblems] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     const initialValues = new Map<string, string>();
-    config.blanks.forEach(blank => {
-      initialValues.set(blank.id, '');
+    config.blanks.forEach((blank) => {
+      initialValues.set(blank.id, "");
     });
     setValues(initialValues);
+    setProblems({});
   }, [config]);
 
   const handleChange = (blankId: string, value: string) => {
@@ -33,8 +51,14 @@ export default function FillBlankQuestion({
     newValues.set(blankId, value);
     setValues(newValues);
 
+    // Komunikat znika, gdy tylko wpis jest już w porządku
+    const blank = config.blanks.find((b) => b.id === blankId);
+    if (problems[blankId] && blank && !formatProblem(blank, value)) {
+      setProblems((p) => ({ ...p, [blankId]: null }));
+    }
+
     const answerData: AnswerData = {
-      type: 'fill_blank',
+      type: "fill_blank",
       filledBlanks: Array.from(newValues.entries()).map(([blankId, value]) => ({
         blankId,
         value,
@@ -43,119 +67,131 @@ export default function FillBlankQuestion({
     onChange(answerData);
   };
 
+  const sortedBlanks = [...config.blanks].sort((a, b) => a.position - b.position);
+
   const renderTextWithBlanks = () => {
     const parts: JSX.Element[] = [];
     let lastIndex = 0;
-    let blankIndex = 0;
 
-    const sortedBlanks = [...config.blanks].sort((a, b) => a.position - b.position);
-
-    for (const blank of sortedBlanks) {
+    sortedBlanks.forEach((blank, blankIndex) => {
       if (blank.position > lastIndex) {
-        parts.push(
-          <span key={`text-${lastIndex}`}>
-            {config.template.substring(lastIndex, blank.position)}
-          </span>
-        );
+        parts.push(<span key={`text-${lastIndex}`}>{config.template.substring(lastIndex, blank.position)}</span>);
       }
 
-      const currentValue = values.get(blank.id) || '';
-      const isCorrect = result?.feedback?.correctItems?.includes(blank.id);
-      const isIncorrect = result?.feedback?.incorrectItems?.includes(blank.id);
+      const currentValue = values.get(blank.id) || "";
+      const isCorrect = showResult && result?.feedback?.correctItems?.includes(blank.id);
+      const isIncorrect = showResult && result?.feedback?.incorrectItems?.includes(blank.id);
+      const problem = !showResult ? problems[blank.id] : null;
 
-      let inputClass = "inline-block w-28 sm:w-36 md:w-40 mx-1 my-1 text-center font-medium border-2 transition-all duration-200";
-      if (showResult) {
-        if (isCorrect) {
-          inputClass += " border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06] text-foreground";
-        } else if (isIncorrect) {
-          inputClass += " border-[#223040] bg-transparent text-foreground";
-        }
-      } else {
-        inputClass += " border-border hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20";
-      }
-
-      const correctAnswer = showResult && isIncorrect && result?.correctAnswer?.type === 'fill_blank'
-        ? result.correctAnswer.filledBlanks.find(b => b.blankId === blank.id)?.value
-        : null;
+      const correctAnswer =
+        showResult && isIncorrect && result?.correctAnswer?.type === "fill_blank"
+          ? result.correctAnswer.filledBlanks.find((b) => b.blankId === blank.id)?.value
+          : null;
 
       parts.push(
-        <span key={`blank-${blank.id}`} className="inline-flex items-center gap-1 align-middle">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium mr-1">
-            [{blankIndex + 1}]
+        <span key={`blank-${blank.id}`} className="mx-1 inline-flex flex-wrap items-center gap-1.5 align-middle">
+          <span className="font-mono text-[11px] text-[var(--label)]" aria-hidden>
+            {blankIndex + 1}
           </span>
-          <Input
+          <input
             type="text"
             value={currentValue}
             onChange={(e) => handleChange(blank.id, e.target.value)}
+            onBlur={(e) => setProblems((p) => ({ ...p, [blank.id]: formatProblem(blank, e.target.value) }))}
             disabled={disabled}
-            placeholder={blank.placeholder || "..."}
-            className={inputClass}
+            placeholder={blank.placeholder || "…"}
+            inputMode={blank.validationType === "numeric_range" ? "decimal" : undefined}
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={`Luka ${blankIndex + 1}${blank.hint ? ` — ${blank.hint}` : ""}`}
+            aria-invalid={problem ? true : undefined}
+            aria-describedby={problem ? `blank-problem-${blank.id}` : undefined}
+            className={cn(
+              "h-10 w-32 rounded-[10px] border bg-transparent px-3 text-center text-[16px] text-[var(--txt)] transition-colors duration-200 placeholder:text-[var(--txt3)] focus-visible:outline-none sm:w-40",
+              "disabled:cursor-default",
+              isCorrect && "border-[var(--puls-deep)] bg-[var(--tint)]",
+              isIncorrect && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)] text-[var(--txt2)]",
+              !isCorrect &&
+                !isIncorrect &&
+                (problem
+                  ? "border-[var(--alarm)]"
+                  : "border-[var(--line2)] hover:border-[var(--txt3)] focus-visible:border-[var(--puls)]"),
+            )}
             data-testid={`blank-input-${blank.id}`}
           />
-          {showResult && isCorrect && (
-            <Check className="h-5 w-5 text-green-600 dark:text-green-400" data-testid={`blank-correct-${blank.id}`} />
+          {isCorrect && (
+            <Check className="h-4 w-4 text-[var(--puls)]" aria-label="Poprawnie" data-testid={`blank-correct-${blank.id}`} />
           )}
-          {showResult && isIncorrect && (
+          {isIncorrect && (
             <>
-              <X className="h-5 w-5 text-red-600 dark:text-red-400" data-testid={`blank-incorrect-${blank.id}`} />
+              <X className="h-4 w-4 text-[var(--alarm)]" aria-label="Błędnie" data-testid={`blank-incorrect-${blank.id}`} />
               {correctAnswer && (
-                <span className="text-xs text-[#0B7E54] dark:text-[#3EE6A8] font-semibold ml-1 px-1.5 py-0.5 bg-[#3EE6A8]/[0.06] rounded">
+                <span className="text-[14px] text-[var(--txt)]">
+                  <span className="label mr-1.5">Poprawnie</span>
                   {correctAnswer}
                 </span>
               )}
             </>
           )}
-        </span>
+        </span>,
       );
 
       lastIndex = blank.position;
-      blankIndex++;
-    }
+    });
 
     if (lastIndex < config.template.length) {
-      parts.push(
-        <span key={`text-end`}>
-          {config.template.substring(lastIndex)}
-        </span>
-      );
+      parts.push(<span key="text-end">{config.template.substring(lastIndex)}</span>);
     }
 
     return parts;
   };
 
-  return (
-    <div className="space-y-4 sm:space-y-6">
-      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
-        Uzupełnij puste pola odpowiednimi wartościami
-      </p>
+  const visibleProblems = showResult
+    ? []
+    : sortedBlanks
+        .map((b, i) => ({ id: b.id, n: i + 1, msg: problems[b.id] }))
+        .filter((p): p is { id: string; n: number; msg: string } => !!p.msg);
+  const hints = sortedBlanks.map((b, i) => ({ n: i + 1, hint: b.hint })).filter((h) => h.hint);
 
-      <div 
-        className="text-base sm:text-lg leading-relaxed sm:leading-loose p-4 sm:p-6 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-        data-testid="fill-blank-text"
-      >
+  return (
+    <div className="grid gap-4">
+      <p className="text-[15px] text-[var(--txt2)]">Uzupełnij luki w tekście.</p>
+
+      <div className="text-[17px] leading-[2.4] text-[var(--txt)]" data-testid="fill-blank-text">
         {renderTextWithBlanks()}
       </div>
 
-      <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 flex-wrap" data-testid="fill-blank-hints">
-        <span className="font-semibold text-slate-900 dark:text-white">Podpowiedzi:</span>
-        {config.blanks.map((blank, index) => (
-          <span 
-            key={blank.id} 
-            className="px-2 py-1 bg-primary/10 text-primary rounded-md font-medium border border-primary/20"
-            data-testid={`hint-${blank.id}`}
-          >
-            [{index + 1}] {blank.hint || 'bez podpowiedzi'}
-          </span>
-        ))}
-      </div>
+      {visibleProblems.length > 0 && (
+        <ul className="grid gap-1 text-[14px] text-[var(--txt)]" aria-live="polite">
+          {visibleProblems.map((p) => (
+            <li key={p.id} id={`blank-problem-${p.id}`} className="flex items-center gap-2">
+              <span className="font-mono text-[11px] text-[var(--alarm)]">{p.n}</span>
+              {p.msg}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {hints.length > 0 && (
+        <div className="grid gap-2 border-t border-[var(--line)] pt-4" data-testid="fill-blank-hints">
+          <p className="label">Podpowiedzi</p>
+          <ul className="grid gap-1 text-[14px] text-[var(--txt2)]">
+            {hints.map((h) => (
+              <li key={h.n} className="flex gap-2.5" data-testid={`hint-${sortedBlanks[h.n - 1].id}`}>
+                <span className="font-mono text-[11px] leading-[1.9] text-[var(--label)]">{h.n}</span>
+                <span>{h.hint}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {showResult && result?.partialScore !== undefined && result.partialScore < 1 && (
-        <div className="mt-4 p-3 sm:p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <p className="text-sm sm:text-base text-amber-800 dark:text-amber-200">
-            Poprawne odpowiedzi: {Math.round(result.partialScore * 100)}% 
-            ({result.feedback?.correctItems?.length || 0} z {config.blanks.length})
-          </p>
-        </div>
+        <PartialScore
+          score={result.partialScore}
+          correct={result.feedback?.correctItems?.length}
+          total={config.blanks.length}
+        />
       )}
     </div>
   );

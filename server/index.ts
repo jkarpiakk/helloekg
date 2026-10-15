@@ -197,7 +197,8 @@ initStripe();
     serveStatic(app);
   }
 
-  server.listen({ port: config.port, host: "0.0.0.0", reusePort: true }, () => {
+  // reusePort działa tylko na Linuksie — na macOS (lokalny podgląd) listen kończy się ENOTSUP
+  server.listen({ port: config.port, host: "0.0.0.0", reusePort: process.platform === "linux" }, () => {
     log(`serving on port ${config.port}`);
   });
 

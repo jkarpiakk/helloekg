@@ -1,21 +1,59 @@
-import { useEffect, useState } from "react";
-import { useLocation, Link } from "wouter";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { CheckCircle, XCircle, Mail } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { rise, stagger } from "@/lib/motion";
+
+/** Wąska kolumna wyśrodkowana: etykieta, tytuł, opis, jedno działanie */
+function Screen({
+  stateKey,
+  label,
+  labelClass = "",
+  title,
+  lead,
+  children,
+  role,
+}: {
+  stateKey: string;
+  label: string;
+  labelClass?: string;
+  title: string;
+  lead: string;
+  children?: ReactNode;
+  role?: string;
+}) {
+  return (
+    <div className="wrap">
+      <motion.div
+        key={stateKey}
+        role={role}
+        className="mx-auto max-w-[30rem] py-20 sm:py-28"
+        variants={stagger(0.05)}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.p variants={rise} className={`label ${labelClass}`}>{label}</motion.p>
+        <motion.h1 variants={rise} className="h2 mt-4 text-[var(--txt)]">{title}</motion.h1>
+        <motion.p variants={rise} className="lead mt-4">{lead}</motion.p>
+        {children && <motion.div variants={rise} className="mt-8">{children}</motion.div>}
+      </motion.div>
+    </div>
+  );
+}
 
 export default function VerifyEmail() {
-  const [, setLocation] = useLocation();
   const [token, setToken] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setToken(params.get('token'));
   }, []);
 
-  const { data, isLoading, error, isError } = useQuery({
+  const { isLoading, error, isError } = useQuery({
     queryKey: ['/api/auth/verify-email', token],
     queryFn: async () => {
       if (!token) throw new Error('Brak tokenu');
@@ -30,96 +68,74 @@ export default function VerifyEmail() {
     retry: false,
   });
 
+  const continueAction = isAuthenticated ? (
+    <Button asChild>
+      <Link href="/dashboard">Przejdź do kursu</Link>
+    </Button>
+  ) : (
+    <Button asChild>
+      <Link href="/?auth=login">Zaloguj się</Link>
+    </Button>
+  );
+
   if (!token) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full shadow-app-lg">
-          <CardContent className="pt-8 pb-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-6">
-              <XCircle className="w-10 h-10 text-destructive" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              Brak tokenu weryfikacyjnego
-            </h1>
-            <p className="text-muted-foreground mb-6">
-              Link weryfikacyjny jest nieprawidłowy. Sprawdź czy skopiowałeś cały link z e-maila.
-            </p>
-            <Button asChild className="w-full">
-              <Link href="/">Wróć na stronę główną</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Screen
+        stateKey="no-token"
+        role="alert"
+        label="Nieprawidłowy link"
+        labelClass="text-[var(--alarm)]"
+        title="Brakuje kodu weryfikacyjnego"
+        lead="Link z e-maila jest niepełny. Otwórz go jeszcze raz albo skopiuj w całości do paska adresu."
+      >
+        <Button asChild>
+          <Link href="/">Wróć na stronę główną</Link>
+        </Button>
+      </Screen>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full shadow-app-lg">
-          <CardContent className="pt-8 pb-8 text-center">
-            <LoadingSpinner size="lg" className="mx-auto mb-6" />
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              Weryfikacja adresu e-mail...
-            </h1>
-            <p className="text-muted-foreground">
-              Proszę czekać
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <Screen
+        stateKey="loading"
+        role="status"
+        label="Weryfikacja"
+        title="Sprawdzam adres e-mail…"
+        lead="To potrwa tylko chwilę."
+      >
+        <LoadingSpinner size="lg" />
+      </Screen>
     );
   }
 
   if (isError) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full shadow-app-lg">
-          <CardContent className="pt-8 pb-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-6">
-              <XCircle className="w-10 h-10 text-destructive" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              Błąd weryfikacji
-            </h1>
-            <p className="text-muted-foreground mb-6">
-              {(error as Error)?.message || 'Nie udało się zweryfikować adresu e-mail'}
-            </p>
-            <div className="space-y-3">
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/">Wróć na stronę główną</Link>
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Token mógł wygasnąć. Spróbuj zalogować się i poprosić o nowy link weryfikacyjny.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Screen
+        stateKey="error"
+        role="alert"
+        label="Weryfikacja nieudana"
+        labelClass="text-[var(--alarm)]"
+        title="Nie udało się potwierdzić adresu"
+        lead={`${(error as Error)?.message || "Link mógł wygasnąć."} Zaloguj się — jeśli konto nadal wymaga potwierdzenia, poprosisz o nowy link.`}
+      >
+        {continueAction}
+      </Screen>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="max-w-md w-full shadow-app-lg">
-        <CardContent className="pt-8 pb-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-chart-2/20 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-chart-2" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">
-            E-mail zweryfikowany!
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            Twój adres e-mail został potwierdzony. Zaloguj się i wybierz plan, aby uzyskać pełny dostęp do kursu.
-          </p>
-          <Button asChild className="w-full min-h-[48px] rounded-xl shadow-app-lg">
-            <Link href="/pricing">Wybierz plan</Link>
-          </Button>
-          <Button asChild variant="ghost" className="w-full mt-2">
-            <Link href="/">Zaloguj się później</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <Screen
+      stateKey="success"
+      role="status"
+      label="Adres potwierdzony"
+      labelClass="label--g"
+      title="Gotowe, możesz zaczynać"
+      lead={isAuthenticated
+        ? "Twój adres e-mail jest potwierdzony. Zacznij od pierwszego modułu."
+        : "Twój adres e-mail jest potwierdzony. Zaloguj się i zacznij od pierwszego modułu."}
+    >
+      {continueAction}
+    </Screen>
   );
 }

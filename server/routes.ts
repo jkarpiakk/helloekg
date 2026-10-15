@@ -861,6 +861,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allModules = allModules.filter(m => m.title.toLowerCase().includes('demo'));
       }
       
+      // Liczba opublikowanych rozdziałów i pytań w sekcjach — interfejs pokazuje,
+      // co naprawdę jest w sekcji (wykład, pytania albo jedno i drugie)
+      const [questionCounts, chapterCounts] = await Promise.all([
+        db.select({ sectionId: questions.sectionId, n: count() }).from(questions)
+          .where(eq(questions.status, "published")).groupBy(questions.sectionId),
+        db.select({ sectionId: lectureChapters.sectionId, n: count() }).from(lectureChapters)
+          .where(eq(lectureChapters.isPublished, true)).groupBy(lectureChapters.sectionId),
+      ]);
+      const qBySection = new Map(questionCounts.map((r) => [r.sectionId, Number(r.n)]));
+      const chBySection = new Map(chapterCounts.map((r) => [r.sectionId, Number(r.n)]));
+
       // Build modules with sections and progress
       const modulesWithSections = await Promise.all(
         allModules.map(async (module) => {
@@ -877,13 +888,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return {
               ...section,
               completionPercentage: progress ? parseFloat(progress.completionPercentage) : 0,
-              lastActivity: progress?.lastActivity
+              lastActivity: progress?.lastActivity,
+              questionCount: qBySection.get(section.id) ?? 0,
+              chapterCount: chBySection.get(section.id) ?? 0,
             };
           });
           
           // Calculate module completion percentage
-          const moduleCompletion = sectionsWithProgress.length > 0
-            ? sectionsWithProgress.reduce((acc, section) => acc + (section.completionPercentage || 0), 0) / sectionsWithProgress.length
+          // Postęp liczymy z odpowiedzi, więc tylko sekcje, które mają pytania —
+          // inaczej sekcje z samym wykładem trzymałyby moduł wiecznie poniżej 100%
+          const gradable = sectionsWithProgress.filter((s) => s.questionCount > 0);
+          const moduleCompletion = gradable.length > 0
+            ? gradable.reduce((acc, section) => acc + (section.completionPercentage || 0), 0) / gradable.length
             : 0;
           
           return {

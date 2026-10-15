@@ -1,161 +1,99 @@
 import { Link } from "wouter";
-import { Facebook, Twitter, Linkedin, Instagram } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import Logo from "@/components/layout/Logo";
+import { useAuth } from "@/lib/auth";
+
+const linkClass =
+  "inline-flex items-center gap-2 text-[var(--txt2)] transition-colors duration-200 hover:text-[var(--txt)]";
 
 export default function Footer() {
+  const { isAuthenticated } = useAuth();
+
   return (
-    <footer className="bg-card border-t border-border mt-12 sm:mt-20">
-      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-          {/* Company info */}
-          <div className="space-y-4 col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center">
-              <Logo markSize={32} />
+    <footer className="mt-16 border-t border-[var(--line)] pb-8 pt-14 text-sm sm:mt-24" data-testid="footer">
+      <div className="wrap">
+        <div className="grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+          <div className="grid content-start gap-4">
+            <Link
+              href={isAuthenticated ? "/dashboard" : "/"}
+              className="inline-flex w-fit rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="helloEKG — strona główna"
+            >
+              <Logo animated={false} />
             </Link>
-            <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
-              Profesjonalna platforma do nauki interpretacji EKG dla studentów medycyny i profesjonalistów.
+            <p className="max-w-[26em] text-[var(--txt2)]">
+              Kurs EKG od podstaw: wykłady, pytania z wyjaśnieniami i powtórki, które utrwalają wiedzę.
             </p>
           </div>
 
-          {/* Courses Links */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Kursy</h3>
-            <ul className="space-y-2 text-xs sm:text-sm">
-              <li>
-                <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Podstawy EKG
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Rytmy serca
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Zawał serca
-                </Link>
-              </li>
-              <li>
-                <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Arytmie
-                </Link>
-              </li>
-            </ul>
-          </div>
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
+            <div className="grid content-start gap-2.5">
+              <p className="label mb-1">Kurs</p>
+              {isAuthenticated ? (
+                <>
+                  <Link href="/modules" className={linkClass}>Moduły</Link>
+                  <Link href="/dashboard" className={linkClass}>Postęp</Link>
+                  <Link href="/quiz?mode=review" className={linkClass}>Powtórka</Link>
+                </>
+              ) : (
+                <Link href="/" className={linkClass}>O becie</Link>
+              )}
+            </div>
 
-          {/* Support Links */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Wsparcie</h3>
-            <ul className="space-y-2 text-xs sm:text-sm">
-              <li>
-                <Link href="/faq" className="text-muted-foreground hover:text-foreground transition-colors">
-                  FAQ
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Kontakt
-                </Link>
-              </li>
-              <li>
-                <Link href="/verify" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Weryfikacja certyfikatu
-                </Link>
-              </li>
-              <li>
-                <Link href="/support" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Pomoc techniczna
-                </Link>
-              </li>
-            </ul>
-          </div>
+            <div className="grid content-start gap-2.5">
+              <p className="label mb-1">Konto</p>
+              {isAuthenticated ? (
+                <Link href="/dashboard" className={linkClass}>Twój postęp</Link>
+              ) : (
+                <>
+                  <Link href="/?auth=login" className={linkClass}>Zaloguj się</Link>
+                  <Link href="/?auth=register" className={linkClass}>Załóż konto</Link>
+                </>
+              )}
+              <Link href="/forgot-password" className={linkClass}>Nie pamiętasz hasła?</Link>
+            </div>
 
-          {/* Legal Links */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-3 sm:mb-4 text-sm sm:text-base">Prawne</h3>
-            <ul className="space-y-2 text-xs sm:text-sm">
-              <li>
-                <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Regulamin
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Polityka prywatności
-                </Link>
-              </li>
-              <li>
-                <Link href="/cookies" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Cookies
-                </Link>
-              </li>
-              <li>
-                <Link href="/gdpr" className="text-muted-foreground hover:text-foreground transition-colors">
-                  RODO
-                </Link>
-              </li>
-            </ul>
+            <div className="grid content-start gap-2.5">
+              <p className="label mb-1">helloEKG</p>
+              <a href="https://helloekg.pl" target="_blank" rel="noopener noreferrer" className={linkClass}>
+                helloekg.pl
+                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+              <a
+                href="https://helloekg.pl/polityka-prywatnosci.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={linkClass}
+              >
+                Polityka prywatności
+              </a>
+            </div>
           </div>
         </div>
 
-        <div className="border-t border-border mt-6 sm:mt-8 pt-6 sm:pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="text-center md:text-left space-y-1">
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              © 2026 helloEKG. Wszystkie prawa zastrzeżone.
-            </p>
-            {/* Atrybucja wymagana licencją CC BY 4.0 modelu serca 3D */}
-            <p className="text-xs text-muted-foreground" data-testid="heart-model-attribution">
-              Model serca 3D:{" "}
-              <a
-                href="https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-foreground transition-colors underline underline-offset-2"
-              >
-                Pigcraft
-              </a>
-              ,{" "}
-              <a
-                href="https://creativecommons.org/licenses/by/4.0/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-foreground transition-colors underline underline-offset-2"
-              >
-                CC BY 4.0
-              </a>
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
+        <div className="mt-12 flex flex-col gap-2 border-t border-[var(--line)] pt-6 text-[13px] text-[var(--label)] md:flex-row md:justify-between md:gap-6">
+          <p>© 2026 helloEKG · Wersja beta</p>
+          {/* Atrybucja wymagana licencją CC BY 4.0 modelu serca 3D (symulator) */}
+          <p data-testid="heart-model-attribution">
+            Model serca 3D:{" "}
             <a
-              href="#"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Facebook"
+              href="https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 transition-colors hover:text-[var(--txt)]"
             >
-              <Facebook className="h-5 w-5" />
+              Pigcraft
             </a>
+            ,{" "}
             <a
-              href="#"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Twitter"
+              href="https://creativecommons.org/licenses/by/4.0/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 transition-colors hover:text-[var(--txt)]"
             >
-              <Twitter className="h-5 w-5" />
+              CC BY 4.0
             </a>
-            <a
-              href="#"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="LinkedIn"
-            >
-              <Linkedin className="h-5 w-5" />
-            </a>
-            <a
-              href="#"
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Instagram"
-            >
-              <Instagram className="h-5 w-5" />
-            </a>
-          </div>
+          </p>
         </div>
       </div>
     </footer>

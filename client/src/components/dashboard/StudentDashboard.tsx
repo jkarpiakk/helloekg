@@ -1,57 +1,84 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo } from "react";
+import { Link } from "wouter";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useTranslation } from "@/lib/i18n";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import ProgressCard from "./ProgressCard";
-import { Play, RotateCcw, Crown, Award, Heart, CheckCircle, AlertCircle, Flame, ChevronRight, Target, Clock, HelpCircle, TrendingUp } from "lucide-react";
-import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import type { SectionWithProgress, UserProgress, WeakArea, Certificate } from "@/types";
+import { rise, stagger } from "@/lib/motion";
+import ProgressCard, { ProgressLine } from "./ProgressCard";
+import type { Certificate, UserProgress, WeakArea } from "@/types";
+
+interface CourseSection {
+  id: string;
+  title: string;
+  order: number;
+  completionPercentage: number;
+  lastActivity?: string | null;
+  questionCount?: number;
+  chapterCount?: number;
+}
+
+interface CourseModule {
+  id: string;
+  title: string;
+  order: number;
+  completionPercentage: number;
+  sections: CourseSection[];
+}
+
+interface Eligibility {
+  isEligible?: boolean;
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const hasLecture = (s: CourseSection) => (s.chapterCount ?? 0) > 0;
+const hasQuestions = (s: CourseSection) => (s.questionCount ?? 0) > 0;
+
+/** Postęp to odsetek opanowanych pytań — liczymy go tylko z sekcji, które mają pytania */
+function moduleProgress(sections: CourseSection[]) {
+  const withQ = sections.filter(hasQuestions);
+  if (!withQ.length) return null;
+  return withQ.reduce((acc, s) => acc + (s.completionPercentage || 0), 0) / withQ.length;
+}
+
+function plural(n: number, one: string, few: string, many: string) {
+  if (n === 1) return one;
+  const d = n % 10;
+  const dd = n % 100;
+  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
+}
+
+const cleanTitle = (title: string) => title.replace(/^\s*moduł\s*\d+\s*[:.–—-]\s*/i, "");
 
 export default function StudentDashboard() {
-  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Fetch sections with progress
-  const { data: sections, isLoading: sectionsLoading } = useQuery({
-    queryKey: ["/api/sections"],
+  // Moduły z sekcjami i postępem — z nich „Kontynuuj” i lista modułów
+  const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({
+    queryKey: ["/api/modules"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/sections");
-      return response.json() as Promise<SectionWithProgress[]>;
+      const response = await apiRequest("GET", "/api/modules");
+      return response.json() as Promise<CourseModule[]>;
     },
+    refetchOnMount: "always",
   });
 
-  // Fetch user progress and statistics
-  const { data: progressData, isLoading: progressLoading } = useQuery({
+  // Statystyki odpowiedzi i słabe obszary
+  const { data: progressData } = useQuery({
     queryKey: ["/api/progress"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/progress");
-      return response.json() as Promise<{
-        progress: any[];
-        stats: UserProgress;
-        weakAreas: WeakArea[];
-      }>;
+      return response.json() as Promise<{ progress: unknown[]; stats: UserProgress; weakAreas: WeakArea[] }>;
     },
+    refetchOnMount: "always",
   });
 
-  // Fetch subscription status
-  const { data: subscriptionData } = useQuery({
-    queryKey: ["/api/subscription/status"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/subscription/status");
-      return response.json();
-    },
-    retry: false,
-  });
-  const subscription = subscriptionData?.hasActiveSubscription ? subscriptionData.subscription : null;
-
-  // Fetch certificate eligibility
-  const { data: certificateEligibility } = useQuery({
+  const { data: certificateEligibility } = useQuery<Eligibility>({
     queryKey: ["/api/certificates/eligibility"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/certificates/eligibility");
@@ -59,7 +86,6 @@ export default function StudentDashboard() {
     },
   });
 
-  // Fetch user certificates
   const { data: myCertificates } = useQuery<Certificate[]>({
     queryKey: ["/api/certificates/my"],
     queryFn: async () => {
@@ -68,21 +94,6 @@ export default function StudentDashboard() {
     },
   });
 
-  // Fetch modules to check visibility for lecture button
-  const { data: modules } = useQuery({
-    queryKey: ["/api/modules"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/modules");
-      return response.json();
-    },
-  });
-
-  // Check if Module 1 (Lecture) is visible - hidden modules won't appear in the list for students
-  const isModule1Visible = modules?.some((m: any) => 
-    m.title?.includes("Moduł 1") || m.title?.includes("Wprowadzenie")
-  ) ?? false;
-
-  // Generate certificate mutation
   const generateCertificateMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/certificates/generate");
@@ -91,556 +102,297 @@ export default function StudentDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/certificates/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/certificates/eligibility"] });
-      toast({
-        title: "Certyfikat wygenerowany!",
-        description: "Twój certyfikat ukończenia kursu został wygenerowany.",
-      });
+      toast({ title: "Certyfikat gotowy", description: "Znajdziesz go w panelu postępu." });
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd",
-        description: error.message || "Nie udało się wygenerować certyfikatu",
+        title: "Nie udało się wygenerować certyfikatu",
+        description: error?.message || "Spróbuj jeszcze raz za chwilę.",
         variant: "destructive",
       });
     },
   });
 
-  if (sectionsLoading || progressLoading) {
+  const course = useMemo(() => {
+    const sortedModules = (modules ?? [])
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((m) => ({ ...m, sections: m.sections.slice().sort((a, b) => a.order - b.order) }));
+    const flat = sortedModules.flatMap((m, mi) => {
+      let lectureNo = 0;
+      return m.sections.map((s) => ({
+        section: s,
+        module: m,
+        moduleNo: mi + 1,
+        lectureNo: hasLecture(s) ? ++lectureNo : null,
+      }));
+    });
+    // Tylko sekcje, w których coś jest — „Kontynuuj” nigdy nie prowadzi do pustej
+    const withContent = flat.filter((x) => hasLecture(x.section) || hasQuestions(x.section));
+    // „Zrobione” da się stwierdzić tylko po pytaniach; sam wykład nie zapisuje postępu
+    const isDone = (s: CourseSection) => hasQuestions(s) && (s.completionPercentage || 0) >= 100;
+
+    const lastActive = withContent
+      .filter((x) => x.section.lastActivity)
+      .sort((a, b) => new Date(b.section.lastActivity!).getTime() - new Date(a.section.lastActivity!).getTime())[0];
+
+    let target: (typeof withContent)[number] | null = null;
+    if (lastActive && !isDone(lastActive.section)) {
+      target = lastActive;
+    } else if (lastActive) {
+      const from = withContent.indexOf(lastActive);
+      target = withContent.slice(from + 1).find((x) => !isDone(x.section)) ?? null;
+    }
+    if (!target) target = withContent.find((x) => !isDone(x.section)) ?? null;
+
+    const questionSections = flat.filter((x) => hasQuestions(x.section));
+    const overall = questionSections.length
+      ? questionSections.reduce((acc, x) => acc + (x.section.completionPercentage || 0), 0) / questionSections.length
+      : 0;
+    return {
+      modules: sortedModules,
+      target,
+      overall,
+      completed: questionSections.filter((x) => isDone(x.section)).length,
+      total: questionSections.length,
+      hasContent: withContent.length > 0,
+    };
+  }, [modules]);
+
+  if (modulesLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-[60vh] grid place-items-center">
         <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  const stats = progressData?.stats || { totalAttempts: 0, successRate: 0, avgTime: 0, streak: 0 };
-  const weakAreas = progressData?.weakAreas || [];
-  const overallProgress = sections && sections.length > 0 
-    ? sections.reduce((acc, section) => acc + section.completionPercentage, 0) / sections.length 
-    : 0;
+  const stats = progressData?.stats;
+  const weakAreas = progressData?.weakAreas ?? [];
+  const target = course.target;
+  const targetHasLecture = target ? hasLecture(target.section) : false;
+  const targetHasQuestions = target ? hasQuestions(target.section) : false;
+  // Kto już odpowiadał na pytania w tym temacie, wraca do pytań; reszta zaczyna od wykładu
+  const targetStartedQuiz = targetHasQuestions && (target?.section.completionPercentage || 0) > 0;
+  const primaryIsQuiz = !targetHasLecture || targetStartedQuiz;
+  const certificate = myCertificates?.[0];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* ===== MOBILE APP LAYOUT ===== */}
-      <div className="md:hidden">
-        {/* Mobile content - full app experience */}
-        <div className="px-5 pt-6 pb-8 space-y-6 safe-bottom">
-          
-          {/* Greeting with premium feel */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-0.5">Witaj ponownie</p>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="welcome-message-mobile">
-                {user?.firstName || 'Użytkowniku'}! 👋
-              </h1>
-            </div>
-            <div className="flex items-center gap-2">
-              {stats.streak > 0 && (
-                <div className="stat-card-orange rounded-2xl px-3 py-2 flex items-center gap-1.5" data-testid="mobile-streak-badge">
-                  <Flame className="h-5 w-5 text-chart-3" />
-                  <span className="text-lg font-bold text-chart-3">{stats.streak}</span>
-                </div>
-              )}
-              {subscription && (
-                <div className="stat-card-teal rounded-2xl p-2.5">
-                  <Crown className="h-5 w-5 text-chart-2" />
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Hero Progress Card */}
-          <ProgressCard
-            overallProgress={overallProgress}
-            successRate={stats.successRate * 100}
-            streak={stats.streak}
-          />
-          
-          {/* Quick Actions - Premium app-style tiles */}
-          <div>
-            <h2 className="text-section text-foreground mb-4">Szybkie akcje</h2>
-            <div className={`grid gap-3 ${isModule1Visible ? 'grid-cols-3' : 'grid-cols-2'}`}>
-              <Link href="/quiz" className="block">
-                <div className="action-tile rounded-2xl p-4 text-center touch-bounce shadow-app min-h-[100px] flex flex-col items-center justify-center" data-testid="action-continue">
-                  <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center mb-2">
-                    <Play className="h-6 w-6 text-primary" />
-                  </div>
-                  <span className="text-sm font-medium text-foreground">Kontynuuj</span>
-                </div>
-              </Link>
-              
-              <Link href="/quiz?mode=review" className="block">
-                <div className="action-tile rounded-2xl p-4 text-center touch-bounce shadow-app min-h-[100px] flex flex-col items-center justify-center" data-testid="action-review">
-                  <div className="w-12 h-12 rounded-2xl bg-chart-3/20 flex items-center justify-center mb-2">
-                    <RotateCcw className="h-6 w-6 text-chart-3" />
-                  </div>
-                  <span className="text-sm font-medium text-foreground">Powtórka</span>
-                </div>
-              </Link>
-              
-              {isModule1Visible && (
-                <Link href="/lecture" className="block">
-                  <div className="action-tile rounded-2xl p-4 text-center touch-bounce shadow-app min-h-[100px] flex flex-col items-center justify-center relative" data-testid="action-lecture">
-                    <div className="absolute -top-1 -right-1">
-                      <span className="bg-chart-2 text-chart-2-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">NEW</span>
-                    </div>
-                    <div className="w-12 h-12 rounded-2xl bg-chart-2/20 flex items-center justify-center mb-2">
-                      <Heart className="h-6 w-6 text-chart-2" />
-                    </div>
-                    <span className="text-sm font-medium text-foreground">Wykład</span>
-                  </div>
-                </Link>
-              )}
-            </div>
-          </div>
-          
-          {/* Module Progress - Compact premium cards */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-section text-foreground">Moduły</h2>
-              <span className="text-sm text-muted-foreground">{sections?.length || 0} dostępnych</span>
-            </div>
-            <div className="space-y-3">
-              {sections?.slice(0, 4).map((section, index) => (
-                <Link 
-                  key={section.id} 
-                  href={`/quiz?sectionId=${section.id}`}
-                  className="block"
-                >
-                  <div 
-                    className={`bg-card border border-border rounded-2xl p-4 touch-bounce shadow-app motion-safe:animate-slide-up motion-safe:opacity-0 motion-safe:[animation-fill-mode:forwards]`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                        section.completionPercentage >= 100 
-                          ? 'bg-chart-2/20' 
-                          : section.completionPercentage > 0 
-                            ? 'bg-primary/20' 
-                            : 'bg-muted/50'
-                      }`}>
-                        {section.completionPercentage >= 100 ? (
-                          <CheckCircle className="h-7 w-7 text-chart-2" />
-                        ) : (
-                          <span className="text-xl font-bold text-foreground">{index + 1}</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-semibold text-foreground mb-1 line-clamp-1">{section.title}</h3>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-700 ${
-                                section.completionPercentage >= 100 ? 'bg-chart-2' : 'bg-primary'
-                              }`}
-                              style={{ width: `${section.completionPercentage}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-semibold text-muted-foreground w-12 text-right">
-                            {Math.round(section.completionPercentage)}%
-                          </span>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    </div>
-                  </div>
-                </Link>
-              ))}
-              {sections && sections.length > 4 && (
-                <Link href="/quiz" className="block">
-                  <div className="bg-card border border-border rounded-2xl p-4 text-center touch-bounce shadow-sm">
-                    <span className="text-sm font-medium text-primary">Zobacz wszystkie moduły →</span>
-                  </div>
-                </Link>
-              )}
-            </div>
-          </div>
-          
-          {/* Certificate Status - Premium card */}
-          <div className="bg-card border border-border rounded-3xl p-5 shadow-app-lg">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-chart-2/20 flex items-center justify-center">
-                <Award className="h-6 w-6 text-chart-2" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">Certyfikat</h3>
-                <p className="text-sm text-muted-foreground">EKG Academy</p>
-              </div>
-            </div>
-            
-            {myCertificates && myCertificates.length > 0 ? (
-              <div className="flex items-center justify-between p-4 stat-card-teal rounded-2xl">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-6 w-6 text-chart-2" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Certyfikat zdobyty!</p>
-                    <p className="text-xs text-muted-foreground">{new Date(myCertificates[0].issuedAt).toLocaleDateString('pl-PL')}</p>
-                  </div>
-                </div>
-                <Link href={`/certificate/${myCertificates[0].certificateId}`}>
-                  <Button size="sm" className="h-10 touch-bounce" data-testid="button-view-certificate">Zobacz</Button>
-                </Link>
-              </div>
-            ) : certificateEligibility?.isEligible ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 p-3 stat-card-teal rounded-xl">
-                  <CheckCircle className="h-5 w-5 text-chart-2" />
-                  <p className="text-sm text-chart-2 font-medium">Możesz otrzymać certyfikat!</p>
-                </div>
-                <Button 
-                  className="w-full h-12 text-base touch-bounce shadow-glow-success" 
-                  onClick={() => generateCertificateMutation.mutate()}
-                  disabled={generateCertificateMutation.isPending}
-                  data-testid="button-generate-certificate"
-                >
-                  {generateCertificateMutation.isPending ? 'Generowanie...' : '🎉 Generuj certyfikat'}
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 rounded-2xl p-4 text-center">
-                  <div className={`text-2xl font-bold mb-1 ${certificateEligibility?.completedModules === certificateEligibility?.totalModules ? "text-chart-2" : "text-foreground"}`}>
-                    {certificateEligibility?.completedModules || 0}/{certificateEligibility?.totalModules || 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground font-medium">Moduły</div>
-                </div>
-                <div className="bg-muted/30 rounded-2xl p-4 text-center">
-                  <div className={`text-2xl font-bold mb-1 ${certificateEligibility?.successRate >= 0.8 ? "text-chart-2" : "text-foreground"}`}>
-                    {Math.round((certificateEligibility?.successRate || 0) * 100)}%
-                  </div>
-                  <div className="text-xs text-muted-foreground font-medium">Wymagane 80%</div>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Weak Areas - Compact */}
-          {weakAreas.length > 0 && (
-            <div>
-              <h2 className="text-section text-foreground mb-3">Do poprawy</h2>
-              <div className="space-y-2">
-                {weakAreas.slice(0, 3).map((area) => (
-                  <div key={area.tag} className="bg-muted/50 border border-border/50 rounded-xl p-3 flex items-center gap-3">
-                    <Target className="h-5 w-5 text-chart-4 flex-shrink-0" />
-                    <span className="text-sm text-foreground flex-1 min-w-0 truncate">{area.tag}</span>
-                    <span className={`text-sm font-semibold ${
-                      area.successRate < 0.5 ? 'text-destructive' : 
-                      area.successRate < 0.7 ? 'text-chart-4' : 'text-chart-2'
-                    }`}>
-                      {Math.round(area.successRate * 100)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Quick Stats Bar */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-card border border-border rounded-2xl p-4 text-center shadow-sm">
-              <HelpCircle className="h-5 w-5 text-primary mx-auto mb-2" />
-              <div className="text-xl font-bold text-foreground">{stats.totalAttempts}</div>
-              <div className="text-xs text-muted-foreground">Pytań</div>
-            </div>
-            <div className="bg-card border border-border rounded-2xl p-4 text-center shadow-sm">
-              <Clock className="h-5 w-5 text-chart-4 mx-auto mb-2" />
-              <div className="text-xl font-bold text-foreground">{Math.round(stats.avgTime / 1000)}s</div>
-              <div className="text-xs text-muted-foreground">Śr. czas</div>
-            </div>
-            <div className="bg-card border border-border rounded-2xl p-4 text-center shadow-sm">
-              <Target className="h-5 w-5 text-chart-2 mx-auto mb-2" />
-              <div className="text-xl font-bold text-chart-2">{Math.round(stats.successRate * 100)}%</div>
-              <div className="text-xs text-muted-foreground">Celność</div>
-            </div>
-          </div>
-          
-        </div>
-      </div>
-      
-      {/* ===== DESKTOP PREMIUM LAYOUT ===== */}
-      <div className="hidden md:block min-h-screen bg-background">
-        {/* Premium Hero Header with Gradient */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 app-gradient-hero opacity-60" />
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-chart-2/10 rounded-full blur-3xl" />
-          
-          <div className="relative max-w-7xl mx-auto px-6 lg:px-8 xl:px-12 py-8 lg:py-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Witaj ponownie</p>
-                <h1 className="text-3xl lg:text-4xl font-bold text-foreground" data-testid="welcome-message">
-                  {user?.firstName}! 👋
-                </h1>
-                <p className="text-base text-muted-foreground mt-1">{t("dashboard.continueWhere")}</p>
-              </div>
-              <div className="flex items-center gap-4">
-                {stats.streak > 0 && (
-                  <div className="stat-card-orange rounded-2xl px-4 py-3 flex items-center gap-2">
-                    <Flame className="h-6 w-6 text-chart-3" />
-                    <div>
-                      <span className="text-2xl font-bold text-chart-3">{stats.streak}</span>
-                      <span className="text-sm text-muted-foreground ml-1">dni</span>
-                    </div>
-                  </div>
-                )}
-                {subscription && (
-                  <div className="stat-card-teal rounded-2xl px-4 py-3 flex items-center gap-2">
-                    <Crown className="h-5 w-5 text-chart-2" />
-                    <span className="text-sm font-medium text-chart-2">
-                      Do {new Date(subscription.endDate).toLocaleDateString('pl-PL')}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Desktop Content */}
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 xl:px-12 py-8">
-          <div className="grid lg:grid-cols-[1fr_380px] gap-8">
-            {/* Main content */}
-            <div className="space-y-8">
-              {/* Progress Overview - Premium Hero Card */}
-              <ProgressCard
-                overallProgress={overallProgress}
-                successRate={stats.successRate * 100}
-                streak={stats.streak}
-              />
-              
-              {/* Quick Actions - Premium Tiles */}
-              <div>
-                <h2 className="text-xl font-semibold text-foreground mb-4">Szybkie akcje</h2>
-                <div className={`grid gap-4 ${isModule1Visible ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                  {isModule1Visible && (
-                    <Link href="/lecture" className="block group">
-                      <div className="h-full p-6 bg-card border border-border rounded-2xl shadow-app hover:shadow-app-lg hover:border-primary/30 transition-all duration-300 cursor-pointer relative overflow-hidden">
-                        <div className="absolute top-3 right-3">
-                          <Badge className="bg-chart-2 text-chart-2-foreground border-0 text-xs px-2 py-0.5">NOWE</Badge>
-                        </div>
-                        <div className="w-14 h-14 bg-gradient-to-br from-primary/20 to-chart-2/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                          <Heart className="h-7 w-7 text-primary" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground mb-1">Interaktywny wykład</h3>
-                        <p className="text-sm text-muted-foreground">Podstawy EKG z wizualizacjami</p>
-                      </div>
-                    </Link>
-                  )}
-                  <Link href="/quiz" className="block group">
-                    <div className="h-full p-6 bg-card border border-border rounded-2xl shadow-app hover:shadow-app-lg hover:border-primary/30 transition-all duration-300 cursor-pointer">
-                      <div className="w-14 h-14 bg-primary/15 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <Play className="h-7 w-7 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-foreground mb-1">Kontynuuj naukę</h3>
-                      <p className="text-sm text-muted-foreground">Wróć do ostatniego modułu</p>
-                    </div>
-                  </Link>
-                  <Link href="/quiz?mode=review" className="block group">
-                    <div className="h-full p-6 bg-card border border-chart-3/20 rounded-2xl shadow-app hover:shadow-app-lg hover:border-chart-3/40 transition-all duration-300 cursor-pointer bg-gradient-to-br from-chart-3/5 to-transparent">
-                      <div className="w-14 h-14 bg-chart-3/15 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                        <RotateCcw className="h-7 w-7 text-chart-3" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-foreground mb-1">{t("dashboard.review")}</h3>
-                      <p className="text-sm text-muted-foreground">Powtórz trudne pytania</p>
-                    </div>
-                  </Link>
-                </div>
-              </div>
-              
-              {/* Module Progress - Premium Cards */}
-              <div>
-                <h2 className="text-xl font-semibold text-foreground mb-4">{t("dashboard.moduleProgress")}</h2>
-                <div className="bg-card border border-border rounded-2xl shadow-app overflow-hidden">
-                  <div className="divide-y divide-border">
-                    {sections?.map((section, index) => (
-                      <Link 
-                        key={section.id} 
-                        href={`/quiz?sectionId=${section.id}`}
-                        className="block"
-                      >
-                        <div className="flex items-center gap-4 p-5 hover:bg-muted/30 transition-colors cursor-pointer group">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                            section.completionPercentage >= 100 
-                              ? 'bg-chart-2/15' 
-                              : section.completionPercentage > 0 
-                                ? 'bg-primary/15' 
-                                : 'bg-muted'
-                          }`}>
-                            {section.completionPercentage >= 100 ? (
-                              <CheckCircle className="h-6 w-6 text-chart-2" />
-                            ) : (
-                              <span className="text-lg font-bold text-foreground">{index + 1}</span>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-4 mb-2">
-                              <h4 className="text-base font-medium text-foreground line-clamp-1">{section.title}</h4>
-                              <span className={`text-sm font-semibold flex-shrink-0 ${
-                                section.completionPercentage >= 100 ? 'text-chart-2' : 'text-muted-foreground'
-                              }`}>
-                                {Math.round(section.completionPercentage)}%
-                              </span>
-                            </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  section.completionPercentage >= 100 ? 'bg-chart-2' : 'bg-primary'
-                                }`}
-                                style={{ width: `${section.completionPercentage}%` }}
-                              />
-                            </div>
-                          </div>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all flex-shrink-0" />
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+    <motion.div className="wrap pt-12 pb-24 sm:pt-16" variants={stagger(0.05)} initial="hidden" animate="show">
+      <motion.header className="grid gap-4 mb-10 sm:mb-14" variants={rise}>
+        <p className="label" data-testid="welcome-message">
+          {user?.firstName ? `Cześć, ${user.firstName}` : "Cześć"}
+        </p>
+        <h1 className="h1">Twój postęp</h1>
+      </motion.header>
 
-            {/* Sidebar - Premium Cards */}
-            <div className="space-y-6">
-              {/* Certificate Section - Premium */}
-              <div className="bg-card border border-border rounded-2xl shadow-app overflow-hidden">
-                <div className="p-5 border-b border-border bg-gradient-to-r from-chart-2/5 to-transparent">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-chart-2/15 flex items-center justify-center">
-                      <Award className="h-5 w-5 text-chart-2" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground">Certyfikat</h3>
+      {modulesError ? (
+        <motion.p className="muted border-t border-[var(--line)] pt-8" variants={rise}>
+          Nie udało się wczytać kursu. Odśwież stronę i spróbuj jeszcze raz.
+        </motion.p>
+      ) : (
+        <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-16">
+          {/* Lewa kolumna: co dalej + moduły */}
+          <div className="grid gap-12 content-start min-w-0">
+            <motion.section variants={rise} aria-labelledby="continue-title">
+              {target ? (
+                <div className="surface p-6 sm:p-8 grid gap-5" data-testid="continue-card">
+                  <p className="label label--g">
+                    Kontynuuj · Moduł {target.moduleNo} · {target.lectureNo !== null ? `Wykład ${target.lectureNo}` : "Pytania"}
+                  </p>
+                  <div className="grid gap-1">
+                    <h2 id="continue-title" className="h3">{target.section.title}</h2>
+                    <p className="muted text-[15px]">{cleanTitle(target.module.title)}</p>
                   </div>
-                </div>
-                <div className="p-5">
-                  {myCertificates && myCertificates.length > 0 ? (
-                    <div className="flex items-center gap-4 p-4 stat-card-teal rounded-xl">
-                      <CheckCircle className="h-6 w-6 text-chart-2 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-base font-medium text-foreground">EKG Academy</p>
-                        <p className="text-sm text-muted-foreground">{new Date(myCertificates[0].issuedAt).toLocaleDateString('pl-PL')}</p>
-                      </div>
-                      <Link href={`/certificate/${myCertificates[0].certificateId}`}>
-                        <Button size="sm" className="h-10" data-testid="button-view-certificate-desktop">Zobacz</Button>
-                      </Link>
+                  {targetHasQuestions && (
+                    <div className="grid gap-2 max-w-[420px]">
+                      <ProgressLine value={target.section.completionPercentage} label="Postęp w tym temacie" />
+                      <p className="text-[14px] text-[var(--txt2)]">
+                        <span className="num">{Math.round(target.section.completionPercentage || 0)}%</span> ukończone ·{" "}
+                        {target.section.questionCount} {plural(target.section.questionCount ?? 0, "pytanie", "pytania", "pytań")}
+                      </p>
                     </div>
-                  ) : certificateEligibility?.isEligible ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 p-4 stat-card-teal rounded-xl">
-                        <CheckCircle className="h-5 w-5 text-chart-2" />
-                        <p className="text-base text-chart-2 font-medium">Możesz otrzymać certyfikat!</p>
-                      </div>
-                      <Button 
-                        className="w-full h-12 text-base shadow-glow-success" 
-                        onClick={() => generateCertificateMutation.mutate()}
-                        disabled={generateCertificateMutation.isPending}
-                        data-testid="button-generate-certificate-desktop"
-                      >
-                        {generateCertificateMutation.isPending ? 'Generowanie...' : '🎉 Generuj certyfikat'}
+                  )}
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <Button asChild data-testid="action-continue">
+                      <Link href={primaryIsQuiz ? `/quiz?sectionId=${target.section.id}` : `/lecture/${target.section.id}`}>
+                        {primaryIsQuiz ? (targetStartedQuiz ? "Wróć do pytań" : "Rozwiąż pytania") : "Czytaj wykład"}
+                        <ArrowRight aria-hidden="true" />
+                      </Link>
+                    </Button>
+                    {primaryIsQuiz && targetHasLecture && (
+                      <Button asChild variant="ghost">
+                        <Link href={`/lecture/${target.section.id}`}>Wykład</Link>
                       </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
-                        <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Ukończ wymagania aby zdobyć certyfikat</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-muted/30 rounded-xl p-4 text-center">
-                          <div className={`text-2xl font-bold mb-1 ${certificateEligibility?.completedModules === certificateEligibility?.totalModules ? "text-chart-2" : "text-foreground"}`}>
-                            {certificateEligibility?.completedModules || 0}/{certificateEligibility?.totalModules || 0}
-                          </div>
-                          <div className="text-xs text-muted-foreground font-medium">Moduły</div>
-                        </div>
-                        <div className="bg-muted/30 rounded-xl p-4 text-center">
-                          <div className={`text-2xl font-bold mb-1 ${certificateEligibility?.successRate >= 0.8 ? "text-chart-2" : "text-foreground"}`}>
-                            {Math.round((certificateEligibility?.successRate || 0) * 100)}%
-                          </div>
-                          <div className="text-xs text-muted-foreground font-medium">Min. 80%</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Weak areas - Premium */}
-              <div className="bg-card border border-border rounded-2xl shadow-app overflow-hidden">
-                <div className="p-5 border-b border-border">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-chart-4/15 flex items-center justify-center">
-                      <Target className="h-5 w-5 text-chart-4" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground">{t("dashboard.weakAreas")}</h3>
-                  </div>
-                </div>
-                <div className="p-5">
-                  <div className="space-y-3">
-                    {weakAreas.slice(0, 3).map((area) => (
-                      <div key={area.tag} className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
-                        <span className="text-sm text-foreground flex-1 min-w-0 truncate">{area.tag}</span>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all ${
-                                area.successRate < 0.5 ? 'bg-destructive' : 
-                                area.successRate < 0.7 ? 'bg-chart-4' : 'bg-chart-2'
-                              }`}
-                              style={{ width: `${area.successRate * 100}%` }}
-                            />
-                          </div>
-                          <span className={`text-sm font-semibold w-12 text-right ${
-                            area.successRate < 0.5 ? 'text-destructive' : 
-                            area.successRate < 0.7 ? 'text-chart-4' : 'text-chart-2'
-                          }`}>
-                            {Math.round(area.successRate * 100)}%
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                    {weakAreas.length === 0 && (
-                      <div className="text-center py-6">
-                        <CheckCircle className="h-10 w-10 text-chart-2 mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">Świetnie! Brak słabych obszarów</p>
-                      </div>
+                    )}
+                    {!primaryIsQuiz && targetHasQuestions && (
+                      <Button asChild variant="ghost">
+                        <Link href={`/quiz?sectionId=${target.section.id}`}>Od razu do pytań</Link>
+                      </Button>
                     )}
                   </div>
                 </div>
-              </div>
+              ) : course.hasContent ? (
+                <div className="surface p-6 sm:p-8 grid gap-4" data-testid="continue-card">
+                  <p className="label label--g">Kurs ukończony</p>
+                  <h2 id="continue-title" className="h3">Wszystkie tematy masz za sobą</h2>
+                  <p className="muted">Utrwal wiedzę w powtórce albo sprawdź się w egzaminie próbnym.</p>
+                  <div>
+                    <Button asChild>
+                      <Link href="/quiz?mode=review">
+                        Zacznij powtórkę
+                        <ArrowRight aria-hidden="true" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p id="continue-title" className="muted border-t border-[var(--line)] pt-8">
+                  Nie masz jeszcze dostępu do żadnego modułu.
+                </p>
+              )}
 
-              {/* Quick stats - Premium Grid */}
-              <div className="bg-card border border-border rounded-2xl shadow-app overflow-hidden">
-                <div className="p-5 border-b border-border">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
-                      <TrendingUp className="h-5 w-5 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground">Statystyki</h3>
-                  </div>
+              <nav className="chips mt-6" aria-label="Szybkie akcje">
+                <Link href="/quiz?mode=review" className="chip min-h-[44px]" data-testid="action-review">
+                  Powtórka
+                </Link>
+                <Link href="/quiz?mode=exam" className="chip min-h-[44px]" data-testid="action-exam">
+                  Egzamin próbny
+                </Link>
+                <Link href="/modules" className="chip min-h-[44px]" data-testid="action-course">
+                  Cały kurs
+                </Link>
+              </nav>
+            </motion.section>
+
+            {course.modules.length > 0 && (
+              <motion.section variants={rise} aria-labelledby="modules-title">
+                <div className="flex items-baseline justify-between gap-4 mb-4">
+                  <h2 id="modules-title" className="label">Moduły</h2>
+                  <Link href="/modules" className="text-[14px] text-[var(--txt2)] hover:text-[var(--txt)]">
+                    Otwórz kurs
+                  </Link>
                 </div>
-                <div className="p-5">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-4 bg-muted/30 rounded-xl">
-                      <HelpCircle className="h-5 w-5 text-primary mx-auto mb-2" />
-                      <div className="text-2xl font-bold text-foreground">{stats.totalAttempts}</div>
-                      <div className="text-xs text-muted-foreground font-medium">Pytań</div>
-                    </div>
-                    <div className="text-center p-4 bg-muted/30 rounded-xl">
-                      <Clock className="h-5 w-5 text-chart-4 mx-auto mb-2" />
-                      <div className="text-2xl font-bold text-foreground">{Math.round(stats.avgTime / 1000)}s</div>
-                      <div className="text-xs text-muted-foreground font-medium">Śr. czas</div>
-                    </div>
-                    <div className="text-center p-4 bg-muted/30 rounded-xl">
-                      <Target className="h-5 w-5 text-chart-2 mx-auto mb-2" />
-                      <div className="text-2xl font-bold text-chart-2">{Math.round(stats.successRate * 100)}%</div>
-                      <div className="text-xs text-muted-foreground font-medium">Celność</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                <ul className="rows">
+                  {course.modules.map((module, mi) => {
+                    const progress = moduleProgress(module.sections);
+                    const pct = Math.round(progress ?? 0);
+                    return (
+                      <li key={module.id} className="contents">
+                        <Link
+                          href={`/modules#m-${module.id}`}
+                          className="row group py-5 grid-cols-[36px_minmax(0,1fr)_28px] sm:grid-cols-[48px_minmax(0,1fr)_auto_28px]"
+                          data-testid={`module-progress-${module.id}`}
+                        >
+                          <span className="row__n">{pad(mi + 1)}</span>
+                          <span className="row__t gap-2">
+                            <b className="!text-[1.0625rem] sm:!text-[1.25rem] !leading-snug">{cleanTitle(module.title)}</b>
+                            {progress !== null && (
+                              <ProgressLine value={pct} label={`Postęp: ${cleanTitle(module.title)}`} className="max-w-[320px]" />
+                            )}
+                          </span>
+                          <span className="num text-[15px] text-[var(--txt2)] hidden sm:block">{progress !== null ? `${pct}%` : ""}</span>
+                          <ChevronRight
+                            className="h-4 w-4 text-[var(--txt3)] transition-colors group-hover:text-[var(--txt)]"
+                            aria-hidden="true"
+                          />
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </motion.section>
+            )}
           </div>
+
+          {/* Prawa kolumna: liczby z odpowiedzi */}
+          <aside className="grid gap-12 content-start" aria-label="Podsumowanie">
+            {course.total > 0 && (
+              <motion.div variants={rise}>
+                <ProgressCard
+                  overallProgress={course.overall}
+                  completedSections={course.completed}
+                  totalSections={course.total}
+                />
+              </motion.div>
+            )}
+
+            {stats && stats.totalAttempts > 0 && (
+              <motion.section variants={rise} aria-labelledby="stats-title">
+                <h2 id="stats-title" className="label mb-4">Twoje odpowiedzi</h2>
+                <dl className="grid grid-cols-3 border-t border-[var(--line)]">
+                  <Stat label="Odpowiedzi" value={String(stats.totalAttempts)} testId="stat-attempts" />
+                  <Stat label="Poprawne" value={`${Math.round(stats.successRate * 100)}%`} testId="stat-success" />
+                  <Stat label="Śr. czas" value={`${Math.round(stats.avgTime / 1000)} s`} testId="stat-time" />
+                </dl>
+              </motion.section>
+            )}
+
+            {weakAreas.length > 0 && (
+              <motion.section variants={rise} aria-labelledby="weak-title">
+                <h2 id="weak-title" className="label mb-4">Do poprawy</h2>
+                <ul className="rows">
+                  {weakAreas.slice(0, 3).map((area) => (
+                    <li
+                      key={area.tag}
+                      className="border-b border-[var(--line)] py-3 flex items-center justify-between gap-4 text-[15px]"
+                    >
+                      <span className="min-w-0 truncate text-[var(--txt)]">{area.tag}</span>
+                      <span className="num text-[var(--txt2)] shrink-0">{Math.round(area.successRate * 100)}% poprawnych</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/quiz?mode=review" className="inline-block mt-4 text-[14px] text-[var(--puls)]">
+                  Powtórz te pytania
+                </Link>
+              </motion.section>
+            )}
+
+            {certificate ? (
+              <motion.section variants={rise} className="surface p-6 grid gap-3" aria-labelledby="cert-title">
+                <p className="label label--g">Certyfikat</p>
+                <h2 id="cert-title" className="h3">Twój certyfikat jest gotowy</h2>
+                <p className="muted text-[15px]">
+                  Wydany {new Date(certificate.issuedAt).toLocaleDateString("pl-PL")}
+                </p>
+                <div>
+                  <Button asChild variant="outline" size="sm" data-testid="button-view-certificate">
+                    <Link href={`/certificate/${certificate.certificateId}`}>Zobacz certyfikat</Link>
+                  </Button>
+                </div>
+              </motion.section>
+            ) : certificateEligibility?.isEligible ? (
+              <motion.section variants={rise} className="surface p-6 grid gap-3" aria-labelledby="cert-title">
+                <p className="label label--g">Certyfikat</p>
+                <h2 id="cert-title" className="h3">Możesz odebrać certyfikat</h2>
+                <p className="muted text-[15px]">Spełniasz warunki ukończenia kursu.</p>
+                <div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generateCertificateMutation.mutate()}
+                    disabled={generateCertificateMutation.isPending}
+                    data-testid="button-generate-certificate"
+                  >
+                    {generateCertificateMutation.isPending ? "Generuję…" : "Wygeneruj certyfikat"}
+                  </Button>
+                </div>
+              </motion.section>
+            ) : null}
+          </aside>
         </div>
-      </div>
+      )}
+    </motion.div>
+  );
+}
+
+function Stat({ label, value, testId }: { label: string; value: string; testId: string }) {
+  return (
+    <div className="grid gap-1 py-4 pr-3">
+      <dt className="text-[13px] text-[var(--txt2)]">{label}</dt>
+      <dd className="num text-[1.5rem] leading-none text-[var(--txt)]" data-testid={testId}>
+        {value}
+      </dd>
     </div>
   );
 }

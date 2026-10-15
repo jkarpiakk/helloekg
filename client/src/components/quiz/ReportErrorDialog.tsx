@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { AlertTriangle } from "lucide-react";
 
 interface ReportErrorDialogProps {
   questionId: string;
@@ -15,6 +14,7 @@ interface ReportErrorDialogProps {
 
 export default function ReportErrorDialog({ questionId, open, onOpenChange }: ReportErrorDialogProps) {
   const [message, setMessage] = useState("");
+  const [touched, setTouched] = useState(false);
   const { toast } = useToast();
 
   const reportMutation = useMutation({
@@ -25,76 +25,89 @@ export default function ReportErrorDialog({ questionId, open, onOpenChange }: Re
     onSuccess: () => {
       toast({
         title: "Zgłoszenie wysłane",
-        description: "Dziękujemy za pomoc w poprawie jakości pytań!",
+        description: "Dzięki — sprawdzimy to pytanie.",
       });
       setMessage("");
+      setTouched(false);
       onOpenChange(false);
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd",
-        description: error.message || "Nie udało się wysłać zgłoszenia",
+        title: "Nie udało się wysłać zgłoszenia",
+        description: error.message || "Sprawdź połączenie i spróbuj ponownie.",
         variant: "destructive",
       });
     },
   });
 
-  const handleSubmit = () => {
-    if (!message.trim()) {
-      toast({
-        title: "Uwaga",
-        description: "Proszę opisać problem",
-        variant: "destructive",
-      });
-      return;
-    }
+  const empty = !message.trim();
 
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setTouched(true);
+    if (empty) return;
     reportMutation.mutate({ questionId, message });
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) setTouched(false);
+        onOpenChange(o);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Zgłoś błąd w pytaniu
-          </DialogTitle>
-          <DialogDescription>
-            Pomóż nam poprawić jakość pytań. Opisz co jest nie tak z tym pytaniem.
+        <DialogHeader className="pr-10">
+          <p className="label">Zgłoszenie</p>
+          <DialogTitle className="h3">Co jest nie tak z tym pytaniem?</DialogTitle>
+          <DialogDescription className="text-[15px] text-[var(--txt2)]">
+            Opisz błąd merytoryczny, literówkę albo niejasne sformułowanie. Twoje zgłoszenie trafi do autorów pytań.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 pt-4">
-          <Textarea
-            placeholder="Opisz błąd lub problem z pytaniem (np. błąd merytoryczny, literówka, nieaktualna informacja...)"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={5}
-            className="resize-none"
-            data-testid="error-report-message"
-          />
+        <form onSubmit={handleSubmit} className="grid gap-4 pt-1">
+          <div className="grid gap-2">
+            <label htmlFor="error-report-message" className="label">
+              Opis
+            </label>
+            <Textarea
+              id="error-report-message"
+              placeholder="Np. w odpowiedzi C powinno być „odstęp PR”, a nie „odcinek PR”."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onBlur={() => setTouched(true)}
+              rows={5}
+              className="resize-none"
+              aria-invalid={touched && empty ? true : undefined}
+              aria-describedby={touched && empty ? "error-report-hint" : undefined}
+              data-testid="error-report-message"
+            />
+            {touched && empty && (
+              <p id="error-report-hint" className="text-[14px] text-[var(--txt2)]">
+                Napisz choć jedno zdanie, żebyśmy wiedzieli, co poprawić.
+              </p>
+            )}
+          </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button
-              variant="outline"
+              type="button"
+              variant="ghost"
               onClick={() => {
                 setMessage("");
+                setTouched(false);
                 onOpenChange(false);
               }}
               data-testid="error-report-cancel"
             >
               Anuluj
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={reportMutation.isPending}
-              data-testid="error-report-submit"
-            >
-              {reportMutation.isPending ? "Wysyłanie..." : "Wyślij zgłoszenie"}
+            <Button type="submit" disabled={reportMutation.isPending} data-testid="error-report-submit">
+              {reportMutation.isPending ? "Wysyłam…" : "Wyślij zgłoszenie"}
             </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

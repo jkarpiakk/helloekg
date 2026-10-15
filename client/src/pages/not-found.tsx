@@ -1,21 +1,35 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { Link } from "wouter";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
+import { rise, stagger } from "@/lib/motion";
 
 export default function NotFound() {
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardContent className="pt-6">
-          <div className="flex mb-4 gap-2">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
-          </div>
+  const { isAuthenticated } = useAuth();
 
-          <p className="mt-4 text-sm text-gray-600">
-            Did you forget to add the page to the router?
-          </p>
-        </CardContent>
-      </Card>
+  return (
+    <div className="wrap">
+      <motion.div
+        className="mx-auto max-w-[30rem] py-20 sm:py-28"
+        variants={stagger(0.05)}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.p variants={rise} className="label">Błąd 404</motion.p>
+        <motion.h1 variants={rise} className="h2 mt-4 text-[var(--txt)]">
+          Nie ma takiej strony
+        </motion.h1>
+        <motion.p variants={rise} className="lead mt-4">
+          Link mógł się zmienić albo zawiera literówkę. Wróć do kursu i wybierz, co chcesz otworzyć.
+        </motion.p>
+        <motion.div variants={rise} className="mt-8">
+          <Button asChild>
+            <Link href={isAuthenticated ? "/dashboard" : "/"}>
+              {isAuthenticated ? "Wróć do kursu" : "Wróć na stronę główną"}
+            </Link>
+          </Button>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

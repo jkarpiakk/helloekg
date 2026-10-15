@@ -9,3 +9,6 @@ cookies.txt
 *.png
 !attached_assets/**/*.png
 !client/**/*.png
+# lokalny podgląd (dane dostępowe do kopii bazy)
+.env.preview
+.preview-assets

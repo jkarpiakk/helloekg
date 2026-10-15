@@ -1,54 +1,110 @@
-import { useState } from "react";
+import { forwardRef, useEffect, useState, type ComponentProps } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import type { LoginForm, RegisterForm } from "@/types";
-import Logo from "@/components/layout/Logo";
 import { apiRequest } from "@/lib/queryClient";
+import { rise, stagger, spring } from "@/lib/motion";
+
+type AuthMode = "login" | "register";
 
 interface AuthFormsProps {
-  mode: "login" | "register";
+  mode: AuthMode;
   onSuccess?: () => void;
+  /** Przełączenie logowanie ↔ rejestracja. Bez tego komponent przełącza się sam. */
+  onSwitchMode?: (mode: AuthMode) => void;
 }
 
+// Komunikaty mówią, co zrobić — nie tylko, co jest źle
+const emailField = z.string().email("Wpisz adres e-mail w formacie imie@domena.pl");
+const passwordField = z.string().min(8, "Hasło musi mieć co najmniej 8 znaków");
+
 const loginSchema = z.object({
-  email: z.string().email("Nieprawidłowy adres e-mail"),
-  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
+  email: emailField,
+  password: passwordField,
 });
 
 const registerSchema = z.object({
-  email: z.string().email("Nieprawidłowy adres e-mail"),
-  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
-  confirmPassword: z.string(),
+  email: emailField,
+  password: passwordField,
+  confirmPassword: z.string().min(1, "Wpisz hasło jeszcze raz"),
   firstName: z.string().optional().default(""),
   lastName: z.string().optional().default(""),
   profession: z.string().optional(),
-  termsAccepted: z.boolean().refine(val => val === true, "Musisz zaakceptować regulamin"),
-  privacyAccepted: z.boolean().refine(val => val === true, "Musisz zaakceptować politykę prywatności"),
+  termsAccepted: z.boolean().refine(val => val === true, "Zaznacz, aby założyć konto"),
+  privacyAccepted: z.boolean().refine(val => val === true, "Zaznacz, aby założyć konto"),
   marketingConsent: z.boolean().default(false),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Hasła nie pasują do siebie",
+  message: "Hasła się różnią — wpisz to samo hasło w obu polach",
   path: ["confirmPassword"],
 });
 
-export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
+/** apiRequest rzuca błąd w formacie „401: {"error": "..."}” — wyciągamy samą treść */
+function readableError(error: unknown, fallback: string): string {
+  const message = (error as Error | undefined)?.message;
+  if (!message) return fallback;
+  try {
+    const jsonStart = message.indexOf("{");
+    if (jsonStart >= 0) {
+      const parsed = JSON.parse(message.substring(jsonStart));
+      return parsed.error || parsed.message || fallback;
+    }
+  } catch {}
+  return message.replace(/^\d{3}:\s*/, "") || fallback;
+}
+
+type PasswordInputProps = ComponentProps<typeof Input> & {
+  visible: boolean;
+  onToggle: () => void;
+  toggleTestId?: string;
+};
+
+const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
+  ({ visible, onToggle, toggleTestId, className, ...props }, ref) => (
+    <div className="relative">
+      <Input ref={ref} type={visible ? "text" : "password"} className={`pr-12 ${className ?? ""}`} {...props} />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-[var(--txt3)] transition-[transform,color] duration-150 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={visible ? "Ukryj hasło" : "Pokaż hasło"}
+        aria-pressed={visible}
+        data-testid={toggleTestId}
+      >
+        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  ),
+);
+PasswordInput.displayName = "PasswordInput";
+
+const fieldLabel = "text-sm font-normal text-[var(--txt2)]";
+
+export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: AuthFormsProps) {
+  const [mode, setMode] = useState<AuthMode>(modeProp);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
-  const { t } = useTranslation();
   const { login, register } = useAuth();
   const { toast } = useToast();
+
+  useEffect(() => setMode(modeProp), [modeProp]);
+
+  const switchMode = (next: AuthMode) => {
+    setShowPassword(false);
+    if (onSwitchMode) onSwitchMode(next);
+    else setMode(next);
+  };
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
@@ -59,24 +115,18 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
       setForgotSent(true);
     },
     onError: (error: any) => {
-      let description = "Nie udało się wysłać linku";
-      try {
-        const jsonStart = error.message?.indexOf("{");
-        if (jsonStart >= 0) {
-          const parsed = JSON.parse(error.message.substring(jsonStart));
-          description = parsed.error || description;
-        }
-      } catch {}
       toast({
-        title: "Błąd",
-        description,
+        title: "Nie udało się wysłać linku",
+        description: readableError(error, "Spróbuj ponownie za chwilę."),
         variant: "destructive",
       });
     },
   });
 
+  // Walidacja przy opuszczeniu pola, potem na bieżąco przy poprawianiu
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
+    mode: "onTouched",
     defaultValues: {
       email: "",
       password: "",
@@ -85,6 +135,7 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
 
   const registerForm = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
+    mode: "onTouched",
     defaultValues: {
       email: "",
       password: "",
@@ -101,17 +152,14 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: () => {
-      toast({
-        title: "Sukces",
-        description: "Zostałeś pomyślnie zalogowany",
-      });
+      toast({ title: "Zalogowano" });
       onSuccess?.();
       window.location.href = "/dashboard";
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd logowania",
-        description: error.message || "Nieprawidłowe dane logowania",
+        title: "Nie udało się zalogować",
+        description: readableError(error, "Sprawdź adres e-mail i hasło."),
         variant: "destructive",
       });
     },
@@ -128,8 +176,8 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd rejestracji",
-        description: error.message || "Nie udało się utworzyć konta",
+        title: "Nie udało się założyć konta",
+        description: readableError(error, "Spróbuj ponownie za chwilę."),
         variant: "destructive",
       });
     },
@@ -143,31 +191,54 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
     registerMutation.mutate(data);
   };
 
+  const header = (label: string, title: string, lead: string) => (
+    <motion.div variants={rise} className="space-y-3 pr-10">
+      <p className="label">{label}</p>
+      <h2 className="h3 text-[var(--txt)]">{title}</h2>
+      <p className="text-[15px] leading-relaxed text-[var(--txt2)]">{lead}</p>
+    </motion.div>
+  );
+
+  const switchLine = (question: string, action: string, next: AuthMode) => (
+    <motion.p variants={rise} className="text-center text-sm text-[var(--txt2)]">
+      {question}{" "}
+      <button
+        type="button"
+        className="font-medium text-[var(--txt)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        onClick={() => switchMode(next)}
+        data-testid={`switch-to-${next}`}
+      >
+        {action}
+      </button>
+    </motion.p>
+  );
+
   if (mode === "login") {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            <Logo markSize={56} />
-          </div>
-          <CardTitle className="text-2xl text-center">{t("auth.loginTitle")}</CardTitle>
-          <CardDescription className="text-center">
-            Wprowadź swoje dane aby uzyskać dostęp do konta
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <motion.div
+        key="login"
+        className="w-full space-y-6"
+        variants={stagger(0.04)}
+        initial="hidden"
+        animate="show"
+      >
+        {header("Logowanie", "Witaj z powrotem", "Zaloguj się, żeby wrócić do kursu i swojego postępu.")}
+
+        <motion.div variants={rise}>
           <Form {...loginForm}>
-            <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+            <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4" noValidate>
               <FormField
                 control={loginForm.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("auth.email")}</FormLabel>
+                    <FormLabel className={fieldLabel}>Adres e-mail</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="email@example.com"
+                        autoComplete="email"
+                        inputMode="email"
+                        placeholder="imie@domena.pl"
                         {...field}
                         data-testid="login-email"
                       />
@@ -181,131 +252,146 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("auth.password")}</FormLabel>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <FormLabel className={fieldLabel}>Hasło</FormLabel>
+                      <button
+                        type="button"
+                        className="text-[13px] text-[var(--txt2)] underline-offset-4 hover:text-[var(--txt)] hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => {
+                          setShowForgotPassword((open) => !open);
+                          setForgotSent(false);
+                          setForgotEmail(loginForm.getValues("email") || "");
+                        }}
+                        aria-expanded={showForgotPassword}
+                        data-testid="forgot-password-link"
+                      >
+                        Nie pamiętasz hasła?
+                      </button>
+                    </div>
                     <FormControl>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="••••••••"
-                          {...field}
-                          data-testid="login-password"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                          data-testid="toggle-password"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
+                      <PasswordInput
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        visible={showPassword}
+                        onToggle={() => setShowPassword((v) => !v)}
+                        toggleTestId="toggle-password"
+                        {...field}
+                        data-testid="login-password"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              <AnimatePresence initial={false}>
+                {showForgotPassword && (
+                  <motion.div
+                    key="forgot"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={spring}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-3 rounded-[12px] border border-[var(--line)] p-4">
+                      {forgotSent ? (
+                        <div className="space-y-3" role="status">
+                          <p className="text-sm text-[var(--txt)]">
+                            Jeśli konto z tym adresem istnieje, wysłaliśmy na nie link do ustawienia nowego hasła. Sprawdź skrzynkę (także spam).
+                          </p>
+                          <button
+                            type="button"
+                            className="text-sm text-[var(--txt2)] underline-offset-4 hover:text-[var(--txt)] hover:underline"
+                            onClick={() => setShowForgotPassword(false)}
+                          >
+                            Zamknij
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-[var(--txt2)]">
+                            Podaj adres e-mail konta, a wyślemy ci link do ustawienia nowego hasła.
+                          </p>
+                          <Input
+                            type="email"
+                            autoComplete="email"
+                            placeholder="imie@domena.pl"
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            aria-label="Adres e-mail do resetu hasła"
+                            data-testid="forgot-password-email"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              disabled={!forgotEmail || forgotPasswordMutation.isPending}
+                              onClick={() => forgotPasswordMutation.mutate(forgotEmail)}
+                              data-testid="forgot-password-submit"
+                            >
+                              {forgotPasswordMutation.isPending ? "Wysyłam…" : "Wyślij link"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowForgotPassword(false)}
+                            >
+                              Anuluj
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <Button
                 type="submit"
                 className="w-full"
                 disabled={loginMutation.isPending}
                 data-testid="login-submit"
               >
-                {loginMutation.isPending ? "Logowanie..." : t("auth.loginButton")}
+                {loginMutation.isPending ? "Loguję…" : "Zaloguj się"}
               </Button>
             </form>
           </Form>
+        </motion.div>
 
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              className="text-sm text-primary hover:underline"
-              onClick={() => { setShowForgotPassword(true); setForgotSent(false); setForgotEmail(""); }}
-              data-testid="forgot-password-link"
-            >
-              Zapomniałem hasła
-            </button>
-          </div>
-
-          {showForgotPassword && (
-            <div className="mt-4 p-4 border rounded-lg space-y-3">
-              {forgotSent ? (
-                <div className="text-center space-y-2">
-                  <p className="text-sm text-green-600 font-medium">
-                    Jeśli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła.
-                  </p>
-                  <button
-                    type="button"
-                    className="text-sm text-muted-foreground hover:underline"
-                    onClick={() => setShowForgotPassword(false)}
-                  >
-                    Zamknij
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    Podaj adres e-mail powiązany z Twoim kontem, a wyślemy Ci link do resetowania hasła.
-                  </p>
-                  <Input
-                    type="email"
-                    placeholder="email@example.com"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    data-testid="forgot-password-email"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      className="flex-1"
-                      disabled={!forgotEmail || forgotPasswordMutation.isPending}
-                      onClick={() => forgotPasswordMutation.mutate(forgotEmail)}
-                      data-testid="forgot-password-submit"
-                    >
-                      {forgotPasswordMutation.isPending ? "Wysyłanie..." : "Wyślij link"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowForgotPassword(false)}
-                    >
-                      Anuluj
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {switchLine("Nie masz konta?", "Załóż konto", "register")}
+      </motion.div>
     );
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="space-y-1">
-        <div className="flex items-center justify-center mb-4">
-          <Logo markSize={56} />
-        </div>
-        <CardTitle className="text-2xl text-center">{t("auth.registerTitle")}</CardTitle>
-        <CardDescription className="text-center">
-          Utwórz konto aby rozpocząć naukę EKG
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <motion.div
+      key="register"
+      className="w-full space-y-6"
+      variants={stagger(0.04)}
+      initial="hidden"
+      animate="show"
+    >
+      {header("Wersja beta", "Załóż konto", "Konto daje dostęp do wszystkich modułów bety i zapisuje twój postęp.")}
+
+      <motion.div variants={rise}>
         <Form {...registerForm}>
-          <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+          <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4" noValidate>
             <FormField
               control={registerForm.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t("auth.email")}</FormLabel>
+                  <FormLabel className={fieldLabel}>Adres e-mail</FormLabel>
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="email@example.com"
+                      autoComplete="email"
+                      inputMode="email"
+                      placeholder="imie@domena.pl"
                       {...field}
                       data-testid="register-email"
                     />
@@ -319,26 +405,17 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t("auth.password")}</FormLabel>
+                  <FormLabel className={fieldLabel}>Hasło</FormLabel>
                   <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        {...field}
-                        data-testid="register-password"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                        data-testid="toggle-password"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
+                    <PasswordInput
+                      autoComplete="new-password"
+                      placeholder="Co najmniej 8 znaków"
+                      visible={showPassword}
+                      onToggle={() => setShowPassword((v) => !v)}
+                      toggleTestId="toggle-password"
+                      {...field}
+                      data-testid="register-password"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -349,10 +426,11 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t("auth.confirmPassword")}</FormLabel>
+                  <FormLabel className={fieldLabel}>Powtórz hasło</FormLabel>
                   <FormControl>
                     <Input
                       type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
                       placeholder="••••••••"
                       {...field}
                       data-testid="register-confirmPassword"
@@ -362,25 +440,30 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                 </FormItem>
               )}
             />
-            
-            <div className="space-y-3">
+
+            <div className="space-y-3 border-t border-[var(--line)] pt-4">
               <FormField
                 control={registerForm.control}
                 name="termsAccepted"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        data-testid="register-terms"
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel className="text-sm">
-                        {t("auth.termsAccepted")}
+                  <FormItem className="space-y-1">
+                    <div className="flex items-start gap-3">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked === true);
+                            field.onBlur();
+                          }}
+                          className="mt-0.5"
+                          data-testid="register-terms"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm font-normal leading-snug text-[var(--txt2)]">
+                        Akceptuję regulamin
                       </FormLabel>
                     </div>
+                    <FormMessage className="pl-7" />
                   </FormItem>
                 )}
               />
@@ -388,19 +471,33 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                 control={registerForm.control}
                 name="privacyAccepted"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        data-testid="register-privacy"
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel className="text-sm">
-                        {t("auth.privacyAccepted")}
+                  <FormItem className="space-y-1">
+                    <div className="flex items-start gap-3">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked === true);
+                            field.onBlur();
+                          }}
+                          className="mt-0.5"
+                          data-testid="register-privacy"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm font-normal leading-snug text-[var(--txt2)]">
+                        Akceptuję{" "}
+                        <a
+                          href="https://helloekg.pl/polityka-prywatnosci.html"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--txt)] underline underline-offset-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          politykę prywatności
+                        </a>
                       </FormLabel>
                     </div>
+                    <FormMessage className="pl-7" />
                   </FormItem>
                 )}
               />
@@ -408,19 +505,18 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
                 control={registerForm.control}
                 name="marketingConsent"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormItem className="flex items-start gap-3 space-y-0">
                     <FormControl>
                       <Checkbox
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(checked) => field.onChange(checked === true)}
+                        className="mt-0.5"
                         data-testid="register-marketing"
                       />
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel className="text-sm">
-                        {t("auth.marketingConsent")}
-                      </FormLabel>
-                    </div>
+                    <FormLabel className="text-sm font-normal leading-snug text-[var(--txt2)]">
+                      Chcę dostawać e-maile o nowościach w kursie (opcjonalnie)
+                    </FormLabel>
                   </FormItem>
                 )}
               />
@@ -432,11 +528,13 @@ export default function AuthForms({ mode, onSuccess }: AuthFormsProps) {
               disabled={registerMutation.isPending}
               data-testid="register-submit"
             >
-              {registerMutation.isPending ? "Tworzenie konta..." : t("auth.registerButton")}
+              {registerMutation.isPending ? "Zakładam konto…" : "Załóż konto"}
             </Button>
           </form>
         </Form>
-      </CardContent>
-    </Card>
+      </motion.div>
+
+      {switchLine("Masz już konto?", "Zaloguj się", "login")}
+    </motion.div>
   );
 }

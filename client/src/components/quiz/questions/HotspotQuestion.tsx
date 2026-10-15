@@ -1,7 +1,10 @@
-import { useState, useCallback, useRef } from "react";
-import { Check, X, MousePointer2 } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { HotspotConfig, AnswerData, QuizResult } from "@/types";
+import { DRAG_THRESHOLD } from "./gesture";
+import PartialScore from "./PartialScore";
 
 interface HotspotQuestionProps {
   config: HotspotConfig;
@@ -9,6 +12,42 @@ interface HotspotQuestionProps {
   disabled: boolean;
   showResult: boolean;
   result?: QuizResult;
+}
+
+type Hotspot = HotspotConfig["hotspots"][0];
+
+/** Trafienie w obszar — współrzędne w % obrazu (0–100); rect = [lewo, góra, prawo, dół] */
+function isPointInHotspot(x: number, y: number, hotspot: Hotspot): boolean {
+  switch (hotspot.shape) {
+    case "rect": {
+      const [x1, y1, x2, y2] = hotspot.coords;
+      return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+    }
+    case "circle": {
+      const [cx, cy, r] = hotspot.coords;
+      const distance = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+      return distance <= r;
+    }
+    case "polygon": {
+      const points = [];
+      for (let i = 0; i < hotspot.coords.length; i += 2) {
+        points.push({ x: hotspot.coords[i], y: hotspot.coords[i + 1] });
+      }
+      let inside = false;
+      for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const xi = points[i].x,
+          yi = points[i].y;
+        const xj = points[j].x,
+          yj = points[j].y;
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+    default:
+      return false;
+  }
 }
 
 export default function HotspotQuestion({
@@ -20,297 +59,285 @@ export default function HotspotQuestion({
 }: HotspotQuestionProps) {
   const [clickedHotspots, setClickedHotspots] = useState<Set<string>>(new Set());
   const [clickCoordinates, setClickCoordinates] = useState<{ x: number; y: number }[]>([]);
+  // Znacznik pokazany od razu przy naciśnięciu; zatwierdzany przy puszczeniu bez przesunięcia
+  const [pending, setPending] = useState<{ x: number; y: number } | null>(null);
+  const press = useRef<{ pid: number; sx: number; sy: number; x: number; y: number } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
-  const isPointInHotspot = (x: number, y: number, hotspot: HotspotConfig['hotspots'][0]): boolean => {
-    switch (hotspot.shape) {
-      case 'rect': {
-        const [x1, y1, x2, y2] = hotspot.coords;
-        return x >= x1 && x <= x2 && y >= y1 && y <= y2;
-      }
-      case 'circle': {
-        const [cx, cy, r] = hotspot.coords;
-        const distance = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-        return distance <= r;
-      }
-      case 'polygon': {
-        const points = [];
-        for (let i = 0; i < hotspot.coords.length; i += 2) {
-          points.push({ x: hotspot.coords[i], y: hotspot.coords[i + 1] });
-        }
-        let inside = false;
-        for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-          const xi = points[i].x, yi = points[i].y;
-          const xj = points[j].x, yj = points[j].y;
-          if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-            inside = !inside;
+  const toPercent = (clientX: number, clientY: number) => {
+    const rect = imageRef.current!.getBoundingClientRect();
+    return {
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 100,
+    };
+  };
+
+  const commitPoint = useCallback(
+    (x: number, y: number) => {
+      const newCoordinates = config.allowMultiple ? [...clickCoordinates, { x, y }] : [{ x, y }];
+      setClickCoordinates(newCoordinates);
+
+      const newClickedHotspots = new Set(config.allowMultiple ? clickedHotspots : []);
+      let foundHotspot = false;
+
+      for (const hotspot of config.hotspots) {
+        if (isPointInHotspot(x, y, hotspot)) {
+          foundHotspot = true;
+          if (config.allowMultiple) {
+            if (newClickedHotspots.has(hotspot.id)) {
+              newClickedHotspots.delete(hotspot.id);
+            } else {
+              newClickedHotspots.add(hotspot.id);
+            }
+          } else {
+            newClickedHotspots.clear();
+            newClickedHotspots.add(hotspot.id);
           }
+          break;
         }
-        return inside;
       }
-      default:
-        return false;
+
+      setClickedHotspots(newClickedHotspots);
+
+      const answerData: AnswerData = {
+        type: "hotspot",
+        clickedHotspots: Array.from(newClickedHotspots),
+        clickCoordinates: newCoordinates,
+        clickedOutside: !foundHotspot,
+      };
+      onChange(answerData);
+    },
+    [config, clickedHotspots, clickCoordinates, onChange],
+  );
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (disabled || !imageRef.current || e.button !== 0) return;
+    const p = toPercent(e.clientX, e.clientY);
+    if (p.x < 0 || p.x > 100 || p.y < 0 || p.y > 100) return;
+    press.current = { pid: e.pointerId, sx: e.clientX, sy: e.clientY, ...p };
+    setPending(p);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = press.current;
+    if (!d || e.pointerId !== d.pid) return;
+    // Przesunięcie = przewijanie strony, nie wskazanie
+    if (Math.hypot(e.clientX - d.sx, e.clientY - d.sy) >= DRAG_THRESHOLD) {
+      press.current = null;
+      setPending(null);
     }
   };
 
-  const handleImageClick = useCallback((event: React.MouseEvent<HTMLImageElement>) => {
-    if (disabled || !imageRef.current) return;
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = press.current;
+    press.current = null;
+    setPending(null);
+    if (!d || e.pointerId !== d.pid) return;
+    commitPoint(d.x, d.y);
+  };
 
-    const rect = imageRef.current.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
-
-    const newCoordinates = config.allowMultiple 
-      ? [...clickCoordinates, { x, y }]
-      : [{ x, y }];
-    
-    setClickCoordinates(newCoordinates);
-
-    const newClickedHotspots = new Set(config.allowMultiple ? clickedHotspots : []);
-    let foundHotspot = false;
-
-    for (const hotspot of config.hotspots) {
-      if (isPointInHotspot(x, y, hotspot)) {
-        foundHotspot = true;
-        if (config.allowMultiple) {
-          if (newClickedHotspots.has(hotspot.id)) {
-            newClickedHotspots.delete(hotspot.id);
-          } else {
-            newClickedHotspots.add(hotspot.id);
-          }
-        } else {
-          newClickedHotspots.clear();
-          newClickedHotspots.add(hotspot.id);
-        }
-        break;
-      }
-    }
-    
-    setClickedHotspots(newClickedHotspots);
-
-    const answerData: AnswerData = {
-      type: 'hotspot',
-      clickedHotspots: Array.from(newClickedHotspots),
-      clickCoordinates: newCoordinates,
-      clickedOutside: !foundHotspot,
-    };
-    onChange(answerData);
-  }, [disabled, config, clickedHotspots, clickCoordinates, onChange]);
+  const onPointerCancel = () => {
+    press.current = null;
+    setPending(null);
+  };
 
   const handleClear = () => {
     setClickedHotspots(new Set());
     setClickCoordinates([]);
     onChange({
-      type: 'hotspot',
+      type: "hotspot",
       clickedHotspots: [],
       clickCoordinates: [],
     });
   };
 
-  const renderHotspotOverlay = (hotspot: HotspotConfig['hotspots'][0]) => {
-    const isIncorrect = result?.feedback?.incorrectItems?.includes(hotspot.id);
-    
-    let fillColor = 'transparent';
-    let strokeColor = 'transparent';
-    
-    // Only show overlay after checking answer (showResult)
+  // Obszary po sprawdzeniu: poprawny — linia pulsu; błędnie wskazany — przerywana linia alarmu
+  const renderHotspotOverlay = (hotspot: Hotspot) => {
     if (!showResult) return null;
-    
+    const isIncorrect = result?.feedback?.incorrectItems?.includes(hotspot.id);
+    let stroke: string;
+    let fill = "transparent";
+    let dash: string | undefined;
     if (hotspot.isCorrect) {
-      fillColor = 'rgba(34, 197, 94, 0.3)';
-      strokeColor = 'rgb(34, 197, 94)';
+      stroke = "var(--puls)";
+      fill = "var(--tint)";
     } else if (isIncorrect) {
-      fillColor = 'rgba(239, 68, 68, 0.3)';
-      strokeColor = 'rgb(239, 68, 68)';
+      stroke = "var(--alarm)";
+      dash = "4 3";
     } else {
-      return null; // Don't show anything for non-clicked, non-correct hotspots
+      return null;
     }
+    const common = {
+      fill,
+      stroke,
+      strokeWidth: 2,
+      strokeDasharray: dash,
+      vectorEffect: "non-scaling-stroke" as const,
+    };
 
     switch (hotspot.shape) {
-      case 'rect': {
+      case "rect": {
         const [x1, y1, x2, y2] = hotspot.coords;
-        return (
-          <rect
-            key={hotspot.id}
-            x={`${x1}%`}
-            y={`${y1}%`}
-            width={`${x2 - x1}%`}
-            height={`${y2 - y1}%`}
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth="2"
-          />
-        );
+        return <rect key={hotspot.id} x={x1} y={y1} width={x2 - x1} height={y2 - y1} rx={0.6} {...common} />;
       }
-      case 'circle': {
+      case "circle": {
         const [cx, cy, r] = hotspot.coords;
-        return (
-          <circle
-            key={hotspot.id}
-            cx={`${cx}%`}
-            cy={`${cy}%`}
-            r={`${r}%`}
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth="2"
-          />
-        );
+        return <ellipse key={hotspot.id} cx={cx} cy={cy} rx={r} ry={r} {...common} />;
       }
-      case 'polygon': {
+      case "polygon": {
         const points = [];
         for (let i = 0; i < hotspot.coords.length; i += 2) {
-          points.push(`${hotspot.coords[i]}%,${hotspot.coords[i + 1]}%`);
+          points.push(`${hotspot.coords[i]},${hotspot.coords[i + 1]}`);
         }
-        return (
-          <polygon
-            key={hotspot.id}
-            points={points.join(' ')}
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth="2"
-          />
-        );
+        return <polygon key={hotspot.id} points={points.join(" ")} {...common} />;
       }
       default:
         return null;
     }
   };
 
+  const markerFor = (coord: { x: number; y: number }) =>
+    config.hotspots.some((h) => h.isCorrect && isPointInHotspot(coord.x, coord.y, h));
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
-        {config.allowMultiple 
-          ? "Kliknij na wszystkie prawidłowe obszary na obrazku"
-          : "Kliknij na prawidłowy obszar na obrazku"}
+    <div className="grid gap-4">
+      <p className="text-[15px] text-[var(--txt2)]">
+        {config.allowMultiple
+          ? "Dotknij zapisu we wszystkich właściwych miejscach."
+          : "Dotknij zapisu we właściwym miejscu."}
       </p>
 
-      <div 
-        className={`relative rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-          disabled 
-            ? 'border-muted' 
-            : 'border-primary/30 hover:border-primary hover:shadow-lg'
-        }`}
+      <div
+        className={cn(
+          "relative select-none overflow-hidden rounded-[12px] border bg-[var(--panel)] transition-[border-color] duration-200",
+          disabled ? "border-[var(--line)]" : "cursor-crosshair border-[var(--line2)] hover:border-[var(--txt3)]",
+        )}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onPointerLeave={onPointerCancel}
         data-testid="hotspot-container"
       >
         <img
           ref={imageRef}
           src={config.imageUrl}
-          alt="Obraz z zaznaczalnymi obszarami"
-          className={`w-full h-auto transition-opacity ${disabled ? 'cursor-default' : 'cursor-crosshair hover:opacity-95'}`}
-          onClick={handleImageClick}
+          alt="Zapis EKG — wskaż właściwe miejsce"
+          draggable={false}
+          className="block h-auto w-full"
           data-testid="hotspot-image"
         />
-        
-        <svg 
-          className="absolute inset-0 w-full h-full pointer-events-none"
+
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
+          aria-hidden
         >
-          {config.hotspots.map(hotspot => renderHotspotOverlay(hotspot))}
-          
-          {/* Show click markers - blue dot, green if correct, red if wrong */}
-          {clickCoordinates.map((coord, idx) => {
-            const isInCorrectHotspot = config.hotspots.some(h => h.isCorrect && isPointInHotspot(coord.x, coord.y, h));
-            let fillColor = "rgb(59, 130, 246)"; // blue by default
-            
-            if (showResult) {
-              fillColor = isInCorrectHotspot ? "rgb(34, 197, 94)" : "rgb(239, 68, 68)"; // green or red
-            }
-            
-            return (
-              <circle
-                key={`click-${idx}`}
-                cx={`${coord.x}%`}
-                cy={`${coord.y}%`}
-                r="1.5%"
-                fill={fillColor}
-                stroke="white"
-                strokeWidth="0.5"
-              />
-            );
-          })}
+          {config.hotspots.map((hotspot) => renderHotspotOverlay(hotspot))}
         </svg>
 
-        {showResult && config.hotspots.filter(h => h.isCorrect).map(hotspot => {
-          let labelX = 0, labelY = 0;
-          switch (hotspot.shape) {
-            case 'rect': {
-              const [x1, y1, x2, y2] = hotspot.coords;
-              labelX = (x1 + x2) / 2;
-              labelY = y2 + 3;
-              break;
-            }
-            case 'circle': {
-              const [cx, cy, r] = hotspot.coords;
-              labelX = cx;
-              labelY = cy + r + 3;
-              break;
-            }
-          }
-          
-          if (hotspot.label) {
-            return (
-              <div
-                key={`label-${hotspot.id}`}
-                className="absolute text-xs font-medium text-[#0B7E54] dark:text-[#3EE6A8] bg-white/90 dark:bg-slate-900/90 px-2 py-0.5 rounded"
-                style={{
-                  left: `${labelX}%`,
-                  top: `${labelY}%`,
-                  transform: 'translate(-50%, 0)',
-                }}
-              >
-                {hotspot.label}
-              </div>
-            );
-          }
-          return null;
+        {/* Znaczniki wskazań (HTML, żeby były okrągłe niezależnie od proporcji obrazu) */}
+        {clickCoordinates.map((coord, idx) => {
+          const hit = markerFor(coord);
+          const tone = !showResult ? "neutral" : hit ? "right" : "wrong";
+          return (
+            <span
+              key={`click-${idx}`}
+              className={cn(
+                "pointer-events-none absolute grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 bg-[var(--ink)]",
+                tone === "neutral" && "border-[var(--txt)]",
+                tone === "right" && "border-[var(--puls)] text-[var(--puls)]",
+                tone === "wrong" && "border-[var(--alarm)] text-[var(--alarm)]",
+              )}
+              style={{ left: `${coord.x}%`, top: `${coord.y}%` }}
+              aria-hidden
+            >
+              {tone === "neutral" && <span className="h-1.5 w-1.5 rounded-full bg-[var(--txt)]" />}
+              {tone === "right" && <Check className="h-3 w-3" strokeWidth={3} />}
+              {tone === "wrong" && <X className="h-3 w-3" strokeWidth={3} />}
+            </span>
+          );
         })}
+        {pending && (
+          <span
+            className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[var(--txt)] bg-[color-mix(in_srgb,var(--ink)_60%,transparent)]"
+            style={{ left: `${pending.x}%`, top: `${pending.y}%` }}
+            aria-hidden
+          />
+        )}
+
+        {showResult &&
+          config.hotspots
+            .filter((h) => h.isCorrect)
+            .map((hotspot) => {
+              let labelX = 0,
+                labelY = 0;
+              switch (hotspot.shape) {
+                case "rect": {
+                  const [x1, , x2, y2] = hotspot.coords;
+                  labelX = (x1 + x2) / 2;
+                  labelY = y2 + 3;
+                  break;
+                }
+                case "circle": {
+                  const [cx, cy, r] = hotspot.coords;
+                  labelX = cx;
+                  labelY = cy + r + 3;
+                  break;
+                }
+              }
+              if (!hotspot.label) return null;
+              return (
+                <div
+                  key={`label-${hotspot.id}`}
+                  className="pointer-events-none absolute rounded-[6px] border border-[var(--puls-deep)] bg-[var(--panel)] px-2 py-0.5 text-[12px] text-[var(--txt)]"
+                  style={{ left: `${labelX}%`, top: `${labelY}%`, transform: "translate(-50%, 0)" }}
+                >
+                  {hotspot.label}
+                </div>
+              );
+            })}
       </div>
 
-      <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" data-testid="hotspot-status">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <MousePointer2 className={`h-5 w-5 ${clickCoordinates.length > 0 ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} />
-          <span className={clickCoordinates.length > 0 ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}>
-            {clickCoordinates.length === 0 
-              ? "Kliknij na obrazek, aby zaznaczyć miejsce" 
-              : clickedHotspots.size > 0
-                ? `Zaznaczono obszar ${config.allowMultiple ? `(${clickedHotspots.size})` : ''}`
-                : "Zaznaczono miejsce poza obszarami"}
-          </span>
-        </div>
-        
+      <div className="flex min-h-[44px] items-center justify-between gap-3" data-testid="hotspot-status">
+        <p className="text-[14px] text-[var(--txt2)]" aria-live="polite">
+          {clickCoordinates.length === 0
+            ? "Nic jeszcze nie wskazano."
+            : clickedHotspots.size > 0
+              ? `Wskazano obszar${config.allowMultiple ? ` (${clickedHotspots.size})` : ""}.`
+              : "Wskazano miejsce poza obszarami."}
+        </p>
         {!disabled && clickCoordinates.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClear}
-            data-testid="clear-hotspots"
-            className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
-          >
+          <Button variant="ghost" size="sm" onClick={handleClear} data-testid="clear-hotspots">
             Wyczyść
           </Button>
         )}
       </div>
 
       {showResult && (
-        <div className="flex items-center gap-4 text-sm p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700" data-testid="hotspot-legend">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-[#3EE6A8]/[0.06] border-2 border-[#0B7E54] dark:border-[#3EE6A8] shadow-sm" />
-            <span className="font-medium text-[#0B7E54] dark:text-[#3EE6A8]">Prawidłowy obszar</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-transparent border-2 border-[#223040] shadow-sm" />
-            <span className="font-medium text-muted-foreground">Błędne zaznaczenie</span>
-          </div>
-        </div>
+        <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[14px] text-[var(--txt2)]" data-testid="hotspot-legend">
+          <li className="flex items-center gap-2">
+            <span className="h-4 w-4 rounded-[4px] border-2 border-[var(--puls)] bg-[var(--tint)]" aria-hidden />
+            Właściwy obszar
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="grid h-4 w-4 place-items-center rounded-full border-2 border-[var(--puls)] text-[var(--puls)]" aria-hidden>
+              <Check className="h-2.5 w-2.5" strokeWidth={3} />
+            </span>
+            Twoje trafne wskazanie
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="grid h-4 w-4 place-items-center rounded-full border-2 border-[var(--alarm)] text-[var(--alarm)]" aria-hidden>
+              <X className="h-2.5 w-2.5" strokeWidth={3} />
+            </span>
+            Twoje chybione wskazanie
+          </li>
+        </ul>
       )}
 
       {showResult && result?.partialScore !== undefined && result.partialScore < 1 && (
-        <div className="mt-4 p-3 sm:p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <p className="text-sm sm:text-base text-amber-800 dark:text-amber-200">
-            Poprawne odpowiedzi: {Math.round(result.partialScore * 100)}%
-          </p>
-        </div>
+        <PartialScore score={result.partialScore} />
       )}
     </div>
   );

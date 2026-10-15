@@ -1,10 +1,9 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useTranslation } from "@/lib/i18n";
+import { motion } from "framer-motion";
+import { Check, Maximize2, X } from "lucide-react";
 import { sanitizeMarkdown, sanitizeHtml } from "@/lib/sanitize";
-import { Check, X, ZoomIn, GripVertical, Type, Link2, ArrowUpDown, Target } from "lucide-react";
-import type { QuizQuestion, QuizResult, AnswerData, QuestionType } from "@/types";
+import { rise } from "@/lib/motion";
+import { cn } from "@/lib/utils";
+import type { QuizQuestion, QuizResult, AnswerData } from "@/types";
 import { QuestionRenderer } from "./questions";
 
 interface QuestionCardProps {
@@ -14,42 +13,36 @@ interface QuestionCardProps {
   quizResult?: QuizResult;
   onAnswerSelect: (index: number) => void;
   onAnswerChange?: (answer: AnswerData) => void;
-  onImageClick: (imageUrl: string) => void;
+  /** Drugi argument: miniatura, z której wyrasta podgląd */
+  onImageClick: (imageUrl: string, origin?: HTMLElement) => void;
   isSubmitting: boolean;
 }
 
-const questionTypeInfo: Record<QuestionType, { label: string; icon: JSX.Element; color: string }> = {
-  multiple_choice: {
-    label: "Wybór odpowiedzi",
-    icon: <Type className="h-3 w-3" />,
-    color: "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary"
-  },
-  drag_drop: {
-    label: "Przeciągnij i upuść",
-    icon: <GripVertical className="h-3 w-3" />,
-    color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-  },
-  fill_blank: {
-    label: "Uzupełnij luki",
-    icon: <Type className="h-3 w-3" />,
-    color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-  },
-  matching: {
-    label: "Dopasuj pary",
-    icon: <Link2 className="h-3 w-3" />,
-    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-  },
-  sorting: {
-    label: "Ułóż w kolejności",
-    icon: <ArrowUpDown className="h-3 w-3" />,
-    color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
-  },
-  hotspot: {
-    label: "Zaznacz na obrazku",
-    icon: <Target className="h-3 w-3" />,
-    color: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200"
-  }
+const letter = (i: number) => String.fromCharCode(65 + i);
+
+/** Tytuł pytania w skali `.q__title` z landingu */
+const titleStyle: React.CSSProperties = {
+  font: "500 clamp(1.3125rem, 1.1rem + .9vw, 1.875rem)/1.22 var(--font-heading)",
+  letterSpacing: "-.018em",
 };
+
+function QuestionImage({ url, onOpen }: { url: string; onOpen: (url: string, origin?: HTMLElement) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => onOpen(url, e.currentTarget)}
+      className="group relative mb-6 block w-full overflow-hidden rounded-[12px] border border-[var(--line)] bg-[var(--ink)] transition-[transform,border-color] duration-200 ease-out hover:border-[var(--line2)] active:scale-[.99]"
+      aria-label="Powiększ zapis EKG"
+      data-testid="question-image"
+    >
+      <img src={url} alt="Zapis EKG" className="block max-h-[60vh] w-full object-contain" />
+      <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-[12px] text-[var(--txt2)] transition-colors duration-200 group-hover:text-[var(--txt)]">
+        <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+        Powiększ
+      </span>
+    </button>
+  );
+}
 
 export default function QuestionCard({
   question,
@@ -61,194 +54,146 @@ export default function QuestionCard({
   onImageClick,
   isSubmitting,
 }: QuestionCardProps) {
-  const { t } = useTranslation();
-  const questionType = question.questionType || 'multiple_choice';
-  const isInteractiveType = questionType !== 'multiple_choice' && question.questionConfig;
-  const typeInfo = questionTypeInfo[questionType];
+  const questionType = question.questionType || "multiple_choice";
+  const isInteractiveType = questionType !== "multiple_choice" && !!question.questionConfig;
+  const imagePosition = (question as QuizQuestion & { imagePosition?: string }).imagePosition;
+  const showImage = !!question.imageUrl && questionType !== "hotspot";
+  const answered = showExplanation && !!quizResult;
 
-  const getOptionClassName = (index: number): string => {
-    const baseClass = "min-h-[52px] py-4 px-4 border-2 rounded-2xl cursor-pointer touch-manipulation flex items-center motion-safe:transition-all motion-safe:duration-200";
-    
-    if (!showExplanation) {
-      if (selectedAnswer === index) {
-        return `${baseClass} bg-white dark:bg-slate-800 border-primary ring-2 ring-primary ring-offset-2 shadow-app-lg text-slate-900 dark:text-white`;
-      }
-      return `${baseClass} bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-primary/50 hover:shadow-app-lg active:scale-[0.97] shadow-app text-slate-900 dark:text-white`;
-    }
-
-    if (selectedAnswer === index) {
-      return quizResult?.isCorrect 
-        ? `${baseClass} correct border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06] text-foreground`
-        : `${baseClass} incorrect border-[#223040] bg-transparent text-foreground`;
-    }
-
-    if (quizResult && index === quizResult.correctIndex) {
-      return `${baseClass} correct border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06] text-foreground`;
-    }
-
-    return `${baseClass} border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 opacity-60`;
-  };
+  const correctAnswer =
+    answered && !isInteractiveType ? question.answers[quizResult!.correctIndex] : undefined;
 
   return (
-    <div className="space-y-5 sm:space-y-6 lg:space-y-8">
-      {/* Question Card - Premium glass styling */}
-      <Card className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-app-lg rounded-2xl overflow-hidden motion-safe:animate-slide-up border border-border/50 dark:border-slate-700/50">
-        <CardContent className="p-5 sm:p-6 lg:p-8">
-          <div className="mb-5 sm:mb-6 lg:mb-8">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              {question.title && (
-                <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white leading-snug" data-testid="question-title">
-                  {question.title}
-                </h3>
-              )}
-              {isInteractiveType && (
-                <Badge 
-                  variant="secondary" 
-                  className={`flex items-center gap-1.5 text-sm shrink-0 rounded-xl px-3 py-1 ${typeInfo.color}`}
-                >
-                  {typeInfo.icon}
-                  <span className="hidden sm:inline">{typeInfo.label}</span>
-                </Badge>
-              )}
-            </div>
-            
-            {/* EKG Image - above question text (default) */}
-            {question.imageUrl && questionType !== 'hotspot' && ((question as any).imagePosition === 'above' || !(question as any).imagePosition) && (
-              <div 
-                className="relative group cursor-pointer mb-5 sm:mb-6 touch-manipulation rounded-2xl overflow-hidden"
-                onClick={() => onImageClick(question.imageUrl!)}
-                data-testid="question-image"
-              >
-                <img
-                  src={question.imageUrl}
-                  alt="Zapis EKG"
-                  className="w-full h-44 sm:h-52 md:h-60 lg:h-72 object-contain bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-border/50"
-                />
-                <div className="absolute inset-0 bg-black/0 active:bg-black/20 sm:group-hover:bg-black/10 motion-safe:transition-colors rounded-2xl flex items-center justify-center">
-                  <div className="opacity-0 active:opacity-100 sm:group-hover:opacity-100 motion-safe:transition-opacity bg-black/80 text-white px-4 py-2.5 rounded-xl text-base pointer-events-none flex items-center gap-2">
-                    <ZoomIn className="h-5 w-5" />
-                    <span>Powiększ</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Question Body */}
-            {question.bodyMd && (
-              <div 
-                className="prose prose-base prose-slate dark:prose-invert max-w-none mb-5 sm:mb-6 [&>p]:text-base [&>p]:leading-relaxed [&>h2]:text-lg [&>h2]:font-bold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-semibold"
-                dangerouslySetInnerHTML={sanitizeHtml(question.bodyMd)}
-                data-testid="question-body"
-              />
-            )}
-            
-            {/* EKG Image - below question text */}
-            {question.imageUrl && questionType !== 'hotspot' && (question as any).imagePosition === 'below' && (
-              <div 
-                className="relative group cursor-pointer mb-5 sm:mb-6 touch-manipulation rounded-2xl overflow-hidden"
-                onClick={() => onImageClick(question.imageUrl!)}
-                data-testid="question-image"
-              >
-                <img
-                  src={question.imageUrl}
-                  alt="Zapis EKG"
-                  className="w-full h-44 sm:h-52 md:h-60 lg:h-72 object-contain bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-border/50"
-                />
-                <div className="absolute inset-0 bg-black/0 active:bg-black/20 sm:group-hover:bg-black/10 motion-safe:transition-colors rounded-2xl flex items-center justify-center">
-                  <div className="opacity-0 active:opacity-100 sm:group-hover:opacity-100 motion-safe:transition-opacity bg-black/80 text-white px-4 py-2.5 rounded-xl text-base pointer-events-none flex items-center gap-2">
-                    <ZoomIn className="h-5 w-5" />
-                    <span>Powiększ</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Interactive Question Types */}
-          {isInteractiveType && onAnswerChange && (
-            <QuestionRenderer
-              question={question}
-              onAnswerChange={onAnswerChange}
-              disabled={showExplanation}
-              showResult={showExplanation}
-              result={quizResult}
-              onImageClick={onImageClick}
-            />
-          )}
-
-          {/* Multiple Choice Answer Options - Premium touch targets */}
-          {!isInteractiveType && (
-            <div className="space-y-3" data-testid="answer-options">
-              {question.answers.map((answer, index) => (
-                <div
-                  key={index}
-                  className={getOptionClassName(index)}
-                  onClick={() => !showExplanation && !isSubmitting && onAnswerSelect(index)}
-                  data-testid={`answer-option-${index}`}
-                >
-                  <div className="flex items-center w-full">
-                    <span className="font-bold text-base mr-3 w-7 shrink-0">
-                      {String.fromCharCode(65 + index)}.
-                    </span>
-                    <span className="text-base leading-snug flex-1">{answer.text}</span>
-                    {showExplanation && quizResult && index === quizResult.correctIndex && (
-                      <Check className="h-5 w-5 shrink-0 ml-2 text-[#0B7E54] dark:text-[#3EE6A8]" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Explanation Panel - Premium mobile styling */}
-      {showExplanation && quizResult && (
-        <Card className={`shadow-app-lg border-2 overflow-hidden rounded-2xl motion-safe:animate-slide-up ${
-          quizResult.isCorrect 
-            ? 'border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/[0.06]' 
-            : 'border-[#223040] bg-transparent'
-        }`} data-testid="explanation-panel">
-          <CardContent className="p-4 sm:p-5 md:p-7">
-            <div className="flex items-start gap-4">
-              <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center flex-shrink-0 border ${
-                quizResult.isCorrect 
-                  ? 'border-[#0B7E54] dark:border-[#3EE6A8] bg-[#3EE6A8]/10' 
-                  : 'border-[#223040] bg-transparent'
-              }`}>
-                {quizResult.isCorrect ? (
-                  <Check className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-[#0B7E54] dark:text-[#3EE6A8] stroke-[3]" />
-                ) : (
-                  <X className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-muted-foreground stroke-[3]" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className={`text-lg sm:text-xl md:text-2xl font-heading font-semibold mb-3 ${
-                  quizResult.isCorrect 
-                    ? 'text-[#0B7E54] dark:text-[#3EE6A8]' 
-                    : 'text-foreground'
-                }`} data-testid="result-title">
-                  {quizResult.isCorrect ? t("quiz.correct") : t("quiz.incorrect")}
-                </h4>
-                <div 
-                  className="bg-card p-4 sm:p-5 rounded-xl shadow-app border border-border"
-                  data-testid="explanation-content"
-                >
-                  <div 
-                    className="prose prose-base sm:prose-lg max-w-none prose-slate dark:prose-invert [&>*]:text-foreground [&>p]:text-base [&>p]:sm:text-lg [&>p]:leading-relaxed [&>p]:font-medium [&>strong]:font-bold"
-                    dangerouslySetInnerHTML={sanitizeMarkdown(quizResult.explanation)}
-                  />
-                </div>
-                <div className="mt-4 flex items-center flex-wrap gap-2">
-                  <Badge variant="outline" className="text-label text-xs py-1.5 px-3 rounded-xl border-border text-muted-foreground">
-                    {Math.round(quizResult.timeMs / 1000)}S
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <article
+      className="rounded-[20px] border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)]"
+      aria-labelledby="question-title"
+    >
+      {question.title && (
+        <h1 id="question-title" className="mb-6 text-[var(--txt)]" style={titleStyle} data-testid="question-title">
+          {question.title}
+        </h1>
       )}
-    </div>
+
+      {showImage && imagePosition !== "below" && <QuestionImage url={question.imageUrl!} onOpen={onImageClick} />}
+
+      {question.bodyMd && (
+        <div
+          className="prose-hk mb-6 max-w-none text-[var(--txt)]"
+          // Bez tytułu treść pytania JEST tytułem — w skali `.q__title` z landingu
+          style={question.title ? undefined : { ...titleStyle, color: "var(--txt)", textWrap: "pretty" }}
+          id={question.title ? undefined : "question-title"}
+          dangerouslySetInnerHTML={sanitizeHtml(question.bodyMd)}
+          data-testid="question-body"
+        />
+      )}
+
+      {showImage && imagePosition === "below" && <QuestionImage url={question.imageUrl!} onOpen={onImageClick} />}
+
+      {/* Pytania interaktywne */}
+      {isInteractiveType && onAnswerChange && (
+        <QuestionRenderer
+          question={question}
+          onAnswerChange={onAnswerChange}
+          disabled={showExplanation}
+          showResult={showExplanation}
+          result={quizResult}
+        />
+      )}
+
+      {/* Wybór odpowiedzi — wiersze `.opt` jak w quizie na landingu */}
+      {!isInteractiveType && (
+        <div className="grid gap-[10px]" role="group" aria-label="Odpowiedzi" data-testid="answer-options">
+          {question.answers.map((answer, index) => {
+            const isRight = answered && index === quizResult!.correctIndex;
+            const isWrong = answered && index === selectedAnswer && !isRight;
+            const isDim = answered && !isRight && !isWrong;
+            return (
+              <button
+                key={index}
+                type="button"
+                className={cn(
+                  "opt",
+                  isRight && "is-right",
+                  isWrong && "is-wrong",
+                  isDim && "is-dim",
+                  !answered && selectedAnswer === index && "is-picked",
+                )}
+                disabled={showExplanation || isSubmitting}
+                aria-pressed={selectedAnswer === index}
+                onClick={() => !showExplanation && !isSubmitting && onAnswerSelect(index)}
+                data-testid={`answer-option-${index}`}
+              >
+                <span className="opt__key" aria-hidden>
+                  {letter(index)}
+                </span>
+                <span>
+                  <span className="sr-only">{letter(index)}. </span>
+                  {answer.text}
+                  {isRight && <span className="sr-only"> — poprawna odpowiedź</span>}
+                  {isWrong && <span className="sr-only"> — twoja odpowiedź, błędna</span>}
+                </span>
+                <span className="opt__mark" aria-hidden>
+                  {isRight && <Check className="h-[18px] w-[18px]" strokeWidth={2.25} />}
+                  {isWrong && <X className="h-[18px] w-[18px]" strokeWidth={2.25} />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Wyjaśnienie: wyrasta pod pytaniem po odpowiedzi */}
+      {showExplanation && (
+        <motion.section
+          variants={rise}
+          initial="hidden"
+          animate="show"
+          className="mt-7 grid gap-3.5 border-t border-[var(--line)] pt-6"
+          aria-live="polite"
+          data-testid="explanation-panel"
+        >
+          {!quizResult ? (
+            <p className="label">Sprawdzam odpowiedź…</p>
+          ) : (
+            <>
+              <p className="flex items-start gap-2.5 text-[17px] font-medium leading-snug text-[var(--txt)]" data-testid="result-title">
+                {quizResult.isCorrect ? (
+                  <Check className="mt-0.5 h-5 w-5 shrink-0 text-[var(--puls)]" strokeWidth={2.25} aria-hidden />
+                ) : (
+                  <X className="mt-0.5 h-5 w-5 shrink-0 text-[var(--alarm)]" strokeWidth={2.25} aria-hidden />
+                )}
+                <span>
+                  {quizResult.isCorrect
+                    ? "Dobrze."
+                    : isInteractiveType && quizResult.partialScore !== undefined && quizResult.partialScore > 0
+                      ? `Częściowo dobrze — ${Math.round(quizResult.partialScore * 100)}%.`
+                      : "Nie tym razem."}
+                </span>
+              </p>
+
+              {correctAnswer && (
+                <p className="text-[15px] text-[var(--txt)]">
+                  <span className="label mr-2">Poprawna odpowiedź</span>
+                  {letter(quizResult.correctIndex)}. {correctAnswer.text}
+                </p>
+              )}
+
+              {quizResult.explanation && (
+                <>
+                  <p className="label mt-1">Wyjaśnienie</p>
+                  <div
+                    className="prose-hk max-w-[46em] text-[16px]"
+                    dangerouslySetInnerHTML={sanitizeMarkdown(quizResult.explanation)}
+                    data-testid="explanation-content"
+                  />
+                </>
+              )}
+
+              <p className="label">Czas · {Math.max(1, Math.round(quizResult.timeMs / 1000))} s</p>
+            </>
+          )}
+        </motion.section>
+      )}
+    </article>
   );
 }
