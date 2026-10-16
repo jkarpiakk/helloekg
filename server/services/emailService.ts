@@ -48,8 +48,8 @@ export class EmailService {
           dynamic_template_data: dynamicData
         }],
         from: { 
-          email: process.env.FROM_EMAIL || 'noreply@ekgacademy.pl',
-          name: 'EKG Academy'
+          email: process.env.FROM_EMAIL || 'kurs@helloekg.pl',
+          name: 'helloEKG'
         },
         template_id: templateId
       })
@@ -65,7 +65,7 @@ export class EmailService {
   async sendEmail(to: string, template: EmailTemplate): Promise<void> {
     try {
       await this.transporter.sendMail({
-        from: process.env.FROM_EMAIL || "noreply@ekgacademy.pl",
+        from: process.env.FROM_EMAIL || "helloEKG <kurs@helloekg.pl>",
         to,
         subject: template.subject,
         html: template.html,
@@ -82,7 +82,7 @@ export class EmailService {
       await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
         firstName,
         verificationUrl,
-        subject: 'Potwierdź swój adres e-mail - EKG Academy'
+        subject: 'Potwierdź swój adres e-mail — helloEKG'
       });
     } else {
       const template = this.getEmailVerificationTemplate(firstName, verificationUrl);
@@ -95,7 +95,7 @@ export class EmailService {
       await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
         firstName,
         resetUrl,
-        subject: 'Reset hasła - EKG Academy',
+        subject: 'Reset hasła — helloEKG',
         isPasswordReset: true
       });
     } else {
@@ -110,7 +110,7 @@ export class EmailService {
         firstName,
         planName,
         endDate,
-        subject: 'Potwierdzenie płatności - EKG Academy',
+        subject: 'Potwierdzenie płatności — helloEKG',
         isSubscription: true
       });
     } else {
@@ -125,7 +125,7 @@ export class EmailService {
         firstName,
         certificateId,
         verificationUrl,
-        subject: 'Gratulacje! Otrzymałeś certyfikat - EKG Academy',
+        subject: 'Gratulacje! Otrzymałeś certyfikat — helloEKG',
         isCertificate: true
       });
     } else {
@@ -136,58 +136,48 @@ export class EmailService {
 
   getEmailVerificationTemplate(firstName: string, verificationUrl: string): EmailTemplate {
     return {
-      subject: "Potwierdź swój adres e-mail - EKG Academy",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #2563eb;">Witaj w EKG Academy!</h1>
-          <p>Cześć ${firstName},</p>
-          <p>Dziękujemy za rejestrację w EKG Academy. Aby ukończyć proces rejestracji, potwierdź swój adres e-mail klikając w poniższy link:</p>
-          <a href="${verificationUrl}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; margin: 16px 0;">Potwierdź adres e-mail</a>
-          <p>Link jest ważny przez 24 godziny.</p>
-          <p>Jeśli nie rejestrowałeś się w naszym serwisie, zignoruj tę wiadomość.</p>
-          <p>Pozdrawiamy,<br>Zespół EKG Academy</p>
-        </div>
-      `,
-      text: `Witaj ${firstName}! Potwierdź swój adres e-mail klikając w link: ${verificationUrl}`
+      subject: "Potwierdź adres e-mail — helloEKG",
+      html: brandEmail({
+        preheader: "Jedno kliknięcie i Twoje konto w helloEKG jest gotowe.",
+        label: "Konto · wersja beta",
+        title: greeting(firstName, "potwierdź adres e-mail."),
+        body: `<p ${P}>Dziękujemy za założenie konta w helloEKG. Kliknij przycisk poniżej, żeby potwierdzić, że ten adres należy do Ciebie.</p>`,
+        cta: { href: verificationUrl, text: "Potwierdź adres e-mail" },
+        note: "Link jest ważny przez 24 godziny. Jeśli to nie Ty zakładałeś konto, zignoruj tę wiadomość.",
+        reason: "Dostajesz tę wiadomość, bo ktoś założył konto z tym adresem na kurs.helloekg.pl.",
+      }),
+      text: `Potwierdź adres e-mail w helloEKG: ${verificationUrl}\n\nLink jest ważny przez 24 godziny.`,
     };
   }
 
   getPasswordResetTemplate(firstName: string, resetUrl: string): EmailTemplate {
     return {
-      subject: "Reset hasła - EKG Academy",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #2563eb;">Reset hasła</h1>
-          <p>Cześć ${firstName},</p>
-          <p>Otrzymaliśmy prośbę o reset hasła do Twojego konta w EKG Academy.</p>
-          <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; margin: 16px 0;">Ustaw nowe hasło</a>
-          <p>Link jest ważny przez 1 godzinę.</p>
-          <p>Jeśli nie prosiłeś o reset hasła, zignoruj tę wiadomość.</p>
-          <p>Pozdrawiamy,<br>Zespół EKG Academy</p>
-        </div>
-      `,
-      text: `Reset hasła: ${resetUrl}`
+      subject: "Ustaw nowe hasło — helloEKG",
+      html: brandEmail({
+        preheader: "Link do ustawienia nowego hasła jest ważny przez godzinę.",
+        label: "Konto · nowe hasło",
+        title: greeting(firstName, "ustaw nowe hasło."),
+        body: `<p ${P}>Otrzymaliśmy prośbę o zmianę hasła do Twojego konta w helloEKG. Kliknij przycisk i wpisz nowe hasło.</p>`,
+        cta: { href: resetUrl, text: "Ustaw nowe hasło" },
+        note: "Link jest ważny przez 1 godzinę. Jeśli nie prosiłeś o zmianę, zignoruj tę wiadomość — Twoje hasło zostaje bez zmian.",
+        reason: "Dostajesz tę wiadomość, bo na kurs.helloekg.pl poproszono o zmianę hasła do tego konta.",
+      }),
+      text: `Ustaw nowe hasło w helloEKG: ${resetUrl}\n\nLink jest ważny przez 1 godzinę. Jeśli nie prosiłeś o zmianę, zignoruj tę wiadomość.`,
     };
   }
 
   getSubscriptionConfirmationTemplate(firstName: string, planName: string, endDate: string): EmailTemplate {
     return {
-      subject: "Potwierdzenie płatności - EKG Academy",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #059669;">Płatność potwierdzona!</h1>
-          <p>Cześć ${firstName},</p>
-          <p>Dziękujemy za zakup! Twój dostęp do EKG Academy został aktywowany.</p>
-          <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-            <h3>Szczegóły subskrypcji:</h3>
-            <p><strong>Plan:</strong> ${planName}</p>
-            <p><strong>Aktywny do:</strong> ${endDate}</p>
-          </div>
-          <a href="${process.env.FRONTEND_URL}/dashboard" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 6px; margin: 16px 0;">Rozpocznij naukę</a>
-          <p>Pozdrawiamy,<br>Zespół EKG Academy</p>
-        </div>
-      `,
-      text: `Płatność potwierdzona! Plan: ${planName}, aktywny do: ${endDate}`
+      subject: "Płatność potwierdzona — helloEKG",
+      html: brandEmail({
+        preheader: "Twój dostęp do kursu jest aktywny.",
+        label: "Płatność · potwierdzenie",
+        title: greeting(firstName, "dostęp jest aktywny."),
+        body: `<p ${P}>Dziękujemy za zakup. Możesz od razu wrócić do nauki.</p>${details([["Plan", planName], ["Aktywny do", endDate]])}`,
+        cta: { href: `${appUrl()}/dashboard`, text: "Przejdź do kursu" },
+        reason: "Dostajesz tę wiadomość, bo opłacono dostęp do kursu helloEKG.",
+      }),
+      text: `Płatność potwierdzona. Plan: ${planName}, aktywny do: ${endDate}. ${appUrl()}/dashboard`,
     };
   }
 
@@ -207,48 +197,93 @@ export class EmailService {
     setPasswordUrl: string
   ): EmailTemplate {
     return {
-      subject: "Płatność potwierdzona — ustaw hasło do EKG Academy",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #059669;">Płatność potwierdzona!</h1>
-          <p>Dziękujemy za zakup! Twój dostęp do EKG Academy został aktywowany.</p>
-          <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-            <h3 style="margin-top:0;">Szczegóły subskrypcji:</h3>
-            <p><strong>Plan:</strong> ${planName}</p>
-            <p><strong>Aktywny do:</strong> ${endDate}</p>
-          </div>
-          <p>Aby zalogować się i rozpocząć naukę, musisz najpierw ustawić hasło do swojego konta:</p>
-          <a href="${setPasswordUrl}"
-             style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:white;text-decoration:none;border-radius:6px;margin:16px 0;">
-            Ustaw hasło i zaloguj się
-          </a>
-          <p style="color:#6b7280;font-size:14px;">Link jest ważny przez 1 godzinę. Jeśli nie dokonywałeś/aś tej płatności, skontaktuj się z nami.</p>
-          <p>Pozdrawiamy,<br>Zespół EKG Academy</p>
-        </div>
-      `,
-      text: `Płatność potwierdzona! Plan: ${planName}, aktywny do: ${endDate}. Ustaw hasło: ${setPasswordUrl}`,
+      subject: "Płatność potwierdzona — ustaw hasło do helloEKG",
+      html: brandEmail({
+        preheader: "Ustaw hasło, żeby zalogować się do kursu.",
+        label: "Płatność · potwierdzenie",
+        title: "Dostęp jest aktywny.",
+        subtitle: "Zostało ustawić hasło.",
+        body: `<p ${P}>Dziękujemy za zakup. Żeby się zalogować, ustaw hasło do swojego konta.</p>${details([["Plan", planName], ["Aktywny do", endDate]])}`,
+        cta: { href: setPasswordUrl, text: "Ustaw hasło i zaloguj się" },
+        note: "Link jest ważny przez 1 godzinę. Jeśli to nie Ty płaciłeś, napisz do nas: kontakt@helloekg.pl.",
+        reason: "Dostajesz tę wiadomość, bo opłacono dostęp do kursu helloEKG z tym adresem.",
+      }),
+      text: `Płatność potwierdzona. Plan: ${planName}, aktywny do: ${endDate}. Ustaw hasło: ${setPasswordUrl}`,
     };
   }
 
   getCertificateTemplate(firstName: string, certificateId: string, verificationUrl: string): EmailTemplate {
     return {
-      subject: "Gratulacje! Otrzymałeś certyfikat - EKG Academy",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #059669;">Gratulacje ${firstName}!</h1>
-          <p>Ukończyłeś pomyślnie kurs EKG Academy i otrzymałeś certyfikat!</p>
-          <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-            <h3>Szczegóły certyfikatu:</h3>
-            <p><strong>ID Certyfikatu:</strong> ${certificateId}</p>
-            <p><strong>Weryfikacja online:</strong> <a href="${verificationUrl}">${verificationUrl}</a></p>
-          </div>
-          <p>Certyfikat z unikalnym ID i możliwością publicznej weryfikacji - idealny do CV!</p>
-          <p>Pozdrawiamy,<br>Zespół EKG Academy</p>
-        </div>
-      `,
-      text: `Gratulacje! Certyfikat ID: ${certificateId}, weryfikacja: ${verificationUrl}`
+      subject: "Twój certyfikat helloEKG",
+      html: brandEmail({
+        preheader: "Ukończyłeś kurs — certyfikat jest gotowy.",
+        label: "Certyfikat",
+        title: greeting(firstName, "gratulacje."),
+        subtitle: "Ukończyłeś kurs helloEKG.",
+        body: `<p ${P}>Twój certyfikat ma unikalny numer i można go zweryfikować online.</p>${details([["Numer certyfikatu", certificateId]])}`,
+        cta: { href: verificationUrl, text: "Zobacz certyfikat" },
+        reason: "Dostajesz tę wiadomość, bo ukończyłeś kurs helloEKG.",
+      }),
+      text: `Gratulacje! Certyfikat nr ${certificateId}, weryfikacja: ${verificationUrl}`,
     };
   }
+}
+
+/* ---------- Szablon wiadomości w stylu marki (jak powitanie z listy startowej na helloekg.pl) ---------- */
+
+const LOGO_URL = "https://storage.mlcdn.com/account_image/2636127/EUDAXhD74WEepXT6E3W2UwwTXKSoDqc8U0iHfxbi.png";
+const LINE_URL = "https://storage.mlcdn.com/account_image/2636127/mThPsI7bGJAeXZr4clHjynYt2QRQdi3jMR1whUpl.png";
+const P = `style="margin:0 0 22px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#B8C2C9;"`;
+
+const esc = (v: string) =>
+  String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+const appUrl = () => process.env.APP_BASE_URL || process.env.FRONTEND_URL || "https://kurs.helloekg.pl";
+
+/** „Kuba, ustaw nowe hasło.” albo „Ustaw nowe hasło.”, gdy nie znamy imienia */
+function greeting(firstName: string, rest: string): string {
+  const name = (firstName || "").trim();
+  return name ? `${esc(name)}, ${rest}` : rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+function details(rows: Array<[string, string]>): string {
+  const tr = rows
+    .map(([k, v]) => `<tr><td style="padding:12px 0;border-bottom:1px solid #1A222B;font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#76838C;">${esc(k)}</td><td align="right" style="padding:12px 0;border-bottom:1px solid #1A222B;font-family:Inter,Helvetica,Arial,sans-serif;font-size:15px;color:#F2F6F4;">${esc(v)}</td></tr>`)
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px 0;border-top:1px solid #1A222B;">${tr}</table>`;
+}
+
+function brandEmail(o: {
+  preheader: string;
+  label: string;
+  title: string;
+  subtitle?: string;
+  body: string;
+  cta: { href: string; text: string };
+  note?: string;
+  reason: string;
+}): string {
+  const H = `font-family:'Space Grotesk',Helvetica,Arial,sans-serif;font-size:32px;line-height:1.1;font-weight:600;letter-spacing:-0.5px;`;
+  return `<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
+<body style="margin:0;padding:0;background:#0B0F14;">
+<div style="display:none;max-height:0;overflow:hidden;color:#0B0F14;">${esc(o.preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0B0F14;"><tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
+<tr><td style="padding:0 4px 24px 4px;"><a href="${appUrl()}" style="text-decoration:none;"><img src="${LOGO_URL}" width="180" height="32" alt="helloEKG" style="display:block;border:0;width:180px;height:32px;"></a></td></tr>
+<tr><td style="background:#0E141A;border:1px solid #1A222B;border-radius:16px;padding:36px 32px 32px 32px;">
+<p style="margin:0 0 18px 0;font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.4;letter-spacing:2px;text-transform:uppercase;color:#3EE6A8;">${esc(o.label)}</p>
+<h1 style="margin:0 0 ${o.subtitle ? "4px" : "22px"} 0;${H}color:#F2F6F4;">${o.title}</h1>
+${o.subtitle ? `<p style="margin:0 0 22px 0;${H}color:#8A97A0;">${esc(o.subtitle)}</p>` : ""}
+${o.body}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px 0;"><tr><td style="border-radius:999px;background:#3EE6A8;"><a href="${esc(o.cta.href)}" style="display:inline-block;padding:15px 28px;font-family:Inter,Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;line-height:1;color:#07130E;text-decoration:none;border-radius:999px;">${esc(o.cta.text)}</a></td></tr></table>
+<p style="margin:0 0 26px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#76838C;">Przycisk nie działa? Skopiuj ten adres do przeglądarki:<br><a href="${esc(o.cta.href)}" style="color:#8A97A0;word-break:break-all;">${esc(o.cta.href)}</a></p>
+${o.note ? `<p style="margin:0 0 26px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#8A97A0;">${esc(o.note)}</p>` : ""}
+<img src="${LINE_URL}" width="536" height="32" alt="" style="display:block;border:0;width:100%;max-width:536px;height:auto;margin:0 0 22px 0;">
+<p style="margin:0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#8A97A0;">Do usłyszenia,<br><b style="color:#F2F6F4;font-weight:600;">zespół helloEKG</b></p>
+</td></tr>
+<tr><td style="padding:22px 8px 0 8px;font-family:Inter,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#5C6870;text-align:center;">${esc(o.reason)}<br><a href="https://helloekg.pl/polityka-prywatnosci.html" style="color:#8A97A0;">Polityka prywatności</a> · <a href="mailto:kontakt@helloekg.pl" style="color:#8A97A0;">kontakt@helloekg.pl</a></td></tr>
+</table></td></tr></table></body></html>`;
 }
 
 export const emailService = new EmailService();
