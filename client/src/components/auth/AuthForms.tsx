@@ -40,7 +40,8 @@ const registerSchema = z.object({
   firstName: z.string().optional().default(""),
   lastName: z.string().optional().default(""),
   profession: z.string().optional(),
-  termsAccepted: z.boolean().refine(val => val === true, "Zaznacz, aby założyć konto"),
+  // Regulamin dojdzie przed startem płatnej wersji — w becie wymagamy tylko polityki prywatności
+  termsAccepted: z.boolean().optional(),
   privacyAccepted: z.boolean().refine(val => val === true, "Zaznacz, aby założyć konto"),
   marketingConsent: z.boolean().default(false),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -441,32 +442,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
               )}
             />
 
-            <div className="space-y-3 border-t border-[var(--line)] pt-4">
-              <FormField
-                control={registerForm.control}
-                name="termsAccepted"
-                render={({ field }) => (
-                  <FormItem className="space-y-1">
-                    <div className="flex items-start gap-3">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={(checked) => {
-                            field.onChange(checked === true);
-                            field.onBlur();
-                          }}
-                          className="mt-0.5"
-                          data-testid="register-terms"
-                        />
-                      </FormControl>
-                      <FormLabel className="text-sm font-normal leading-snug text-[var(--txt2)]">
-                        Akceptuję regulamin
-                      </FormLabel>
-                    </div>
-                    <FormMessage className="pl-7" />
-                  </FormItem>
-                )}
-              />
+            <div className="grid gap-3 border-t border-[var(--line)] pt-4">
               <FormField
                 control={registerForm.control}
                 name="privacyAccepted"
