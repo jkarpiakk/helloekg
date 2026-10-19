@@ -315,11 +315,15 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
               Wstecz
             </Button>
           )}
-          {step.kind === "info" && (
-            <Button ref={primaryRef} size="sm" onClick={onNext} data-testid="tour-next">
-              {step.primary ?? "Dalej"}
-            </Button>
-          )}
+          <Button
+            ref={primaryRef}
+            size="sm"
+            variant={step.kind === "action" ? "outline" : "default"}
+            onClick={onNext}
+            data-testid="tour-next"
+          >
+            {step.primary ?? "Dalej"}
+          </Button>
         </div>
       </div>
     </motion.div>
@@ -636,6 +640,25 @@ function Tour({ userId }: { userId: string }) {
     }
   };
   const canBack = index !== null && index >= 2;
+
+  /* „Dalej” w kroku-działaniu robi to, o co prosimy (kursant może też kliknąć sam).
+     Krok sam się zaliczy, gdy zmieni się trasa albo rozwinie moduł. */
+  const doNext = () => {
+    if (index === null || !step) return;
+    if (step.kind !== "action") return go(index + 1);
+    if (step.id === "nav-kurs") return navigate("/modules");
+    if (step.id === "module-first") {
+      const d = document.querySelector('[data-tour="module-first"]')?.parentElement as HTMLDetailsElement | null;
+      if (d) d.open = true;
+      return;
+    }
+    if (step.id === "section-first-lecture") {
+      const a = document.querySelector<HTMLAnchorElement>('[data-tour="section-first-lecture"]');
+      const href = a?.getAttribute("href") ?? firstLectureHref(modules);
+      return navigate(href);
+    }
+    go(index + 1);
+  };
   const target = step?.targets?.[ti];
   const hasHole = !!step?.targets && phase === "show";
   const label = index ? `Instrukcja · ${index} / ${TOUR_STEPS.length - 1}` : "Instrukcja";
@@ -708,7 +731,7 @@ function Tour({ userId }: { userId: string }) {
                   mobile={mobile}
                   reduce={reduce}
                   nudge={nudge}
-                  onNext={() => go((index ?? 0) + 1)}
+                  onNext={doNext}
                   onBack={canBack ? goBack : null}
                   onSkip={finish}
                 />
