@@ -10,7 +10,6 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
 import { getModuleArt } from "@/components/course/moduleArt";
-import { ModuleFigure, ModuleThumb } from "@/components/course/ModuleVisual";
 import OrchestraMethod from "@/components/course/OrchestraMethod";
 
 interface ModuleSection {
@@ -190,10 +189,9 @@ export default function Modules() {
                 data-testid={`module-${module.id}`}
               >
                 <summary
-                  className="group list-none [&::-webkit-details-marker]:hidden cursor-pointer grid grid-cols-[24px_64px_minmax(0,1fr)_28px] sm:grid-cols-[40px_104px_minmax(0,1fr)_auto_28px] items-center gap-3 sm:gap-5 py-5 sm:py-6 transition-transform duration-[120ms] ease-out active:scale-[.995] select-none"
+                  className="group list-none [&::-webkit-details-marker]:hidden cursor-pointer grid grid-cols-[28px_minmax(0,1fr)_28px] sm:grid-cols-[48px_minmax(0,1fr)_auto_28px] items-center gap-3 sm:gap-5 py-5 sm:py-6 transition-transform duration-[120ms] ease-out active:scale-[.995] select-none"
                 >
                   <span className="label label--g num">{pad(mi + 1)}</span>
-                  <ModuleThumb art={art} />
                   <span className="row__t">
                     <b>{cleanTitle(module.title)}</b>
                     <span className="label !text-[11px] sm:hidden mt-1">{meta}</span>
@@ -226,8 +224,6 @@ export default function Modules() {
                         module.description ? "md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "max-w-[520px]"
                       }`}
                     >
-                      {/* Pasek EKG montujemy dopiero po otwarciu — zamknięty <details> nie ma szerokości */}
-                      <ModuleFigure art={art} live={isOpen} />
                       {module.description && (
                         <div className="grid gap-3 content-start">
                           <p className="label label--g">Moduł {pad(mi + 1)}</p>

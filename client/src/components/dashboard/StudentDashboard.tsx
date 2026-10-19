@@ -10,8 +10,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { rise, stagger } from "@/lib/motion";
 import ProgressCard, { ProgressLine } from "./ProgressCard";
-import { getModuleArt, isIntroModule } from "@/components/course/moduleArt";
-import { ModuleFigure, ModuleThumb } from "@/components/course/ModuleVisual";
+import { isIntroModule } from "@/components/course/moduleArt";
 import OrchestraMethod from "@/components/course/OrchestraMethod";
 import type { Certificate, UserProgress, WeakArea } from "@/types";
 
@@ -223,7 +222,7 @@ export default function StudentDashboard() {
   const targetStartedQuiz = targetHasQuestions && (target?.section.completionPercentage || 0) > 0;
   const primaryIsQuiz = !targetHasLecture || targetStartedQuiz;
   const certificate = myCertificates?.[0];
-  const targetArt = target ? getModuleArt(target.module.title) : null;
+
 
   // „Metoda” (orkiestra) — dla tych, którzy nie skończyli jeszcze modułu wprowadzającego
   const introModule = course.modules.find((m) => isIntroModule(m.title)) ?? null;
@@ -242,13 +241,6 @@ export default function StudentDashboard() {
           <WelcomeSheet />
         </Suspense>
       </Quiet>
-      <div className="[&:not(:empty)]:mb-14 sm:[&:not(:empty)]:mb-16">
-        <Quiet>
-          <Suspense fallback={null}>
-            <FirstSteps />
-          </Suspense>
-        </Quiet>
-      </div>
       {/* ── /SLOT: onboarding ── */}
 
       {/* Hero jak na landingu: etykieta + tytuł + postęp po lewej, „Kontynuuj” z ilustracją po prawej */}
@@ -291,9 +283,8 @@ export default function StudentDashboard() {
             <p className="muted border-t border-[var(--line)] pt-8">
               Nie udało się wczytać kursu. Odśwież stronę i spróbuj jeszcze raz.
             </p>
-          ) : target && targetArt ? (
+          ) : target ? (
             <section className="surface p-4 sm:p-5 grid gap-6" aria-labelledby="continue-title" data-testid="continue-card">
-              <ModuleFigure art={targetArt} eager stripHeight={64} />
               <div className="grid gap-5 px-1 sm:px-3 pb-2 sm:pb-3">
                 <p className="label label--g">
                   Kontynuuj · Moduł {target.moduleNo} · {target.lectureNo !== null ? `Wykład ${target.lectureNo}` : "Pytania"}
@@ -353,6 +344,16 @@ export default function StudentDashboard() {
         </motion.div>
       </section>
 
+      {/* Pierwsze kroki — po tym, co najważniejsze (tytuł + „Kontynuuj”) */}
+      <div className="[&:not(:empty)]:mb-16 sm:[&:not(:empty)]:mb-20">
+        <Quiet>
+          <Suspense fallback={null}>
+            <FirstSteps />
+          </Suspense>
+        </Quiet>
+      </div>
+
+
       {!modulesError && showMethod && introModule && (
         <motion.section variants={rise} className="mb-16 sm:mb-20" aria-label="Metoda">
           <details
@@ -411,11 +412,10 @@ export default function StudentDashboard() {
                       <li key={module.id} className="contents">
                         <Link
                           href={`/modules#m-${module.id}`}
-                          className="row group py-4 sm:py-5 gap-3 sm:gap-5 grid-cols-[24px_64px_minmax(0,1fr)_20px] sm:grid-cols-[40px_104px_minmax(0,1fr)_auto_28px]"
+                          className="row group py-4 sm:py-5 gap-3 sm:gap-5 grid-cols-[28px_minmax(0,1fr)_20px] sm:grid-cols-[48px_minmax(0,1fr)_auto_28px]"
                           data-testid={`module-progress-${module.id}`}
                         >
                           <span className="row__n">{pad(mi + 1)}</span>
-                          <ModuleThumb art={getModuleArt(module.title)} />
                           <span className="row__t gap-2">
                             <b className="!text-[1.0625rem] sm:!text-[1.25rem] !leading-snug">{cleanTitle(module.title)}</b>
                             {progress !== null && (

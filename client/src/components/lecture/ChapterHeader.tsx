@@ -55,7 +55,6 @@ export function ChapterHeader({
       <h2 id="chapter-title" className="h2" data-testid="current-chapter-title">
         {title}
       </h2>
-      {showLine && <EkgCanvas rhythm={rhythm} height={56} label={false} className="mt-1" />}
     </header>
   );
 }

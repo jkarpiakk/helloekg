@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { EkgCanvas, type Rhythm } from "@/components/ekg/EkgCanvas";
+import { EkgCanvas, EKG_RHYTHM_LABELS, type Rhythm } from "@/components/ekg/EkgCanvas";
 import { rise, stagger } from "@/lib/motion";
 
 /** Nagłówek wykładu jak hero na landingu: etykieta, tytuł, moduł, meta i żywy pasek EKG */
@@ -34,9 +34,13 @@ export function LectureHero({
           {meta ?? ""}
         </p>
       </motion.div>
-      <motion.div variants={rise} className="mt-3">
-        <EkgCanvas rhythm={rhythm} height={90} label={rhythmLabel} />
-      </motion.div>
+      {/* Żywy zapis tylko wtedy, gdy pokazuje rytm, o którym jest wykład — nie jako ozdoba */}
+      {rhythmLabel && (
+        <motion.figure variants={rise} className="mt-3 grid gap-2">
+          <EkgCanvas rhythm={rhythm} height={90} label={rhythmLabel} />
+          <figcaption className="text-[13px] text-[var(--txt3)]">Żywy zapis: {EKG_RHYTHM_LABELS[rhythm]} — tak wygląda rytm, o którym jest ten wykład.</figcaption>
+        </motion.figure>
+      )}
     </motion.header>
   );
 }
