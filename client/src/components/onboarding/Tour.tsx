@@ -309,18 +309,18 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
         >
           Pomiń instrukcję
         </button>
-        {step.kind === "info" && (
-          <div className="flex items-center gap-1">
-            {onBack && (
-              <Button variant="ghost" size="sm" onClick={onBack} data-testid="tour-back">
-                Wstecz
-              </Button>
-            )}
+        <div className="flex items-center gap-1">
+          {onBack && (
+            <Button variant="ghost" size="sm" onClick={onBack} data-testid="tour-back">
+              Wstecz
+            </Button>
+          )}
+          {step.kind === "info" && (
             <Button ref={primaryRef} size="sm" onClick={onNext} data-testid="tour-next">
               {step.primary ?? "Dalej"}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -348,6 +348,7 @@ function Tour({ userId }: { userId: string }) {
 
   const { data: modules } = useModules(active);
   const lectureRef = useRef<string | null>(null);
+  const pendingBack = useRef<number | null>(null);
   const geomRef = useRef<Rect | null>(null);
   const targetRef = useRef<HTMLElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -469,6 +470,15 @@ function Tour({ userId }: { userId: string }) {
   useEffect(() => {
     if (isLecturePath(path)) lectureRef.current = path;
     if (index === null) return;
+    const back = pendingBack.current;
+    if (back !== null) {
+      // trwa cofanie na inną stronę — czekamy, aż trasa będzie właściwa dla kroku docelowego
+      if (TOUR_STEPS[back].route?.(path) ?? true) {
+        pendingBack.current = null;
+        go(back);
+      }
+      return;
+    }
     const st = TOUR_STEPS[index];
     if (st.kind === "action" && st.done?.(path)) go(index + 1);
   }, [path, index, go]);
@@ -598,19 +608,34 @@ function Tour({ userId }: { userId: string }) {
     return () => window.removeEventListener("keydown", onKey, true);
   }, [visible, step, phase, index, finish]);
 
+  const hrefFor = (st: (typeof TOUR_STEPS)[number]) =>
+    st.resume === "modules"
+      ? "/modules"
+      : st.resume === "lecture"
+        ? lectureRef.current ?? firstLectureHref(modules)
+        : "/dashboard";
+
   const resume = () => {
     if (!step) return;
-    const href =
-      step.resume === "modules"
-        ? "/modules"
-        : step.resume === "lecture"
-          ? lectureRef.current ?? firstLectureHref(modules)
-          : "/dashboard";
-    navigate(href);
+    navigate(hrefFor(step));
   };
 
-  const prev = index !== null && index > 0 ? TOUR_STEPS[index - 1] : null;
-  const canBack = !!prev && prev.kind === "info" && (!prev.route || prev.route(path));
+  /* „Wstecz” na każdym kroku po powitaniu. Gdy poprzedni krok jest na innej stronie, najpierw tam
+     przechodzimy, a krok włączamy dopiero po zmianie trasy — inaczej krok-działanie uznałby się
+     za zrobiony od razu (np. „Otwórz wykład”, gdy jesteśmy jeszcze w wykładzie) i przeskoczył dalej. */
+  const goBack = () => {
+    if (index === null || index < 2) return;
+    const i = index - 1;
+    const p = TOUR_STEPS[i];
+    if (p.route && !p.route(path)) {
+      pendingBack.current = i;
+      navigate(hrefFor(p));
+    } else {
+      p.undo?.();
+      go(i);
+    }
+  };
+  const canBack = index !== null && index >= 2;
   const target = step?.targets?.[ti];
   const hasHole = !!step?.targets && phase === "show";
   const label = index ? `Instrukcja · ${index} / ${TOUR_STEPS.length - 1}` : "Instrukcja";
@@ -660,6 +685,16 @@ function Tour({ userId }: { userId: string }) {
             <motion.div className="pointer-events-auto fixed bottom-0 left-0 right-0" style={{ top: holeBottom }} onPointerDown={block} />
             <motion.div className="pointer-events-auto fixed left-0" style={{ top: hy, height: hh, width: leftW }} onPointerDown={block} />
             <motion.div className="pointer-events-auto fixed right-0" style={{ top: hy, height: hh, left: holeRight }} onPointerDown={block} />
+            {/* Krok informacyjny: podświetlony element tylko pokazujemy — kliknięcie w niego nie może
+                wyprowadzić z instrukcji (np. „Kontynuuj” → quiz). Klikalny jest tylko w krokach-działaniach. */}
+            {step?.kind !== "action" && (
+              <motion.div
+                className="pointer-events-auto fixed left-0 top-0"
+                style={{ x: hx, y: hy, width: hw, height: hh }}
+                onPointerDown={block}
+                onClick={(e) => e.preventDefault()}
+              />
+            )}
 
             <AnimatePresence>
               {phase === "show" && (
@@ -674,7 +709,7 @@ function Tour({ userId }: { userId: string }) {
                   reduce={reduce}
                   nudge={nudge}
                   onNext={() => go((index ?? 0) + 1)}
-                  onBack={canBack ? () => go((index ?? 1) - 1) : null}
+                  onBack={canBack ? goBack : null}
                   onSkip={finish}
                 />
               )}

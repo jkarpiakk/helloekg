@@ -49,6 +49,19 @@ const fixDeep = (v: any): any =>
 /** Treść wykładu: znaczniki zamiast tekstowych zaślepek studia — renderer kursu decyduje, co pokazać */
 const fixLecture = (md: string) =>
   fixAssets(md).replace(/\*\[Grafika w przygotowaniu: (GFX-\d+)\]\*/g, '<div data-gfx-pending="$1"></div>');
+/**
+ * Interaktywne wstawki kursu, których studio jeszcze nie zna jako dyrektyw.
+ * „Serce to orkiestra” (mapa: struktura przewodząca ↔ element zapisu) stoi po pierwszym akapicie
+ * rozdziału, który właśnie to omawia. Gdy studio dostanie dyrektywę, ten wpis do usunięcia.
+ */
+const WIDGETS: Array<{ chapterTitle: string; widget: string }> = [
+  { chapterTitle: "Od układu przewodzącego do zapisu EKG", widget: "orchestra" },
+];
+const withWidgets = (c: { title: string; contentMd: string }) => {
+  const w = WIDGETS.find((x) => x.chapterTitle === c.title);
+  if (!w || c.contentMd.includes("data-widget")) return c;
+  return { ...c, contentMd: c.contentMd.replace(/\n\n/, `\n\n<div data-widget="${w.widget}"></div>\n\n`) };
+};
 const isAsset = (u: unknown) => typeof u === "string" && u.startsWith("/content-assets/");
 
 /** Dzieli wykład na rozdziały po nagłówkach `##`. Tekst przed pierwszym trafia do „Wstępu". */
@@ -96,7 +109,7 @@ async function main() {
         const [sec] = await tx.insert(sections).values({ moduleId: mod.id, title: l.title, order: order++ }).returning();
         sectionByLecture.set(l.externalId, sec.id);
         stats.sections++;
-        const chapters = splitChapters(l.title, fixLecture(l.contentMdApp));
+        const chapters = splitChapters(l.title, fixLecture(l.contentMdApp)).map(withWidgets);
         await tx.insert(lectureChapters).values(chapters.map((c, i) => ({
           sectionId: sec.id,
           title: c.title.slice(0, 300),

@@ -11,7 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { rise, stagger } from "@/lib/motion";
 import ProgressCard, { ProgressLine } from "./ProgressCard";
 import { isIntroModule } from "@/components/course/moduleArt";
-import OrchestraMethod from "@/components/course/OrchestraMethod";
 import type { Certificate, UserProgress, WeakArea } from "@/types";
 
 interface CourseSection {
@@ -101,7 +100,6 @@ export default function StudentDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   // null = jeszcze nie ruszany: decyduje stan kursu (otwarte dla kogoś, kto nie zaczął modułu 1)
-  const [methodOpen, setMethodOpen] = useState<boolean | null>(null);
 
   // Moduły z sekcjami i postępem — z nich „Kontynuuj” i lista modułów
   const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({
@@ -226,9 +224,6 @@ export default function StudentDashboard() {
   // „Metoda” (orkiestra) — dla tych, którzy nie skończyli jeszcze modułu wprowadzającego
   const introModule = course.modules.find((m) => isIntroModule(m.title)) ?? null;
   const introProgress = introModule ? moduleProgress(introModule.sections) : null;
-  const showMethod = Boolean(introModule) && (introProgress === null || introProgress < 100);
-  const introUntouched = introModule ? introModule.sections.every((s) => !s.lastActivity && !(s.completionPercentage > 0)) : false;
-  const isMethodOpen = methodOpen ?? introUntouched;
 
   return (
     <motion.div className="wrap pt-12 pb-24 sm:pt-16" variants={stagger(0.05)} initial="hidden" animate="show">
@@ -347,43 +342,6 @@ export default function StudentDashboard() {
       </div>
 
 
-      {!modulesError && showMethod && introModule && (
-        <motion.section variants={rise} className="mb-16 sm:mb-20" aria-label="Metoda">
-          <details
-            open={isMethodOpen}
-            onToggle={(e) => {
-              const open = (e.currentTarget as HTMLDetailsElement).open;
-              if (open !== isMethodOpen) setMethodOpen(open);
-            }}
-            className="border-y border-[var(--line)]"
-            data-testid="method-block"
-          >
-            <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer grid grid-cols-[minmax(0,1fr)_28px] items-center gap-4 py-6 transition-transform duration-[120ms] ease-out active:scale-[.995] select-none">
-              <span className="grid gap-2">
-                <span className="label label--g">Metoda · Moduł {pad(course.modules.indexOf(introModule) + 1)}</span>
-                <span className="h3">
-                  Serce to orkiestra. <span className="muted">EKG to jej nagranie.</span>
-                </span>
-              </span>
-              <span className="module-i">
-                <PlusIcon />
-              </span>
-            </summary>
-            <div className="pb-8 grid gap-6">
-              <OrchestraMethod header="lead" level={2} />
-              <div>
-                <Link
-                  href={`/modules#m-${introModule.id}`}
-                  className="inline-flex items-center gap-1 text-[15px] text-[var(--puls)] min-h-[44px]"
-                >
-                  {cleanTitle(introModule.title)}: otwórz moduł
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              </div>
-            </div>
-          </details>
-        </motion.section>
-      )}
 
       {!modulesError && (
         <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-16">

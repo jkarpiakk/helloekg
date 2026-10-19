@@ -43,6 +43,8 @@ export interface TourStep {
   targets?: TourTarget[];
   /** Na jakiej trasie krok ma sens; brak = na każdej */
   route?: (path: string) => boolean;
+  /** Cofa stan, który kończy krok-działanie (używane przy „Wstecz”) */
+  undo?: () => void;
   /** Dokąd prowadzi „Wróć do instrukcji”, gdy kursant jest gdzie indziej */
   resume?: ResumeTo;
   /** Krok-działanie: czy już zrobione (trasa / stan DOM) */
@@ -98,6 +100,8 @@ export const TOUR_STEPS: TourStep[] = [
       { selector: '[data-tour="mobile-nav-kurs"]', hint: "Kliknij „Kurs”" },
       { selector: '[data-tour="menu-button"]', hint: "Otwórz menu", body: "Cały kurs jest w zakładce Kurs, w menu." },
     ],
+    route: isDashboard,
+    resume: "dashboard",
     done: isModules,
   },
   {
@@ -109,13 +113,22 @@ export const TOUR_STEPS: TourStep[] = [
     route: isModules,
     resume: "modules",
     done: () => !!(q('[data-tour="module-first"]')?.parentElement as HTMLDetailsElement | null)?.open,
+    // „Wstecz” do tego kroku: zwijamy moduł, żeby krok nie uznał się od razu za zrobiony
+    undo: () => {
+      const d = q('[data-tour="module-first"]')?.parentElement as HTMLDetailsElement | null;
+      if (d) d.open = false;
+    },
   },
   {
     id: "section-first-lecture",
     kind: "action",
     title: "Wykład i pytania",
     body: "Każdy temat to wykład i pytania. Otwórz pierwszy wykład.",
-    targets: [{ selector: 'details[open] [data-tour="section-first-lecture"]', hint: "Kliknij pierwszy temat" }],
+    targets: [
+      { selector: 'details[open] [data-tour="section-first-lecture"]', hint: "Kliknij pierwszy temat" },
+      // Moduł zwinięty (np. po „Wstecz” albo gdy kursant go zamknął) — najpierw wskazujemy moduł
+      { selector: '[data-tour="module-first"]', hint: "Najpierw rozwiń pierwszy moduł", body: "Każdy temat to wykład i pytania. Rozwiń pierwszy moduł, a potem otwórz pierwszy wykład." },
+    ],
     route: isModules,
     resume: "modules",
     done: isLecturePath,

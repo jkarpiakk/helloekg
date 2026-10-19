@@ -1,6 +1,7 @@
 import { createElement, Fragment, useCallback, useMemo, useState, type ReactNode } from "react";
 import ImageLightbox from "@/components/quiz/ImageLightbox";
 import { EkgCanvas, isRhythm } from "@/components/ekg/EkgCanvas";
+import OrchestraMethod from "@/components/course/OrchestraMethod";
 import { InlineLectureImage, LectureFigure, type OpenImage } from "./LectureFigure";
 
 /**
@@ -13,7 +14,7 @@ import { InlineLectureImage, LectureFigure, type OpenImage } from "./LectureFigu
 const VOID = new Set(["img", "br", "hr", "wbr", "col", "source", "area"]);
 /** W tych rodzicach białe znaki między dziećmi są niedozwolone w DOM Reacta */
 const NO_WS = new Set(["table", "thead", "tbody", "tfoot", "tr", "colgroup", "ul", "ol", "details"]);
-const SPECIAL = "img, details, div[data-ekg], div[data-gfx-pending]";
+const SPECIAL = "img, details, div[data-ekg], div[data-gfx-pending], div[data-widget]";
 const ATTR_MAP: Record<string, string> = {
   class: "className",
   for: "htmlFor",
@@ -72,6 +73,19 @@ function renderNode(n: ChildNode, ctx: Ctx, key: string, dropBlank: boolean): Re
     const height = Number.isFinite(h) ? Math.min(240, Math.max(48, h)) : 90;
     if (isRhythm(r)) return <EkgCanvas key={key} rhythm={r} height={height} />;
     return ctx.canSeeGaps ? <GapNote key={key} text={`Nieznany rytm EKG: „${r || "—"}”`} /> : null;
+  }
+
+  // Interaktywne wstawki w treści wykładu (np. „Serce to orkiestra” przy rozdziale o drodze impulsu)
+  if (tag === "div" && el.hasAttribute("data-widget")) {
+    const w = (el.getAttribute("data-widget") ?? "").trim();
+    if (w === "orchestra") {
+      return (
+        <div key={key} className="not-prose my-10 border-y border-[var(--line)] py-8 [text-align:left]">
+          <OrchestraMethod header="none" level={3} />
+        </div>
+      );
+    }
+    return ctx.canSeeGaps ? <GapNote key={key} text={`Nieznana wstawka: „${w || "—"}”`} /> : null;
   }
 
   if (tag === "div" && el.hasAttribute("data-gfx-pending")) {

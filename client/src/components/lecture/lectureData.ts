@@ -34,7 +34,7 @@ export function renderMarkdown(md: string): string {
     return DOMPurify.sanitize(raw, {
       USE_PROFILES: { html: true },
       ADD_TAGS: ["details", "summary"],
-      ADD_ATTR: ["data-ekg", "data-height", "data-gfx-pending"],
+      ADD_ATTR: ["data-ekg", "data-height", "data-gfx-pending", "data-widget"],
       FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select", "iframe"],
       FORBID_ATTR: ["style"],
     });
@@ -44,7 +44,7 @@ export function renderMarkdown(md: string): string {
 }
 
 /** Czy rozdział ma już własny obraz albo zapis EKG (wtedy nie dokładamy ozdobnika) */
-export const chapterHasVisual = (md: string) => /!\[[^\]]*\]\(|<img\b|data-ekg\s*=/i.test(md ?? "");
+export const chapterHasVisual = (md: string) => /!\[[^\]]*\]\(|<img\b|data-ekg\s*=|data-widget\s*=/i.test(md ?? "");
 
 /** Liczba słów do szacowania czasu czytania (bez składni markdown, znaczników i obrazów) */
 export function countWords(chapters: LectureChapter[]): number {

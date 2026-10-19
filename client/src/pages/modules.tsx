@@ -9,8 +9,6 @@ import { ProgressLine } from "@/components/dashboard/ProgressCard";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
-import { getModuleArt } from "@/components/course/moduleArt";
-import OrchestraMethod from "@/components/course/OrchestraMethod";
 
 interface ModuleSection {
   id: string;
@@ -176,7 +174,6 @@ export default function Modules() {
             if (progress !== null) metaParts.push(`${Math.round(progress)}%`);
             const meta = module.isLocked ? "Zablokowany" : metaParts.join(" · ") || "Wkrótce";
             const isOpen = openIds.has(module.id);
-            const art = getModuleArt(module.title);
 
             return (
               <motion.details
@@ -207,33 +204,10 @@ export default function Modules() {
                 </summary>
 
                 <div className="pb-8 grid gap-8 sm:gap-10 sm:pl-[60px]">
-                  {/* Nagłówek modułu: ilustracja + żywy zapis rytmu modułu + opis z bazy (jeśli jest).
-                      We „Wprowadzeniu” ilustracją jest interaktywna „Metoda” (ten sam rysunek układu
-                      bodźcoprzewodzącego), więc nie powtarzamy obrazka dwa razy. */}
-                  {art.key === "intro" && !module.isLocked ? (
-                    <div className="grid gap-8">
-                      {module.description && (
-                        <p className="text-[16px] sm:text-[17px] leading-[1.7] text-[var(--txt2)] max-w-[42em]">
-                          {module.description}
-                        </p>
-                      )}
-                      <OrchestraMethod header="full" level={3} />
-                    </div>
-                  ) : (
-                    <div
-                      className={`grid gap-5 sm:gap-8 items-start ${
-                        module.description ? "md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "max-w-[520px]"
-                      }`}
-                    >
-                      {module.description && (
-                        <div className="grid gap-3 content-start">
-                          <p className="label label--g">Moduł {pad(mi + 1)}</p>
-                          <p className="text-[16px] sm:text-[17px] leading-[1.7] text-[var(--txt2)] max-w-[34em]">
-                            {module.description}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                  {module.description && (
+                    <p className="text-[16px] sm:text-[17px] leading-[1.7] text-[var(--txt2)] max-w-[42em]">
+                      {module.description}
+                    </p>
                   )}
 
                   {module.isLocked ? (
