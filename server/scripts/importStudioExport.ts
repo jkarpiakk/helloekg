@@ -42,6 +42,9 @@ const fixDeep = (v: any): any =>
   : Array.isArray(v) ? v.map(fixDeep)
   : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fixDeep(x)]))
   : v;
+/** Treść wykładu: znaczniki zamiast tekstowych zaślepek studia — renderer kursu decyduje, co pokazać */
+const fixLecture = (md: string) =>
+  fixAssets(md).replace(/\*\[Grafika w przygotowaniu: (GFX-\d+)\]\*/g, '<div data-gfx-pending="$1"></div>');
 const isAsset = (u: unknown) => typeof u === "string" && u.startsWith("/content-assets/");
 
 /** Dzieli wykład na rozdziały po nagłówkach `##`. Tekst przed pierwszym trafia do „Wstępu". */
@@ -89,7 +92,7 @@ async function main() {
         const [sec] = await tx.insert(sections).values({ moduleId: mod.id, title: l.title, order: order++ }).returning();
         sectionByLecture.set(l.externalId, sec.id);
         stats.sections++;
-        const chapters = splitChapters(l.title, fixAssets(l.contentMdApp));
+        const chapters = splitChapters(l.title, fixLecture(l.contentMdApp));
         await tx.insert(lectureChapters).values(chapters.map((c, i) => ({
           sectionId: sec.id,
           title: c.title.slice(0, 300),
