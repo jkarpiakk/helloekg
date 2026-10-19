@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, ImagePlus, ShieldAlert, X } from "lucide-react";
+import { ArrowLeft, Check, ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
@@ -377,12 +377,6 @@ export default function FeedbackPage() {
                   />
                 </label>
 
-                <p className="flex items-start gap-2 text-[14px] leading-[1.5] text-[var(--txt2)]">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--txt3)]" aria-hidden />
-                  <span>
-                    Nie wgrywaj zrzutów z danymi pacjentów — imienia, nazwiska, PESEL-u czy numeru badania. Zamaż je przed wysłaniem.
-                  </span>
-                </p>
 
                 {fileError && (
                   <p className="text-[14px] text-[var(--alarm)]" role="alert">
