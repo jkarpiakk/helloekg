@@ -32,6 +32,8 @@ type NavItem = {
   href: string;
   label: string;
   testId: string;
+  /** Kotwica instrukcji (data-tour) */
+  tour: string;
   isActive: (path: string, search: URLSearchParams) => boolean;
 };
 
@@ -41,18 +43,21 @@ const NAV_ITEMS: NavItem[] = [
     href: "/modules",
     label: "Kurs",
     testId: "modules",
+    tour: "kurs",
     isActive: (p) => p === "/modules" || p.startsWith("/lecture"),
   },
   {
     href: "/dashboard",
     label: "Postęp",
     testId: "dashboard",
+    tour: "postep",
     isActive: (p) => p === "/dashboard",
   },
   {
     href: "/quiz?mode=review",
     label: "Powtórka",
     testId: "review",
+    tour: "powtorka",
     isActive: (p, s) => p === "/quiz" && s.get("mode") === "review",
   },
 ];
@@ -146,6 +151,7 @@ export default function Header() {
                   className={linkClass(active)}
                   aria-current={active ? "page" : undefined}
                   data-testid={`nav-${item.testId}`}
+                  data-tour={`nav-${item.tour}`}
                 >
                   {item.label}
                 </Link>
@@ -253,6 +259,7 @@ export default function Header() {
             aria-expanded={isMobileMenuOpen}
             aria-controls="mobile-menu"
             data-testid="mobile-menu-toggle"
+            data-tour="menu-button"
           >
             {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
@@ -286,6 +293,7 @@ export default function Header() {
                           aria-current={active ? "page" : undefined}
                           onClick={() => setIsMobileMenuOpen(false)}
                           data-testid={`mobile-nav-${item.testId}`}
+                          data-tour={`mobile-nav-${item.tour}`}
                         >
                           {item.label}
                         </Link>

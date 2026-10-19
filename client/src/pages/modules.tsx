@@ -189,6 +189,7 @@ export default function Modules() {
                 data-testid={`module-${module.id}`}
               >
                 <summary
+                  data-tour={mi === 0 ? "module-first" : undefined}
                   className="group list-none [&::-webkit-details-marker]:hidden cursor-pointer grid grid-cols-[28px_minmax(0,1fr)_28px] sm:grid-cols-[48px_minmax(0,1fr)_auto_28px] items-center gap-3 sm:gap-5 py-5 sm:py-6 transition-transform duration-[120ms] ease-out active:scale-[.995] select-none"
                 >
                   <span className="label label--g num">{pad(mi + 1)}</span>
@@ -248,6 +249,7 @@ export default function Modules() {
                             key={section.id}
                             index={si + 1}
                             section={section}
+                            tourFirst={section === module.sections.find((x) => (x.chapterCount ?? 0) > 0)}
                           />
                         ))}
                       </ul>
@@ -263,7 +265,7 @@ export default function Modules() {
   );
 }
 
-function SectionRow({ index, section }: { index: number; section: ModuleSection }) {
+function SectionRow({ index, section, tourFirst }: { index: number; section: ModuleSection; tourFirst?: boolean }) {
   const pct = Math.round(section.completionPercentage || 0);
   const hasLecture = (section.chapterCount ?? 0) > 0;
   const hasQuestions = (section.questionCount ?? 0) > 0;
@@ -281,6 +283,7 @@ function SectionRow({ index, section }: { index: number; section: ModuleSection 
         isEmpty ? "active:scale-100" : ""
       }`}
       data-testid={`section-${section.id}`}
+      data-tour={tourFirst ? "section-first-lecture" : undefined}
     >
       <span className="row__n">
         {done ? (

@@ -17,13 +17,13 @@ import {
   STEPS_EVENT,
   firstLectureHref,
   markStep,
-  openWelcome,
   readSteps,
   stepsKey,
   useCurrentUser,
   useModules,
   type StepFlag,
 } from "./onboardingStore";
+import { startTour } from "./tourSteps";
 
 const ANSWERS_GOAL = 5;
 
@@ -209,7 +209,7 @@ export default function FirstSteps() {
 
           <button
             type="button"
-            onClick={openWelcome}
+            onClick={startTour}
             className="mt-3 inline-flex min-h-[44px] items-center text-[14px] text-[var(--txt2)] underline decoration-[var(--line2)] underline-offset-4 transition-colors hover:text-[var(--txt)]"
             data-testid="first-steps-welcome"
           >

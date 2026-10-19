@@ -203,6 +203,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
           Pasek: odcinek na rozdział, bieżący wypełnia się w miarę czytania. */}
       <div
         ref={barRef}
+        data-tour="chapter-bar"
         className="material-bar sticky top-[var(--nav-h)] z-30 mx-[calc(50%-50vw)] border-b border-[var(--line)]"
       >
         <div className="wrap wrap--narrow flex min-h-[48px] items-center gap-3 py-1.5">
@@ -229,6 +230,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
                 disabled={isLast}
                 aria-label="Następny rozdział"
                 data-testid="button-next"
+                data-tour="chapter-next"
               >
                 <ChevronRight />
               </Button>

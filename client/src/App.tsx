@@ -43,6 +43,7 @@ const FeedbackPage = lazy(() => import("@/pages/feedback"));
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import FeedbackFab from "@/components/feedback/FeedbackFab";
+import Tour from "@/components/onboarding/Tour";
 
 // Loader zgodny z marką: sygnet H z szybszym impulsem jako fallback Suspense
 const LOADER_H_PATH =
@@ -124,6 +125,8 @@ function AppContent() {
       <Footer />
       {/* Zgłoszenia testerów (beta) — tylko dla zalogowanych */}
       {user && <FeedbackFab />}
+      {/* Instrukcja przy pierwszym logowaniu — poza trasami, więc przeżywa nawigację */}
+      {user && <Tour key={user.id} userId={String(user.id)} />}
     </div>
   );
 }

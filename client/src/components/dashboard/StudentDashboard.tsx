@@ -56,15 +56,15 @@ function plural(n: number, one: string, few: string, many: string) {
 
 const cleanTitle = (title: string) => title.replace(/^\s*moduł\s*\d+\s*[:.–—-]\s*/i, "");
 
-/* ── Onboarding (FirstSteps, WelcomeSheet) ─────────────────────────────────────────────
+/* ── Onboarding (FirstSteps) ─────────────────────────────────────────────
  * Pliki tworzy osobno inny etap prac. `import.meta.glob` zwraca pusty obiekt, gdy pliku nie ma,
  * więc build i HMR działają także bez nich; gdy się pojawią, Vite sam je podepnie.
  * Ładowane leniwie (React.lazy + Suspense fallback null) i odgrodzone granicą błędu —
  * usterka w onboardingu nie może zabrać całego panelu postępu. */
-const onboardingLoaders = import.meta.glob("../onboarding/{FirstSteps,WelcomeSheet}.tsx");
+const onboardingLoaders = import.meta.glob("../onboarding/FirstSteps.tsx");
 const Nothing: ComponentType = () => null;
 
-function optionalLazy(name: "FirstSteps" | "WelcomeSheet") {
+function optionalLazy(name: "FirstSteps") {
   const load = onboardingLoaders[`../onboarding/${name}.tsx`];
   return lazy(async () => {
     if (!load) return { default: Nothing };
@@ -78,7 +78,6 @@ function optionalLazy(name: "FirstSteps" | "WelcomeSheet") {
 }
 
 const FirstSteps = optionalLazy("FirstSteps");
-const WelcomeSheet = optionalLazy("WelcomeSheet");
 
 class Quiet extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -233,15 +232,7 @@ export default function StudentDashboard() {
 
   return (
     <motion.div className="wrap pt-12 pb-24 sm:pt-16" variants={stagger(0.05)} initial="hidden" animate="show">
-      {/* ── SLOT: onboarding ─────────────────────────────────────────────────────────
-          WelcomeSheet sam decyduje, czy się pokazać; FirstSteps to lista „pierwsze kroki”.
-          Odstęp tylko wtedy, gdy lista coś narysowała (pusty div = brak marginesu). */}
-      <Quiet>
-        <Suspense fallback={null}>
-          <WelcomeSheet />
-        </Suspense>
-      </Quiet>
-      {/* ── /SLOT: onboarding ── */}
+      {/* Powitanie i prowadzenie po aplikacji: components/onboarding/Tour.tsx (montowane w App) */}
 
       {/* Hero jak na landingu: etykieta + tytuł + postęp po lewej, „Kontynuuj” z ilustracją po prawej */}
       <section
@@ -258,11 +249,13 @@ export default function StudentDashboard() {
           </p>
           {!modulesError && course.total > 0 && (
             <div className="pt-4 max-w-[460px]">
+              <div data-tour="overall-progress">
               <ProgressCard
                 overallProgress={course.overall}
                 completedSections={course.completed}
                 totalSections={course.total}
               />
+              </div>
             </div>
           )}
           <nav className="chips pt-2" aria-label="Szybkie akcje">
@@ -284,7 +277,7 @@ export default function StudentDashboard() {
               Nie udało się wczytać kursu. Odśwież stronę i spróbuj jeszcze raz.
             </p>
           ) : target ? (
-            <section className="surface p-4 sm:p-5 grid gap-6" aria-labelledby="continue-title" data-testid="continue-card">
+            <section className="surface p-4 sm:p-5 grid gap-6" aria-labelledby="continue-title" data-testid="continue-card" data-tour="continue">
               <div className="grid gap-5 px-1 sm:px-3 pb-2 sm:pb-3">
                 <p className="label label--g">
                   Kontynuuj · Moduł {target.moduleNo} · {target.lectureNo !== null ? `Wykład ${target.lectureNo}` : "Pytania"}
@@ -323,7 +316,7 @@ export default function StudentDashboard() {
               </div>
             </section>
           ) : course.hasContent ? (
-            <section className="surface p-6 sm:p-8 grid gap-4" aria-labelledby="continue-title" data-testid="continue-card">
+            <section className="surface p-6 sm:p-8 grid gap-4" aria-labelledby="continue-title" data-testid="continue-card" data-tour="continue">
               <p className="label label--g">Kurs ukończony</p>
               <h2 id="continue-title" className="h3">Wszystkie tematy masz za sobą</h2>
               <p className="muted">Utrwal wiedzę w powtórce albo sprawdź się w egzaminie próbnym.</p>

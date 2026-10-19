@@ -148,6 +148,7 @@ export default function FeedbackFab() {
         aria-label="Zgłoś uwagę lub błąd"
         title="Zgłoś uwagę"
         data-testid="feedback-fab"
+        data-tour="feedback-fab"
         style={{ ...inset, borderRadius: 999 }}
         className="material-bar fixed z-[45] flex h-12 min-w-12 items-center justify-center gap-2 border border-[var(--line2)] px-[14px] text-[15px] font-medium text-[var(--txt)] no-underline transition-[border-color] duration-150 hover:border-[var(--txt3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--puls)]"
       >
