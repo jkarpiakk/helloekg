@@ -2,19 +2,34 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
-import express from "express";
-import path from "path";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { storage } from "./storage";
 import { authService } from "./auth";
-import { emailService } from "./services/emailService";
+import { emailService, esc } from "./services/emailService";
 import { quizService } from "./services/quizService";
 import { certificateService } from "./services/certificateService";
 import * as gamificationService from "./services/gamificationService";
-import { requireAuth, requireAdmin, requireReviewer, requireActiveSubscription } from "./middleware/auth";
-import { authRateLimit, apiRateLimit, paymentRateLimit } from "./middleware/rateLimit";
+import {
+  requireAuth,
+  requireAdmin,
+  requireReviewer,
+  requireOwner,
+  requireSubscriptionManager,
+  requireActiveSubscription,
+  ACCOUNT_SUSPENDED_MESSAGE,
+} from "./middleware/auth";
+import {
+  authRateLimit,
+  apiRateLimit,
+  paymentRateLimit,
+  hashEmail,
+  NIL_UUID,
+  loginEmailBlockedFor,
+  recordLoginFailure,
+  clearLoginFailures,
+} from "./middleware/rateLimit";
 import {
   loginSchema,
   registerSchema,
@@ -25,11 +40,13 @@ import {
   insertDemoQuestionSchema,
   insertHomePageContentSchema,
   BlogPost,
-  InsertBlogPost
+  InsertBlogPost,
+  PASSWORD_MAX_LENGTH,
+  type User,
 } from "@shared/schema";
 import { db } from "./db";
 import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters, blogPosts } from "@shared/schema";
-import { eq, or, and, gte, desc, count, ilike, avg, sql } from "drizzle-orm";
+import { eq, or, and, gte, desc, count, ilike, avg, sql, isNull, isNotNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 // Blog validation schemas
@@ -44,6 +61,79 @@ const blogQuerySchema = z.object({
 const statusUpdateSchema = z.object({
   status: z.enum(['draft', 'published'])
 });
+
+// ── Role i zarządzanie kontami ─────────────────────────────────────────────
+const USER_ROLES = ["owner", "admin", "reviewer", "support", "student"] as const;
+// Role, które może nadawać/odbierać wyłącznie właściciel
+const PRIVILEGED_ROLES: readonly string[] = ["owner", "admin"];
+
+const adminCreateUserSchema = z.object({
+  email: z.string().trim().email().max(255),
+  password: z.string().min(8).max(PASSWORD_MAX_LENGTH),
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  role: z.enum(USER_ROLES).default("student"),
+});
+
+const adminUpdateUserSchema = z.object({
+  role: z.enum(USER_ROLES).optional(),
+  // "suspended" zawiesza; "verified" potwierdza e-mail i zdejmuje zawieszenie; "active" tylko zdejmuje zawieszenie
+  status: z.enum(["verified", "suspended", "active"]).optional(),
+});
+
+const adminSubscriptionSchema = z.object({
+  action: z.enum(["grant", "revoke"]),
+  durationMonths: z.coerce.number().int().min(1).max(24).default(1),
+});
+
+const deleteAccountSchema = z.object({
+  password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+});
+
+const REGISTER_MESSAGE = "Konto zostało utworzone. Sprawdź e-mail w celu weryfikacji.";
+
+/** Dane użytkownika zwracane po zalogowaniu/rejestracji (bez pól wrażliwych) */
+function sessionUser(user: User) {
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role: user.role,
+    locale: user.locale,
+    emailVerified: user.emailVerified,
+  };
+}
+
+/** Użytkownik w panelu admina — bez haseł, tokenów i identyfikatorów Stripe */
+function adminUserView(user: User) {
+  const {
+    password: _pw,
+    emailVerificationToken: _evt,
+    passwordResetToken: _prt,
+    passwordResetExpiry: _pre,
+    stripeCustomerId: _sc,
+    stripeSubscriptionId: _ss,
+    ...safe
+  } = user;
+  return safe;
+}
+
+/** Nowa sesja dla użytkownika (regenerate chroni przed session fixation) */
+function establishSession(req: import("express").Request, userId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((regenErr) => {
+      if (regenErr) return reject(regenErr);
+      req.session.userId = userId;
+      req.session.save((saveErr) => (saveErr ? reject(saveErr) : resolve()));
+    });
+  });
+}
+
+/** Audyt „best effort” — błąd zapisu nie psuje odpowiedzi */
+function auditSafe(entry: Parameters<typeof storage.createAuditLog>[0]) {
+  storage.createAuditLog(entry).catch((e) => console.error("[audit] write failed:", e?.message));
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit environment
@@ -70,9 +160,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve static files from attached_assets
-  app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets')));
-  
+  // (Usunięto publiczny katalog /attached_assets — klient importuje te pliki przez @assets, Vite je pakuje.)
+
   // Session configuration
   const PgSession = connectPg(session);
   app.use(session({
@@ -127,17 +216,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         privacyAccepted: userData.privacyAccepted ?? false,
       };
 
-      let user: any;
+      let user: User;
       let verificationToken: string;
       try {
         ({ user, verificationToken } = await authService.registerUser(userDataFixed));
       } catch (err: any) {
         if (err.message?.includes("już istnieje")) {
-          // Return the same response as a successful registration — do not reveal
-          // whether the e-mail address is already registered.
-          return res.status(201).json({
-            message: "Konto zostało utworzone. Sprawdź e-mail w celu weryfikacji.",
-          });
+          // Ten sam status i komunikat co przy nowym koncie, bez danych konta i bez sesji.
+          return res.status(201).json({ message: REGISTER_MESSAGE });
         }
         throw err;
       }
@@ -149,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Failed to send verification email:", emailError);
       }
 
-      await storage.createAuditLog({
+      auditSafe({
         actorId: user.id,
         action: "user_registered",
         entityType: "user",
@@ -158,10 +244,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get("User-Agent"),
       });
 
-      res.status(201).json({
-        message: "Konto zostało utworzone. Sprawdź e-mail w celu weryfikacji.",
-        user: { id: user.id, email: user.email },
-      });
+      // Od razu zalogowany — klient może przejść prosto do /dashboard
+      try {
+        await establishSession(req, user.id);
+      } catch (sessionErr) {
+        console.error("Session after registration error:", sessionErr);
+        return res.status(201).json({ message: REGISTER_MESSAGE });
+      }
+
+      res.status(201).json({ message: REGISTER_MESSAGE, user: sessionUser(user) });
     } catch (error: any) {
       console.error("Registration error:", error.message);
       res.status(400).json({ error: "Błąd podczas rejestracji" });
@@ -169,55 +260,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/login", authRateLimit, async (req, res) => {
+    let email: string;
+    let password: string;
     try {
-      const { email, password } = loginSchema.parse(req.body);
-      
+      ({ email, password } = loginSchema.parse(req.body));
+    } catch {
+      return res.status(400).json({ error: "Błąd podczas logowania" });
+    }
+
+    try {
+      // Limit nieudanych prób na konto (niezależnie od limitu per IP)
+      const blockedFor = await loginEmailBlockedFor(email);
+      if (blockedFor) {
+        auditSafe({
+          actorId: null,
+          action: "rate_limited",
+          entityType: "auth",
+          entityId: NIL_UUID,
+          diff: { limiter: "login_email", emailHash: hashEmail(email) },
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+        });
+        res.setHeader("Retry-After", blockedFor);
+        return res.status(429).json({
+          error: "Zbyt wiele nieudanych prób logowania. Spróbuj ponownie za 15 minut.",
+          retryAfter: blockedFor,
+        });
+      }
+
       const user = await authService.authenticateUser(email, password);
       if (!user) {
+        await recordLoginFailure(email);
+        auditSafe({
+          actorId: null,
+          action: "login_failed",
+          entityType: "auth",
+          entityId: NIL_UUID,
+          diff: { emailHash: hashEmail(email) },
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+        });
         return res.status(401).json({ error: "Nieprawidłowe dane logowania" });
       }
 
-      // Regenerate session ID before storing credentials (prevents session fixation)
-      req.session.regenerate((regenErr) => {
-        if (regenErr) {
-          console.error("Session regenerate error:", regenErr);
-          return res.status(500).json({ error: "Błąd sesji" });
-        }
-
-        req.session.userId = user.id;
-
-        req.session.save(async (err) => {
-          if (err) {
-            console.error("Session save error:", err);
-            return res.status(500).json({ error: "Błąd sesji" });
-          }
-
-          // Create audit log
-          await storage.createAuditLog({
-            actorId: user.id,
-            action: "user_login",
-            entityType: "user",
-            entityId: user.id,
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent')
-          });
-
-          res.json({
-            user: {
-              id: user.id,
-              email: user.email,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              role: user.role,
-              locale: user.locale,
-              emailVerified: user.emailVerified
-            }
-          });
+      // Zawieszenie sprawdzamy dopiero po poprawnym haśle (nie zdradza stanu konta obcym)
+      if (user.suspendedAt) {
+        auditSafe({
+          actorId: user.id,
+          action: "login_blocked_suspended",
+          entityType: "user",
+          entityId: user.id,
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
         });
+        return res.status(403).json({ error: ACCOUNT_SUSPENDED_MESSAGE, code: "ACCOUNT_SUSPENDED" });
+      }
+
+      await clearLoginFailures(email);
+
+      // Regenerate session ID before storing credentials (prevents session fixation)
+      try {
+        await establishSession(req, user.id);
+      } catch (sessionErr) {
+        console.error("Session error:", sessionErr);
+        return res.status(500).json({ error: "Błąd sesji" });
+      }
+
+      auditSafe({
+        actorId: user.id,
+        action: "user_login",
+        entityType: "user",
+        entityId: user.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
       });
+
+      res.json({ user: sessionUser(user) });
     } catch (error: any) {
       console.error("Login error:", error);
-      res.status(400).json({ error: "Błąd podczas logowania" });
+      res.status(500).json({ error: "Błąd podczas logowania" });
     }
   });
 
@@ -258,38 +379,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Resend verification email
   app.post("/api/auth/resend-verification", authRateLimit, async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email } = req.body ?? {};
       
-      if (!email) {
+      if (!email || typeof email !== "string") {
         return res.status(400).json({ error: "Podaj adres e-mail" });
       }
 
-      const user = await storage.getUserByEmail(email);
-      
-      if (!user) {
-        // Don't reveal if email exists or not
-        return res.json({ message: "Jeśli konto istnieje, wysłaliśmy nowy link weryfikacyjny" });
-      }
+      // Ta sama odpowiedź niezależnie od tego, czy konto istnieje / jest już zweryfikowane
+      const genericResponse = { message: "Jeśli konto istnieje i nie jest jeszcze zweryfikowane, wysłaliśmy nowy link weryfikacyjny" };
 
-      if (user.emailVerified) {
-        return res.status(400).json({ error: "Adres e-mail został już zweryfikowany" });
+      const user = await storage.getUserByEmail(email);
+      if (!user || user.emailVerified) {
+        return res.json(genericResponse);
       }
 
       // Generate new token
       const newToken = authService.generateToken();
       await storage.updateUser(user.id, { emailVerificationToken: newToken });
 
-      // Send verification email via SendGrid
       const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/verify-email?token=${newToken}`;
       
       try {
         await emailService.sendEmailVerification(user.email, user.firstName, verificationUrl);
       } catch (emailError) {
         console.error("Failed to resend verification email:", emailError);
-        return res.status(500).json({ error: "Nie udało się wysłać e-maila" });
       }
 
-      res.json({ message: "Nowy link weryfikacyjny został wysłany na Twój adres e-mail" });
+      res.json(genericResponse);
     } catch (error: any) {
       console.error("Resend verification error:", error);
       res.status(500).json({ error: "Błąd podczas wysyłania e-maila" });
@@ -305,6 +421,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { email } = parsed.data;
       const resetToken = await authService.initiatePasswordReset(email);
+
+      auditSafe({
+        actorId: null,
+        action: "password_reset_requested",
+        entityType: "auth",
+        entityId: NIL_UUID,
+        diff: { emailHash: hashEmail(email), accountExists: !!resetToken },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
 
       if (resetToken) {
         const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}`;
@@ -366,45 +492,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.delete("/api/auth/account", requireAuth, async (req, res) => {
+  // Usunięcie konta: JSON { password } — wymagane bieżące hasło
+  app.delete("/api/auth/account", authRateLimit, requireAuth, async (req, res) => {
+    const parsed = deleteAccountSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Podaj hasło, aby potwierdzić usunięcie konta" });
+    }
+
     try {
       const userId = req.user!.id;
       const userEmail = req.user!.email;
       const userFirstName = req.user!.firstName;
 
-      await db.update(subscriptions)
-        .set({ status: "cancelled", endDate: new Date() })
-        .where(and(
-          eq(subscriptions.userId, userId),
-          eq(subscriptions.status, "active")
-        ));
+      const passwordOk = await authService.verifyPassword(parsed.data.password, req.user!.password);
+      if (!passwordOk) {
+        auditSafe({
+          actorId: userId,
+          action: "account_delete_failed_password",
+          entityType: "user",
+          entityId: userId,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
+        return res.status(403).json({ error: "Nieprawidłowe hasło" });
+      }
 
-      await storage.createAuditLog({
-        actorId: userId,
-        action: "account_deleted",
-        entityType: "user",
-        entityId: userId,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
+      // Wszystko albo nic: audyt, anonimizacja zgłoszeń, sesje, konto
+      await db.transaction(async (tx) => {
+        await tx.update(subscriptions)
+          .set({ status: "cancelled", endDate: new Date() })
+          .where(and(
+            eq(subscriptions.userId, userId),
+            eq(subscriptions.status, "active")
+          ));
+
+        // Zgłoszenia zostają (historia supportu), ale bez danych osobowych
+        await tx.update(supportTickets)
+          .set({ userEmail: "usuniete-konto@helloekg.invalid", userName: "Usunięte konto", userId: null })
+          .where(or(eq(supportTickets.userId, userId), eq(supportTickets.userEmail, userEmail)));
+
+        // actor_id zostanie wyzerowany przez ON DELETE SET NULL
+        await tx.insert(auditLog).values({
+          actorId: userId,
+          action: "account_deleted",
+          entityType: "user",
+          entityId: userId,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
+
+        await tx.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${userId}`);
+        await tx.delete(users).where(eq(users.id, userId));
       });
-
-      await db.delete(users).where(eq(users.id, userId));
 
       try {
         await emailService.sendEmail(userEmail, {
-          subject: "Potwierdzenie usunięcia konta — EKG Academy",
-          html: `<p>Cześć ${userFirstName || ''},</p><p>Twoje konto w EKG Academy zostało usunięte zgodnie z Twoim żądaniem. Wszystkie Twoje dane osobowe zostały trwale usunięte z naszych systemów.</p><p>Zespół EKG Academy</p>`,
-          text: "Twoje konto w EKG Academy zostało usunięte zgodnie z Twoim żądaniem. Wszystkie Twoje dane osobowe zostały trwale usunięte z naszych systemów."
+          subject: "Potwierdzenie usunięcia konta — helloEKG",
+          html: `<p>Cześć ${esc(userFirstName || '')},</p><p>Twoje konto w helloEKG zostało usunięte zgodnie z Twoim żądaniem. Wszystkie Twoje dane osobowe zostały trwale usunięte z naszych systemów.</p><p>Zespół helloEKG</p>`,
+          text: "Twoje konto w helloEKG zostało usunięte zgodnie z Twoim żądaniem. Wszystkie Twoje dane osobowe zostały trwale usunięte z naszych systemów."
         });
       } catch (emailError) {
         console.error("Failed to send account deletion confirmation email:", emailError);
       }
 
       req.session.destroy(() => {});
+      res.clearCookie("connect.sid");
 
       res.json({ message: "Konto zostało usunięte zgodnie z życzeniem." });
     } catch (error: any) {
       console.error("Account deletion error:", error);
+      // 23503 = FK: konto zespołu z autorstwem treści (pytania, rozdziały) — nie da się usunąć samoobsługowo
+      if (error?.code === "23503" || error?.cause?.code === "23503") {
+        return res.status(409).json({ error: "Tego konta nie można usunąć samodzielnie — napisz do nas: kontakt@helloekg.pl" });
+      }
       res.status(500).json({ error: "Błąd podczas usuwania konta" });
     }
   });
@@ -961,7 +1121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/quiz/question", requireAuth, requireActiveSubscription, async (req, res) => {
     try {
-      const { sectionId, mode = "learn" } = req.query;
+      const { sectionId, mode = "learn", exclude, ids } = req.query;
+      const list = (v: unknown) => (typeof v === "string" && v ? v.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 100) : undefined);
       
       // For review mode, sectionId is optional (uses review queue)
       if (!sectionId && mode !== "review") {
@@ -971,7 +1132,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const question = await quizService.getQuestionForUser(
         req.user!.id,
         sectionId as string || null,
-        mode as any
+        mode as any,
+        { exclude: list(exclude), ids: list(ids) }
       );
 
       if (!question) {
@@ -998,7 +1160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(session);
     } catch (error: any) {
       console.error("Exam initialization error:", error);
-      res.status(500).json({ error: error.message || "Błąd podczas inicjalizacji egzaminu" });
+      res.status(500).json({ error: "Błąd podczas inicjalizacji egzaminu" });
     }
   });
 
@@ -1011,7 +1173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const questionIndex = parseInt(index);
-      const question = await quizService.getExamQuestion(sessionId as string, questionIndex);
+      const question = await quizService.getExamQuestion(sessionId as string, questionIndex, req.user!.id);
 
       if (!question) {
         return res.status(404).json({ error: "Brak dostępnych pytań" });
@@ -1020,7 +1182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(question);
     } catch (error: any) {
       console.error("Exam question fetch error:", error);
-      res.status(500).json({ error: error.message || "Błąd podczas pobierania pytania" });
+      res.status(500).json({ error: "Błąd podczas pobierania pytania" });
     }
   });
 
@@ -1062,7 +1224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "sessionId jest wymagane" });
       }
 
-      const summary = await quizService.getExamSummary(sessionId as string);
+      const summary = await quizService.getExamSummary(sessionId as string, req.user!.id);
 
       if (!summary) {
         return res.status(404).json({ error: "Sesja egzaminu nie znaleziona" });
@@ -1071,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(summary);
     } catch (error: any) {
       console.error("Exam summary error:", error);
-      res.status(500).json({ error: error.message || "Błąd podczas pobierania podsumowania" });
+      res.status(500).json({ error: "Błąd podczas pobierania podsumowania" });
     }
   });
 
@@ -1265,9 +1427,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Pobierz ranking (leaderboard)
   app.get("/api/gamification/leaderboard", requireAuth, async (req, res) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 10;
+      const requested = parseInt(req.query.limit as string, 10);
+      const limit = Number.isFinite(requested) ? Math.min(50, Math.max(1, requested)) : 10;
       const leaderboard = await gamificationService.getLeaderboard(limit);
-      res.json(leaderboard);
+      // Bez userId — ranking widzą wszyscy zalogowani
+      res.json(leaderboard.map(({ userId: _uid, ...entry }) => entry));
     } catch (error) {
       console.error("Leaderboard error:", error);
       res.status(500).json({ error: "Błąd podczas pobierania rankingu" });
@@ -1338,7 +1502,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/questions/:id", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
-      const updates = req.body;
+      // Tylko edytowalne pola treści — bez createdBy/reviewedBy/wersji (brak mass assignment)
+      const parsedUpdates = insertQuestionSchema.omit({ createdBy: true }).partial().safeParse(req.body);
+      if (!parsedUpdates.success) {
+        return res.status(400).json({ error: "Nieprawidłowe dane pytania", details: parsedUpdates.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) });
+      }
+      const updates = parsedUpdates.data;
       
       const oldQuestion = await storage.getQuestionById(id);
       if (!oldQuestion) {
@@ -1515,7 +1684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Bulk question import error:", error);
-      res.status(500).json({ error: error.message || "Błąd podczas importu pytań" });
+      res.status(500).json({ error: "Błąd podczas importu pytań" });
     }
   });
 
@@ -1769,7 +1938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ uploadURL });
     } catch (error: any) {
       console.error("Upload URL generation error:", error);
-      res.status(500).json({ error: error.message || "Błąd podczas generowania URL uploadu" });
+      res.status(500).json({ error: "Błąd podczas generowania URL uploadu" });
     }
   });
 
@@ -1899,6 +2068,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           conditions.push(eq(users.emailVerified, true));
         } else if (status === 'unverified') {
           conditions.push(eq(users.emailVerified, false));
+        } else if (status === 'suspended') {
+          conditions.push(isNotNull(users.suspendedAt));
+        } else if (status === 'active') {
+          conditions.push(isNull(users.suspendedAt));
         }
       }
       
@@ -1907,7 +2080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const allUsers = await query.orderBy(desc(users.createdAt));
-      res.json(allUsers.map(({ password: _pw, ...u }) => u));
+      res.json(allUsers.map(adminUserView));
     } catch (error: any) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Błąd podczas pobierania użytkowników" });
@@ -1939,13 +2112,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/users", requireAuth, requireReviewer, async (req, res) => {
+  // Tworzenie kont przez panel — wyłącznie właściciel
+  app.post("/api/admin/users", requireAuth, requireOwner, async (req, res) => {
     try {
-      const { email, password, firstName, lastName, role = 'student' } = req.body;
-      
-      if (!email || !password || !firstName || !lastName) {
-        return res.status(400).json({ error: "Email, hasło, imię i nazwisko są wymagane" });
+      const parsed = adminCreateUserSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Email, hasło (8–128 znaków), imię i nazwisko są wymagane; rola musi być prawidłowa" });
       }
+      const { email, password, firstName, lastName, role } = parsed.data;
 
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
@@ -1980,9 +2154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get('User-Agent')
       });
 
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = newUser;
-      res.status(201).json(userWithoutPassword);
+      res.status(201).json(adminUserView(newUser));
     } catch (error: any) {
       console.error("Error creating user:", error);
       res.status(500).json({ error: "Błąd podczas tworzenia użytkownika" });
@@ -1992,29 +2164,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { role, status } = req.body;
+      const parsed = adminUpdateUserSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Nieprawidłowa rola lub status użytkownika" });
+      }
+      const { role, status } = parsed.data;
+      const actor = req.user!;
+      const actorIsOwner = actor.role === "owner";
 
-      // Block self-role change
-      if (req.user!.id === id && role !== undefined) {
-        return res.status(403).json({ error: "Nie możesz zmieniać własnej roli" });
+      const target = await storage.getUser(id);
+      if (!target) {
+        return res.status(404).json({ error: "Użytkownik nie znaleziony" });
       }
 
-      const ALLOWED_ROLES = ["owner", "admin", "reviewer", "support", "student"] as const;
-      const updateData: any = {};
-      if (role !== undefined) {
-        if (!ALLOWED_ROLES.includes(role)) {
-          return res.status(400).json({ error: "Nieprawidłowa rola użytkownika" });
+      const countOwners = async (opts: { activeOnly: boolean }) => {
+        const where = opts.activeOnly
+          ? and(eq(users.role, "owner"), isNull(users.suspendedAt))
+          : eq(users.role, "owner");
+        const [row] = await db.select({ n: count() }).from(users).where(where);
+        return Number(row?.n ?? 0);
+      };
+
+      const updateData: Partial<typeof users.$inferInsert> = {};
+
+      if (role !== undefined && role !== target.role) {
+        // Block self-role change
+        if (actor.id === id) {
+          return res.status(403).json({ error: "Nie możesz zmieniać własnej roli" });
+        }
+        // Nadawanie/odbieranie ról admin/owner — tylko właściciel
+        if (!actorIsOwner && (PRIVILEGED_ROLES.includes(role) || PRIVILEGED_ROLES.includes(target.role))) {
+          return res.status(403).json({ error: "Tylko właściciel może nadawać i odbierać role administratora i właściciela" });
+        }
+        // Nigdy nie zostawiamy systemu bez właściciela
+        if (target.role === "owner" && (await countOwners({ activeOnly: false })) <= 1) {
+          return res.status(409).json({ error: "Nie można odebrać roli ostatniemu właścicielowi" });
         }
         updateData.role = role;
       }
-      if (status) {
-        if (status === 'verified') updateData.emailVerified = true;
-        if (status === 'suspended') updateData.emailVerified = false;
+
+      if (status !== undefined) {
+        if (actor.id === id && status === "suspended") {
+          return res.status(403).json({ error: "Nie możesz zawiesić własnego konta" });
+        }
+        // Konta admin/owner może zmieniać tylko właściciel
+        if (!actorIsOwner && PRIVILEGED_ROLES.includes(target.role) && actor.id !== id) {
+          return res.status(403).json({ error: "Tylko właściciel może zmieniać status kont administratorów i właścicieli" });
+        }
+        if (status === "suspended") {
+          if (target.role === "owner" && !target.suspendedAt && (await countOwners({ activeOnly: true })) <= 1) {
+            return res.status(409).json({ error: "Nie można zawiesić ostatniego aktywnego właściciela" });
+          }
+          updateData.suspendedAt = target.suspendedAt ?? new Date();
+          // Zgodność ze starym przełącznikiem w panelu (oparty na emailVerified)
+          updateData.emailVerified = false;
+        } else if (status === "verified") {
+          updateData.emailVerified = true;
+          updateData.suspendedAt = null;
+        } else if (status === "active") {
+          updateData.suspendedAt = null;
+        }
       }
-      
+
+      if (Object.keys(updateData).length === 0) {
+        return res.json(adminUserView(target));
+      }
+
       const [updatedUser] = await db
         .update(users)
-        .set(updateData)
+        .set({ ...updateData, updatedAt: new Date() })
         .where(eq(users.id, id))
         .returning();
 
@@ -2022,30 +2240,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Użytkownik nie znaleziony" });
       }
 
+      // Zmiana roli albo zawieszenie → wszystkie sesje tego użytkownika tracą ważność
+      const roleChanged = updateData.role !== undefined;
+      const suspended = status === "suspended";
+      if (roleChanged || suspended) {
+        await storage.invalidateUserSessions(id);
+      }
+
       // Create audit log
       await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "user_updated",
+        actorId: actor.id,
+        action: suspended ? "user_suspended" : roleChanged ? "user_role_changed" : "user_updated",
         entityType: "user",
         entityId: id,
-        diff: updateData,
+        diff: { ...updateData, previousRole: target.role, previousSuspendedAt: target.suspendedAt },
         ipAddress: req.ip,
         userAgent: req.get('User-Agent')
       });
 
-      const { password: _pw, ...userWithoutPassword } = updatedUser;
-      res.json(userWithoutPassword);
+      res.json(adminUserView(updatedUser));
     } catch (error: any) {
       console.error("Error updating user:", error);
       res.status(500).json({ error: "Błąd podczas aktualizacji użytkownika" });
     }
   });
 
-  // Grant/revoke subscription for user
-  app.post("/api/admin/users/:id/subscription", requireAuth, requireReviewer, async (req, res) => {
+  // Grant/revoke subscription for user — tylko owner/support
+  app.post("/api/admin/users/:id/subscription", requireAuth, requireSubscriptionManager, async (req, res) => {
     try {
       const { id } = req.params;
-      const { action, durationMonths = 1 } = req.body; // action: "grant" or "revoke"
+      const parsed = adminSubscriptionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const actionInvalid = parsed.error.issues.some((i) => i.path[0] === "action");
+        return res.status(400).json({
+          error: actionInvalid
+            ? "Nieprawidłowa akcja. Użyj 'grant' lub 'revoke'"
+            : "Nieprawidłowy czas trwania (1–24 miesiące)",
+        });
+      }
+      const { action, durationMonths } = parsed.data;
       
       const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
       if (!user) {

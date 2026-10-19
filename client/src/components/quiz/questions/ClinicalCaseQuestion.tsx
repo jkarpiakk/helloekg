@@ -125,7 +125,7 @@ export default function ClinicalCaseQuestion({
       {/* Scenariusz */}
       {config.intro && (
         <div
-          className="prose-hk max-w-[42em] text-[16px] leading-[1.7] text-[var(--txt2)]"
+          className="prose-hk max-w-[42em] text-[1rem] leading-[1.7] text-[var(--txt2)]"
           dangerouslySetInnerHTML={sanitizeMarkdown(config.intro)}
           data-testid="case-intro"
         />
@@ -157,7 +157,7 @@ export default function ClinicalCaseQuestion({
           data-testid="case-image"
         >
           <img src={imageUrl} alt="Zapis EKG przypadku" className="block max-h-[60vh] w-full object-contain" />
-          <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-[12px] text-[var(--txt2)]">
+          <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-[.75rem] text-[var(--txt2)]">
             <Maximize2 className="h-3.5 w-3.5" aria-hidden />
             Powiększ
           </span>
@@ -183,8 +183,8 @@ export default function ClinicalCaseQuestion({
               <div className="relative flex flex-col items-center" aria-hidden>
                 <span
                   className={cn(
-                    "z-[1] grid h-8 w-8 place-items-center rounded-full border font-mono text-[12px] transition-colors duration-300",
-                    !visible && "border-[var(--line)] text-[var(--txt4)]",
+                    "z-[1] grid h-8 w-8 place-items-center rounded-full border font-mono text-[.75rem] transition-colors duration-300",
+                    !visible && "border-[var(--line)] text-[var(--label)]",
                     visible && !done && "border-[var(--puls-deep)] text-[var(--puls)]",
                     done && ok && "border-[var(--puls-deep)] bg-[var(--tint)] text-[var(--puls)]",
                     done && !ok && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)] text-[var(--alarm)]",
@@ -204,7 +204,7 @@ export default function ClinicalCaseQuestion({
                 </p>
 
                 {!visible ? (
-                  <p className="text-[14px] text-[var(--txt3)]">Odsłoni się po odpowiedzi na poprzedni krok.</p>
+                  <p className="text-[.875rem] text-[var(--txt2)]">Odsłoni się po odpowiedzi na poprzedni krok.</p>
                 ) : (
                   <motion.div variants={rise} initial={i === 0 ? false : "hidden"} animate="show" className="grid gap-4">
                     <div
@@ -279,7 +279,7 @@ export default function ClinicalCaseQuestion({
                         )}
                       </div>
                     ) : (
-                      <p className="text-[14px] text-[var(--txt2)]">Ten krok wymaga zapisu EKG, którego jeszcze nie ma.</p>
+                      <p className="text-[.875rem] text-[var(--txt2)]">Ten krok wymaga zapisu EKG, którego jeszcze nie ma.</p>
                     )}
 
                     {/* Wyjaśnienie kroku — wyrasta pod odpowiedziami */}
@@ -294,7 +294,7 @@ export default function ClinicalCaseQuestion({
                           aria-live="polite"
                           data-testid={`case-step-${i}-explanation`}
                         >
-                          <p className="flex items-start gap-2.5 text-[16px] font-medium leading-snug text-[var(--txt)]">
+                          <p className="flex items-start gap-2.5 text-[1rem] font-medium leading-snug text-[var(--txt)]">
                             {ok ? (
                               <Check className="mt-0.5 h-5 w-5 shrink-0 text-[var(--puls)]" strokeWidth={2.25} aria-hidden />
                             ) : (
@@ -303,7 +303,7 @@ export default function ClinicalCaseQuestion({
                             {ok ? "Dobrze." : "Nie tym razem."}
                           </p>
                           <div
-                            className="prose-hk max-w-[46em] text-[15px] text-[var(--txt2)]"
+                            className="prose-hk max-w-[46em] text-[.9375rem] text-[var(--txt2)]"
                             dangerouslySetInnerHTML={sanitizeMarkdown(step.explanation)}
                           />
                           {!isLast && revealed === i + 1 && (
@@ -350,12 +350,12 @@ export default function ClinicalCaseQuestion({
                       key={s.id}
                       className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[var(--line)] px-4 py-3 last:border-b-0"
                     >
-                      <span className="font-mono text-[12px] text-[var(--label)]">{pad(i + 1)}</span>
+                      <span className="font-mono text-[.75rem] text-[var(--label)]">{pad(i + 1)}</span>
                       <span
-                        className="line-clamp-2 text-[15px] text-[var(--txt)]"
+                        className="line-clamp-2 text-[.9375rem] text-[var(--txt)]"
                         dangerouslySetInnerHTML={sanitizeMarkdown(s.prompt)}
                       />
-                      <span className={cn("inline-flex items-center gap-1.5 text-[14px]", ok ? "text-[var(--puls)]" : "text-[var(--alarm)]")}>
+                      <span className={cn("inline-flex items-center gap-1.5 text-[.875rem]", ok ? "text-[var(--puls)]" : "text-[var(--alarm)]")}>
                         {ok ? <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden /> : <X className="h-4 w-4" strokeWidth={2.5} aria-hidden />}
                         {ok ? "Dobrze" : "Błąd"}
                       </span>

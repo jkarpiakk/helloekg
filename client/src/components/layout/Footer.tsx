@@ -4,7 +4,7 @@ import Logo from "@/components/layout/Logo";
 import { useAuth } from "@/lib/auth";
 
 const linkClass =
-  "inline-flex items-center gap-2 text-[var(--txt2)] transition-colors duration-200 hover:text-[var(--txt)]";
+  "inline-flex min-h-11 w-fit items-center gap-2 text-[var(--txt2)] transition-colors duration-200 hover:text-[var(--txt)]";
 
 export default function Footer() {
   const { isAuthenticated } = useAuth();
@@ -27,7 +27,7 @@ export default function Footer() {
           </div>
 
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
-            <div className="grid content-start gap-2.5">
+            <div className="grid content-start">
               <p className="label mb-1">Kurs</p>
               {isAuthenticated ? (
                 <>
@@ -40,7 +40,7 @@ export default function Footer() {
               )}
             </div>
 
-            <div className="grid content-start gap-2.5">
+            <div className="grid content-start">
               <p className="label mb-1">Konto</p>
               {isAuthenticated ? (
                 <Link href="/dashboard" className={linkClass}>Twój postęp</Link>
@@ -53,7 +53,7 @@ export default function Footer() {
               <Link href="/forgot-password" className={linkClass}>Nie pamiętasz hasła?</Link>
             </div>
 
-            <div className="grid content-start gap-2.5">
+            <div className="grid content-start">
               <p className="label mb-1">helloEKG</p>
               <a href="https://helloekg.pl" target="_blank" rel="noopener noreferrer" className={linkClass}>
                 helloekg.pl
@@ -71,7 +71,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-2 border-t border-[var(--line)] pt-6 text-[13px] text-[var(--label)] md:flex-row md:justify-between md:gap-6">
+        <div className="mt-12 flex flex-col gap-2 border-t border-[var(--line)] pt-6 text-[.8125rem] text-[var(--label)] md:flex-row md:justify-between md:gap-6">
           <p>© 2026 helloEKG · Wersja beta</p>
           {/* Atrybucja wymagana licencją CC BY 4.0 modelu serca 3D (symulator) */}
           <p data-testid="heart-model-attribution">

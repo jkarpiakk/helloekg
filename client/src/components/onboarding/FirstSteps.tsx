@@ -167,7 +167,7 @@ export default function FirstSteps() {
             aria-valuemax={items.length}
             aria-valuenow={doneCount}
           >
-            <span style={{ width: `${(doneCount / items.length) * 100}%` }} />
+            <span style={{ "--w": doneCount / items.length } as React.CSSProperties} />
           </div>
 
           <motion.ul className="mt-4 border-t border-[var(--line)]" variants={stagger(0.04)}>

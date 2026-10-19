@@ -16,6 +16,8 @@ declare module "express-session" {
   }
 }
 
+export const ACCOUNT_SUSPENDED_MESSAGE = "Konto zawieszone — napisz do nas: kontakt@helloekg.pl";
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
     return res.status(401).json({ error: "Wymagane uwierzytelnienie" });
@@ -26,6 +28,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (!user) {
       req.session.destroy(() => {});
       return res.status(401).json({ error: "Nieprawidłowa sesja" });
+    }
+
+    if (user.suspendedAt) {
+      req.session.destroy(() => {});
+      return res.status(403).json({ error: ACCOUNT_SUSPENDED_MESSAGE, code: "ACCOUNT_SUSPENDED" });
     }
 
     req.user = user;
@@ -53,6 +60,9 @@ export function requireRole(roles: string[]) {
 export const requireAdmin = requireRole(["owner", "admin"]);
 export const requireReviewer = requireRole(["owner", "reviewer"]);
 export const requireSupport = requireRole(["owner", "support", "admin"]);
+export const requireOwner = requireRole(["owner"]);
+// Ręczne nadawanie/odbieranie dostępu (bez płatności) — tylko właściciel i support
+export const requireSubscriptionManager = requireRole(["owner", "support"]);
 
 export async function requireActiveSubscription(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {

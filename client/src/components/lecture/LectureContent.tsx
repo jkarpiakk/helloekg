@@ -121,7 +121,7 @@ function renderNode(n: ChildNode, ctx: Ctx, key: string, dropBlank: boolean): Re
 function GapNote({ text }: { text: string }) {
   return (
     <div
-      className="rounded-[12px] border border-dashed border-[var(--line2)] px-4 py-3 text-center font-mono text-[11px] uppercase tracking-[.16em] text-[var(--label)]"
+      className="rounded-[12px] border border-dashed border-[var(--line2)] px-4 py-3 text-center font-mono text-[.75rem] uppercase tracking-[.16em] text-[var(--label)]"
       data-testid="gfx-pending"
     >
       {text}

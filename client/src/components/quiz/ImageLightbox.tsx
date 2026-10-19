@@ -93,6 +93,9 @@ type Geo = { s: number; dx: number; dy: number } | null;
  * - po puszczeniu prędkość przechodzi na sprężynę, a rzut pędu decyduje: zamknąć czy wrócić
  *   (powrót z lekkim odbiciem — damping 0.85, bo gest niósł pęd),
  * - tło blednie razem z przeciąganiem; Esc i kliknięcie tła zamykają,
+ * - zamykany podgląd można złapać w locie: wraca pod palec od bieżącej wartości (przerywalność),
+ * - dwa palce = powiększanie przeglądarki (pinch-zoom); wtedy, i przy powiększonym widoku,
+ *   przeciąganie nie zamyka podglądu,
  * - przy „Ogranicz ruch” zostaje samo przenikanie.
  */
 export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powiększony zapis EKG" }: ImageLightboxProps) {
@@ -212,6 +215,29 @@ export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powię
     };
   }, [close, origin]);
 
+  /* ── Powiększanie palcami: przy skali 1 obraz przyjmuje tylko pinch (jeden palec = nasz gest);
+     po powiększeniu wolno też przesuwać widok, a przeciąganie nie zamyka ── */
+  const pointers = useRef(new Set<number>());
+  const zoomed = () => (window.visualViewport?.scale ?? 1) > 1.01;
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const img = imgRef.current;
+    if (!vv || !img) return;
+    const sync = () => {
+      img.style.touchAction = vv.scale > 1.01 ? "manipulation" : "pinch-zoom";
+    };
+    sync();
+    vv.addEventListener("resize", sync);
+    return () => vv.removeEventListener("resize", sync);
+  }, []);
+
+  /** Gest przerwany (drugi palec, powiększenie) — panel wraca na miejsce sprężyną */
+  const abandonDrag = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (d?.axis === "y" && !still) springs.current!.y.to(0, { response: 0.35, damping: 1 });
+  };
+
   /* ── Gest na obrazie: 10 px zwłoki, potem oś; pion śledzony 1:1, w górę gumowo ── */
   const drag = useRef<{
     x0: number;
@@ -223,7 +249,17 @@ export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powię
   } | null>(null);
 
   const onPointerDown = (e: React.PointerEvent<HTMLImageElement>) => {
-    if (e.button !== 0 || closing.current) return;
+    if (e.button !== 0) return;
+    pointers.current.add(e.pointerId);
+    if (pointers.current.size > 1 || zoomed()) {
+      abandonDrag();
+      return;
+    }
+    if (closing.current) {
+      // Złapany w trakcie zamykania: anuluj zamknięcie i wróć od bieżącej wartości (sprężyna nie skacze)
+      closing.current = false;
+      springs.current!.p.to(1, { response: still ? 0.3 : 0.42, damping: 1 });
+    }
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -242,6 +278,10 @@ export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powię
   const onPointerMove = (e: React.PointerEvent<HTMLImageElement>) => {
     const d = drag.current;
     if (!d || e.pointerId !== d.pid) return;
+    if (pointers.current.size > 1 || zoomed()) {
+      abandonDrag();
+      return;
+    }
     const dx = e.clientX - d.x0;
     const dy = e.clientY - d.y0;
     d.hist.push({ t: e.timeStamp, x: e.clientX, y: e.clientY });
@@ -258,6 +298,7 @@ export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powię
   };
 
   const onPointerEnd = (e: React.PointerEvent<HTMLImageElement>) => {
+    pointers.current.delete(e.pointerId);
     const d = drag.current;
     if (!d || e.pointerId !== d.pid) return;
     drag.current = null;
@@ -270,7 +311,11 @@ export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powię
     const y = springs.current!.y;
     const end = y.value + project(vy);
     if (end > window.innerHeight * 0.22) close(vy);
-    else y.to(0, { velocity: vy, response: 0.35, damping: 0.85 });
+    else {
+      // Odbicie tylko, gdy gest niósł pęd; inaczej spokojny powrót
+      y.to(0, { velocity: vy, response: 0.35, damping: Math.abs(vy) > 200 ? 0.85 : 1 });
+      if (springs.current!.p.target !== 1) springs.current!.p.to(1, { response: 0.42, damping: 1 });
+    }
   };
 
   return createPortal(
@@ -293,20 +338,20 @@ export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powię
             onPointerMove={onPointerMove}
             onPointerUp={onPointerEnd}
             onPointerCancel={onPointerEnd}
-            className="block max-h-[calc(100dvh-120px)] w-full cursor-grab touch-none select-none bg-[var(--ink)] object-contain active:cursor-grabbing"
+            className="block max-h-[calc(100dvh-120px)] w-full cursor-grab touch-pinch-zoom select-none bg-[var(--ink)] object-contain active:cursor-grabbing"
             data-testid="lightbox-image"
           />
           <button
             ref={closeRef}
             type="button"
             onClick={() => close()}
-            className="absolute right-2.5 top-2.5 grid h-10 w-10 place-items-center rounded-full border border-[var(--line2)] bg-[var(--panel)] text-[var(--txt)] transition-transform duration-100 active:scale-[.94]"
+            className="absolute right-2 top-2 grid h-11 w-11 place-items-center rounded-full border border-[var(--line2)] bg-[var(--panel)] text-[var(--txt)] transition-transform duration-100 active:scale-[.94]"
             aria-label="Zamknij podgląd"
             data-testid="close-lightbox"
           >
             <X className="h-4 w-4" />
           </button>
-          <div ref={barRef} className="border-t border-[var(--line)] px-4 py-2.5 text-center text-[13px] text-[var(--txt3)]">
+          <div ref={barRef} className="border-t border-[var(--line)] px-4 py-2.5 text-center text-[.8125rem] text-[var(--txt2)]">
             <span className="[@media(hover:hover)_and_(pointer:fine)]:hidden">Przeciągnij w dół, aby zamknąć</span>
             <span className="hidden [@media(hover:hover)_and_(pointer:fine)]:inline">Esc albo kliknięcie obok zamyka podgląd</span>
           </div>

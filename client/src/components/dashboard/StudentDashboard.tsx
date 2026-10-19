@@ -172,7 +172,8 @@ export default function StudentDashboard() {
     });
     // Tylko sekcje, w których coś jest — „Kontynuuj” nigdy nie prowadzi do pustej
     const withContent = flat.filter((x) => hasLecture(x.section) || hasQuestions(x.section));
-    // „Zrobione” da się stwierdzić tylko po pytaniach; sam wykład nie zapisuje postępu
+    // „Zrobione” = wszystkie pytania tematu opanowane (ostatnia odpowiedź na każde poprawna);
+    // sam wykład nie zapisuje postępu
     const isDone = (s: CourseSection) => hasQuestions(s) && (s.completionPercentage || 0) >= 100;
 
     const lastActive = withContent
@@ -215,8 +216,10 @@ export default function StudentDashboard() {
   const target = course.target;
   const targetHasLecture = target ? hasLecture(target.section) : false;
   const targetHasQuestions = target ? hasQuestions(target.section) : false;
-  // Kto już odpowiadał na pytania w tym temacie, wraca do pytań; reszta zaczyna od wykładu
-  const targetStartedQuiz = targetHasQuestions && (target?.section.completionPercentage || 0) > 0;
+  // Kto już odpowiadał na pytania w tym temacie, wraca do pytań; reszta zaczyna od wykładu.
+  // lastActivity zapisuje każda odpowiedź — także błędna, która nie podnosi opanowania
+  const targetStartedQuiz =
+    targetHasQuestions && ((target?.section.completionPercentage || 0) > 0 || !!target?.section.lastActivity);
   const primaryIsQuiz = !targetHasLecture || targetStartedQuiz;
   const certificate = myCertificates?.[0];
 
@@ -240,7 +243,7 @@ export default function StudentDashboard() {
           </p>
           <h1 id="dashboard-title" className="h1">Twój postęp</h1>
           <p className="lead max-w-[30em]">
-            Tu widzisz, co masz za sobą i od czego zacząć dziś. Postęp liczymy z twoich odpowiedzi na pytania.
+            Tu widzisz, co masz za sobą i od czego zacząć dziś. Postęp to odsetek opanowanych pytań — tych, w których twoja ostatnia odpowiedź była poprawna.
           </p>
           {!modulesError && course.total > 0 && (
             <div className="pt-4 max-w-[460px]">
@@ -283,9 +286,9 @@ export default function StudentDashboard() {
                 </div>
                 {targetHasQuestions && (
                   <div className="grid gap-2 max-w-[420px]">
-                    <ProgressLine value={target.section.completionPercentage} label="Postęp w tym temacie" />
+                    <ProgressLine value={target.section.completionPercentage} label="Opanowane w tym temacie" />
                     <p className="text-[14px] text-[var(--txt2)]">
-                      <span className="num">{Math.round(target.section.completionPercentage || 0)}%</span> ukończone ·{" "}
+                      <span className="num">{Math.round(target.section.completionPercentage || 0)}%</span> opanowane ·{" "}
                       {target.section.questionCount} {plural(target.section.questionCount ?? 0, "pytanie", "pytania", "pytań")}
                     </p>
                   </div>
@@ -313,7 +316,7 @@ export default function StudentDashboard() {
           ) : course.hasContent ? (
             <section className="surface p-6 sm:p-8 grid gap-4" aria-labelledby="continue-title" data-testid="continue-card" data-tour="continue">
               <p className="label label--g">Kurs ukończony</p>
-              <h2 id="continue-title" className="h3">Wszystkie tematy masz za sobą</h2>
+              <h2 id="continue-title" className="h3">Wszystkie pytania opanowane</h2>
               <p className="muted">Utrwal wiedzę w powtórce albo sprawdź się w egzaminie próbnym.</p>
               <div>
                 <Button asChild>
@@ -351,7 +354,7 @@ export default function StudentDashboard() {
               <motion.section variants={rise} aria-labelledby="modules-title">
                 <div className="flex items-baseline justify-between gap-4 mb-4">
                   <h2 id="modules-title" className="label">Moduły</h2>
-                  <Link href="/modules" className="text-[14px] text-[var(--txt2)] hover:text-[var(--txt)]">
+                  <Link href="/modules" className="inline-flex min-h-11 items-center text-[14px] text-[var(--txt2)] hover:text-[var(--txt)]">
                     Otwórz kurs
                   </Link>
                 </div>
@@ -414,7 +417,7 @@ export default function StudentDashboard() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/quiz?mode=review" className="inline-block mt-4 text-[14px] text-[var(--puls)]">
+                <Link href="/quiz?mode=review" className="inline-flex min-h-11 items-center mt-2 text-[14px] text-[var(--puls)]">
                   Powtórz te pytania
                 </Link>
               </motion.section>

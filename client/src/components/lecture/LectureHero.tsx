@@ -29,7 +29,7 @@ export function LectureHero({
         {title}
       </motion.h1>
       <motion.div variants={rise} className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <p className="muted text-[15px]">{moduleName}</p>
+        <p className="muted text-[.9375rem]">{moduleName}</p>
         <p className="label min-h-[1.4em]" data-testid="lecture-meta">
           {meta ?? ""}
         </p>
@@ -38,7 +38,7 @@ export function LectureHero({
       {rhythmLabel && (
         <motion.figure variants={rise} className="mt-3 grid gap-2">
           <EkgCanvas rhythm={rhythm} height={90} label={rhythmLabel} />
-          <figcaption className="text-[13px] text-[var(--txt3)]">Żywy zapis: {EKG_RHYTHM_LABELS[rhythm]} — tak wygląda rytm, o którym jest ten wykład.</figcaption>
+          <figcaption className="text-[.8125rem] text-[var(--txt2)]">Żywy zapis: {EKG_RHYTHM_LABELS[rhythm]} — tak wygląda rytm, o którym jest ten wykład.</figcaption>
         </motion.figure>
       )}
     </motion.header>

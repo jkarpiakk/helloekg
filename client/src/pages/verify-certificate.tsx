@@ -109,12 +109,6 @@ export default function VerifyCertificate({ params }: VerifyCertificateProps) {
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">{t("certificate.examScore")}</span>
-                        <span className="text-foreground font-semibold" data-testid="exam-score">
-                          {Math.round(parseFloat(verification.certificate.score) * 100)}%
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
                         <span className="text-muted-foreground">{t("certificate.status")}</span>
                         <span className={`font-semibold ${
                           verification.isValid ? "text-chart-2" : "text-destructive"

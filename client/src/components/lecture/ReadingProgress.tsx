@@ -80,7 +80,7 @@ export function ReadingProgress({
           {i === index && (
             <span
               ref={fillRef}
-              className="absolute inset-0 origin-left bg-[var(--puls)] transition-transform duration-150 ease-out will-change-transform"
+              className="absolute inset-0 origin-left bg-[var(--puls)] will-change-transform"
               style={{ transform: "scaleX(0)" }}
             />
           )}

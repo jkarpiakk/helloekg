@@ -41,7 +41,7 @@ export function LectureFigure({ src, alt, onOpen }: { src: string; alt: string; 
         />
       </button>
       {caption && (
-        <figcaption className="max-w-[36em] text-center text-[13px] leading-[1.5] text-[var(--txt3)]">{caption}</figcaption>
+        <figcaption className="max-w-[36em] text-center text-[.8125rem] leading-[1.5] text-[var(--txt2)]">{caption}</figcaption>
       )}
     </figure>
   );

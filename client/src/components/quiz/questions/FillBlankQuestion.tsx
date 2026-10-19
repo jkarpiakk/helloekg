@@ -90,7 +90,7 @@ export default function FillBlankQuestion({
 
       parts.push(
         <span key={`blank-${blank.id}`} className="mx-1 inline-flex flex-wrap items-center gap-1.5 align-middle">
-          <span className="font-mono text-[11px] text-[var(--label)]" aria-hidden>
+          <span className="font-mono text-[.75rem] text-[var(--label)]" aria-hidden>
             {blankIndex + 1}
           </span>
           <input
@@ -107,7 +107,7 @@ export default function FillBlankQuestion({
             aria-invalid={problem ? true : undefined}
             aria-describedby={problem ? `blank-problem-${blank.id}` : undefined}
             className={cn(
-              "h-10 w-32 rounded-[10px] border bg-transparent px-3 text-center text-[16px] text-[var(--txt)] transition-colors duration-200 placeholder:text-[var(--txt3)] focus-visible:outline-none sm:w-40",
+              "h-11 w-32 rounded-[10px] border bg-transparent px-3 text-center text-base text-[var(--txt)] transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--txt3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--puls)] focus-visible:ring-offset-0 sm:w-40",
               "disabled:cursor-default",
               isCorrect && "border-[var(--puls-deep)] bg-[var(--tint)]",
               isIncorrect && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)] text-[var(--txt2)]",
@@ -115,7 +115,7 @@ export default function FillBlankQuestion({
                 !isIncorrect &&
                 (problem
                   ? "border-[var(--alarm)]"
-                  : "border-[var(--line2)] hover:border-[var(--txt3)] focus-visible:border-[var(--puls)]"),
+                  : "border-[var(--field-border)] hover:border-[var(--txt2)] focus-visible:border-[var(--puls)]"),
             )}
             data-testid={`blank-input-${blank.id}`}
           />
@@ -126,7 +126,7 @@ export default function FillBlankQuestion({
             <>
               <X className="h-4 w-4 text-[var(--alarm)]" aria-label="Błędnie" data-testid={`blank-incorrect-${blank.id}`} />
               {correctAnswer && (
-                <span className="text-[14px] text-[var(--txt)]">
+                <span className="text-[.875rem] text-[var(--txt)]">
                   <span className="label mr-1.5">Poprawnie</span>
                   {correctAnswer}
                 </span>
@@ -155,17 +155,17 @@ export default function FillBlankQuestion({
 
   return (
     <div className="grid gap-4">
-      <p className="text-[15px] text-[var(--txt2)]">Uzupełnij luki w tekście.</p>
+      <p className="text-[.9375rem] text-[var(--txt2)]">Uzupełnij luki w tekście.</p>
 
-      <div className="text-[17px] leading-[2.4] text-[var(--txt)]" data-testid="fill-blank-text">
+      <div className="text-[1.0625rem] leading-[2.4] text-[var(--txt)]" data-testid="fill-blank-text">
         {renderTextWithBlanks()}
       </div>
 
       {visibleProblems.length > 0 && (
-        <ul className="grid gap-1 text-[14px] text-[var(--txt)]" aria-live="polite">
+        <ul className="grid gap-1 text-[.875rem] text-[var(--txt)]" aria-live="polite">
           {visibleProblems.map((p) => (
             <li key={p.id} id={`blank-problem-${p.id}`} className="flex items-center gap-2">
-              <span className="font-mono text-[11px] text-[var(--alarm)]">{p.n}</span>
+              <span className="font-mono text-[.75rem] text-[var(--alarm)]">{p.n}</span>
               {p.msg}
             </li>
           ))}
@@ -175,10 +175,10 @@ export default function FillBlankQuestion({
       {hints.length > 0 && (
         <div className="grid gap-2 border-t border-[var(--line)] pt-4" data-testid="fill-blank-hints">
           <p className="label">Podpowiedzi</p>
-          <ul className="grid gap-1 text-[14px] text-[var(--txt2)]">
+          <ul className="grid gap-1 text-[.875rem] text-[var(--txt2)]">
             {hints.map((h) => (
               <li key={h.n} className="flex gap-2.5" data-testid={`hint-${sortedBlanks[h.n - 1].id}`}>
-                <span className="font-mono text-[11px] leading-[1.9] text-[var(--label)]">{h.n}</span>
+                <span className="font-mono text-[.75rem] leading-[1.9] text-[var(--label)]">{h.n}</span>
                 <span>{h.hint}</span>
               </li>
             ))}

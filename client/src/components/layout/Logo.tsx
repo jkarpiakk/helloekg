@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 interface LogoProps {
@@ -6,6 +7,8 @@ interface LogoProps {
   markSize?: number;
   showWordmark?: boolean;
   animated?: boolean;
+  /** Zmiana wartości (np. trasy) odtwarza puls jeszcze raz — dwa przebiegi i stop */
+  replayKey?: string;
 }
 
 const H_PATH =
@@ -14,11 +17,14 @@ const H_PATH =
 /**
  * Logo jak na helloekg.pl: znak 26px (ślad + biegnący puls) i wordmark „hello**EKG**”
  * w Space Grotesk 500/600. Kolory z tokenów, więc działa w obu motywach.
- * Puls to jedyna nieskończona animacja w interfejsie; przy „Ogranicz ruch” znika.
+ * Puls przebiega dwa razy przy wejściu (i przy zmianie `replayKey`), potem znak zostaje
+ * pełny — bez nieskończonej pętli w polu widzenia. Przy „Ogranicz ruch” od razu pełny znak.
  */
-export default function Logo({ className = "", markSize = 26, showWordmark = true, animated = true }: LogoProps) {
+export default function Logo({ className = "", markSize = 26, showWordmark = true, animated = true, replayKey }: LogoProps) {
   const reducedMotion = useReducedMotion();
-  const isAnimated = animated && !reducedMotion;
+  const [played, setPlayed] = useState(false);
+  useEffect(() => setPlayed(false), [replayKey]);
+  const isAnimated = animated && !reducedMotion && !played;
 
   return (
     <span className={`inline-flex items-center gap-[9px] text-[var(--txt)] ${className}`} data-testid="logo">
@@ -35,6 +41,7 @@ export default function Logo({ className = "", markSize = 26, showWordmark = tru
         <path
           d={H_PATH}
           stroke={isAnimated ? "var(--puls-dark)" : "var(--puls)"}
+          style={{ transition: "stroke .5s ease" }}
           strokeWidth={9}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -47,12 +54,14 @@ export default function Logo({ className = "", markSize = 26, showWordmark = tru
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeDasharray="180 360"
-            className="logo-pulse-path"
+            className="logo-pulse-path is-twice"
+            key={replayKey}
+            onAnimationEnd={() => setPlayed(true)}
           />
         )}
       </svg>
       {showWordmark && (
-        <span className="font-heading text-[18px] font-medium leading-none tracking-[-0.015em] whitespace-nowrap">
+        <span className="font-heading text-[1.125rem] font-medium leading-none tracking-[-0.015em] whitespace-nowrap">
           hello<b className="font-semibold">EKG</b>
         </span>
       )}

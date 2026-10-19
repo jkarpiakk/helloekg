@@ -5,7 +5,8 @@
  * Ruch (Apple, „Designing Fluid Interfaces”):
  * - wycięcie przechodzi między celami sprężyną bez odbicia; x, y, szerokość i wysokość osobno,
  *   zawsze od bieżącej wartości na ekranie — zmiana kroku w połowie ruchu nie skacze,
- * - cel śledzony co klatkę (przewijanie, zmiany układu), karta jedzie razem z nim,
+ * - cel śledzony zdarzeniami (przewijanie, zmiana rozmiaru, zmiany DOM) z krótkim „ogonem” klatek
+ *   po każdym z nich — bez stałej pętli rAF; karta jedzie razem z nim,
  * - karta „materializuje się” od strony celu (skala .96 → 1, krycie, rozmycie) i tak samo znika,
  * - przyciski reagują przy naciśnięciu; Esc zamyka od razu; klik w przyciemnienie tylko „trąca” kartę.
  * „Ogranicz ruch”: bez podróży sprężyną i bez oddychania obwódki — samo przenikanie.
@@ -49,6 +50,10 @@ const GUTTER = 16;
 const SEEK_MS = 4000;
 const SKIP_MS = 600;
 const holeSpring = { type: "spring", bounce: 0, duration: 0.4 } as const;
+/** Po każdym zdarzeniu (przewinięcie, zmiana układu) śledzimy cel jeszcze przez tyle ms — łapie przejścia CSS */
+const TAIL_MS = 500;
+/** Zmiana położenia celu — karta przelicza swoją pozycję */
+const GEOM_EVENT = "hk:tour-geom";
 
 type Rect = { x: number; y: number; w: number; h: number };
 type Side = "center" | "below" | "above" | "dock-bottom" | "dock-top";
@@ -203,7 +208,8 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
   const [side, setSide] = useState<Side>("center");
   const sideRef = useRef<Side>("center");
 
-  // Pozycja liczona przed pierwszym narysowaniem, potem co klatkę (cel się przewija) — do wyjścia
+  // Pozycja liczona przed pierwszym narysowaniem, potem przy każdej zmianie celu, okna
+  // albo rozmiaru karty (zdarzenia, bez stałej pętli) — do wyjścia
   useLayoutEffect(() => {
     const update = () => {
       const el = ref.current;
@@ -221,11 +227,15 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
     };
     update();
     if (!isPresent) return; // znikająca karta zostaje tam, gdzie była
-    let raf = requestAnimationFrame(function loop() {
-      update();
-      raf = requestAnimationFrame(loop);
-    });
-    return () => cancelAnimationFrame(raf);
+    window.addEventListener(GEOM_EVENT, update);
+    window.addEventListener("resize", update);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    if (ro && ref.current) ro.observe(ref.current);
+    return () => {
+      window.removeEventListener(GEOM_EVENT, update);
+      window.removeEventListener("resize", update);
+      ro?.disconnect();
+    };
   }, [isPresent, mobile, geomRef, px, py, ax, origin]);
 
   useEffect(() => {
@@ -277,19 +287,19 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
         <motion.span className="tour-arrow" data-edge={edgeTop ? "top" : "bottom"} style={{ x: arrowX, rotate: 45 }} aria-hidden="true" />
       )}
       <p className="label label--g">{label}</p>
-      <h2 id={titleId} className="mt-2 font-heading text-[19px] font-medium leading-snug tracking-[-0.012em]">
+      <h2 id={titleId} className="mt-2 font-heading text-[1.1875rem] font-medium leading-snug tracking-[-0.012em]">
         {step.title}
       </h2>
-      <p id={bodyId} className="mt-1.5 text-[15px] leading-[1.55] text-[var(--txt2)]">
+      <p id={bodyId} className="mt-1.5 text-[.9375rem] leading-[1.55] text-[var(--txt2)]">
         {body}
       </p>
 
       {step.kind === "action" && hint && (
-        <p className="mt-4 flex items-center gap-2 text-[14px] font-medium text-[var(--puls)]" data-testid="tour-hint">
+        <p className="mt-4 flex items-center gap-2 text-[.875rem] font-medium text-[var(--puls)]" data-testid="tour-hint">
           <motion.span
             className="inline-grid place-items-center"
             animate={reduce ? undefined : { y: edgeTop ? [0, -3, 0] : [0, 3, 0] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 1.6, repeat: 2, ease: "easeInOut" }}
             aria-hidden="true"
           >
             <Arrow className="h-4 w-4" />
@@ -304,7 +314,7 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
           onClick={onSkip}
           aria-keyshortcuts="Escape"
           title="Esc"
-          className="-ml-1 inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-1 text-[13px] text-[var(--txt2)] transition-[transform,color] duration-100 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--puls)]"
+          className="-ml-1 inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-1 text-[.8125rem] text-[var(--txt2)] transition-[transform,color] duration-100 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--puls)]"
           data-testid="tour-skip"
         >
           Pomiń instrukcję
@@ -487,7 +497,9 @@ function Tour({ userId }: { userId: string }) {
     if (st.kind === "action" && st.done?.(path)) go(index + 1);
   }, [path, index, go]);
 
-  /* pętla: szukanie celu → przewinięcie → stabilny → pokazanie; potem śledzenie co klatkę */
+  /* szukanie celu → przewinięcie → stabilny → pokazanie (klatka po klatce, najwyżej SEEK_MS);
+     potem śledzenie sterowane zdarzeniami: przewijanie, zmiana rozmiaru, ResizeObserver,
+     MutationObserver — każde z nich daje TAIL_MS klatek, potem pętla staje */
   useEffect(() => {
     if (index === null || paused) return;
     const st = TOUR_STEPS[index];
@@ -496,7 +508,11 @@ function Tour({ userId }: { userId: string }) {
     let shown = false;
     let lastTi = -1;
     let raf = 0;
+    let until = 0;
     let stopped = false;
+    let lastGeom: Rect | null = null;
+    let observed: HTMLElement | null = null;
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => kick()) : null;
 
     const checkDone = () => {
       if (stopped || st.kind !== "action" || !st.done?.(window.location.pathname)) return false;
@@ -509,14 +525,26 @@ function Tour({ userId }: { userId: string }) {
     const onToggle = () => checkDone();
     document.addEventListener("toggle", onToggle, true);
 
+    const publish = (rect: Rect | null) => {
+      geomRef.current = rect;
+      if (rect && lastGeom && sameRect(lastGeom, rect)) return;
+      if (!rect && !lastGeom) return;
+      lastGeom = rect;
+      window.dispatchEvent(new CustomEvent(GEOM_EVENT));
+    };
+
     const tick = () => {
       if (stopped) return;
-      raf = requestAnimationFrame(tick);
       if (checkDone()) return;
       const now = performance.now();
       const found = st.targets ? resolveTarget(st) : null;
       const el = found?.el ?? null;
       targetRef.current = el;
+      if (ro && el !== observed) {
+        if (observed) ro.unobserve(observed);
+        if (el) ro.observe(el);
+        observed = el;
+      }
       if (found && found.ti !== lastTi) {
         lastTi = found.ti;
         setTi(found.ti);
@@ -551,7 +579,8 @@ function Tour({ userId }: { userId: string }) {
         }
         if (!el || (s.stable >= 6 && now - s.scrolledAt > 120)) {
           shown = true;
-          geomRef.current = el ? rect : null;
+          until = now + TAIL_MS;
+          publish(el ? rect : null);
           driveHole(rect, el ?? "center");
           setPhase("show");
         }
@@ -565,14 +594,50 @@ function Tour({ userId }: { userId: string }) {
         setPhase("seek");
         return;
       }
-      geomRef.current = el ? rect : null;
+      publish(el ? rect : null);
       driveHole(rect, el ?? "center");
     };
-    raf = requestAnimationFrame(tick);
+
+    // Szukanie biegnie co klatkę; pokazany cel — tylko w „ogonie” po zdarzeniu
+    function loop() {
+      raf = 0;
+      if (stopped) return;
+      tick();
+      if (stopped) return;
+      if (!shown || performance.now() < until) raf = requestAnimationFrame(loop);
+    }
+    function kick() {
+      if (stopped) return;
+      until = Math.max(until, performance.now() + TAIL_MS);
+      if (!raf) raf = requestAnimationFrame(loop);
+    }
+
+    const opts = { passive: true, capture: true } as const;
+    window.addEventListener("scroll", kick, opts);
+    window.addEventListener("resize", kick);
+    window.visualViewport?.addEventListener("resize", kick);
+    window.visualViewport?.addEventListener("scroll", kick);
+    ro?.observe(document.body);
+    // Zmiany DOM (rozwinięty moduł, zamknięte menu). Bez atrybutu style — animacje pisałyby go co klatkę.
+    const mo = new MutationObserver(() => kick());
+    mo.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "open", "hidden", "aria-expanded", "data-state"],
+    });
+    raf = requestAnimationFrame(loop);
     return () => {
       stopped = true;
       cancelAnimationFrame(raf);
+      raf = 0;
       document.removeEventListener("toggle", onToggle, true);
+      window.removeEventListener("scroll", kick, opts);
+      window.removeEventListener("resize", kick);
+      window.visualViewport?.removeEventListener("resize", kick);
+      window.visualViewport?.removeEventListener("scroll", kick);
+      ro?.disconnect();
+      mo.disconnect();
     };
   }, [index, paused, reduce, driveHole]);
 
@@ -697,8 +762,9 @@ function Tour({ userId }: { userId: string }) {
                 <motion.div
                   className="tour-ring"
                   initial={{ opacity: 0 }}
-                  animate={reduce ? { opacity: 0.8 } : { opacity: [0.3, 1, 0.3] }}
-                  transition={reduce ? { duration: 0.2 } : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                  // Trzy „oddechy” i spoczynek w pełnym kolorze — bez nieskończonej pętli
+                  animate={reduce ? { opacity: 0.8 } : { opacity: [0.3, 1, 0.3, 1, 0.3, 1] }}
+                  transition={reduce ? { duration: 0.2 } : { duration: 6, ease: "easeInOut" }}
                 />
               )}
             </motion.div>
@@ -746,7 +812,7 @@ function Tour({ userId }: { userId: string }) {
         {paused && !quiet && (
           <motion.div
             key="tour-pill"
-            className="tour-material fixed z-[60] flex items-center rounded-full py-1 pl-1 pr-1 text-[14px]"
+            className="tour-material fixed z-[60] flex items-center rounded-full py-1 pl-1 pr-1 text-[.875rem]"
             style={{
               left: "max(16px, calc(env(safe-area-inset-left) + 12px))",
               bottom: "max(16px, calc(env(safe-area-inset-bottom) + 12px))",
@@ -760,7 +826,7 @@ function Tour({ userId }: { userId: string }) {
             <button
               type="button"
               onClick={resume}
-              className="inline-flex h-10 items-center rounded-full px-4 font-medium text-[var(--txt)] transition-transform duration-100 active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--puls)]"
+              className="inline-flex h-11 items-center rounded-full px-4 font-medium text-[var(--txt)] transition-transform duration-100 active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--puls)]"
             >
               Wróć do instrukcji
             </button>
@@ -768,7 +834,7 @@ function Tour({ userId }: { userId: string }) {
               type="button"
               onClick={finish}
               aria-label="Zakończ instrukcję"
-              className="grid h-10 w-10 place-items-center rounded-full text-[var(--txt2)] transition-[transform,color] duration-100 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--puls)]"
+              className="grid h-11 w-11 place-items-center rounded-full text-[var(--txt2)] transition-[transform,color] duration-100 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--puls)]"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>

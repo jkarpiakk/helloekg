@@ -3,24 +3,32 @@
  *
  * Gest (Pointer Events + setPointerCapture):
  * - naciśnięcie: element od razu lekko się wciska (reakcja przy dotknięciu),
- * - 10 px zwłoki, potem element śledzi palec 1:1 od miejsca chwytu i unosi się (skala 1.02 + linia),
+ * - 10 px zwłoki, potem element śledzi palec 1:1 od miejsca chwytu i unosi się (skala 1.02 + linia);
+ *   na dotyku element przewija stronę (pan-y) — podnosi się za uchwyt albo po przytrzymaniu ~200 ms,
+ * - przy krawędzi ekranu strona przewija się sama, a element zostaje pod palcem (dolne miejsca na telefonie),
  * - miejsce docelowe pod palcem podświetla się,
  * - puszczenie nad miejscem: element „wpada” do niego sprężyną z prędkością gestu (FLIP z bieżącej pozycji),
  * - puszczenie poza miejscem: wraca tą samą prostą, którą przyszedł, niosąc składową prędkości.
  * Alternatywa bez gestu (dotyk / klawiatura): wybierz element, potem miejsce — lub odwrotnie.
  */
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
 import { Check, GripVertical, Undo2, X } from "lucide-react";
 import { spring, springMomentum, springSnappy } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
   DRAG_THRESHOLD,
+  HOLD_MS,
+  HOLD_SLOP,
+  blockTouchScrollWhile,
+  createAutoScroll,
+  dragStartMode,
   pushSample,
   releaseVelocity,
   returnVelocity,
   withVelocity,
   vt,
+  type AutoScroll,
   type Sample,
 } from "./gesture";
 
@@ -83,6 +91,8 @@ export default function PlacementBoard({
   const [hover, setHover] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  /** Synchronicznie (bez czekania na render) — blokada przewijania palcem musi zadziałać od razu */
+  const draggingRef = useRef<string | null>(null);
   const els = useRef(new Map<string, HTMLElement>());
   const flips = useRef(new Map<string, Flip>());
 
@@ -90,6 +100,13 @@ export default function PlacementBoard({
   useLayoutEffect(() => {
     flips.current.clear();
   });
+
+  // Podniesiony element: palec nie przewija strony (elementy mają touch-action: pan-y)
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    return blockTouchScrollWhile(board, () => draggingRef.current !== null);
+  }, []);
 
   // Po sprawdzeniu nic nie jest już wybrane
   useLayoutEffect(() => {
@@ -219,11 +236,13 @@ export default function PlacementBoard({
       consumeFlip={consumeFlip}
       onTap={onPieceTap}
       onDragStart={(id) => {
+        draggingRef.current = id;
         setSelection(null);
         setDraggingId(id);
       }}
       onDragMove={(id, x, y) => setHover(targetAt(x, y, id))}
       onRelease={(id, x, y, v) => {
+        draggingRef.current = null;
         setHover(null);
         setDraggingId(null);
         const dest = targetAt(x, y, id);
@@ -231,6 +250,7 @@ export default function PlacementBoard({
         return move(id, dest, { ...v, lifted: true });
       }}
       onCancel={() => {
+        draggingRef.current = null;
         setHover(null);
         setDraggingId(null);
       }}
@@ -261,7 +281,7 @@ export default function PlacementBoard({
           >
             {poolPieces.map((p) => renderPiece(p))}
             {poolPieces.length === 0 && (
-              <p className="px-3 py-4 text-[14px] text-[var(--txt3)]" onClick={onPoolTap}>
+              <p className="px-3 py-4 text-[.875rem] text-[var(--txt2)]" onClick={onPoolTap}>
                 {showResult ? "Wszystkie elementy rozmieszczone." : "Wszystko rozmieszczone. Przeciągnij tu element, aby go odłożyć."}
               </p>
             )}
@@ -280,7 +300,7 @@ export default function PlacementBoard({
               const awaiting = !disabled && (selection?.kind === "piece" || draggingId) && !occupant;
               return (
                 <li key={slot.id} className="grid gap-2">
-                  <div className="flex items-center gap-3 text-[15px] leading-snug text-[var(--txt)]">
+                  <div className="flex items-center gap-3 text-[.9375rem] leading-snug text-[var(--txt)]">
                     {slot.imageUrl && (
                       <img
                         src={slot.imageUrl}
@@ -290,13 +310,13 @@ export default function PlacementBoard({
                     )}
                     <span className="min-w-0 flex-1">{slot.label}</span>
                     {slot.result === "right" && (
-                      <span className="inline-flex items-center gap-1 text-[13px] text-[var(--puls)]">
+                      <span className="inline-flex items-center gap-1 text-[.8125rem] text-[var(--puls)]">
                         <Check className="h-4 w-4" aria-hidden />
                         <span>Dobrze</span>
                       </span>
                     )}
                     {slot.result === "wrong" && (
-                      <span className="inline-flex items-center gap-1 text-[13px] text-[var(--alarm)]">
+                      <span className="inline-flex items-center gap-1 text-[.8125rem] text-[var(--alarm)]">
                         <X className="h-4 w-4" aria-hidden />
                         <span>Błąd</span>
                       </span>
@@ -325,7 +345,7 @@ export default function PlacementBoard({
                               move(occupant.id, POOL);
                               setSelection(null);
                             }}
-                            className="grid w-11 shrink-0 place-items-center rounded-[8px] text-[var(--txt3)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.94]"
+                            className="grid w-11 shrink-0 place-items-center rounded-[8px] text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.94]"
                             aria-label={`Odłóż „${occupant.content}” z powrotem`}
                             data-testid={`remove-btn-${slot.id}`}
                           >
@@ -340,14 +360,14 @@ export default function PlacementBoard({
                         onClick={() => onSlotTap(slot.id)}
                         aria-pressed={isSelected}
                         aria-label={`Miejsce: ${slot.label}. ${selectedPiece ? `Wstaw „${selectedPiece.content}”.` : "Puste."}`}
-                        className="flex flex-1 items-center justify-center rounded-[8px] px-3 text-[14px] text-[var(--txt3)] transition-colors duration-200 hover:text-[var(--txt2)] disabled:cursor-default"
+                        className="flex flex-1 items-center justify-center rounded-[8px] px-3 text-[.875rem] text-[var(--txt2)] transition-colors duration-200 hover:text-[var(--txt)] disabled:cursor-default"
                       >
                         {showResult ? "Puste" : selectedPiece ? "Wstaw tutaj" : "Upuść tutaj"}
                       </button>
                     )}
                   </div>
                   {slot.result === "wrong" && slot.correctText && (
-                    <p className="text-[14px] text-[var(--txt2)]">
+                    <p className="text-[.875rem] text-[var(--txt2)]">
                       <span className="label mr-2">Poprawnie</span>
                       {slot.correctText}
                     </p>
@@ -360,12 +380,12 @@ export default function PlacementBoard({
       </div>
 
       {!disabled && (
-        <p className="min-h-[1.5em] text-[14px] text-[var(--txt2)]" aria-live="polite">
+        <p className="min-h-[1.5em] text-[.875rem] text-[var(--txt2)]" aria-live="polite">
           {selectedPiece
             ? `Wybrano „${selectedPiece.content}”. Wskaż miejsce${placedIn(selectedPiece.id) ? " albo dotknij pulę, aby odłożyć" : ""}.`
             : selectedSlot
               ? `Wybrano miejsce „${selectedSlot.label}”. Wskaż element.`
-              : "Przeciągnij element albo dotknij go, a potem miejsce."}
+              : "Przeciągnij element (za uchwyt albo po przytrzymaniu) lub dotknij go, a potem miejsce."}
         </p>
       )}
     </div>
@@ -416,12 +436,26 @@ function Piece({
   const g = useRef<{
     sx: number;
     sy: number;
+    /** Ostatni punkt wskaźnika — auto-przewijanie przelicza z niego pozycję bez ruchu palca */
+    lx: number;
+    ly: number;
     bx: number;
     by: number;
     pid: number;
+    mode: "threshold" | "hold";
     active: boolean;
+    hold: ReturnType<typeof setTimeout> | null;
     hist: Sample[];
   } | null>(null);
+  const scroller = useRef<AutoScroll | null>(null);
+
+  useEffect(
+    () => () => {
+      if (g.current?.hold) clearTimeout(g.current.hold);
+      scroller.current?.stop();
+    },
+    [],
+  );
 
   const setRef = useCallback(
     (el: HTMLButtonElement | null) => {
@@ -469,19 +503,70 @@ function Piece({
     animate(scale, 1, vt(springSnappy));
   };
 
+  /** Pozycja 1:1 od miejsca chwytu z ostatniego punktu wskaźnika */
+  const track = () => {
+    const d = g.current;
+    if (!d || !d.active) return;
+    x.set(d.bx + d.lx - d.sx);
+    y.set(d.by + d.ly - d.sy);
+    onDragMove(piece.id, d.lx, d.ly);
+  };
+
+  /** Podniesienie: od progu (mysz, uchwyt) albo po przytrzymaniu (dotyk) */
+  const lift = () => {
+    const d = g.current;
+    if (!d || d.active) return;
+    d.active = true;
+    if (d.hold) clearTimeout(d.hold);
+    d.hold = null;
+    setLifted(true);
+    onDragStart(piece.id);
+    animate(scale, 1.02, vt(springSnappy));
+    if (d.mode === "hold") navigator.vibrate?.(8);
+    if (ref.current) {
+      // Przy krawędzi ekranu strona przewija się sama — przesunięcie dodajemy do pozycji elementu
+      scroller.current = createAutoScroll(ref.current, (moved) => {
+        const cur = g.current;
+        if (!cur) return;
+        cur.sy -= moved;
+        track();
+      });
+    }
+  };
+
+  const endGesture = () => {
+    const d = g.current;
+    g.current = null;
+    if (d?.hold) clearTimeout(d.hold);
+    scroller.current?.stop();
+    scroller.current = null;
+    return d;
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (disabled || e.button !== 0) return;
+    if (disabled || e.button !== 0 || g.current) return;
     x.stop();
     y.stop();
-    g.current = {
+    const mode = dragStartMode(e);
+    const d = {
       sx: e.clientX,
       sy: e.clientY,
+      lx: e.clientX,
+      ly: e.clientY,
       bx: x.get(),
       by: y.get(),
       pid: e.pointerId,
+      mode,
       active: false,
+      hold: null as ReturnType<typeof setTimeout> | null,
       hist: [{ t: e.timeStamp, x: e.clientX, y: e.clientY }],
     };
+    g.current = d;
+    if (mode === "hold") {
+      d.hold = setTimeout(() => {
+        if (g.current === d && !d.active) lift();
+      }, HOLD_MS);
+    }
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -495,27 +580,33 @@ function Piece({
     const d = g.current;
     if (!d || e.pointerId !== d.pid) return;
     pushSample(d.hist, { t: e.timeStamp, x: e.clientX, y: e.clientY });
-    const dx = e.clientX - d.sx;
-    const dy = e.clientY - d.sy;
+    d.lx = e.clientX;
+    d.ly = e.clientY;
     if (!d.active) {
-      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-      d.active = true;
-      setLifted(true);
-      onDragStart(piece.id);
-      animate(scale, 1.02, vt(springSnappy));
+      const dist = Math.hypot(e.clientX - d.sx, e.clientY - d.sy);
+      if (d.mode === "hold") {
+        // Palec ruszył przed przytrzymaniem — to przewijanie albo zwykły ruch, nie przeciąganie
+        if (dist > HOLD_SLOP) {
+          endGesture();
+          settleBack();
+        }
+        return;
+      }
+      if (dist < DRAG_THRESHOLD) return;
+      lift();
     }
-    // 1:1 od miejsca chwytu
-    x.set(d.bx + dx);
-    y.set(d.by + dy);
-    onDragMove(piece.id, e.clientX, e.clientY);
+    track();
+    scroller.current?.update(e.clientY);
   };
 
   const finish = (e: React.PointerEvent<HTMLButtonElement>, cancelled: boolean) => {
-    const d = g.current;
-    if (!d || e.pointerId !== d.pid) return;
-    g.current = null;
+    const cur = g.current;
+    if (!cur || e.pointerId !== cur.pid) return;
+    const d = endGesture()!;
     if (!d.active) {
-      animate(scale, 1, vt(springSnappy));
+      // Złapany w locie i puszczony bez przeciągania — dowieź go na miejsce
+      if (Math.abs(x.get()) + Math.abs(y.get()) > 0.5) settleBack();
+      else animate(scale, 1, vt(springSnappy));
       if (!cancelled) onTap(piece.id);
       return;
     }
@@ -550,14 +641,23 @@ function Piece({
       aria-disabled={disabled || undefined}
       data-testid={testId}
       className={cn(
-        "relative flex min-h-[48px] w-full select-none items-center gap-3 rounded-[10px] border bg-[var(--panel)] px-3.5 py-2.5 text-left text-[15px] leading-snug text-[var(--txt)] transition-[border-color,background-color,color] duration-200",
-        disabled ? "cursor-default" : "cursor-grab touch-none active:cursor-grabbing",
+        "relative flex min-h-[48px] w-full select-none items-center gap-3 rounded-[10px] border bg-[var(--panel)] px-3.5 py-2.5 text-left text-[.9375rem] leading-snug text-[var(--txt)] transition-[border-color,background-color,color] duration-200",
+        disabled ? "cursor-default" : "cursor-grab touch-pan-y touch-pinch-zoom [-webkit-touch-callout:none] active:cursor-grabbing",
         state === "right" && "border-[var(--puls-deep)] bg-[var(--tint)]",
         state === "wrong" && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)] text-[var(--txt2)]",
         !state && (lifted ? "border-[var(--txt3)]" : selected ? "border-[var(--puls-deep)] bg-[var(--tint)]" : "border-[var(--line2)] hover:border-[var(--txt3)]"),
       )}
     >
-      {!disabled && <GripVertical className="h-4 w-4 shrink-0 text-[var(--txt3)]" aria-hidden />}
+      {!disabled && (
+        // Uchwyt: na dotyku przeciąga od razu (bez przytrzymania), strony tu nie przewija
+        <span
+          data-drag-handle
+          aria-hidden
+          className="-my-2.5 -ml-3.5 grid w-11 shrink-0 touch-none place-items-center self-stretch text-[var(--label)]"
+        >
+          <GripVertical className="h-4 w-4" />
+        </span>
+      )}
       {piece.imageUrl && (
         <img
           src={piece.imageUrl}

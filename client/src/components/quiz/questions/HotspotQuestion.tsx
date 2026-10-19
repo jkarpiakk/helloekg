@@ -201,7 +201,7 @@ export default function HotspotQuestion({
 
   return (
     <div className="grid gap-4">
-      <p className="text-[15px] text-[var(--txt2)]">
+      <p className="text-[.9375rem] text-[var(--txt2)]">
         {config.allowMultiple
           ? "Dotknij zapisu we wszystkich właściwych miejscach."
           : "Dotknij zapisu we właściwym miejscu."}
@@ -291,7 +291,7 @@ export default function HotspotQuestion({
               return (
                 <div
                   key={`label-${hotspot.id}`}
-                  className="pointer-events-none absolute rounded-[6px] border border-[var(--puls-deep)] bg-[var(--panel)] px-2 py-0.5 text-[12px] text-[var(--txt)]"
+                  className="pointer-events-none absolute rounded-[6px] border border-[var(--puls-deep)] bg-[var(--panel)] px-2 py-0.5 text-[.75rem] text-[var(--txt)]"
                   style={{ left: `${labelX}%`, top: `${labelY}%`, transform: "translate(-50%, 0)" }}
                 >
                   {hotspot.label}
@@ -301,7 +301,7 @@ export default function HotspotQuestion({
       </div>
 
       <div className="flex min-h-[44px] items-center justify-between gap-3" data-testid="hotspot-status">
-        <p className="text-[14px] text-[var(--txt2)]" aria-live="polite">
+        <p className="text-[.875rem] text-[var(--txt2)]" aria-live="polite">
           {clickCoordinates.length === 0
             ? "Nic jeszcze nie wskazano."
             : clickedHotspots.size > 0
@@ -316,7 +316,7 @@ export default function HotspotQuestion({
       </div>
 
       {showResult && (
-        <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[14px] text-[var(--txt2)]" data-testid="hotspot-legend">
+        <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[.875rem] text-[var(--txt2)]" data-testid="hotspot-legend">
           <li className="flex items-center gap-2">
             <span className="h-4 w-4 rounded-[4px] border-2 border-[var(--puls)] bg-[var(--tint)]" aria-hidden />
             Właściwy obszar

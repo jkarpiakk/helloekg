@@ -25,6 +25,8 @@ export const users = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
   // Pierwsza interakcja z podpowiedzią przycisku „Zgłoś uwagę” (null = jeszcze pokazujemy)
   feedbackHintSeenAt: timestamp("feedback_hint_seen_at"),
+  // Zawieszenie konta (null = aktywne). Logowanie i requireAuth odrzucają zawieszonych.
+  suspendedAt: timestamp("suspended_at"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -295,8 +297,8 @@ export const supportTickets = pgTable("support_tickets", {
   priority: varchar("priority", { length: 20 }).notNull().default("medium"),
   questionId: uuid("question_id").references(() => questions.id, { onDelete: "set null" }),
   adminResponse: text("admin_response"),
-  adminUserId: uuid("admin_user_id").references(() => users.id),
-  assignedTo: uuid("assigned_to").references(() => users.id),
+  adminUserId: uuid("admin_user_id").references(() => users.id, { onDelete: "set null" }),
+  assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
   // Zgłoszenia testerów (beta): kind = support | question | feedback.
   // Dla kind = feedback: status nowe/w_analizie/wdrozone/odrzucone, priority P0–P2 (albo "medium" = brak),
   // adminResponse = notatka zespołu widoczna dla zgłaszającego.
@@ -328,7 +330,8 @@ export type FeedbackAttachmentMeta = {
 // Audit log for tracking changes
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  actorId: uuid("actor_id").notNull().references(() => users.id),
+  // Nullable + SET NULL: usunięcie konta nie jest blokowane, wpisy audytu zostają (bez aktora)
+  actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
   action: varchar("action", { length: 100 }).notNull(),
   entityType: varchar("entity_type", { length: 50 }).notNull(),
   entityId: uuid("entity_id").notNull(),
@@ -731,15 +734,18 @@ export type StreakFreezeLog = typeof streakFreezeLog.$inferSelect;
 export type InsertStreakFreezeLog = z.infer<typeof insertStreakFreezeLogSchema>;
 
 // Additional schemas for API endpoints
+// Górny limit długości hasła (bcrypt i tak czyta tylko 72 bajty; chroni przed kosztownymi żądaniami)
+export const PASSWORD_MAX_LENGTH = 128;
+
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).max(PASSWORD_MAX_LENGTH),
 });
 
 export const registerSchema = z.object({
   email: z.string().email("Podaj prawidłowy adres e-mail"),
-  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
-  confirmPassword: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
+  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków").max(PASSWORD_MAX_LENGTH, "Hasło może mieć najwyżej 128 znaków"),
+  confirmPassword: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków").max(PASSWORD_MAX_LENGTH, "Hasło może mieć najwyżej 128 znaków"),
   marketingConsent: z.boolean().optional().default(false),
   termsAccepted: z.boolean().optional().default(false),
   privacyAccepted: z.boolean().optional().default(false),
@@ -754,8 +760,8 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: z.string(),
-  password: z.string().min(8),
-  confirmPassword: z.string().min(8),
+  password: z.string().min(8).max(PASSWORD_MAX_LENGTH),
+  confirmPassword: z.string().min(8).max(PASSWORD_MAX_LENGTH),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Hasła nie pasują do siebie",
   path: ["confirmPassword"],

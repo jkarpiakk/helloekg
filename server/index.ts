@@ -11,6 +11,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { applySecurityHeaders } from "./middleware/security";
+import { csrfOriginCheck } from "./middleware/csrf";
 
 // ---------------------------------------------------------------------------
 // Unhandled rejection / uncaught exception safety net
@@ -36,6 +37,9 @@ app.use(compression());
 
 // Security headers (CSP in report-only mode; other headers enforced)
 applySecurityHeaders(app);
+
+// CSRF: żądania zmieniające stan do /api tylko z naszego originu (webhooki Stripe — wyjątek, podpis)
+app.use(csrfOriginCheck);
 
 // Stripe webhooks need the raw body — mount before express.json()
 app.post(
@@ -91,7 +95,8 @@ app.post(
 );
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Bez express.urlencoded: aplikacja nie przyjmuje formularzy HTML (same JSON-y z fetch),
+// a urlencoded to „prosty” content-type, który obcy formularz może wysłać bez preflightu.
 
 // Grafiki kursu zaimportowane ze studia (paczka eksportu → katalog na dysku)
 if (process.env.CONTENT_ASSETS_DIR) {
@@ -105,9 +110,12 @@ if (process.env.CONTENT_ASSETS_DIR) {
 // Correlation ID — attach a unique request ID to every request/response
 // ---------------------------------------------------------------------------
 app.use((req: Request, res: Response, next: NextFunction) => {
+  // Przyjmujemy cudzy X-Request-ID tylko w bezpiecznym formacie (bez wstrzykiwania do logów/nagłówków)
+  const incoming = req.headers["x-request-id"];
   const id =
-    (req.headers["x-request-id"] as string) ||
-    crypto.randomBytes(8).toString("hex");
+    typeof incoming === "string" && /^[a-zA-Z0-9-]{1,64}$/.test(incoming)
+      ? incoming
+      : crypto.randomBytes(8).toString("hex");
   (req as any).correlationId = id;
   res.setHeader("X-Request-ID", id);
   next();
@@ -197,9 +205,11 @@ initStripe();
     serveStatic(app);
   }
 
+  // Domyślnie tylko loopback — produkcja stoi za Caddy na tym samym hoście. HOST=0.0.0.0, jeśli trzeba inaczej.
   // reusePort działa tylko na Linuksie — na macOS (lokalny podgląd) listen kończy się ENOTSUP
-  server.listen({ port: config.port, host: "0.0.0.0", reusePort: process.platform === "linux" }, () => {
-    log(`serving on port ${config.port}`);
+  const host = process.env.HOST || "127.0.0.1";
+  server.listen({ port: config.port, host, reusePort: process.platform === "linux" }, () => {
+    log(`serving on ${host}:${config.port}`);
   });
 
   // ---------------------------------------------------------------------------

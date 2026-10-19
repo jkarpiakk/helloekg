@@ -74,7 +74,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: "continue",
     kind: "info",
     title: "Kontynuuj",
-    body: "Tu zawsze wrócisz do miejsca, w którym skończyłeś.",
+    body: "Tu zawsze wrócisz tam, gdzie przerwano naukę.",
     targets: [{ selector: '[data-tour="continue"]' }],
     route: isDashboard,
     resume: "dashboard",

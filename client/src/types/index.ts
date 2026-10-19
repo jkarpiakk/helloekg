@@ -79,10 +79,10 @@ export interface QuizQuestion {
   title: string;
   bodyMd: string;
   imageUrl?: string;
+  /** Kolejność potasowana; `index` = indeks w bazie — ten wysyłamy jako selectedIndex */
   answers: Array<{ text: string; index: number }>;
   sectionId: string;
-  correctIndex: number;
-  explanation: string;
+  // Bez correctIndex i explanation: ocenia serwer, wynik przychodzi w QuizResult
   // New fields for interactive question types
   questionType: QuestionType;
   questionConfig?: QuestionConfig;
@@ -91,6 +91,7 @@ export interface QuizQuestion {
 
 export interface QuizResult {
   isCorrect: boolean;
+  /** Indeks poprawnej odpowiedzi w bazie — porównuj z `answers[].index` */
   correctIndex: number;
   explanation: string;
   timeMs: number;
@@ -108,6 +109,8 @@ export interface QuizResult {
     correctItems?: string[]; // IDs of correctly answered items
     incorrectItems?: string[]; // IDs of incorrectly answered items
   };
+  /** Pełna konfiguracja pytania interaktywnego (w pytaniu części z odpowiedzią są wyczyszczone) */
+  questionConfig?: QuestionConfig;
 }
 
 export interface UserProgress {

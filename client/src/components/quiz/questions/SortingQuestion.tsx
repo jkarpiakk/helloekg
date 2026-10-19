@@ -1,10 +1,23 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import { Check, ChevronDown, ChevronUp, GripVertical, X } from "lucide-react";
 import { rubberband, spring, springSnappy } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { SortingConfig, AnswerData, QuizResult } from "@/types";
-import { DRAG_THRESHOLD, pushSample, releaseVelocity, withVelocity, vt, type Sample } from "./gesture";
+import {
+  DRAG_THRESHOLD,
+  HOLD_MS,
+  HOLD_SLOP,
+  blockTouchScrollWhile,
+  createAutoScroll,
+  dragStartMode,
+  pushSample,
+  releaseVelocity,
+  withVelocity,
+  vt,
+  type AutoScroll,
+  type Sample,
+} from "./gesture";
 import PartialScore from "./PartialScore";
 
 interface SortingQuestionProps {
@@ -32,6 +45,8 @@ function arrayMove<T>(arr: T[], from: number, to: number): T[] {
  * Sortowanie: wiersz chwycony po 10 px śledzi palec 1:1 w pionie (w poziomie i za krańcami listy
  * — gumowo), sąsiedzi rozstępują się sprężyną, a po puszczeniu wiersz wpada na swoje miejsce
  * z prędkością gestu. Strzałki przy wierszu to alternatywa dla dotyku i klawiatury.
+ * Dotyk: wiersz przewija stronę (pan-y); przeciąga się za uchwyt albo po przytrzymaniu ~200 ms.
+ * Przy krawędzi ekranu strona przewija się sama, a wiersz zostaje pod palcem.
  */
 export default function SortingQuestion({
   config,
@@ -50,6 +65,8 @@ export default function SortingQuestion({
     return shuffled;
   });
   const [activeId, setActiveId] = useState<string | null>(null);
+  const activeIdRef = useRef<string | null>(null);
+  activeIdRef.current = activeId;
   const listRef = useRef<HTMLOListElement>(null);
   const rowEls = useRef(new Map<string, HTMLLIElement>());
   const dragX = useMotionValue(0);
@@ -59,14 +76,24 @@ export default function SortingQuestion({
     id: string;
     sx: number;
     sy: number;
+    /** Ostatnia pozycja wskaźnika — auto-przewijanie przelicza z niej położenie bez ruchu palca */
+    lx: number;
+    ly: number;
     by: number;
     top: number;
     pid: number;
+    mode: "threshold" | "hold";
     active: boolean;
+    /** Złapany w trakcie własnego powrotu — przy rezygnacji trzeba go dowieźć na miejsce */
+    caught: boolean;
+    hold: ReturnType<typeof setTimeout> | null;
     /** Przestawiono — czekamy, aż układ się odświeży, zanim policzymy kolejne miejsce */
     pending: boolean;
     hist: Sample[];
   } | null>(null);
+  const scroller = useRef<AutoScroll | null>(null);
+  /** Słuchacze okna dodane przy chwycie — zdejmujemy dokładnie te same */
+  const handlers = useRef<{ move: (e: PointerEvent) => void; up: (e: PointerEvent) => void } | null>(null);
 
   const getItemById = (itemId: string) => config.items.find((i) => i.id === itemId);
 
@@ -91,27 +118,40 @@ export default function SortingQuestion({
     }
   }, [items, dragY]);
 
+  // Palec po podniesieniu wiersza nie przewija strony (wiersz ma touch-action: pan-y)
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    return blockTouchScrollWhile(list, () => !!g.current?.active);
+  }, []);
+
+  useEffect(
+    () => () => {
+      const d = g.current;
+      if (d?.hold) clearTimeout(d.hold);
+      scroller.current?.stop();
+      const h = handlers.current;
+      if (h) {
+        window.removeEventListener("pointermove", h.move);
+        window.removeEventListener("pointerup", h.up);
+        window.removeEventListener("pointercancel", h.up);
+      }
+    },
+    [],
+  );
+
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
-  // Ruch i puszczenie słuchamy na oknie: wiersze zmieniają kolejność w DOM w trakcie gestu,
-  // a przeniesienie węzła mogłoby zerwać przechwycenie wskaźnika.
-  const onMove = (e: PointerEvent) => {
+  /** Pozycja przeciąganego wiersza z ostatniego punktu wskaźnika + nowe miejsce na liście */
+  const track = () => {
     const d = g.current;
     const list = listRef.current;
-    if (!d || e.pointerId !== d.pid || !list) return;
-    pushSample(d.hist, { t: e.timeStamp, x: e.clientX, y: e.clientY });
-    const dx = e.clientX - d.sx;
-    const dy = e.clientY - d.sy;
-    if (!d.active) {
-      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-      d.active = true;
-      setActiveId(d.id);
-      animate(dragScale, 1.02, vt(springSnappy));
-    }
-    e.preventDefault();
+    if (!d || !d.active || !list) return;
     const el = rowEls.current.get(d.id);
     if (!el) return;
+    const dx = d.lx - d.sx;
+    const dy = d.ly - d.sy;
     // Pion 1:1, za krańcami listy gumowo; poziom tylko lekko, gumowo
     const minY = -el.offsetTop;
     const maxY = list.clientHeight - el.offsetTop - el.offsetHeight;
@@ -139,17 +179,31 @@ export default function SortingQuestion({
     }
   };
 
-  const onUp = (e: PointerEvent) => {
+  /** Podniesienie wiersza: od progu (mysz, uchwyt) albo po przytrzymaniu (dotyk) */
+  const lift = () => {
     const d = g.current;
-    if (!d || e.pointerId !== d.pid) return;
-    g.current = null;
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", onUp);
-    if (!d.active) return;
-    const v = releaseVelocity(d.hist, { t: e.timeStamp, x: e.clientX, y: e.clientY });
-    onChange({ type: "sorting", order: itemsRef.current });
-    const done = () => setActiveId((cur) => (cur === d.id && !g.current ? null : cur));
+    if (!d || d.active) return;
+    d.active = true;
+    if (d.hold) clearTimeout(d.hold);
+    d.hold = null;
+    setActiveId(d.id);
+    animate(dragScale, 1.02, vt(springSnappy));
+    if (d.mode === "hold") navigator.vibrate?.(8);
+    const list = listRef.current;
+    if (list) {
+      // Przy krawędzi ekranu strona przewija się sama; przesunięcie dodajemy do pozycji wiersza
+      scroller.current = createAutoScroll(list, (moved) => {
+        const cur = g.current;
+        if (!cur) return;
+        cur.sy -= moved;
+        track();
+      });
+    }
+  };
+
+  /** Wiersz wraca na swoje miejsce z prędkością gestu (albo od razu przy „Ogranicz ruch”) */
+  const settle = (id: string, vy: number) => {
+    const done = () => setActiveId((cur) => (cur === id && !g.current ? null : cur));
     if (reduce) {
       dragX.set(0);
       dragY.set(0);
@@ -159,37 +213,117 @@ export default function SortingQuestion({
     }
     animate(dragX, 0, withVelocity(0));
     animate(dragScale, 1, vt(springSnappy));
-    animate(dragY, 0, { ...withVelocity(v.vy), onComplete: done });
+    animate(dragY, 0, { ...withVelocity(vy), onComplete: done });
   };
+
+  const endGesture = () => {
+    const d = g.current;
+    g.current = null;
+    if (d?.hold) clearTimeout(d.hold);
+    scroller.current?.stop();
+    scroller.current = null;
+    const h = handlers.current;
+    handlers.current = null;
+    if (h) {
+      window.removeEventListener("pointermove", h.move);
+      window.removeEventListener("pointerup", h.up);
+      window.removeEventListener("pointercancel", h.up);
+    }
+    return d;
+  };
+
+  // Ruch i puszczenie słuchamy na oknie: wiersze zmieniają kolejność w DOM w trakcie gestu,
+  // a przeniesienie węzła mogłoby zerwać przechwycenie wskaźnika.
+  function onMove(e: PointerEvent) {
+    const d = g.current;
+    if (!d || e.pointerId !== d.pid) return;
+    pushSample(d.hist, { t: e.timeStamp, x: e.clientX, y: e.clientY });
+    d.lx = e.clientX;
+    d.ly = e.clientY;
+    if (!d.active) {
+      const dist = Math.hypot(e.clientX - d.sx, e.clientY - d.sy);
+      if (d.mode === "hold") {
+        // Palec ruszył przed przytrzymaniem — to przewijanie, nie przeciąganie
+        if (dist > HOLD_SLOP) {
+          endGesture();
+          if (d.caught) settle(d.id, 0);
+        }
+        return;
+      }
+      if (dist < DRAG_THRESHOLD) return;
+      lift();
+    }
+    e.preventDefault();
+    track();
+    scroller.current?.update(e.clientY);
+  }
+
+  function onUp(e: PointerEvent) {
+    const cur = g.current;
+    if (!cur || e.pointerId !== cur.pid) return;
+    const d = endGesture()!;
+    if (!d.active) {
+      if (d.caught) settle(d.id, 0);
+      return;
+    }
+    const v = releaseVelocity(d.hist, { t: e.timeStamp, x: e.clientX, y: e.clientY });
+    onChange({ type: "sorting", order: itemsRef.current });
+    settle(d.id, v.vy);
+  }
 
   const onPointerDown = (id: string) => (e: React.PointerEvent<HTMLLIElement>) => {
     if (disabled || e.button !== 0 || g.current) return;
     const el = rowEls.current.get(id);
     if (!el) return;
-    if (activeId && activeId !== id) return;
+    const settling = activeIdRef.current;
+    if (settling && settling !== id) {
+      // Inny wiersz jeszcze wraca na miejsce: kończymy jego powrót od razu (bez czekania)
+      // i bierzemy nowy — dotyk nigdy nie jest zablokowany przez animację
+      dragX.stop();
+      dragY.stop();
+      dragScale.stop();
+      dragX.set(0);
+      dragY.set(0);
+      dragScale.set(1);
+      activeIdRef.current = null;
+      setActiveId(null);
+    }
     dragX.stop();
     dragY.stop();
-    const continuing = activeId === id; // złapany ponownie w trakcie powrotu
+    const caught = settling === id; // złapany ponownie w trakcie powrotu — od bieżącej pozycji
+    const mode = dragStartMode(e);
     g.current = {
       id,
       sx: e.clientX,
       sy: e.clientY,
-      by: continuing ? dragY.get() : 0,
+      lx: e.clientX,
+      ly: e.clientY,
+      by: caught ? dragY.get() : 0,
       top: el.offsetTop,
       pid: e.pointerId,
+      mode,
       active: false,
+      caught,
+      hold: null,
       pending: false,
       hist: [{ t: e.timeStamp, x: e.clientX, y: e.clientY }],
     };
-    if (!continuing) {
+    if (!caught) {
       dragX.set(0);
       dragY.set(0);
+    }
+    if (mode === "hold") {
+      const d = g.current;
+      d.hold = setTimeout(() => {
+        if (g.current === d && !d.active) lift();
+      }, HOLD_MS);
     }
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
       /* gest działa i bez przechwycenia */
     }
+    handlers.current = { move: onMove, up: onUp };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
@@ -224,8 +358,8 @@ export default function SortingQuestion({
               onPointerDown={onPointerDown(itemId)}
               data-testid={`sortable-item-${itemId}`}
               className={cn(
-                "relative grid select-none grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-3.5 rounded-[10px] border bg-[var(--panel)] py-2 pl-4 pr-1.5 text-[15px] leading-snug transition-[border-color,background-color,color] duration-200",
-                disabled ? "cursor-default" : "cursor-grab touch-none active:cursor-grabbing",
+                "relative grid select-none grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-3.5 rounded-[10px] border bg-[var(--panel)] py-2 pl-4 pr-1.5 text-[.9375rem] leading-snug transition-[border-color,background-color,color] duration-200",
+                disabled ? "cursor-default" : "cursor-grab touch-pan-y touch-pinch-zoom [-webkit-touch-callout:none] active:cursor-grabbing",
                 isCorrect && "border-[var(--puls-deep)] bg-[var(--tint)]",
                 isIncorrect && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)] text-[var(--txt2)]",
                 !isCorrect && !isIncorrect && (isActive ? "border-[var(--txt3)]" : "border-[var(--line2)] hover:border-[var(--txt3)]"),
@@ -233,7 +367,7 @@ export default function SortingQuestion({
             >
               <span
                 className={cn(
-                  "grid h-[30px] w-[30px] place-items-center rounded-[8px] border font-mono text-[12px] font-medium",
+                  "grid h-[30px] w-[30px] place-items-center rounded-[8px] border font-mono text-[.75rem] font-medium",
                   isCorrect ? "border-[var(--puls-deep)] text-[var(--puls)]" : "border-[var(--line2)] text-[var(--txt2)]",
                 )}
               >
@@ -261,7 +395,7 @@ export default function SortingQuestion({
                       onClick={() => nudge(index, -1)}
                       disabled={index === 0}
                       aria-label={`Przesuń „${text}” wyżej`}
-                      className="grid h-11 w-9 place-items-center rounded-[8px] text-[var(--txt3)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
+                      className="grid h-11 w-11 place-items-center rounded-[8px] text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
                     >
                       <ChevronUp className="h-4 w-4" />
                     </button>
@@ -271,11 +405,18 @@ export default function SortingQuestion({
                       onClick={() => nudge(index, 1)}
                       disabled={index === items.length - 1}
                       aria-label={`Przesuń „${text}” niżej`}
-                      className="grid h-11 w-9 place-items-center rounded-[8px] text-[var(--txt3)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
+                      className="grid h-11 w-11 place-items-center rounded-[8px] text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
                     >
                       <ChevronDown className="h-4 w-4" />
                     </button>
-                    <GripVertical className="mx-1 h-4 w-4 text-[var(--txt3)]" aria-hidden />
+                    {/* Uchwyt: na dotyku przeciąga od razu (bez przytrzymania), strony tu nie przewija */}
+                    <span
+                      data-drag-handle
+                      aria-hidden
+                      className="grid h-11 w-11 shrink-0 touch-none place-items-center rounded-[8px] text-[var(--label)]"
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </span>
                   </>
                 )}
               </span>
@@ -285,8 +426,8 @@ export default function SortingQuestion({
       </ol>
 
       {!disabled && (
-        <p className="text-[14px] text-[var(--txt2)]">
-          Przeciągnij wiersz albo użyj strzałek, aby ułożyć elementy od pierwszego do ostatniego.
+        <p className="text-[.875rem] text-[var(--txt2)]">
+          Przeciągnij wiersz za uchwyt (albo przytrzymaj go chwilę) lub użyj strzałek, aby ułożyć elementy od pierwszego do ostatniego.
         </p>
       )}
 
@@ -306,8 +447,8 @@ export default function SortingQuestion({
             {result.correctAnswer.order.map((itemId: string, i: number) => {
               const item = getItemById(itemId);
               return (
-                <li key={itemId} className="grid grid-cols-[30px_minmax(0,1fr)] items-baseline gap-3.5 text-[15px] text-[var(--txt)]">
-                  <span className="font-mono text-[12px] text-[var(--label)]">{String(i + 1).padStart(2, "0")}</span>
+                <li key={itemId} className="grid grid-cols-[30px_minmax(0,1fr)] items-baseline gap-3.5 text-[.9375rem] text-[var(--txt)]">
+                  <span className="font-mono text-[.75rem] text-[var(--label)]">{String(i + 1).padStart(2, "0")}</span>
                   <span>{item ? getItemText(item) : itemId}</span>
                 </li>
               );

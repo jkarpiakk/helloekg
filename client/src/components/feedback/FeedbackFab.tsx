@@ -39,7 +39,8 @@ function isActiveQuiz(path: string, search: string): boolean {
 
 /**
  * Pływający przycisk „Zgłoś uwagę” (beta). Prawy dolny róg, z uwzględnieniem bezpiecznego obszaru.
- * Przy przewijaniu w dół zwija się do ikony, po chwili bezczynności rozwija z powrotem.
+ * Przy przewijaniu w dół zwija się do ikony; rozwija się tylko przy przewinięciu w górę
+ * albo na końcu strony (bez samoczynnego rozwijania po czasie — nic nie rusza się bez powodu).
  */
 export default function FeedbackFab() {
   const [path, navigate] = useLocation();
@@ -48,7 +49,6 @@ export default function FeedbackFab() {
   const [localHintSeen, setLocalHintSeen] = useState(readLocalHint);
   const lastY = useRef(0);
   const frame = useRef<number | null>(null);
-  const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hidden = path.startsWith("/admin") || path.startsWith("/zgloszenie") || isActiveQuiz(path, search);
 
@@ -74,19 +74,18 @@ export default function FeedbackFab() {
       frame.current = window.requestAnimationFrame(() => {
         const y = window.scrollY;
         const delta = y - lastY.current;
-        if (delta > 4 && y > 80) setCollapsed(true);
-        else if (delta < -4) setCollapsed(false);
+        const atEnd = y + window.innerHeight >= document.documentElement.scrollHeight - 8;
+        if (atEnd || delta < -4) setCollapsed(false);
+        else if (delta > 4 && y > 80) setCollapsed(true);
         lastY.current = y;
         frame.current = null;
-        if (idle.current) clearTimeout(idle.current);
-        idle.current = setTimeout(() => setCollapsed(false), 1600);
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       if (frame.current !== null) window.cancelAnimationFrame(frame.current);
-      if (idle.current) clearTimeout(idle.current);
+      frame.current = null;
     };
   }, [hidden]);
 
@@ -117,7 +116,7 @@ export default function FeedbackFab() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="fixed z-[45] flex w-[min(320px,calc(100vw-32px))] items-start gap-2 rounded-2xl border border-[var(--line2)] bg-[var(--panel)] py-2 pl-4 pr-1 text-[15px] leading-[1.5] text-[var(--txt)]"
+            className="fixed z-[45] flex w-[min(320px,calc(100vw-32px))] items-start gap-2 rounded-2xl border border-[var(--line2)] bg-[var(--panel)] py-2 pl-4 pr-1 text-[.9375rem] leading-[1.5] text-[var(--txt)]"
             style={{ right: inset.right, bottom: `calc(${inset.bottom} + 60px)` }}
             data-testid="feedback-hint"
           >
@@ -150,7 +149,7 @@ export default function FeedbackFab() {
         data-testid="feedback-fab"
         data-tour="feedback-fab"
         style={{ ...inset, borderRadius: 999 }}
-        className="material-bar fixed z-[45] flex h-12 min-w-12 items-center justify-center gap-2 border border-[var(--line2)] px-[14px] text-[15px] font-medium text-[var(--txt)] no-underline transition-[border-color] duration-150 hover:border-[var(--txt3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--puls)]"
+        className="material-bar fixed z-[45] flex h-12 min-w-12 items-center justify-center gap-2 border border-[var(--line2)] px-[14px] text-[.9375rem] font-medium text-[var(--txt)] no-underline transition-[border-color] duration-150 hover:border-[var(--txt3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--puls)]"
       >
         <motion.span layout="position" className="grid place-items-center">
           <MessageSquareText className="h-[18px] w-[18px]" aria-hidden />

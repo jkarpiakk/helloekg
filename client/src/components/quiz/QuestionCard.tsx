@@ -8,16 +8,28 @@ import { QuestionRenderer } from "./questions";
 import { caseKicker } from "./questions/ClinicalCaseQuestion";
 import type { AnyQuestionConfig } from "@shared/clinicalCase";
 
+/**
+ * Stan odpowiedzi na bieżące pytanie:
+ * idle — czeka na odpowiedź; pending — wysłana, czekamy na serwer;
+ * result — wynik z serwera (nauka/powtórka); saved — zapisana bez wyniku (egzamin);
+ * error — nie udało się zapisać (można odpowiedzieć/wysłać jeszcze raz).
+ */
+export type AnswerStatus = "idle" | "pending" | "result" | "saved" | "error";
+
 interface QuestionCardProps {
   question: QuizQuestion;
+  /** Pozycja wybranej odpowiedzi NA EKRANIE (odpowiedzi są tasowane) */
   selectedAnswer: number | null;
-  showExplanation: boolean;
+  status: AnswerStatus;
+  /** Pokaż „Sprawdzam…” — dopiero gdy serwer odpowiada dłużej niż ~300 ms */
+  showPending: boolean;
+  /** Egzamin: bez poprawności i wyjaśnienia, tylko „Zapisano” */
+  examMode?: boolean;
   quizResult?: QuizResult;
-  onAnswerSelect: (index: number) => void;
+  onAnswerSelect: (position: number) => void;
   onAnswerChange?: (answer: AnswerData) => void;
   /** Drugi argument: miniatura, z której wyrasta podgląd */
   onImageClick: (imageUrl: string, origin?: HTMLElement) => void;
-  isSubmitting: boolean;
 }
 
 const letter = (i: number) => String.fromCharCode(65 + i);
@@ -49,12 +61,13 @@ function QuestionImage({ url, onOpen }: { url: string; onOpen: (url: string, ori
 export default function QuestionCard({
   question,
   selectedAnswer,
-  showExplanation,
+  status,
+  showPending,
+  examMode = false,
   quizResult,
   onAnswerSelect,
   onAnswerChange,
   onImageClick,
-  isSubmitting,
 }: QuestionCardProps) {
   const questionType = question.questionType || "multiple_choice";
   const isInteractiveType = questionType !== "multiple_choice" && !!question.questionConfig;
@@ -63,10 +76,13 @@ export default function QuestionCard({
   const caseConfig = anyConfig?.type === "clinical_case" ? anyConfig.config : undefined;
   // Hotspot i przypadek rysują obraz same (plansza do wskazywania / zapis przypadku)
   const showImage = !!question.imageUrl && questionType !== "hotspot" && !caseConfig;
-  const answered = showExplanation && !!quizResult;
+  // Wynik widać tylko w nauce/powtórce i tylko z odpowiedzi serwera
+  const answered = status === "result" && !!quizResult && !examMode;
+  const locked = status === "pending" || status === "result" || status === "saved";
 
-  const correctAnswer =
-    answered && !isInteractiveType ? question.answers[quizResult!.correctIndex] : undefined;
+  // correctIndex to indeks w bazie; odpowiedzi na ekranie są potasowane
+  const correctPosition = answered ? question.answers.findIndex((a) => a.index === quizResult!.correctIndex) : -1;
+  const correctAnswer = answered && !isInteractiveType && correctPosition >= 0 ? question.answers[correctPosition] : undefined;
 
   return (
     <article
@@ -105,9 +121,9 @@ export default function QuestionCard({
         <QuestionRenderer
           question={question}
           onAnswerChange={onAnswerChange}
-          disabled={showExplanation}
-          showResult={showExplanation}
-          result={quizResult}
+          disabled={locked}
+          showResult={answered}
+          result={answered ? quizResult : undefined}
           onImageClick={onImageClick}
         />
       )}
@@ -116,7 +132,7 @@ export default function QuestionCard({
       {!isInteractiveType && (
         <div className="grid gap-[10px]" role="group" aria-label="Odpowiedzi" data-testid="answer-options">
           {question.answers.map((answer, index) => {
-            const isRight = answered && index === quizResult!.correctIndex;
+            const isRight = answered && index === correctPosition;
             const isWrong = answered && index === selectedAnswer && !isRight;
             const isDim = answered && !isRight && !isWrong;
             return (
@@ -130,9 +146,9 @@ export default function QuestionCard({
                   isDim && "is-dim",
                   !answered && selectedAnswer === index && "is-picked",
                 )}
-                disabled={showExplanation || isSubmitting}
+                disabled={locked}
                 aria-pressed={selectedAnswer === index}
-                onClick={() => !showExplanation && !isSubmitting && onAnswerSelect(index)}
+                onClick={() => !locked && onAnswerSelect(index)}
                 data-testid={`answer-option-${index}`}
               >
                 <span className="opt__key" aria-hidden>
@@ -154,8 +170,44 @@ export default function QuestionCard({
         </div>
       )}
 
-      {/* Wyjaśnienie: wyrasta pod pytaniem po odpowiedzi */}
-      {showExplanation && (
+      {/* Egzamin: odpowiedź zapisana, bez wyniku — pełny przegląd dopiero na końcu */}
+      {examMode && (status === "saved" || (status === "pending" && showPending)) && (
+        <p className="mt-7 flex items-center gap-2 border-t border-[var(--line)] pt-6 label" role="status" data-testid="exam-saved">
+          {status === "saved" ? (
+            <>
+              <Check className="h-4 w-4 text-[var(--puls)]" strokeWidth={2.25} aria-hidden />
+              Zapisano
+            </>
+          ) : (
+            "Zapisuję…"
+          )}
+        </p>
+      )}
+
+      {!examMode && status === "pending" && showPending && (
+        <p className="mt-7 border-t border-[var(--line)] pt-6 label" role="status" data-testid="answer-pending">
+          Sprawdzam…
+        </p>
+      )}
+
+      {status === "error" && (
+        <section
+          className="mt-7 grid gap-1.5 border-t border-[var(--line)] pt-6"
+          role="alert"
+          data-testid="answer-save-error"
+        >
+          <p className="flex items-start gap-2.5 text-[17px] font-medium leading-snug text-[var(--txt)]">
+            <X className="mt-0.5 h-5 w-5 shrink-0 text-[var(--alarm)]" strokeWidth={2.25} aria-hidden />
+            Nie zapisano odpowiedzi
+          </p>
+          <p className="text-[15px] text-[var(--txt2)]">
+            Sprawdź połączenie i wyślij jeszcze raz{isInteractiveType ? "" : " — możesz też zmienić wybór"}.
+          </p>
+        </section>
+      )}
+
+      {/* Wyjaśnienie: wyrasta pod pytaniem po odpowiedzi (wynik z serwera) */}
+      {answered && (
         <motion.section
           variants={rise}
           initial="hidden"
@@ -164,46 +216,40 @@ export default function QuestionCard({
           aria-live="polite"
           data-testid="explanation-panel"
         >
-          {!quizResult ? (
-            <p className="label">Sprawdzam odpowiedź…</p>
-          ) : (
+          <p className="flex items-start gap-2.5 text-[17px] font-medium leading-snug text-[var(--txt)]" data-testid="result-title">
+            {quizResult!.isCorrect ? (
+              <Check className="mt-0.5 h-5 w-5 shrink-0 text-[var(--puls)]" strokeWidth={2.25} aria-hidden />
+            ) : (
+              <X className="mt-0.5 h-5 w-5 shrink-0 text-[var(--alarm)]" strokeWidth={2.25} aria-hidden />
+            )}
+            <span>
+              {quizResult!.isCorrect
+                ? "Dobrze."
+                : isInteractiveType && quizResult!.partialScore !== undefined && quizResult!.partialScore > 0
+                  ? `Częściowo dobrze — ${Math.round(quizResult!.partialScore * 100)}%.`
+                  : "Nie tym razem."}
+            </span>
+          </p>
+
+          {correctAnswer && !quizResult!.isCorrect && (
+            <p className="text-[15px] text-[var(--txt)]">
+              <span className="label mr-2">Poprawna odpowiedź</span>
+              {letter(correctPosition)}. {correctAnswer.text}
+            </p>
+          )}
+
+          {quizResult!.explanation && (
             <>
-              <p className="flex items-start gap-2.5 text-[17px] font-medium leading-snug text-[var(--txt)]" data-testid="result-title">
-                {quizResult.isCorrect ? (
-                  <Check className="mt-0.5 h-5 w-5 shrink-0 text-[var(--puls)]" strokeWidth={2.25} aria-hidden />
-                ) : (
-                  <X className="mt-0.5 h-5 w-5 shrink-0 text-[var(--alarm)]" strokeWidth={2.25} aria-hidden />
-                )}
-                <span>
-                  {quizResult.isCorrect
-                    ? "Dobrze."
-                    : isInteractiveType && quizResult.partialScore !== undefined && quizResult.partialScore > 0
-                      ? `Częściowo dobrze — ${Math.round(quizResult.partialScore * 100)}%.`
-                      : "Nie tym razem."}
-                </span>
-              </p>
-
-              {correctAnswer && (
-                <p className="text-[15px] text-[var(--txt)]">
-                  <span className="label mr-2">Poprawna odpowiedź</span>
-                  {letter(quizResult.correctIndex)}. {correctAnswer.text}
-                </p>
-              )}
-
-              {quizResult.explanation && (
-                <>
-                  <p className="label mt-1">{caseConfig ? "Podsumowanie przypadku" : "Wyjaśnienie"}</p>
-                  <div
-                    className="prose-hk max-w-[46em] text-[16px]"
-                    dangerouslySetInnerHTML={sanitizeMarkdown(quizResult.explanation)}
-                    data-testid="explanation-content"
-                  />
-                </>
-              )}
-
-              <p className="label">Czas · {Math.max(1, Math.round(quizResult.timeMs / 1000))} s</p>
+              <p className="label mt-1">{caseConfig ? "Podsumowanie przypadku" : "Wyjaśnienie"}</p>
+              <div
+                className="prose-hk max-w-[46em] text-[16px]"
+                dangerouslySetInnerHTML={sanitizeMarkdown(quizResult!.explanation)}
+                data-testid="explanation-content"
+              />
             </>
           )}
+
+          <p className="label">Czas · {Math.max(1, Math.round(quizResult!.timeMs / 1000))} s</p>
         </motion.section>
       )}
     </article>

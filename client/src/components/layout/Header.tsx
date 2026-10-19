@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import {
   DropdownMenu,
@@ -63,6 +64,24 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 /** Inicjał do awatara: imię, a gdy go brak (nowe konta) — pierwsza litera e-maila */
+/** apiRequest rzuca „401: {"error": "..."}” — pokazujemy samą treść */
+function readableError(error: unknown): string {
+  const fallback = "Nie udało się usunąć konta. Spróbuj ponownie za chwilę.";
+  const message = (error as Error | undefined)?.message ?? "";
+  const status = Number(message.slice(0, 3));
+  try {
+    const start = message.indexOf("{");
+    if (start >= 0) {
+      const parsed = JSON.parse(message.slice(start));
+      if (parsed.error || parsed.message) return parsed.error || parsed.message;
+    }
+  } catch {
+    /* treść nie jest JSON-em */
+  }
+  if (status === 401 || status === 403) return "Hasło się nie zgadza. Wpisz je jeszcze raz.";
+  return fallback;
+}
+
 function initialOf(user: { firstName?: string | null; email?: string | null } | null): string {
   const source = user?.firstName?.trim() || user?.email?.trim() || "";
   return source ? source[0].toUpperCase() : "?";
@@ -73,6 +92,8 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const { user, isAuthenticated, logout } = useAuth();
@@ -102,16 +123,33 @@ export default function Header() {
     }
   };
 
-  const handleDeleteAccount = async () => {
+  const openDeleteDialog = (open: boolean) => {
+    if (isDeleting) return;
+    setShowDeleteDialog(open);
+    if (!open) {
+      setDeletePassword("");
+      setDeleteError(null);
+    }
+  };
+
+  // Serwer wymaga hasła ({ password }); błąd pokazujemy w oknie, okno zostaje otwarte
+  const handleDeleteAccount = async (e?: { preventDefault: () => void }) => {
+    e?.preventDefault();
+    if (!deletePassword) {
+      setDeleteError("Wpisz hasło, żeby potwierdzić.");
+      return;
+    }
     setIsDeleting(true);
+    setDeleteError(null);
     try {
-      await apiRequest("DELETE", "/api/auth/account");
+      await apiRequest("DELETE", "/api/auth/account", { password: deletePassword });
       toast({ title: "Konto zostało usunięte." });
       setShowDeleteDialog(false);
+      setDeletePassword("");
       setLocation("/");
       window.location.reload();
     } catch (error) {
-      toast({ title: "Nie udało się usunąć konta. Spróbuj ponownie za chwilę.", variant: "destructive" });
+      setDeleteError(readableError(error));
     } finally {
       setIsDeleting(false);
     }
@@ -119,8 +157,11 @@ export default function Header() {
 
   const openAuth = (mode: "login" | "register") => setLocation(`/?auth=${mode}`);
 
+  // Aktywny link: kolor + podkreślenie 2px w akcencie (stan nie tylko kolorem)
   const linkClass = (active: boolean) =>
-    `text-sm transition-colors duration-200 ${active ? "text-[var(--txt)]" : "text-[var(--txt2)] hover:text-[var(--txt)]"}`;
+    `inline-flex min-h-11 items-center text-sm transition-colors duration-200 decoration-2 underline-offset-[10px] ${
+      active ? "text-[var(--txt)] underline decoration-[var(--puls)]" : "text-[var(--txt2)] hover:text-[var(--txt)]"
+    }`;
 
   return (
     <nav
@@ -137,7 +178,7 @@ export default function Header() {
           data-testid="logo-link"
           aria-label="helloEKG — strona główna"
         >
-          <Logo />
+          <Logo replayKey={location} />
         </Link>
 
         {isAuthenticated && (
@@ -201,7 +242,7 @@ export default function Header() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
+                    onClick={() => openDeleteDialog(true)}
                     className="text-[var(--alarm)] focus:text-[var(--alarm)]"
                     data-testid="menu-delete-account"
                   >
@@ -211,25 +252,53 @@ export default function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+              <AlertDialog open={showDeleteDialog} onOpenChange={openDeleteDialog}>
                 <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Na pewno chcesz usunąć konto?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Tego nie da się cofnąć. Usuniemy twoje dane, postęp w nauce,
-                      certyfikaty i aktywne subskrypcje.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>Anuluj</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDeleteAccount}
-                      disabled={isDeleting}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {isDeleting ? "Usuwam…" : "Tak, usuń konto"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
+                  <form onSubmit={handleDeleteAccount} className="grid gap-5" noValidate>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Na pewno chcesz usunąć konto?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tego nie da się cofnąć. Usuniemy twoje dane, postęp w nauce,
+                        certyfikaty i aktywne subskrypcje.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="grid gap-2">
+                      <label htmlFor="delete-account-password" className="text-sm text-[var(--txt2)]">
+                        Wpisz hasło, żeby potwierdzić
+                      </label>
+                      <Input
+                        id="delete-account-password"
+                        type="password"
+                        autoComplete="current-password"
+                        value={deletePassword}
+                        onChange={(e) => {
+                          setDeletePassword(e.target.value);
+                          if (deleteError) setDeleteError(null);
+                        }}
+                        aria-invalid={deleteError ? true : undefined}
+                        aria-describedby={deleteError ? "delete-account-error" : undefined}
+                        disabled={isDeleting}
+                        data-testid="delete-account-password"
+                      />
+                      {deleteError && (
+                        <p id="delete-account-error" role="alert" className="text-sm text-[var(--alarm)]">
+                          {deleteError}
+                        </p>
+                      )}
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel type="button" disabled={isDeleting}>Anuluj</AlertDialogCancel>
+                      <AlertDialogAction
+                        type="submit"
+                        onClick={handleDeleteAccount}
+                        disabled={isDeleting}
+                        className={buttonVariants({ variant: "destructive" })}
+                        data-testid="delete-account-confirm"
+                      >
+                        {isDeleting ? "Usuwam…" : "Tak, usuń konto"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </form>
                 </AlertDialogContent>
               </AlertDialog>
             </>
@@ -266,15 +335,16 @@ export default function Header() {
         </div>
       </div>
 
+      {/* Menu mobilne: nakładka pod belką (bez animacji wysokości — tylko przesunięcie i krycie) */}
       <AnimatePresence initial={false}>
         {isMobileMenuOpen && (
           <motion.div
             key="mobile-menu"
             id="mobile-menu"
-            className={`${isAuthenticated ? "md:hidden" : "sm:hidden"} overflow-hidden`}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+            className={`${isAuthenticated ? "md:hidden" : "sm:hidden"} absolute inset-x-0 top-full border-b bg-[var(--ink)] border-[var(--line)]`}
+            initial={{ y: -8, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -8, opacity: 0 }}
             transition={spring}
             data-testid="mobile-menu"
           >
@@ -287,8 +357,8 @@ export default function Header() {
                       <li key={item.href} className="border-b border-[var(--line)]">
                         <Link
                           href={item.href}
-                          className={`flex h-12 items-center text-[15px] transition-colors active:opacity-70 ${
-                            active ? "text-[var(--txt)]" : "text-[var(--txt2)]"
+                          className={`flex h-12 items-center text-[.9375rem] transition-colors decoration-2 underline-offset-[6px] active:opacity-70 ${
+                            active ? "text-[var(--txt)] underline decoration-[var(--puls)]" : "text-[var(--txt2)]"
                           }`}
                           aria-current={active ? "page" : undefined}
                           onClick={() => setIsMobileMenuOpen(false)}
@@ -304,7 +374,7 @@ export default function Header() {
                   <li className="border-b border-[var(--line)]">
                     <button
                       type="button"
-                      className="flex h-12 w-full items-center text-left text-[15px] text-[var(--txt2)] active:opacity-70"
+                      className="flex h-12 w-full items-center text-left text-[.9375rem] text-[var(--txt2)] active:opacity-70"
                       onClick={() => {
                         setIsMobileMenuOpen(false);
                         openAuth("login");

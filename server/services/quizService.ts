@@ -1,8 +1,8 @@
+import { randomUUID } from "crypto";
 import { storage } from "../storage";
 import { db } from "../db";
-import { examSessions } from "@shared/schema";
-import { eq, lt } from "drizzle-orm";
-import { handleQuestionAnswer } from "./gamificationService";
+import { examSessions, progress, attempts } from "@shared/schema";
+import { and, eq, lt, sql } from "drizzle-orm";
 import type { 
   Question, 
   Attempt, 
@@ -25,16 +25,21 @@ import {
 // Question types
 export type QuestionType = 'multiple_choice' | 'drag_drop' | 'fill_blank' | 'matching' | 'sorting' | 'hotspot' | 'clinical_case';
 
+/**
+ * Pytanie wysyłane do przeglądarki. NIE zawiera poprawnej odpowiedzi ani wyjaśnienia:
+ * ocenia wyłącznie serwer, a wynik (correctIndex, explanation, correctAnswer) wraca
+ * dopiero w odpowiedzi na POST /api/quiz/answer. W questionConfig części z odpowiedzią
+ * są wyczyszczone (patrz sanitizeConfigForClient) — wyjątek: clinical_case w nauce/powtórce,
+ * bo kroki przypadku pokazują wynik od razu, krok po kroku (do egzaminu przypadki nie wchodzą).
+ */
 export interface QuizQuestion {
   id: string;
   title: string;
   bodyMd: string;
   imageUrl?: string;
+  /** Kolejność potasowana; `index` = indeks w bazie — ten wysyła klient jako selectedIndex */
   answers: Array<{ text: string; index: number }>;
   sectionId: string;
-  correctIndex: number;
-  explanation: string;
-  // New fields for interactive question types
   questionType: QuestionType;
   questionConfig?: QuestionConfig;
   mediaAssets?: QuestionMediaAssets;
@@ -42,30 +47,54 @@ export interface QuizQuestion {
 
 export interface QuizResult {
   isCorrect: boolean;
+  /** Indeks poprawnej odpowiedzi w bazie (porównuj z `answers[].index`, nie z pozycją na ekranie) */
   correctIndex: number;
   explanation: string;
   timeMs: number;
-  xpEarned?: number;
-  newAchievements?: Array<{
-    id: string;
-    name: string;
-    description: string;
-    icon: string;
-  }>;
-  // New fields for interactive question types
   partialScore?: number;
   correctAnswer?: AnswerData;
   feedback?: {
     correctItems?: string[];
     incorrectItems?: string[];
   };
+  /** Pełna konfiguracja pytania interaktywnego — do pokazania wyniku (np. poprawne obszary hotspotu) */
+  questionConfig?: QuestionConfig;
 }
 
-export interface ReviewQueue {
+/** Odpowiedź na pytanie egzaminu — bez informacji, czy była poprawna */
+export interface ExamAnswerReceipt {
+  saved: true;
+  answered: number;
+  totalQuestions: number;
+}
+
+/** Jedno pytanie w przeglądzie po egzaminie */
+export interface ExamReviewItem {
   questionId: string;
-  lastAttempt: Date;
-  incorrectCount: number;
-  nextReviewDate: Date;
+  title: string;
+  bodyMd: string;
+  imageUrl?: string;
+  questionType: QuestionType;
+  /** Odpowiedzi w kolejności z bazy (index = pozycja) */
+  answers: Array<{ text: string; index: number }>;
+  selectedIndex: number;
+  answerData?: AnswerData;
+  correctIndex: number;
+  correctAnswer?: AnswerData;
+  isCorrect: boolean;
+  partialScore?: number;
+  explanation: string;
+}
+
+export interface ExamSummary {
+  totalQuestions: number;
+  answered: number;
+  /** Tylko po zakończeniu — w trakcie egzaminu wynik się nie ujawnia */
+  correctAnswers?: number;
+  totalTime: number;
+  finished: boolean;
+  /** Tylko po zakończeniu egzaminu */
+  review?: ExamReviewItem[];
 }
 
 export interface ExamSession {
@@ -77,19 +106,27 @@ export interface ExamSession {
     selectedIndex: number;
     isCorrect: boolean;
     timeMs: number;
+    partialScore?: number;
+    answerData?: AnswerData;
   }>;
 }
+
+/** Stan pytania dla kursanta, liczony z OSTATNIEJ próby */
+type QuestionState = "new" | "wrong" | "mastered";
 
 export class QuizService {
   // Exam sessions are persisted in the database (table: exam_sessions) so that
   // in-progress exams survive server restarts.
   private readonly EXAM_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+  private readonly EXAM_MAX_QUESTIONS = 100;
 
   // Loads a non-expired exam session from the DB.
   // Deletes the record and returns null if it has expired or does not exist.
-  private async loadExamSession(sessionId: string): Promise<ExamSession | null> {
+  // With userId: a session that belongs to someone else is treated as not found.
+  private async loadExamSession(sessionId: string, userId?: string): Promise<ExamSession | null> {
     const [row] = await db.select().from(examSessions).where(eq(examSessions.sessionId, sessionId));
     if (!row) return null;
+    if (userId !== undefined && row.userId !== userId) return null;
     if (new Date(row.expiresAt).getTime() < Date.now()) {
       await db.delete(examSessions).where(eq(examSessions.sessionId, sessionId));
       return null;
@@ -99,21 +136,25 @@ export class QuizService {
 
   // ======= ANSWER VALIDATION FUNCTIONS =======
 
+  // correctItems/incorrectItems = identyfikatory CELÓW (tak oznacza je DragDropQuestion).
+  // Cel bez elementu też jest błędny; poprawne = każdy cel ma właściwy element.
   validateDragDropAnswer(config: DragDropConfig, answer: { type: 'drag_drop'; placements: Array<{ sourceId: string; targetId: string }> }): { isCorrect: boolean; partialScore: number; correctItems: string[]; incorrectItems: string[] } {
     const correctItems: string[] = [];
     const incorrectItems: string[] = [];
+    const placements = Array.isArray(answer.placements) ? answer.placements : [];
     
-    for (const placement of answer.placements) {
-      const target = config.targets.find(t => t.id === placement.targetId);
-      if (target && target.acceptsSourceId === placement.sourceId) {
-        correctItems.push(placement.sourceId);
+    for (const target of config.targets) {
+      const placed = placements.find(p => String(p.targetId) === String(target.id));
+      if (placed && String(placed.sourceId) === String(target.acceptsSourceId)) {
+        correctItems.push(target.id);
       } else {
-        incorrectItems.push(placement.sourceId);
+        incorrectItems.push(target.id);
       }
     }
     
-    const partialScore = correctItems.length / config.sources.length;
-    const isCorrect = incorrectItems.length === 0 && correctItems.length === config.sources.length;
+    const total = config.targets.length;
+    const partialScore = total === 0 ? 0 : correctItems.length / total;
+    const isCorrect = total > 0 && incorrectItems.length === 0;
     
     return { isCorrect, partialScore, correctItems, incorrectItems };
   }
@@ -295,6 +336,47 @@ export class QuizService {
     }
   }
 
+  // ======= OCENA (wspólna dla nauki, powtórki i egzaminu) =======
+
+  private isInteractive(question: Question): boolean {
+    const questionType = (question.questionType || 'multiple_choice') as QuestionType;
+    return questionType !== 'multiple_choice' && !!question.questionConfig;
+  }
+
+  /** Ocena po stronie serwera. Pytanie interaktywne bez answerData = błędna odpowiedź. */
+  private grade(question: Question, selectedIndex: number, answerData?: AnswerData) {
+    const correctIndex = question.answers.findIndex(answer => answer.isCorrect);
+    if (this.isInteractive(question)) {
+      if (!answerData) {
+        return { isCorrect: false, partialScore: 0, correctIndex, correctItems: [] as string[], incorrectItems: [] as string[], interactive: true };
+      }
+      return { ...this.validateAnswer(question, answerData), correctIndex, interactive: true };
+    }
+    const isCorrect = correctIndex >= 0 && selectedIndex === correctIndex;
+    return { isCorrect, partialScore: isCorrect ? 1 : 0, correctIndex, correctItems: undefined, incorrectItems: undefined, interactive: false };
+  }
+
+  private buildResult(question: Question, grading: ReturnType<QuizService["grade"]>, timeMs: number): QuizResult {
+    return {
+      isCorrect: grading.isCorrect,
+      correctIndex: grading.correctIndex,
+      explanation: question.explanationMd,
+      timeMs,
+      partialScore: grading.partialScore,
+      correctAnswer: question.questionConfig ? this.buildCorrectAnswerData(question) : undefined,
+      feedback: grading.interactive
+        ? { correctItems: grading.correctItems, incorrectItems: grading.incorrectItems }
+        : undefined,
+      questionConfig: grading.interactive ? (question.questionConfig as QuestionConfig) : undefined,
+    };
+  }
+
+  private safeTime(timeMs: number): number {
+    return Number.isFinite(timeMs) ? Math.min(Math.max(0, Math.round(timeMs)), 24 * 60 * 60 * 1000) : 0;
+  }
+
+  // ======= EGZAMIN =======
+
   async initializeExam(userId: string, count: number): Promise<{ sessionId: string; totalQuestions: number }> {
     // Get all published questions from all sections
     const sections = await storage.getSections();
@@ -304,17 +386,20 @@ export class QuizService {
       const sectionQuestions = await storage.getQuestionsBySection(section.id, "published");
       allQuestions.push(...sectionQuestions);
     }
+
+    // Przypadki kliniczne pokazują wynik krok po kroku (to ich sens dydaktyczny),
+    // więc nie dałoby się ich zadać na egzaminie bez zdradzania odpowiedzi
+    allQuestions = allQuestions.filter(q => q.questionType !== 'clinical_case');
     
     if (allQuestions.length === 0) {
       throw new Error("Brak dostępnych pytań w bazie danych");
     }
     
-    // Shuffle and select questions
-    const shuffled = this.shuffleArray(allQuestions);
-    const selectedQuestions = shuffled.slice(0, Math.min(count, allQuestions.length));
+    const wanted = Math.max(1, Math.min(Math.floor(count), this.EXAM_MAX_QUESTIONS));
+    const selectedQuestions = this.shuffleArray(allQuestions).slice(0, Math.min(wanted, allQuestions.length));
     
-    // Create session (persisted to DB)
-    const sessionId = `${userId}_${Date.now()}`;
+    // Losowy, niezgadywalny identyfikator sesji (persisted to DB)
+    const sessionId = randomUUID();
     const session: ExamSession = {
       questionIds: selectedQuestions.map(q => q.id),
       currentIndex: 0,
@@ -336,27 +421,39 @@ export class QuizService {
     };
   }
 
-  async getExamQuestion(sessionId: string, questionIndex: number): Promise<QuizQuestion | null> {
-    const session = await this.loadExamSession(sessionId);
+  /**
+   * Pytanie egzaminu bez odpowiedzi i wyjaśnienia. Można pobrać tylko bieżące
+   * (albo wcześniejsze) pytanie — nie da się podejrzeć kolejnych.
+   * userId: przekazuj req.user.id — cudza sesja jest traktowana jak nieistniejąca.
+   */
+  async getExamQuestion(sessionId: string, questionIndex: number, userId?: string): Promise<QuizQuestion | null> {
+    const session = await this.loadExamSession(sessionId, userId);
     
     if (!session) {
       throw new Error("Sesja egzaminu nie znaleziona lub wygasła. Rozpocznij egzamin od nowa.");
     }
     
-    if (questionIndex >= session.questionIds.length) {
-      return null; // Exam finished
+    if (!Number.isInteger(questionIndex) || questionIndex < 0 || questionIndex >= session.questionIds.length) {
+      return null; // Exam finished / out of range
+    }
+
+    if (questionIndex > session.currentIndex) {
+      throw new Error("Najpierw odpowiedz na bieżące pytanie egzaminu.");
     }
     
-    const questionId = session.questionIds[questionIndex];
-    const question = await storage.getQuestionById(questionId);
-    
+    const question = await storage.getQuestionById(session.questionIds[questionIndex]);
     if (!question) {
       return null;
     }
     
-    return this.formatQuestionForQuiz(question);
+    return this.formatQuestionForQuiz(question, "exam");
   }
 
+  /**
+   * Zapisuje odpowiedź egzaminu. Ocena tylko na serwerze; odpowiedź do klienta
+   * NIE mówi, czy była poprawna (pełny przegląd dopiero w getExamSummary po końcu).
+   * Przyjmuje wyłącznie bieżące pytanie i tylko raz.
+   */
   async submitExamAnswer(
     sessionId: string, 
     questionId: string, 
@@ -364,84 +461,86 @@ export class QuizService {
     timeMs: number, 
     userId: string,
     answerData?: AnswerData
-  ): Promise<QuizResult> {
-    const session = await this.loadExamSession(sessionId);
+  ): Promise<ExamAnswerReceipt> {
+    const session = await this.loadExamSession(sessionId, userId);
     
     if (!session) {
       throw new Error("Sesja egzaminu nie znaleziona lub wygasła. Rozpocznij egzamin od nowa.");
+    }
+
+    if (session.currentIndex >= session.questionIds.length) {
+      throw new Error("Egzamin jest już zakończony.");
+    }
+
+    if (session.answers.some(a => a.questionId === questionId)) {
+      throw new Error("Na to pytanie już odpowiedziano.");
+    }
+
+    if (questionId !== session.questionIds[session.currentIndex]) {
+      throw new Error("To nie jest bieżące pytanie egzaminu.");
     }
     
     const question = await storage.getQuestionById(questionId);
     if (!question) {
       throw new Error("Pytanie nie znalezione");
     }
-    
-    const questionType = (question.questionType || 'multiple_choice') as QuestionType;
-    let isCorrect: boolean;
-    let partialScore: number | undefined;
-    let correctItems: string[] | undefined;
-    let incorrectItems: string[] | undefined;
-    const correctIndex = question.answers.findIndex(answer => answer.isCorrect);
 
-    // For interactive question types, use answerData validation
-    if (answerData && questionType !== 'multiple_choice') {
-      const validationResult = this.validateAnswer(question, answerData);
-      isCorrect = validationResult.isCorrect;
-      partialScore = validationResult.partialScore;
-      correctItems = validationResult.correctItems;
-      incorrectItems = validationResult.incorrectItems;
-    } else {
-      // Legacy multiple choice validation
-      isCorrect = selectedIndex === correctIndex;
-      partialScore = isCorrect ? 1 : 0;
+    const time = this.safeTime(timeMs);
+    const grading = this.grade(question, selectedIndex, answerData);
+
+    const next: ExamSession = {
+      ...session,
+      currentIndex: session.currentIndex + 1,
+      answers: [
+        ...session.answers,
+        {
+          questionId,
+          selectedIndex,
+          isCorrect: grading.isCorrect,
+          timeMs: time,
+          partialScore: grading.partialScore,
+          answerData: answerData || undefined,
+        },
+      ],
+    };
+
+    // Zapis warunkowy: przejdzie tylko, jeśli nikt w międzyczasie nie odpowiedział
+    // na to samo pytanie (np. podwójne kliknięcie, dwie karty)
+    const updated = await db
+      .update(examSessions)
+      .set({ data: next })
+      .where(and(
+        eq(examSessions.sessionId, sessionId),
+        sql`(${examSessions.data}->>'currentIndex')::int = ${session.currentIndex}`,
+      ))
+      .returning({ id: examSessions.id });
+
+    if (updated.length === 0) {
+      throw new Error("Na to pytanie już odpowiedziano.");
     }
     
-    // Save answer to session
-    session.answers.push({
-      questionId,
-      selectedIndex,
-      isCorrect,
-      timeMs
-    });
-    
-    session.currentIndex++;
-    
-    // Persist updated session state to DB
-    await db.update(examSessions).set({ data: session }).where(eq(examSessions.sessionId, sessionId));
-    
-    // Save attempt to database (for statistics)
+    // Save attempt to database (statystyki, opanowanie, powtórka)
     await storage.createAttempt({
       userId,
       questionId,
       selectedIndex,
-      isCorrect,
-      timeMs,
+      isCorrect: grading.isCorrect,
+      timeMs: time,
       mode: "exam",
       answerData: answerData || undefined
     });
+    await this.updateUserProgress(userId, question.sectionId);
 
-    // Build correct answer for feedback
-    let correctAnswer: AnswerData | undefined;
-    if (question.questionConfig) {
-      correctAnswer = this.buildCorrectAnswerData(question);
-    }
-    
     return {
-      isCorrect,
-      correctIndex,
-      explanation: question.explanationMd,
-      timeMs,
-      partialScore,
-      correctAnswer,
-      feedback: (correctItems || incorrectItems) ? {
-        correctItems,
-        incorrectItems
-      } : undefined
+      saved: true,
+      answered: next.answers.length,
+      totalQuestions: next.questionIds.length,
     };
   }
 
-  async getExamSummary(sessionId: string): Promise<{ totalQuestions: number; correctAnswers: number; totalTime: number } | null> {
-    const session = await this.loadExamSession(sessionId);
+  /** userId: przekazuj req.user.id — cudza sesja jest traktowana jak nieistniejąca. */
+  async getExamSummary(sessionId: string, userId?: string): Promise<ExamSummary | null> {
+    const session = await this.loadExamSession(sessionId, userId);
     
     if (!session) {
       return null;
@@ -449,12 +548,45 @@ export class QuizService {
     
     const correctAnswers = session.answers.filter(a => a.isCorrect).length;
     const totalTime = session.answers.reduce((sum, a) => sum + a.timeMs, 0);
-    
-    return {
+    const finished = session.answers.length >= session.questionIds.length;
+
+    const summary: ExamSummary = {
       totalQuestions: session.questionIds.length,
-      correctAnswers,
-      totalTime
+      answered: session.answers.length,
+      correctAnswers: finished ? correctAnswers : undefined,
+      totalTime,
+      finished,
     };
+
+    // Przegląd z poprawnymi odpowiedziami i wyjaśnieniami — dopiero po ostatnim pytaniu
+    if (finished) {
+      const questionsById = new Map<string, Question>();
+      await Promise.all(session.questionIds.map(async (id) => {
+        const q = await storage.getQuestionById(id);
+        if (q) questionsById.set(id, q);
+      }));
+      summary.review = session.answers.flatMap((a): ExamReviewItem[] => {
+        const q = questionsById.get(a.questionId);
+        if (!q) return [];
+        return [{
+          questionId: q.id,
+          title: q.title || "",
+          bodyMd: q.bodyMd,
+          imageUrl: q.imageUrl || undefined,
+          questionType: (q.questionType || 'multiple_choice') as QuestionType,
+          answers: q.answers.map((ans, index) => ({ text: ans.text, index })),
+          selectedIndex: a.selectedIndex,
+          answerData: a.answerData,
+          correctIndex: q.answers.findIndex(ans => ans.isCorrect),
+          correctAnswer: q.questionConfig ? this.buildCorrectAnswerData(q) : undefined,
+          isCorrect: a.isCorrect,
+          partialScore: a.partialScore,
+          explanation: q.explanationMd,
+        }];
+      });
+    }
+
+    return summary;
   }
 
   async clearExamSession(sessionId: string): Promise<void> {
@@ -473,75 +605,157 @@ export class QuizService {
     }
     return shuffled;
   }
-  async getQuestionForUser(userId: string, sectionId: string | null, mode: "learn" | "review" | "exam" = "learn", examQuestionCount?: number): Promise<QuizQuestion | null> {
+
+  // ======= NAUKA I POWTÓRKA =======
+
+  /** Ostatnia próba każdego pytania (getUserAttempts zwraca od najnowszej) */
+  private async latestAttempts(userId: string): Promise<Map<string, { isCorrect: boolean; at: Date }>> {
+    const userAttempts = await storage.getUserAttempts(userId);
+    const latest = new Map<string, { isCorrect: boolean; at: Date }>();
+    for (const attempt of userAttempts) {
+      if (!latest.has(attempt.questionId)) {
+        latest.set(attempt.questionId, { isCorrect: attempt.isCorrect, at: new Date(attempt.createdAt) });
+      }
+    }
+    return latest;
+  }
+
+  private stateOf(latest: Map<string, { isCorrect: boolean; at: Date }>, questionId: string): QuestionState {
+    const l = latest.get(questionId);
+    return !l ? "new" : l.isCorrect ? "mastered" : "wrong";
+  }
+
+  /**
+   * Następne pytanie sesji nauki / powtórki.
+   *
+   * opts.exclude — pytania pokazane już w tej sesji (bez powtórzeń w sesji).
+   * opts.ids     — tylko powtórka: ogranicz do tych pytań (np. błędne z właśnie
+   *                skończonej sesji); muszą być pytaniami, na które kursant już odpowiadał.
+   * Zwraca null, gdy nie ma już nic do pokazania (koniec sesji / pusta powtórka).
+   *
+   * Kolejność w nauce: nowe (po kolei) → błędne (najdawniej ćwiczone) → opanowane
+   * (najdawniej ćwiczone). Dzięki temu nawet bez `exclude` pytanie nie wraca od razu.
+   */
+  async getQuestionForUser(
+    userId: string,
+    sectionId: string | null,
+    mode: "learn" | "review" | "exam" = "learn",
+    opts: { exclude?: string[]; ids?: string[] } = {}
+  ): Promise<QuizQuestion | null> {
     // Exam mode should use initializeExam and getExamQuestion instead
     if (mode === "exam") {
       throw new Error("Use initializeExam and getExamQuestion for exam mode");
     }
-    
-    // For review mode without section, get questions from review queue
-    if (mode === "review" && !sectionId) {
-      const reviewQuestionIds = await this.getReviewQueue(userId);
-      
-      if (reviewQuestionIds.length === 0) {
-        return null;
+
+    const exclude = new Set(opts.exclude ?? []);
+    const latest = await this.latestAttempts(userId);
+    const byOldestAttempt = (a: string, b: string) =>
+      (latest.get(a)?.at.getTime() ?? 0) - (latest.get(b)?.at.getTime() ?? 0);
+
+    if (mode === "review") {
+      let candidateIds: string[];
+      if (opts.ids && opts.ids.length > 0) {
+        // Wskazane pytania — tylko te, które kursant już widział
+        candidateIds = Array.from(new Set(opts.ids)).filter(id => latest.has(id));
+      } else {
+        candidateIds = await this.getReviewQueue(userId);
       }
-      
-      // Get random question from review queue
-      const randomQuestionId = reviewQuestionIds[Math.floor(Math.random() * reviewQuestionIds.length)];
-      const question = await storage.getQuestionById(randomQuestionId);
-      
-      if (!question) {
-        return null;
+      if (sectionId) {
+        const inSection = new Set((await storage.getQuestionsBySection(sectionId, "published")).map(q => q.id));
+        candidateIds = candidateIds.filter(id => inSection.has(id));
       }
-      
-      return this.formatQuestionForQuiz(question);
+
+      for (const id of candidateIds.filter(id => !exclude.has(id))) {
+        const question = await storage.getQuestionById(id);
+        if (question && question.status === "published") {
+          return this.formatQuestionForQuiz(question, mode);
+        }
+      }
+      return null;
     }
-    
-    // Regular mode - get questions from specific section
-    const questions = await storage.getQuestionsBySection(sectionId!, "published");
-    
+
+    // Nauka — pytania z sekcji
+    if (!sectionId) return null;
+    const questions = (await storage.getQuestionsBySection(sectionId, "published")).filter(q => !exclude.has(q.id));
     if (questions.length === 0) {
       return null;
     }
 
-    let selectedQuestion: Question;
+    const fresh = questions.filter(q => this.stateOf(latest, q.id) === "new");
+    const wrong = questions.filter(q => this.stateOf(latest, q.id) === "wrong").sort((a, b) => byOldestAttempt(a.id, b.id));
+    const mastered = questions.filter(q => this.stateOf(latest, q.id) === "mastered").sort((a, b) => byOldestAttempt(a.id, b.id));
 
-    if (mode === "review") {
-      // Get questions the user got wrong recently
-      const userAttempts = await storage.getUserAttempts(userId);
-      const incorrectQuestions = userAttempts
-        .filter(attempt => !attempt.isCorrect)
-        .map(attempt => attempt.questionId);
-      
-      const reviewQuestions = questions.filter(q => incorrectQuestions.includes(q.id));
-      
-      if (reviewQuestions.length > 0) {
-        selectedQuestion = reviewQuestions[Math.floor(Math.random() * reviewQuestions.length)];
-      } else {
-        selectedQuestion = questions[Math.floor(Math.random() * questions.length)];
-      }
-    } else {
-      // For learn mode, select questions user hasn't seen or got wrong
-      const userAttempts = await storage.getUserAttempts(userId);
-      const attemptedQuestionIds = new Set(userAttempts.map(a => a.questionId));
-      
-      const unattemptedQuestions = questions.filter(q => !attemptedQuestionIds.has(q.id));
-      
-      if (unattemptedQuestions.length > 0) {
-        selectedQuestion = unattemptedQuestions[0]; // Sequential learning
-      } else {
-        // All questions attempted, select randomly
-        selectedQuestion = questions[Math.floor(Math.random() * questions.length)];
-      }
-    }
-
-    return this.formatQuestionForQuiz(selectedQuestion);
+    const selectedQuestion = fresh[0] ?? wrong[0] ?? mastered[0];
+    return this.formatQuestionForQuiz(selectedQuestion, mode);
   }
 
-  private formatQuestionForQuiz(question: Question): QuizQuestion {
-    const correctIndex = question.answers.findIndex(answer => answer.isCorrect);
-    
+  /** Usuwa z konfiguracji pytania wszystko, co zdradza odpowiedź */
+  private sanitizeConfigForClient(config: Question["questionConfig"], mode: "learn" | "review" | "exam"): QuestionConfig | undefined {
+    if (!config) return undefined;
+    const c = config as AnyQuestionConfig;
+    switch (c.type) {
+      case 'drag_drop':
+        return {
+          type: 'drag_drop',
+          config: {
+            ...c.config,
+            // Kolejność źródeł bywa zgodna z kolejnością celów
+            sources: this.shuffleArray(c.config.sources),
+            targets: c.config.targets.map(t => ({ ...t, acceptsSourceId: "" })),
+          },
+        };
+      case 'fill_blank':
+        return {
+          type: 'fill_blank',
+          config: {
+            ...c.config,
+            blanks: c.config.blanks.map(({ correctAnswers: _a, regex: _r, numericRange: _n, ...blank }) => ({
+              ...blank,
+              correctAnswers: [],
+            })),
+          },
+        };
+      case 'matching':
+        return {
+          type: 'matching',
+          config: {
+            ...c.config,
+            rightColumn: c.config.shuffleRight === false ? c.config.rightColumn : this.shuffleArray(c.config.rightColumn),
+            correctPairs: [],
+          },
+        };
+      case 'sorting':
+        return {
+          type: 'sorting',
+          config: { ...c.config, items: this.shuffleArray(c.config.items), correctOrder: [] },
+        };
+      case 'hotspot':
+        return {
+          type: 'hotspot',
+          config: { ...c.config, hotspots: c.config.hotspots.map(h => ({ ...h, isCorrect: false })) },
+        };
+      case 'clinical_case':
+        // Nauka/powtórka: kroki przypadku same pokazują wynik po każdym kroku — zostają pełne.
+        // Egzamin (przypadki są z niego wyłączone, to tylko zabezpieczenie): bez odpowiedzi.
+        if (mode !== "exam") return config as QuestionConfig;
+        return {
+          type: 'clinical_case',
+          config: {
+            ...c.config,
+            takeaway: "",
+            steps: c.config.steps.map(s =>
+              s.kind === "single"
+                ? { ...s, explanation: "", answers: s.answers.map(a => ({ ...a, isCorrect: false })) }
+                : { ...s, explanation: "", hotspots: s.hotspots.map(h => ({ ...h, isCorrect: false })) }
+            ),
+          },
+        } as unknown as QuestionConfig;
+      default:
+        return config as QuestionConfig;
+    }
+  }
+
+  private formatQuestionForQuiz(question: Question, mode: "learn" | "review" | "exam"): QuizQuestion {
     const answers = question.answers.map((answer, index) => ({
       text: answer.text,
       index
@@ -556,19 +770,23 @@ export class QuizService {
       }
     }
 
+    let mediaAssets: QuestionMediaAssets | undefined = question.mediaAssets || undefined;
+    if (mediaAssets?.explanationImage) {
+      const { explanationImage: _e, ...rest } = mediaAssets;
+      mediaAssets = rest;
+    }
+
+    // Celowo bez correctIndex i explanation — wracają w odpowiedzi na POST /api/quiz/answer
     return {
       id: question.id,
-      title: question.title,
+      title: question.title || "",
       bodyMd: question.bodyMd,
       imageUrl: question.imageUrl || undefined,
       answers,
       sectionId: question.sectionId,
-      correctIndex,
-      explanation: question.explanationMd,
-      // New fields for interactive question types
       questionType,
-      questionConfig: question.questionConfig || undefined,
-      mediaAssets: question.mediaAssets || undefined
+      questionConfig: this.sanitizeConfigForClient(question.questionConfig, mode),
+      mediaAssets
     };
   }
 
@@ -578,88 +796,36 @@ export class QuizService {
     selectedIndex: number, 
     timeMs: number,
     mode: "learn" | "review" | "exam" = "learn",
-    answerData?: AnswerData // New: structured answer data for interactive question types
+    answerData?: AnswerData // structured answer data for interactive question types
   ): Promise<QuizResult> {
+    // Egzamin ma własną ścieżkę (submitExamAnswer) — tu tylko nauka i powtórka
+    const attemptMode = mode === "review" ? "review" : "learn";
+
     const question = await storage.getQuestionById(questionId);
     if (!question) {
       throw new Error("Pytanie nie znalezione");
     }
 
-    const questionType = (question.questionType || 'multiple_choice') as QuestionType;
-    let isCorrect: boolean;
-    let partialScore: number | undefined;
-    let correctItems: string[] | undefined;
-    let incorrectItems: string[] | undefined;
-    const correctIndex = question.answers.findIndex(answer => answer.isCorrect);
+    const time = this.safeTime(timeMs);
+    const grading = this.grade(question, selectedIndex, answerData);
 
-    // For interactive question types, use answerData validation
-    if (answerData && questionType !== 'multiple_choice') {
-      const validationResult = this.validateAnswer(question, answerData);
-      isCorrect = validationResult.isCorrect;
-      partialScore = validationResult.partialScore;
-      correctItems = validationResult.correctItems;
-      incorrectItems = validationResult.incorrectItems;
-    } else {
-      // Legacy multiple choice validation
-      isCorrect = selectedIndex === correctIndex;
-      partialScore = isCorrect ? 1 : 0;
-    }
-
-    // Save attempt with optional answerData
     await storage.createAttempt({
       userId,
       questionId,
       selectedIndex,
-      isCorrect,
-      timeMs,
-      mode,
+      isCorrect: grading.isCorrect,
+      timeMs: time,
+      mode: attemptMode,
       answerData: answerData || undefined
     });
 
-    // Update progress if in learn mode
-    if (mode === "learn") {
-      await this.updateUserProgress(userId, question.sectionId);
-    }
+    // Opanowanie sekcji zmienia każda odpowiedź (także w powtórce)
+    await this.updateUserProgress(userId, question.sectionId);
 
-    // Handle gamification (XP, achievements, streak) - only in learn mode
-    let xpEarned: number | undefined;
-    let newAchievements: Array<{ id: string; name: string; description: string; icon: string; }> | undefined;
+    // XP, seria i osiągnięcia przyznaje trasa POST /api/quiz/answer (gamificationService) —
+    // tutaj już nie, bo w nauce liczyło się podwójnie
 
-    if (mode === "learn") {
-      const gamificationResult = await handleQuestionAnswer(userId, isCorrect, timeMs);
-      xpEarned = gamificationResult.xpEarned;
-      
-      if (gamificationResult.unlockedAchievements.length > 0) {
-        newAchievements = gamificationResult.unlockedAchievements.map(achievement => ({
-          id: achievement.id,
-          name: achievement.name,
-          description: achievement.description,
-          icon: achievement.icon,
-        }));
-      }
-    }
-
-    // Build correct answer for feedback
-    let correctAnswer: AnswerData | undefined;
-    if (question.questionConfig) {
-      correctAnswer = this.buildCorrectAnswerData(question);
-    }
-
-    return {
-      isCorrect,
-      correctIndex,
-      explanation: question.explanationMd,
-      timeMs,
-      xpEarned,
-      newAchievements,
-      // New fields for interactive question types
-      partialScore,
-      correctAnswer,
-      feedback: (correctItems || incorrectItems) ? {
-        correctItems,
-        incorrectItems
-      } : undefined
-    };
+    return this.buildResult(question, grading, time);
   }
 
   // Build the correct answer data structure from question config
@@ -707,42 +873,93 @@ export class QuizService {
     }
   }
 
-  private async updateUserProgress(userId: string, sectionId: string): Promise<void> {
+  /**
+   * Postęp sekcji = OPANOWANIE: odsetek opublikowanych pytań sekcji, których
+   * ostatnia próba jest poprawna. Samo odpowiadanie (także źle) nie podbija postępu.
+   */
+  private async computeMastery(sectionId: string, latest: Map<string, { isCorrect: boolean; at: Date }>): Promise<number | null> {
     const sectionQuestions = await storage.getQuestionsBySection(sectionId, "published");
-    const userAttempts = await storage.getUserAttempts(userId);
-    
-    // Count unique questions attempted in this section
-    const sectionAttempts = userAttempts.filter(attempt => 
-      sectionQuestions.some(q => q.id === attempt.questionId)
-    );
-    
-    const uniqueQuestionsAttempted = new Set(sectionAttempts.map(a => a.questionId)).size;
-    const completionPercentage = Math.min(100, (uniqueQuestionsAttempted / sectionQuestions.length) * 100);
-    
-    await storage.updateProgress(userId, sectionId, completionPercentage);
+    if (sectionQuestions.length === 0) return null;
+    const mastered = sectionQuestions.filter(q => latest.get(q.id)?.isCorrect === true).length;
+    return Math.round((mastered / sectionQuestions.length) * 10000) / 100;
   }
 
-  async getReviewQueue(userId: string): Promise<string[]> {
+  private async updateUserProgress(userId: string, sectionId: string): Promise<void> {
+    const latest = await this.latestAttempts(userId);
+    const pct = await this.computeMastery(sectionId, latest);
+    if (pct === null) return;
+    await storage.updateProgress(userId, sectionId, pct);
+  }
+
+  /**
+   * Przelicza zapisany postęp kursanta według opanowania (bez ruszania lastActivity,
+   * od którego zależy „Kontynuuj”). Brakujące wiersze dopisuje z datą ostatniej próby.
+   * Zwraca liczbę zmienionych/dodanych wierszy.
+   */
+  async recomputeUserProgress(userId: string): Promise<number> {
     const userAttempts = await storage.getUserAttempts(userId);
-    
-    // Get questions that were answered incorrectly
-    const incorrectAttempts = userAttempts.filter(attempt => !attempt.isCorrect);
-    
-    // Group by question and get the most recent attempt for each
-    const questionAttempts = new Map<string, Attempt>();
-    
-    incorrectAttempts.forEach(attempt => {
-      const existing = questionAttempts.get(attempt.questionId);
-      if (!existing || attempt.createdAt > existing.createdAt) {
-        questionAttempts.set(attempt.questionId, attempt);
+    const latest = await this.latestAttempts(userId);
+    const rows = await storage.getUserProgress(userId);
+    const allQuestions = await storage.getAllQuestions();
+    const sectionOf = new Map(allQuestions.map(q => [q.id, q.sectionId]));
+
+    // Sekcje z wierszem postępu albo z jakąkolwiek próbą
+    const lastActivity = new Map<string, Date>();
+    for (const a of userAttempts) {
+      const sectionId = sectionOf.get(a.questionId);
+      if (sectionId && !lastActivity.has(sectionId)) lastActivity.set(sectionId, new Date(a.createdAt));
+    }
+    const sectionIds = new Set<string>([...rows.map(r => r.sectionId), ...Array.from(lastActivity.keys())]);
+
+    let changed = 0;
+    for (const sectionId of Array.from(sectionIds)) {
+      const pct = (await this.computeMastery(sectionId, latest)) ?? 0;
+      const row = rows.find(r => r.sectionId === sectionId);
+      if (row) {
+        if (Math.abs(parseFloat(row.completionPercentage) - pct) > 0.001) {
+          await db.update(progress)
+            .set({ completionPercentage: pct.toString(), updatedAt: sql`CURRENT_TIMESTAMP` })
+            .where(eq(progress.id, row.id));
+          changed++;
+        }
+      } else {
+        await db.insert(progress).values({
+          userId,
+          sectionId,
+          completionPercentage: pct.toString(),
+          lastActivity: lastActivity.get(sectionId) ?? new Date(),
+        });
+        changed++;
       }
-    });
+    }
+    return changed;
+  }
 
-    // Return all incorrect questions (immediately available for review)
-    // Note: Spaced repetition can be added later with a more sophisticated algorithm
-    const reviewQuestions: string[] = Array.from(questionAttempts.keys());
+  /** Jednorazowe przeliczenie postępu wszystkich kursantów (scripts/recompute-progress.ts) */
+  async recomputeAllProgress(): Promise<{ users: number; rowsChanged: number }> {
+    const fromAttempts = await db.selectDistinct({ userId: attempts.userId }).from(attempts);
+    const fromProgress = await db.selectDistinct({ userId: progress.userId }).from(progress);
+    const userIds = Array.from(new Set([...fromAttempts, ...fromProgress].map(r => r.userId)));
+    let rowsChanged = 0;
+    for (const userId of userIds) {
+      rowsChanged += await this.recomputeUserProgress(userId);
+    }
+    return { users: userIds.length, rowsChanged };
+  }
 
-    return reviewQuestions;
+  /**
+   * Kolejka powtórki: opublikowane pytania, których OSTATNIA próba jest błędna.
+   * Pytanie znika z kolejki, gdy odpowiesz na nie dobrze. Najdawniej ćwiczone pierwsze.
+   */
+  async getReviewQueue(userId: string): Promise<string[]> {
+    const latest = await this.latestAttempts(userId);
+    const wrongIds = Array.from(latest.entries())
+      .filter(([, l]) => !l.isCorrect)
+      .sort((a, b) => a[1].at.getTime() - b[1].at.getTime())
+      .map(([id]) => id);
+    if (wrongIds.length === 0) return [];
+    const published = new Set((await storage.getAllQuestions("published")).map(q => q.id));
+    return wrongIds.filter(id => published.has(id));
   }
 
   async getUserWeakAreas(userId: string): Promise<Array<{ tag: string; successRate: number; questionCount: number }>> {

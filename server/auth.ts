@@ -12,6 +12,15 @@ function hashToken(plaintext: string): string {
   return createHash("sha256").update(plaintext).digest("hex");
 }
 
+// Hash-atrapa (ten sam koszt co prawdziwe hasła): przy nieznanym e-mailu i tak liczymy
+// bcrypt.compare, żeby czas odpowiedzi nie zdradzał, czy konto istnieje.
+let dummyHashPromise: Promise<string> | null = null;
+function getDummyHash(): Promise<string> {
+  if (!dummyHashPromise) dummyHashPromise = bcrypt.hash(randomBytes(16).toString("hex"), 12);
+  return dummyHashPromise;
+}
+void getDummyHash(); // policz od razu przy starcie, nie przy pierwszym logowaniu
+
 export class AuthService {
   async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 12);
@@ -27,10 +36,9 @@ export class AuthService {
 
   async authenticateUser(email: string, password: string): Promise<User | null> {
     const user = await storage.getUserByEmail(email);
-    if (!user) return null;
-
-    const isValid = await this.verifyPassword(password, user.password);
-    if (!isValid) return null;
+    const hash = user?.password ?? (await getDummyHash());
+    const isValid = await this.verifyPassword(password, hash);
+    if (!user || !isValid) return null;
 
     return user;
   }

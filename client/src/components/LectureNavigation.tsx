@@ -210,7 +210,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
           <p className="label num shrink-0" aria-live="polite" data-testid="chapter-counter">
             {total > 1 ? `Rozdział ${safeIndex + 1}/${total}` : "Wykład"}
           </p>
-          <p className="min-w-0 flex-1 truncate text-[14px] text-[var(--txt2)]">{chapter.title}</p>
+          <p className="min-w-0 flex-1 truncate text-[.875rem] text-[var(--txt2)]">{chapter.title}</p>
           {total > 1 && (
             <div className="flex shrink-0 items-center">
               <Button
@@ -260,12 +260,12 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
                     type="button"
                     onClick={() => goTo(i)}
                     aria-current={current ? "step" : undefined}
-                    className={`w-full grid grid-cols-[36px_minmax(0,1fr)_20px] items-center gap-3 py-2.5 min-h-[44px] text-left text-[15px] rounded-md transition-[transform,color] duration-150 active:scale-[.99] ${
+                    className={`w-full grid grid-cols-[36px_minmax(0,1fr)_20px] items-center gap-3 py-2.5 min-h-[44px] text-left text-[.9375rem] rounded-md transition-[transform,color] duration-150 active:scale-[.99] ${
                       current ? "text-[var(--txt)]" : "text-[var(--txt2)] hover:text-[var(--txt)]"
                     }`}
                     data-testid={`chapter-nav-${i}`}
                   >
-                    <span className={`font-mono text-[12px] ${current ? "text-[var(--puls)]" : "text-[var(--label)]"}`}>
+                    <span className={`font-mono text-[.75rem] ${current ? "text-[var(--puls)]" : "text-[var(--label)]"}`}>
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="truncate">{c.title}</span>
@@ -389,7 +389,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
                       {next.title}
                     </span>
                   </span>
-                  <ChevronRight className="h-4 w-4 text-[var(--txt3)] transition-colors group-hover:text-[var(--txt)]" aria-hidden="true" />
+                  <ChevronRight className="h-4 w-4 text-[var(--label)] transition-colors group-hover:text-[var(--txt)]" aria-hidden="true" />
                 </Link>
               )}
             </section>

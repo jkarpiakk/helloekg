@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useAuth } from "@/lib/auth";
+import { useLocation } from "wouter";
+import { authService, useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import type { LoginForm, RegisterForm } from "@/types";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { rise, stagger, spring } from "@/lib/motion";
 
 type AuthMode = "login" | "register";
@@ -72,11 +73,11 @@ type PasswordInputProps = ComponentProps<typeof Input> & {
 const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
   ({ visible, onToggle, toggleTestId, className, ...props }, ref) => (
     <div className="relative">
-      <Input ref={ref} type={visible ? "text" : "password"} className={`pr-12 ${className ?? ""}`} {...props} />
+      <Input ref={ref} type={visible ? "text" : "password"} className={`pr-14 ${className ?? ""}`} {...props} />
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-[var(--txt3)] transition-[transform,color] duration-150 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute right-0.5 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-[var(--label)] transition-[transform,color] duration-150 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={visible ? "Ukryj hasło" : "Pokaż hasło"}
         aria-pressed={visible}
         data-testid={toggleTestId}
@@ -96,13 +97,17 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
+  /** Po rejestracji bez automatycznego logowania: komunikat nad formularzem logowania */
+  const [loginNotice, setLoginNotice] = useState<string | null>(null);
   const { login, register } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   useEffect(() => setMode(modeProp), [modeProp]);
 
   const switchMode = (next: AuthMode) => {
     setShowPassword(false);
+    setLoginNotice(null);
     if (onSwitchMode) onSwitchMode(next);
     else setMode(next);
   };
@@ -168,12 +173,24 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
 
   const registerMutation = useMutation({
     mutationFn: register,
-    onSuccess: (data) => {
-      toast({
-        title: "Konto utworzone",
-        description: data.message,
-      });
-      onSuccess?.();
+    onSuccess: async (data, vars) => {
+      // Nowy serwer loguje od razu i zwraca { user } jak /login. Sesję potwierdzamy przez /me —
+      // jeśli jej nie ma (starszy serwer), prowadzimy do logowania z wpisanym adresem.
+      const me = (data as { user?: unknown } | undefined)?.user ? await authService.getCurrentUser() : null;
+      if (me) {
+        queryClient.setQueryData(["/api/auth/me"], me);
+        queryClient.invalidateQueries();
+        toast({ title: "Konto gotowe. Potwierdzający e-mail jest w drodze." });
+        onSuccess?.();
+        navigate("/dashboard");
+        return;
+      }
+      loginForm.reset({ email: vars.email, password: "" });
+      setLoginNotice("Konto gotowe — zaloguj się");
+      setShowPassword(false);
+      if (onSwitchMode) onSwitchMode("login");
+      else setMode("login");
+      setTimeout(() => loginForm.setFocus("password"), 50);
     },
     onError: (error: any) => {
       toast({
@@ -196,7 +213,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
     <motion.div variants={rise} className="space-y-3 pr-10">
       <p className="label">{label}</p>
       <h2 className="h3 text-[var(--txt)]">{title}</h2>
-      <p className="text-[15px] leading-relaxed text-[var(--txt2)]">{lead}</p>
+      <p className="text-[.9375rem] leading-relaxed text-[var(--txt2)]">{lead}</p>
     </motion.div>
   );
 
@@ -205,7 +222,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
       {question}{" "}
       <button
         type="button"
-        className="font-medium text-[var(--txt)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        className="inline-flex min-h-11 items-center font-medium text-[var(--txt)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
         onClick={() => switchMode(next)}
         data-testid={`switch-to-${next}`}
       >
@@ -224,6 +241,17 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
         animate="show"
       >
         {header("Logowanie", "Witaj z powrotem", "Zaloguj się, żeby wrócić do kursu i swojego postępu.")}
+
+        {loginNotice && (
+          <motion.p
+            variants={rise}
+            role="status"
+            className="rounded-[12px] border border-[var(--puls-deep)] bg-[var(--tint)] px-4 py-3 text-[.9375rem] text-[var(--txt)]"
+            data-testid="login-notice"
+          >
+            {loginNotice}
+          </motion.p>
+        )}
 
         <motion.div variants={rise}>
           <Form {...loginForm}>
@@ -257,7 +285,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
                       <FormLabel className={fieldLabel}>Hasło</FormLabel>
                       <button
                         type="button"
-                        className="text-[13px] text-[var(--txt2)] underline-offset-4 hover:text-[var(--txt)] hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="-my-3 inline-flex min-h-11 items-center text-[.8125rem] text-[var(--txt2)] underline-offset-4 hover:text-[var(--txt)] hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => {
                           setShowForgotPassword((open) => !open);
                           setForgotSent(false);
@@ -303,7 +331,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
                           </p>
                           <button
                             type="button"
-                            className="text-sm text-[var(--txt2)] underline-offset-4 hover:text-[var(--txt)] hover:underline"
+                            className="inline-flex min-h-11 items-center text-sm text-[var(--txt2)] underline-offset-4 hover:text-[var(--txt)] hover:underline"
                             onClick={() => setShowForgotPassword(false)}
                           >
                             Zamknij

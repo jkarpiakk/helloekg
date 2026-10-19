@@ -1,12 +1,13 @@
+import { randomBytes } from "crypto";
 import { storage } from "../storage";
 import { emailService } from "./emailService";
 import type { User } from "@shared/schema";
 
 export class CertificateService {
   generateCertificateId(): string {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 8);
-    return `EKG-${timestamp}-${random}`.toUpperCase();
+    // Kryptograficznie losowe (nie do odgadnięcia/wyliczenia): EKG-XXXXXXXX-XXXXXXXX
+    const hex = randomBytes(8).toString("hex").toUpperCase();
+    return `EKG-${hex.slice(0, 8)}-${hex.slice(8)}`;
   }
 
   async isEligibleForCertificate(userId: string): Promise<boolean> {
@@ -16,16 +17,18 @@ export class CertificateService {
     
     // Requirements: at least 80% success rate and completed all modules
     const requiredSuccessRate = 0.8;
-    const requiredModules = await storage.getSections();
-    
     if (userStats.successRate < requiredSuccessRate) {
       return false;
     }
 
-    // Check if all modules are completed (100% progress)
-    const completedModules = progress.filter(p => parseFloat(p.completionPercentage) >= 100);
-    
-    return completedModules.length >= requiredModules.length;
+    // Wymagane są tylko tematy z pytaniami — postęp (opanowanie) liczy się z odpowiedzi,
+    // więc temat z samym wykładem nigdy nie miałby 100% i blokowałby certyfikat na zawsze
+    const published = await storage.getAllQuestions("published");
+    const requiredSectionIds = new Set(published.map((q) => q.sectionId));
+    const mastered = new Set(
+      progress.filter((p) => parseFloat(p.completionPercentage) >= 100).map((p) => p.sectionId),
+    );
+    return requiredSectionIds.size > 0 && Array.from(requiredSectionIds).every((id) => mastered.has(id));
   }
 
   async generateCertificate(userId: string): Promise<{ certificateId: string; pdfUrl: string }> {
@@ -110,12 +113,17 @@ export class CertificateService {
       return null;
     }
 
+    // Publiczna weryfikacja: tylko imię i nazwisko, kurs, data, numer (+ ważność).
+    // Bez wyniku, zawodu, userId i innych pól wewnętrznych.
     return {
-      certificate,
+      certificate: {
+        certificateId: certificate.certificateId,
+        issuedAt: certificate.issuedAt,
+        course: "Kurs EKG — helloEKG",
+      },
       user: {
         firstName: user.firstName,
         lastName: user.lastName,
-        profession: user.profession,
       },
       isValid: certificate.isValid && (!certificate.expiresAt || new Date() < certificate.expiresAt),
     };

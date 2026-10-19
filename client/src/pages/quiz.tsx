@@ -59,11 +59,11 @@ const MODE_COPY: Record<Mode, { label: string; lead: string }> = {
   },
   review: {
     label: "Powtórka",
-    lead: "Wracasz do pytań, które wcześniej sprawiły ci trudność — aż zaczną wchodzić same.",
+    lead: "Wracają tu pytania, w których ostatnia odpowiedź była błędna. Dobra odpowiedź zdejmuje pytanie z powtórki.",
   },
   exam: {
     label: "Egzamin",
-    lead: "Losowe pytania z całego kursu, jak na egzaminie. Wynik zobaczysz na końcu.",
+    lead: "Losowe pytania z całego kursu. W trakcie nie widzisz, czy odpowiedź jest dobra — wynik i wyjaśnienia dostajesz na końcu.",
   },
 };
 
@@ -74,11 +74,17 @@ export default function Quiz() {
 
   // Adres jest jedynym źródłem prawdy o tym, co się teraz dzieje:
   //   /quiz?sectionId=X        → quiz tej sekcji (stary parametr ?section= też działa)
-  //   /quiz?mode=review        → powtórka
+  //   /quiz?mode=review        → powtórka (kolejka błędnych)
+  //   /quiz?mode=review&ids=…  → powtórka tylko tych pytań (np. błędne z ostatniej sesji)
   //   /quiz?mode=exam          → wybór liczby pytań, potem /quiz?mode=exam&count=N
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const urlMode = params.get("mode");
   const sectionId = params.get("sectionId") ?? params.get("section");
+  const reviewIds = useMemo(() => {
+    const raw = params.get("ids");
+    const ids = raw ? raw.split(",").map((x) => x.trim()).filter(Boolean) : [];
+    return ids.length ? Array.from(new Set(ids)).slice(0, 50) : undefined;
+  }, [params]);
   const countParam = Number(params.get("count"));
   const examCount = EXAM_COUNTS.includes(countParam as ExamCount) ? (countParam as ExamCount) : null;
 
@@ -153,10 +159,11 @@ export default function Quiz() {
     const moduleId = sectionId ? sorted.find((m) => m.sections.some((s) => s.id === sectionId))?.id : undefined;
     return (
       <QuizInterface
-        key={`${runningMode}-${sectionId ?? ""}-${examCount ?? ""}`}
+        key={`${runningMode}-${sectionId ?? ""}-${examCount ?? ""}-${reviewIds?.join(",") ?? ""}`}
         sectionId={runningMode === "learn" ? sectionId || undefined : undefined}
         mode={runningMode}
         examQuestionCount={runningMode === "exam" ? examCount ?? undefined : undefined}
+        reviewIds={runningMode === "review" ? reviewIds : undefined}
         onExit={() => {
           if (runningMode === "learn") setLocation(moduleId ? `/modules#m-${moduleId}` : "/modules");
           else setLocation("/dashboard");
@@ -228,7 +235,7 @@ export default function Quiz() {
                               {pct >= 100 ? (
                                 <span className="inline-flex text-[var(--puls)]">
                                   <Check className="h-4 w-4" aria-hidden="true" />
-                                  <span className="sr-only">Ukończone</span>
+                                  <span className="sr-only">Opanowane w całości</span>
                                 </span>
                               ) : (
                                 pad(si + 1)
@@ -247,11 +254,11 @@ export default function Quiz() {
                                         <span aria-hidden="true"> · </span>
                                       </>
                                     )}
-                                    <span className="num">{pct}%</span>
+                                    <span className="num">{pct}%</span> opanowane
                                   </>
                                 )}
                               </span>
-                              {!locked && <ProgressLine value={pct} label={`Postęp: ${section.title}`} className="max-w-[260px]" />}
+                              {!locked && <ProgressLine value={pct} label={`Opanowane: ${section.title}`} className="max-w-[260px]" />}
                             </span>
                             <span />
                             <ChevronRight className="h-4 w-4 text-[var(--txt3)] transition-colors group-hover:text-[var(--txt)]" aria-hidden="true" />
@@ -294,7 +301,8 @@ export default function Quiz() {
                       {queueSize}
                     </p>
                     <p className="muted">
-                      {queueSize === 1 ? "pytanie czeka" : "pytań czeka"} na powtórkę
+                      {plural(queueSize, "pytanie czeka", "pytania czekają", "pytań czeka")} na powtórkę
+                      {queueSize > 10 && " · sesja to 10 pytań"}
                     </p>
                   </div>
                   <Button onClick={() => setLocation("/quiz?mode=review")} data-testid="button-start-review">
@@ -304,11 +312,11 @@ export default function Quiz() {
                 </>
               ) : (
                 <>
-                  <p className="muted max-w-[34em]">
-                    Nie masz pytań do powtórki. Każde pytanie, na które odpowiesz źle, trafi tutaj.
+                  <p className="muted max-w-[34em]" data-testid="review-empty">
+                    Nic do powtórki — wszystkie błędne pytania już poprawione.
                   </p>
-                  <Button variant="outline" onClick={() => chooseMode("learn")} data-testid="button-switch-to-learn">
-                    Wybierz temat
+                  <Button variant="outline" onClick={() => setLocation("/modules")} data-testid="button-switch-to-learn">
+                    Przejdź do kursu
                   </Button>
                 </>
               )}

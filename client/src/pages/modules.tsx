@@ -171,7 +171,7 @@ export default function Modules() {
             const metaParts: string[] = [];
             if (lectures) metaParts.push(`${lectures} ${plural(lectures, "wykład", "wykłady", "wykładów")}`);
             if (questions) metaParts.push(`${questions} ${plural(questions, "pytanie", "pytania", "pytań")}`);
-            if (progress !== null) metaParts.push(`${Math.round(progress)}%`);
+            if (progress !== null) metaParts.push(`${Math.round(progress)}% opanowane`);
             const meta = module.isLocked ? "Zablokowany" : metaParts.join(" · ") || "Wkrótce";
             const isOpen = openIds.has(module.id);
 
@@ -263,7 +263,7 @@ function SectionRow({ index, section, tourFirst }: { index: number; section: Mod
         {done ? (
           <span className="text-[var(--puls)] inline-flex">
             <Check className="h-4 w-4" aria-hidden="true" />
-            <span className="sr-only">Ukończone</span>
+            <span className="sr-only">Opanowane w całości</span>
           </span>
         ) : (
           pad(index)
@@ -271,7 +271,7 @@ function SectionRow({ index, section, tourFirst }: { index: number; section: Mod
       </span>
       <span className="row__t gap-2">
         {isEmpty ? (
-          <b className="!text-[1.0625rem] sm:!text-[1.1875rem] !leading-snug text-[var(--txt3)]">{section.title}</b>
+          <b className="!text-[1.0625rem] sm:!text-[1.1875rem] !leading-snug text-[var(--txt2)]">{section.title}</b>
         ) : (
           <Link
             href={primaryHref}
@@ -290,13 +290,13 @@ function SectionRow({ index, section, tourFirst }: { index: number; section: Mod
               {hasQuestions && (
                 <>
                   <span aria-hidden="true">·</span>
-                  <span className="num">{pct}%</span>
+                  <span><span className="num">{pct}%</span> opanowane</span>
                 </>
               )}
             </>
           )}
         </span>
-        {hasQuestions && <ProgressLine value={pct} label={`Postęp: ${section.title}`} className="max-w-[260px]" />}
+        {hasQuestions && <ProgressLine value={pct} label={`Opanowane: ${section.title}`} className="max-w-[260px]" />}
       </span>
       <span className="relative z-10">
         {hasLecture && hasQuestions && (

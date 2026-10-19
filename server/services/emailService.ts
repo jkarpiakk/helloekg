@@ -23,7 +23,9 @@ export class EmailService {
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: false,
+      // 465 = TLS od początku; inne porty: STARTTLS wymuszony (bez wysyłki otwartym tekstem)
+      secure: parseInt(process.env.SMTP_PORT || "587") === 465,
+      requireTLS: true,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -275,7 +277,7 @@ const LOGO_URL = "https://storage.mlcdn.com/account_image/2636127/EUDAXhD74WEepX
 const LINE_URL = "https://storage.mlcdn.com/account_image/2636127/mThPsI7bGJAeXZr4clHjynYt2QRQdi3jMR1whUpl.png";
 const P = `style="margin:0 0 22px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#B8C2C9;"`;
 
-const esc = (v: string) =>
+export const esc = (v: string) =>
   String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 const appUrl = () => process.env.APP_BASE_URL || process.env.FRONTEND_URL || "https://kurs.helloekg.pl";

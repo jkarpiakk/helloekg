@@ -5,7 +5,7 @@ const STYLE: Record<FeedbackStatus, string> = {
   nowe: "border-[var(--line2)] text-[var(--txt2)]",
   w_analizie: "border-[var(--txt3)] text-[var(--txt)]",
   wdrozone: "border-[var(--puls-deep)] bg-[var(--tint)] text-[var(--puls)]",
-  odrzucone: "border-[var(--line2)] text-[var(--txt3)]",
+  odrzucone: "border-[var(--line2)] text-[var(--txt2)]",
 };
 
 const ICON: Record<FeedbackStatus, typeof Check> = {
@@ -21,7 +21,7 @@ export default function FeedbackStatusPill({ status, className = "" }: { status:
   const Icon = ICON[s];
   return (
     <span
-      className={`inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 font-mono text-[11px] uppercase tracking-[.12em] ${STYLE[s]} ${className}`}
+      className={`inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 font-mono text-[.75rem] uppercase tracking-[.12em] ${STYLE[s]} ${className}`}
       data-testid={`feedback-status-${s}`}
     >
       <Icon className="h-3 w-3" aria-hidden />
