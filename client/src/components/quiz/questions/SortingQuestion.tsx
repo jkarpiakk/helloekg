@@ -118,6 +118,14 @@ export default function SortingQuestion({
     }
   }, [items, dragY]);
 
+  // Kolejność startowa też jest odpowiedzią — „Sprawdź” aktywny od razu, nawet jeśli losowanie
+  // dało już dobry układ (inaczej nie dałoby się go wysłać bez ruszania czegokolwiek)
+  useEffect(() => {
+    if (!disabled) onChange({ type: "sorting", order: items });
+    // tylko przy pierwszym wyświetleniu pytania
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Palec po podniesieniu wiersza nie przewija strony (wiersz ma touch-action: pan-y)
   useEffect(() => {
     const list = listRef.current;

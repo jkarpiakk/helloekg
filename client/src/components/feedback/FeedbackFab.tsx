@@ -46,6 +46,14 @@ export default function FeedbackFab() {
   const [path, navigate] = useLocation();
   const search = useSearch();
   const [collapsed, setCollapsed] = useState(false);
+  // Na telefonie sama ikona (44 px) — etykieta zasłaniała tekst wykładu w połowie ekranu
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
   const [localHintSeen, setLocalHintSeen] = useState(readLocalHint);
   const lastY = useRef(0);
   const frame = useRef<number | null>(null);
@@ -53,7 +61,16 @@ export default function FeedbackFab() {
   const hidden = path.startsWith("/admin") || path.startsWith("/zgloszenie") || isActiveQuiz(path, search);
 
   const { data } = useQuery<Mine>({ queryKey: ["/api/feedback/mine"], enabled: !hidden && !localHintSeen });
-  const showHint = !hidden && !localHintSeen && data !== undefined && !data.hintSeen;
+  // Podpowiedź tylko raz, tylko na „Postępie” i dopiero po instrukcji — nigdy nad wykładem czy listą
+  // modułów, gdzie zasłaniałaby treść. Znika sama po kilku sekundach.
+  const tourDone = (() => {
+    try {
+      return Object.keys(window.localStorage).some((k) => k.startsWith("hk-tour-v1:") && window.localStorage.getItem(k) === "done");
+    } catch {
+      return true;
+    }
+  })();
+  const showHint = !hidden && path === "/dashboard" && tourDone && !localHintSeen && data !== undefined && !data.hintSeen;
 
   useEffect(() => {
     // Serwer pamięta podpowiedź — przenieś to do localStorage, żeby nie pytać przy każdym wejściu
@@ -88,6 +105,15 @@ export default function FeedbackFab() {
       frame.current = null;
     };
   }, [hidden]);
+
+  useEffect(() => {
+    if (!showHint) return;
+    const t = window.setTimeout(() => {
+      setLocalHintSeen(true);
+      recordHintSeen();
+    }, 7000);
+    return () => window.clearTimeout(t);
+  }, [showHint]);
 
   if (hidden) return null;
 
@@ -155,7 +181,7 @@ export default function FeedbackFab() {
           <MessageSquareText className="h-[18px] w-[18px]" aria-hidden />
         </motion.span>
         <AnimatePresence initial={false} mode="popLayout">
-          {!collapsed && (
+          {!collapsed && !narrow && (
             <motion.span
               key="label"
               layout="position"

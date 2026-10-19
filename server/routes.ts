@@ -22,6 +22,7 @@ import {
 } from "./middleware/auth";
 import {
   authRateLimit,
+  accountDeleteRateLimit,
   apiRateLimit,
   paymentRateLimit,
   hashEmail,
@@ -493,7 +494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Usunięcie konta: JSON { password } — wymagane bieżące hasło
-  app.delete("/api/auth/account", authRateLimit, requireAuth, async (req, res) => {
+  app.delete("/api/auth/account", accountDeleteRateLimit, requireAuth, async (req, res) => {
     const parsed = deleteAccountSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Podaj hasło, aby potwierdzić usunięcie konta" });

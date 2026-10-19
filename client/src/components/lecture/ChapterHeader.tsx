@@ -43,7 +43,7 @@ export function ChapterHeader({
     <header className="mb-9 grid gap-5" data-testid="chapter-band">
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-x-5 gap-y-3 sm:gap-x-7">
         <span
-          className="num select-none font-medium leading-[.8] text-[clamp(3.75rem,2.6rem+4.4vw,6.5rem)] tracking-[-0.04em] text-[var(--txt4)]"
+          className="num select-none font-medium leading-[.8] text-[clamp(3.75rem,2.6rem+4.4vw,6.5rem)] tracking-[-0.04em] text-[var(--txt3)]"
           aria-hidden="true"
         >
           {n}

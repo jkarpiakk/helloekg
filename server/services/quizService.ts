@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { storage } from "../storage";
 import { db } from "../db";
-import { examSessions, progress, attempts } from "@shared/schema";
+import { examSessions, progress, attempts, questions } from "@shared/schema";
 import { and, eq, lt, sql } from "drizzle-orm";
 import type { 
   Question, 
@@ -379,13 +379,11 @@ export class QuizService {
 
   async initializeExam(userId: string, count: number): Promise<{ sessionId: string; totalQuestions: number }> {
     // Get all published questions from all sections
-    const sections = await storage.getSections();
-    let allQuestions: Question[] = [];
-    
-    for (const section of sections) {
-      const sectionQuestions = await storage.getQuestionsBySection(section.id, "published");
-      allQuestions.push(...sectionQuestions);
-    }
+    // Jedno lekkie zapytanie: do losowania wystarczą id i typ (wcześniej 33 zapytania o pełne pytania)
+    let allQuestions = await db
+      .select({ id: questions.id, questionType: questions.questionType })
+      .from(questions)
+      .where(eq(questions.status, "published"));
 
     // Przypadki kliniczne pokazują wynik krok po kroku (to ich sens dydaktyczny),
     // więc nie dałoby się ich zadać na egzaminie bez zdradzania odpowiedzi

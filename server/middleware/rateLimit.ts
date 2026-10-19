@@ -113,9 +113,11 @@ export function createRateLimit(options: {
   };
 }
 
+// Limit na adres IP jest celowo luźniejszy: testerzy z jednej sieci (szpital, uczelnia, akademik)
+// wychodzą spod wspólnego IP. Konto chroni osobny limit nieudanych logowań na adres e-mail.
 export const authRateLimit = createRateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20,
   message: "Zbyt wiele prób logowania. Spróbuj ponownie za 15 minut.",
   keyPrefix: "auth",
 });
@@ -184,3 +186,11 @@ export async function clearLoginFailures(email: string): Promise<void> {
     console.error("[rateLimit] clearing login failures failed:", err);
   }
 }
+
+/** Usunięcie konta — osobny limit i komunikat, który mówi o tym, co się dzieje */
+export const accountDeleteRateLimit = createRateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Zbyt wiele prób usunięcia konta. Spróbuj ponownie za 15 minut.",
+  keyPrefix: "account-delete",
+});

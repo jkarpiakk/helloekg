@@ -300,7 +300,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
                     <FormControl>
                       <PasswordInput
                         autoComplete="current-password"
-                        placeholder="••••••••"
+                        placeholder="Twoje hasło"
                         visible={showPassword}
                         onToggle={() => setShowPassword((v) => !v)}
                         toggleTestId="toggle-password"
@@ -460,7 +460,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
                     <Input
                       type={showPassword ? "text" : "password"}
                       autoComplete="new-password"
-                      placeholder="••••••••"
+                      placeholder="Wpisz hasło jeszcze raz"
                       {...field}
                       data-testid="register-confirmPassword"
                     />

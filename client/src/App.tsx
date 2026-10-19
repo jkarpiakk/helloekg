@@ -94,7 +94,8 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main>
+      {/* Dolny odstęp: pływający „Zgłoś uwagę” nie zasłania ostatnich linii treści */}
+      <main className="pb-24">
         <Suspense fallback={<RouteLoader />}>
         <Switch>
           <Route path="/" component={Home} />
