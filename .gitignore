@@ -12,3 +12,4 @@ cookies.txt
 # lokalny podgląd (dane dostępowe do kopii bazy)
 .env.preview
 .preview-assets
+data/feedback-uploads

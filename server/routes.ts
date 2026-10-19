@@ -2140,7 +2140,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, search } = req.query;
       let query = db.select().from(supportTickets);
 
-      const ticketConditions: any[] = [];
+      // Zgłoszenia z bety i błędy w pytaniach mają własną zakładkę „Zgłoszenia” — tu tylko wiadomości do supportu
+      const ticketConditions: any[] = [eq(supportTickets.kind, "support"), sql`${supportTickets.questionId} IS NULL`];
       
       // Apply status filter
       if (status && status !== 'all') {
@@ -3050,6 +3051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  (await import("./feedbackRoutes")).registerFeedbackRoutes(app); // zgłoszenia testerów (beta)
   const httpServer = createServer(app);
   return httpServer;
 }

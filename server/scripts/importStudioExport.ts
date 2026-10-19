@@ -31,8 +31,12 @@ const studioLectures: any[] = read("lectures.json");
 const studioQuestions: any[] = read("questions.json");
 const manifest = read("manifest.json");
 
+/** Rozszerzenia studia, które kurs już obsługuje — reszta zostaje szkicem */
+const SUPPORTED_EXTENSIONS = new Set(["clinical_case"]);
 const unsupported = new Set<string>(
-  (manifest.extensionsUsed ?? []).map((e: any) => e.questionExternalId)
+  (manifest.extensionsUsed ?? [])
+    .filter((e: any) => !SUPPORTED_EXTENSIONS.has(e.ext))
+    .map((e: any) => e.questionExternalId)
 );
 
 const ASSET_RE = /(^|[("'\s])assets\/([0-9a-f]{64}\.[a-z0-9]+)/g;
@@ -130,6 +134,17 @@ async function main() {
             imageUrl = null;
           }
           if (!isAsset(config.config.imageUrl)) ok = false;
+        }
+        // Przypadek kliniczny: zapis EKG należy do przypadku (rysuje go ClinicalCaseQuestion),
+        // nie do karty pytania. Eksport dokłada config.imageUrl = assets/… obok kodu GFX.
+        if (q.questionType === "clinical_case" && config?.config) {
+          if (!isAsset(config.config.imageUrl) && isAsset(imageUrl)) config.config.imageUrl = imageUrl;
+          if (!isAsset(config.config.imageUrl)) delete config.config.imageUrl;
+          imageUrl = null;
+          // Krok „wskaż na zapisie" bez pliku grafiki jest nie do rozwiązania
+          const steps: any[] = Array.isArray(config.config.steps) ? config.config.steps : [];
+          if (steps.some((st) => st?.kind === "hotspot") && !config.config.imageUrl) ok = false;
+          if (steps.length < 2) ok = false;
         }
         if (imageUrl && !isAsset(imageUrl)) imageUrl = null;
         const published = ok && (allPublished || q.status === "zatwierdzone");

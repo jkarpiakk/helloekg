@@ -23,13 +23,15 @@ interface QuizInterfaceProps {
 /** Sesja nauki / powtórki: tyle pytań, potem podsumowanie (egzamin ma własną liczbę) */
 const SESSION_LENGTH = 10;
 
-const TYPE_LABEL: Record<QuestionType, string> = {
+// clinical_case jeszcze nie ma w QuestionType (@/types) — klucz dopisany obok
+const TYPE_LABEL: Record<QuestionType | "clinical_case", string> = {
   multiple_choice: "Wybór",
   drag_drop: "Przeciąganie",
   fill_blank: "Uzupełnianie",
   matching: "Dopasowanie",
   sorting: "Kolejność",
   hotspot: "Wskaż na zapisie",
+  clinical_case: "Przypadek",
 };
 
 const MODE_LABEL = { learn: "Nauka", review: "Powtórka", exam: "Egzamin próbny" } as const;
@@ -372,7 +374,9 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const total = mode === "exam" ? examTotalQuestions : SESSION_LENGTH;
   const done = currentQuestionIndex + (showExplanation ? 1 : 0);
   const progress = total > 0 ? Math.min(100, (done / total) * 100) : 0;
-  const typeLabel = question ? TYPE_LABEL[question.questionType || "multiple_choice"] : null;
+  const typeLabel = question
+    ? TYPE_LABEL[(question.questionType || "multiple_choice") as keyof typeof TYPE_LABEL] ?? null
+    : null;
 
   if (!questionLoading && !question && (mode !== "exam" || examSessionId)) {
     return (

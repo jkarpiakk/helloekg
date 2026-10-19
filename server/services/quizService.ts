@@ -15,9 +15,15 @@ import type {
   HotspotConfig,
   QuestionMediaAssets
 } from "@shared/schema";
+import {
+  gradeClinicalCase,
+  buildClinicalCaseCorrectAnswer,
+  type AnyQuestionConfig,
+  type AnyAnswerData,
+} from "@shared/clinicalCase";
 
 // Question types
-export type QuestionType = 'multiple_choice' | 'drag_drop' | 'fill_blank' | 'matching' | 'sorting' | 'hotspot';
+export type QuestionType = 'multiple_choice' | 'drag_drop' | 'fill_blank' | 'matching' | 'sorting' | 'hotspot' | 'clinical_case';
 
 export interface QuizQuestion {
   id: string;
@@ -273,6 +279,16 @@ export class QuizService {
           return { isCorrect: false, partialScore: 0, correctItems: [], incorrectItems: [] };
         }
         return this.validateHotspotAnswer(question.questionConfig.config, answerData);
+
+      case 'clinical_case': {
+        // Typy z @shared/clinicalCase — unia QuestionConfig w schema.ts jeszcze go nie zna
+        const config = question.questionConfig as AnyQuestionConfig | null;
+        const answer = answerData as AnyAnswerData;
+        if (answer.type !== 'clinical_case' || !config || config.type !== 'clinical_case') {
+          return { isCorrect: false, partialScore: 0, correctItems: [], incorrectItems: [] };
+        }
+        return gradeClinicalCase(config.config, answer);
+      }
         
       default:
         return { isCorrect: false, partialScore: 0, correctItems: [], incorrectItems: [] };
@@ -650,7 +666,7 @@ export class QuizService {
   private buildCorrectAnswerData(question: Question): AnswerData | undefined {
     if (!question.questionConfig) return undefined;
     
-    const config = question.questionConfig;
+    const config = question.questionConfig as AnyQuestionConfig;
     switch (config.type) {
       case 'drag_drop':
         return {
@@ -683,6 +699,9 @@ export class QuizService {
           type: 'hotspot',
           clickedHotspots: config.config.hotspots.filter(h => h.isCorrect).map(h => h.id)
         };
+      case 'clinical_case':
+        // AnswerData z schema.ts nie ma jeszcze tego wariantu — kształt z @shared/clinicalCase
+        return buildClinicalCaseCorrectAnswer(config.config) as unknown as AnswerData;
       default:
         return undefined;
     }

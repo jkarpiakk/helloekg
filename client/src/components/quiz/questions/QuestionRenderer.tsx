@@ -5,6 +5,8 @@ import FillBlankQuestion from "./FillBlankQuestion";
 import MatchingQuestion from "./MatchingQuestion";
 import SortingQuestion from "./SortingQuestion";
 import HotspotQuestion from "./HotspotQuestion";
+import ClinicalCaseQuestion from "./ClinicalCaseQuestion";
+import type { AnyQuestionConfig } from "@shared/clinicalCase";
 
 interface QuestionRendererProps {
   question: QuizQuestion;
@@ -12,8 +14,8 @@ interface QuestionRendererProps {
   disabled: boolean;
   showResult: boolean;
   result?: QuizResult;
-  /** Zostawione dla zgodności — obraz pytania pokazuje QuestionCard */
-  onImageClick?: (imageUrl: string) => void;
+  /** Obraz pytania pokazuje QuestionCard; przypadek kliniczny rysuje swój zapis sam */
+  onImageClick?: (imageUrl: string, origin?: HTMLElement) => void;
 }
 
 /**
@@ -26,14 +28,17 @@ export default function QuestionRenderer({
   disabled,
   showResult,
   result,
+  onImageClick,
 }: QuestionRendererProps) {
   if (!question.questionConfig) return null;
+  // Unia QuestionConfig w schema.ts nie zna jeszcze clinical_case — szersza z @shared/clinicalCase
+  const questionConfig = question.questionConfig as AnyQuestionConfig;
 
-  switch (question.questionConfig.type) {
+  switch (questionConfig.type) {
     case "drag_drop":
       return (
         <DragDropQuestion
-          config={question.questionConfig.config}
+          config={questionConfig.config}
           onChange={onAnswerChange}
           disabled={disabled}
           showResult={showResult}
@@ -43,7 +48,7 @@ export default function QuestionRenderer({
     case "fill_blank":
       return (
         <FillBlankQuestion
-          config={question.questionConfig.config}
+          config={questionConfig.config}
           onChange={onAnswerChange}
           disabled={disabled}
           showResult={showResult}
@@ -53,7 +58,7 @@ export default function QuestionRenderer({
     case "matching":
       return (
         <MatchingQuestion
-          config={question.questionConfig.config}
+          config={questionConfig.config}
           onChange={onAnswerChange}
           disabled={disabled}
           showResult={showResult}
@@ -63,7 +68,7 @@ export default function QuestionRenderer({
     case "sorting":
       return (
         <SortingQuestion
-          config={question.questionConfig.config}
+          config={questionConfig.config}
           onChange={onAnswerChange}
           disabled={disabled}
           showResult={showResult}
@@ -73,11 +78,26 @@ export default function QuestionRenderer({
     case "hotspot":
       return (
         <HotspotQuestion
-          config={question.questionConfig.config}
+          config={questionConfig.config}
           onChange={onAnswerChange}
           disabled={disabled}
           showResult={showResult}
           result={result}
+        />
+      );
+    case "clinical_case":
+      return (
+        <ClinicalCaseQuestion
+          // Nowe pytanie = nowy stan kroków
+          key={question.id}
+          config={questionConfig.config}
+          questionId={question.id}
+          fallbackImageUrl={question.imageUrl}
+          onChange={onAnswerChange}
+          disabled={disabled}
+          showResult={showResult}
+          result={result}
+          onImageClick={onImageClick}
         />
       );
     default:

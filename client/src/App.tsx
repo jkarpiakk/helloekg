@@ -37,10 +37,12 @@ const Admin = lazy(() => import("@/pages/admin"));
 const CertificatePage = lazy(() => import("@/pages/certificate"));
 const CertificatePreviewPage = lazy(() => import("@/pages/certificate-preview"));
 const EKGSimulator = lazy(() => import("@/pages/ekg-simulator"));
+const FeedbackPage = lazy(() => import("@/pages/feedback"));
 
 // Layout
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import FeedbackFab from "@/components/feedback/FeedbackFab";
 
 // Loader zgodny z marką: sygnet H z szybszym impulsem jako fallback Suspense
 const LOADER_H_PATH =
@@ -111,6 +113,7 @@ function AppContent() {
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/simulator" component={EKGSimulator} />
+          <Route path="/zgloszenie" component={FeedbackPage} />
           <Route path="/certificate/preview" component={CertificatePreviewPage} />
           <Route path="/certificate/:certificateId" component={CertificatePage} />
           <Route path="/verify/:certificateId" component={VerifyCertificate} />
@@ -119,6 +122,8 @@ function AppContent() {
         </Suspense>
       </main>
       <Footer />
+      {/* Zgłoszenia testerów (beta) — tylko dla zalogowanych */}
+      {user && <FeedbackFab />}
     </div>
   );
 }

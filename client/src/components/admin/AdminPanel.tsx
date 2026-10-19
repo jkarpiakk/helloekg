@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle, FileText, HelpCircle, Home, Sparkles } from "lucide-react";
+import { Shield, Users, BarChart3, Settings, BookOpen, MessageCircle, FileText, HelpCircle, Home, Sparkles, Inbox } from "lucide-react";
 import QuestionManager from "./QuestionManager";
 import CourseManager from "./CourseManager";
 import UserManager from "./UserManager";
@@ -14,6 +14,19 @@ import BlogManager from "./BlogManager";
 import DemoQuestionManager from "./DemoQuestionManager";
 import HomePageContentManager from "./HomePageContentManager";
 import FutureFeatures from "./FutureFeatures";
+import FeedbackAdminPanel from "./FeedbackAdminPanel";
+
+const ADMIN_TABS = ["course", "questions", "blog", "demo", "homepage", "users", "zgloszenia", "support", "analytics", "future"];
+
+/** ?tab=zgloszenia (np. z maila o nowym zgłoszeniu) otwiera od razu tę zakładkę */
+function initialTab(): string {
+  try {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t && ADMIN_TABS.includes(t) ? t : "course";
+  } catch {
+    return "course";
+  }
+}
 
 export default function AdminPanel() {
   const { t } = useTranslation();
@@ -40,8 +53,8 @@ export default function AdminPanel() {
 
       {/* Admin Content */}
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="course" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-9">
+        <Tabs defaultValue={initialTab()} className="space-y-8">
+          <TabsList className="grid w-full grid-cols-10">
             <TabsTrigger value="course" className="flex items-center space-x-2">
               <BookOpen className="h-4 w-4" />
               <span>Kurs</span>
@@ -65,6 +78,10 @@ export default function AdminPanel() {
             <TabsTrigger value="users" className="flex items-center space-x-2">
               <Users className="h-4 w-4" />
               <span>Użytkownicy</span>
+            </TabsTrigger>
+            <TabsTrigger value="zgloszenia" className="flex items-center space-x-2" data-testid="admin-tab-feedback">
+              <Inbox className="h-4 w-4" />
+              <span>Zgłoszenia</span>
             </TabsTrigger>
             <TabsTrigger value="support" className="flex items-center space-x-2">
               <MessageCircle className="h-4 w-4" />
@@ -102,6 +119,10 @@ export default function AdminPanel() {
 
           <TabsContent value="users">
             <UserManager />
+          </TabsContent>
+
+          <TabsContent value="zgloszenia">
+            <FeedbackAdminPanel />
           </TabsContent>
 
           <TabsContent value="support">

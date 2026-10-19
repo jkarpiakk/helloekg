@@ -2,24 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 import { ArrowRight, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { ProgressLine } from "@/components/dashboard/ProgressCard";
-import { apiRequest } from "@/lib/queryClient";
+import type { Rhythm } from "@/components/ekg/EkgCanvas";
+import { LectureContent } from "@/components/lecture/LectureContent";
+import { ChapterHeader } from "@/components/lecture/ChapterHeader";
+import { ReadingProgress } from "@/components/lecture/ReadingProgress";
+import { chapterHasVisual, chaptersQuery, GAP_ROLES, renderMarkdown, sortChapters } from "@/components/lecture/lectureData";
+import { useAuth } from "@/lib/auth";
 import { spring } from "@/lib/motion";
-
-interface LectureChapter {
-  id: string;
-  title: string;
-  contentMd: string;
-  analogy?: string | null;
-  keyPoints?: string[] | null;
-  visual?: string | null;
-  order: number;
-}
 
 export interface NextSectionLink {
   href: string;
@@ -45,26 +37,9 @@ interface LectureNavigationProps {
   check: CheckLink | null;
   /** Kolejny temat w kursie (jeśli jest) */
   next?: NextSectionLink | null;
+  /** Rytm ozdobnej linii EKG dobrany do tematu (nagłówek wykładu używa tego samego) */
+  rhythm?: Rhythm;
   onComplete?: () => void;
-}
-
-/**
- * Markdown → bezpieczny HTML. Domyślny profil DOMPurify (bez skryptów, handlerów, ramek),
- * plus <details>/<summary>, których używają wykłady. Atrybut style wycinamy — wygląd daje .prose-hk.
- */
-function renderMarkdown(md: string): string {
-  try {
-    const raw = marked.parse(md ?? "", { async: false }) as string;
-    const clean = DOMPurify.sanitize(raw, {
-      USE_PROFILES: { html: true },
-      ADD_TAGS: ["details", "summary"],
-      FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select", "iframe"],
-      FORBID_ATTR: ["style"],
-    });
-    return clean.replace(/<img /g, '<img loading="lazy" decoding="async" ');
-  } catch {
-    return DOMPurify.sanitize(md ?? "", { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
-  }
 }
 
 const readHashIndex = () => {
@@ -79,25 +54,24 @@ const chapterVariants: Variants = {
   exit: (dir: number) => ({ opacity: 0, y: dir >= 0 ? -12 : 12, transition: { duration: 0.15, ease: "easeIn" } }),
 };
 
-export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, next, onComplete }: LectureNavigationProps) {
+export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, next, rhythm = "sinus", onComplete }: LectureNavigationProps) {
   const reduce = useReducedMotion();
   const [index, setIndex] = useState(readHashIndex);
   const [direction, setDirection] = useState(1);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const topRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const articleRef = useRef<HTMLElement>(null);
+  const { user } = useAuth();
+  const canSeeGaps = !!user && GAP_ROLES.includes(user.role);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["/api/sections", sectionId, "chapters"],
-    queryFn: () => apiRequest("GET", `/api/sections/${sectionId}/chapters`).then((res) => res.json()),
+    ...chaptersQuery(sectionId),
     enabled: hasLecture !== false,
-    retry: false,
   });
 
-  const chapters = useMemo<LectureChapter[]>(
-    () => (Array.isArray(data) ? (data as LectureChapter[]).slice().sort((a, b) => a.order - b.order) : []),
-    [data],
-  );
+  const chapters = useMemo(() => sortChapters(data), [data]);
   const total = chapters.length;
   const safeIndex = Math.min(index, Math.max(0, total - 1));
   const chapter = chapters[safeIndex];
@@ -120,14 +94,18 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
     }
   }, [safeIndex, total]);
 
+  /** Wysokość nawigacji i przyklejonej belki — o tyle treść jest przykryta od góry */
+  const coverH = useCallback(() => {
+    const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 64;
+    return navH + (barRef.current?.offsetHeight ?? 0);
+  }, []);
+
   const scrollToChapterTop = useCallback(() => {
     const el = topRef.current;
     if (!el) return;
-    const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 64;
-    const barH = barRef.current?.offsetHeight ?? 0;
-    const top = el.getBoundingClientRect().top + window.scrollY - navH - barH - 16;
+    const top = el.getBoundingClientRect().top + window.scrollY - coverH() - 16;
     if (window.scrollY > top) window.scrollTo({ top, behavior: "auto" });
-  }, []);
+  }, [coverH]);
 
   const goTo = useCallback(
     (target: number) => {
@@ -216,23 +194,23 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
     );
   }
 
-  const progress = ((safeIndex + 1) / total) * 100;
   const showChapterTitle = !(total === 1 && chapter.title.trim() === sectionTitle.trim());
   const nextChapter = chapters[safeIndex + 1];
 
   return (
-    <div data-testid="lecture">
-      {/* Belka rozdziałów: przyklejona pod nawigacją, treść przewija się pod spodem */}
-      {total > 1 && (
-        <div
-          ref={barRef}
-          className="material-bar sticky top-[var(--nav-h)] z-30 mx-[calc(50%-50vw)] border-b border-[var(--line)]"
-        >
-          <div className="wrap wrap--narrow flex items-center gap-3 py-2.5">
-            <p className="label num shrink-0" aria-live="polite" data-testid="chapter-counter">
-              Rozdział {safeIndex + 1}/{total}
-            </p>
-            <p className="min-w-0 flex-1 truncate text-[14px] text-[var(--txt2)]">{chapter.title}</p>
+    <div ref={rootRef} data-testid="lecture">
+      {/* Belka rozdziałów: przyklejona pod nawigacją, treść przewija się pod spodem.
+          Pasek: odcinek na rozdział, bieżący wypełnia się w miarę czytania. */}
+      <div
+        ref={barRef}
+        className="material-bar sticky top-[var(--nav-h)] z-30 mx-[calc(50%-50vw)] border-b border-[var(--line)]"
+      >
+        <div className="wrap wrap--narrow flex min-h-[48px] items-center gap-3 py-1.5">
+          <p className="label num shrink-0" aria-live="polite" data-testid="chapter-counter">
+            {total > 1 ? `Rozdział ${safeIndex + 1}/${total}` : "Wykład"}
+          </p>
+          <p className="min-w-0 flex-1 truncate text-[14px] text-[var(--txt2)]">{chapter.title}</p>
+          {total > 1 && (
             <div className="flex shrink-0 items-center">
               <Button
                 variant="ghost"
@@ -255,10 +233,10 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
                 <ChevronRight />
               </Button>
             </div>
-          </div>
-          <ProgressLine value={progress} label="Postęp w wykładzie" className="rounded-none h-[2px]" />
+          )}
         </div>
-      )}
+        <ReadingProgress index={safeIndex} total={total} articleRef={articleRef} watchRef={rootRef} offset={coverH} />
+      </div>
 
       {/* Spis rozdziałów — zwinięty, żeby nie odciągał od czytania */}
       {total > 1 && (
@@ -306,6 +284,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
 
       <AnimatePresence mode="wait" initial={false} custom={direction} onExitComplete={scrollToChapterTop}>
         <motion.article
+          ref={articleRef}
           key={chapter.id}
           custom={direction}
           variants={chapterVariants}
@@ -314,14 +293,15 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
           exit="exit"
           aria-labelledby={showChapterTitle ? "chapter-title" : undefined}
         >
-          {showChapterTitle && (
-            <header className="grid gap-3 mb-8">
-              {total > 1 && <p className="label label--g">Rozdział {safeIndex + 1}</p>}
-              <h2 id="chapter-title" className="h2" data-testid="current-chapter-title">
-                {chapter.title}
-              </h2>
-            </header>
-          )}
+          <ChapterHeader
+            index={safeIndex}
+            total={total}
+            title={chapter.title}
+            showTitle={showChapterTitle}
+            decorate={!chapterHasVisual(chapter.contentMd)}
+            rhythm={rhythm}
+            showLine={safeIndex > 0}
+          />
 
           <div className="prose-hk">
             {chapter.analogy && (
@@ -330,7 +310,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
                 <p>{chapter.analogy}</p>
               </blockquote>
             )}
-            <div className="prose-hk max-w-none" dangerouslySetInnerHTML={{ __html: html }} data-testid="chapter-content" />
+            <LectureContent html={html} canSeeGaps={canSeeGaps} />
             {chapter.keyPoints && chapter.keyPoints.length > 0 && (
               <section className="border-t border-[var(--line)] pt-6 mt-10" aria-label="Najważniejsze">
                 <p className="label mb-3">Najważniejsze</p>

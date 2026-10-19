@@ -9,6 +9,9 @@ import { ProgressLine } from "@/components/dashboard/ProgressCard";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
+import { getModuleArt } from "@/components/course/moduleArt";
+import { ModuleFigure, ModuleThumb } from "@/components/course/ModuleVisual";
+import OrchestraMethod from "@/components/course/OrchestraMethod";
 
 interface ModuleSection {
   id: string;
@@ -174,6 +177,7 @@ export default function Modules() {
             if (progress !== null) metaParts.push(`${Math.round(progress)}%`);
             const meta = module.isLocked ? "Zablokowany" : metaParts.join(" · ") || "Wkrótce";
             const isOpen = openIds.has(module.id);
+            const art = getModuleArt(module.title);
 
             return (
               <motion.details
@@ -186,13 +190,13 @@ export default function Modules() {
                 data-testid={`module-${module.id}`}
               >
                 <summary
-                  className="list-none [&::-webkit-details-marker]:hidden cursor-pointer grid grid-cols-[36px_minmax(0,1fr)_28px] sm:grid-cols-[48px_minmax(0,1fr)_auto_28px] items-center gap-4 py-6 transition-transform duration-[120ms] ease-out active:scale-[.995] select-none"
+                  className="group list-none [&::-webkit-details-marker]:hidden cursor-pointer grid grid-cols-[24px_64px_minmax(0,1fr)_28px] sm:grid-cols-[40px_104px_minmax(0,1fr)_auto_28px] items-center gap-3 sm:gap-5 py-5 sm:py-6 transition-transform duration-[120ms] ease-out active:scale-[.995] select-none"
                 >
                   <span className="label label--g num">{pad(mi + 1)}</span>
+                  <ModuleThumb art={art} />
                   <span className="row__t">
                     <b>{cleanTitle(module.title)}</b>
-                    {module.description && <span>{module.description}</span>}
-                    <span className="label sm:hidden mt-1">{meta}</span>
+                    <span className="label !text-[11px] sm:hidden mt-1">{meta}</span>
                   </span>
                   <span className="label hidden sm:inline-flex items-center gap-2">
                     {module.isLocked && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -203,21 +207,55 @@ export default function Modules() {
                   </span>
                 </summary>
 
-                <div className="pb-6 sm:pl-16">
+                <div className="pb-8 grid gap-8 sm:gap-10 sm:pl-[60px]">
+                  {/* Nagłówek modułu: ilustracja + żywy zapis rytmu modułu + opis z bazy (jeśli jest).
+                      We „Wprowadzeniu” ilustracją jest interaktywna „Metoda” (ten sam rysunek układu
+                      bodźcoprzewodzącego), więc nie powtarzamy obrazka dwa razy. */}
+                  {art.key === "intro" && !module.isLocked ? (
+                    <div className="grid gap-8">
+                      {module.description && (
+                        <p className="text-[16px] sm:text-[17px] leading-[1.7] text-[var(--txt2)] max-w-[42em]">
+                          {module.description}
+                        </p>
+                      )}
+                      <OrchestraMethod header="full" level={3} />
+                    </div>
+                  ) : (
+                    <div
+                      className={`grid gap-5 sm:gap-8 items-start ${
+                        module.description ? "md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "max-w-[520px]"
+                      }`}
+                    >
+                      {/* Pasek EKG montujemy dopiero po otwarciu — zamknięty <details> nie ma szerokości */}
+                      <ModuleFigure art={art} live={isOpen} />
+                      {module.description && (
+                        <div className="grid gap-3 content-start">
+                          <p className="label label--g">Moduł {pad(mi + 1)}</p>
+                          <p className="text-[16px] sm:text-[17px] leading-[1.7] text-[var(--txt2)] max-w-[34em]">
+                            {module.description}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {module.isLocked ? (
                     <p className="muted pb-2">Ukończ poprzedni moduł, żeby odblokować ten.</p>
                   ) : count === 0 ? (
                     <p className="muted pb-2">W tym module nie ma jeszcze materiałów.</p>
                   ) : (
-                    <ul className="rows [&>li:last-child]:border-b-0">
-                      {module.sections.map((section, si) => (
-                        <SectionRow
-                          key={section.id}
-                          index={si + 1}
-                          section={section}
-                        />
-                      ))}
-                    </ul>
+                    <div className="grid gap-3">
+                      <h3 className="label">Tematy</h3>
+                      <ul className="rows [&>li:last-child]:border-b-0">
+                        {module.sections.map((section, si) => (
+                          <SectionRow
+                            key={section.id}
+                            index={si + 1}
+                            section={section}
+                          />
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               </motion.details>

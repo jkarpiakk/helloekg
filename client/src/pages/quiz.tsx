@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dialog";
 import { ProgressLine } from "@/components/dashboard/ProgressCard";
 import { rise, stagger } from "@/lib/motion";
+import { getModuleArt } from "@/components/course/moduleArt";
+import { ModuleThumb } from "@/components/course/ModuleVisual";
 
 type Mode = "learn" | "review" | "exam";
 type ExamCount = 10 | 20 | 40;
@@ -210,11 +212,14 @@ export default function Quiz() {
               <motion.div className="grid gap-12" variants={stagger(0.04)} initial="hidden" animate="show">
                 {withQuestions.map((module) => (
                   <motion.section key={module.id} variants={rise} aria-labelledby={`qm-${module.id}`}>
-                    <div className="flex items-baseline gap-3 mb-3">
-                      <span className="label label--g num">{pad(module.no)}</span>
-                      <h2 id={`qm-${module.id}`} className="h3">
-                        {cleanTitle(module.title)}
-                      </h2>
+                    <div className="flex items-center gap-4 mb-4">
+                      <ModuleThumb art={getModuleArt(module.title)} />
+                      <div className="grid gap-1 min-w-0">
+                        <span className="label label--g">Moduł {pad(module.no)}</span>
+                        <h2 id={`qm-${module.id}`} className="h3">
+                          {cleanTitle(module.title)}
+                        </h2>
+                      </div>
                     </div>
                     <ul className="rows">
                       {module.sections.map((section, si) => {

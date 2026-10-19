@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Component, Suspense, lazy, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -10,6 +10,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { rise, stagger } from "@/lib/motion";
 import ProgressCard, { ProgressLine } from "./ProgressCard";
+import { getModuleArt, isIntroModule } from "@/components/course/moduleArt";
+import { ModuleFigure, ModuleThumb } from "@/components/course/ModuleVisual";
+import OrchestraMethod from "@/components/course/OrchestraMethod";
 import type { Certificate, UserProgress, WeakArea } from "@/types";
 
 interface CourseSection {
@@ -54,9 +57,53 @@ function plural(n: number, one: string, few: string, many: string) {
 
 const cleanTitle = (title: string) => title.replace(/^\s*moduł\s*\d+\s*[:.–—-]\s*/i, "");
 
+/* ── Onboarding (FirstSteps, WelcomeSheet) ─────────────────────────────────────────────
+ * Pliki tworzy osobno inny etap prac. `import.meta.glob` zwraca pusty obiekt, gdy pliku nie ma,
+ * więc build i HMR działają także bez nich; gdy się pojawią, Vite sam je podepnie.
+ * Ładowane leniwie (React.lazy + Suspense fallback null) i odgrodzone granicą błędu —
+ * usterka w onboardingu nie może zabrać całego panelu postępu. */
+const onboardingLoaders = import.meta.glob("../onboarding/{FirstSteps,WelcomeSheet}.tsx");
+const Nothing: ComponentType = () => null;
+
+function optionalLazy(name: "FirstSteps" | "WelcomeSheet") {
+  const load = onboardingLoaders[`../onboarding/${name}.tsx`];
+  return lazy(async () => {
+    if (!load) return { default: Nothing };
+    try {
+      const mod = (await load()) as Record<string, unknown>;
+      return { default: ((mod.default ?? mod[name]) as ComponentType | undefined) ?? Nothing };
+    } catch {
+      return { default: Nothing };
+    }
+  });
+}
+
+const FirstSteps = optionalLazy("FirstSteps");
+const WelcomeSheet = optionalLazy("WelcomeSheet");
+
+class Quiet extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function StudentDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  // null = jeszcze nie ruszany: decyduje stan kursu (otwarte dla kogoś, kto nie zaczął modułu 1)
+  const [methodOpen, setMethodOpen] = useState<boolean | null>(null);
 
   // Moduły z sekcjami i postępem — z nich „Kontynuuj” i lista modułów
   const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({
@@ -176,95 +223,178 @@ export default function StudentDashboard() {
   const targetStartedQuiz = targetHasQuestions && (target?.section.completionPercentage || 0) > 0;
   const primaryIsQuiz = !targetHasLecture || targetStartedQuiz;
   const certificate = myCertificates?.[0];
+  const targetArt = target ? getModuleArt(target.module.title) : null;
+
+  // „Metoda” (orkiestra) — dla tych, którzy nie skończyli jeszcze modułu wprowadzającego
+  const introModule = course.modules.find((m) => isIntroModule(m.title)) ?? null;
+  const introProgress = introModule ? moduleProgress(introModule.sections) : null;
+  const showMethod = Boolean(introModule) && (introProgress === null || introProgress < 100);
+  const introUntouched = introModule ? introModule.sections.every((s) => !s.lastActivity && !(s.completionPercentage > 0)) : false;
+  const isMethodOpen = methodOpen ?? introUntouched;
 
   return (
     <motion.div className="wrap pt-12 pb-24 sm:pt-16" variants={stagger(0.05)} initial="hidden" animate="show">
-      <motion.header className="grid gap-4 mb-10 sm:mb-14" variants={rise}>
-        <p className="label" data-testid="welcome-message">
-          {user?.firstName ? `Cześć, ${user.firstName}` : "Cześć"}
-        </p>
-        <h1 className="h1">Twój postęp</h1>
-      </motion.header>
+      {/* ── SLOT: onboarding ─────────────────────────────────────────────────────────
+          WelcomeSheet sam decyduje, czy się pokazać; FirstSteps to lista „pierwsze kroki”.
+          Odstęp tylko wtedy, gdy lista coś narysowała (pusty div = brak marginesu). */}
+      <Quiet>
+        <Suspense fallback={null}>
+          <WelcomeSheet />
+        </Suspense>
+      </Quiet>
+      <div className="[&:not(:empty)]:mb-14 sm:[&:not(:empty)]:mb-16">
+        <Quiet>
+          <Suspense fallback={null}>
+            <FirstSteps />
+          </Suspense>
+        </Quiet>
+      </div>
+      {/* ── /SLOT: onboarding ── */}
 
-      {modulesError ? (
-        <motion.p className="muted border-t border-[var(--line)] pt-8" variants={rise}>
-          Nie udało się wczytać kursu. Odśwież stronę i spróbuj jeszcze raz.
-        </motion.p>
-      ) : (
-        <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-16">
-          {/* Lewa kolumna: co dalej + moduły */}
-          <div className="grid gap-12 content-start min-w-0">
-            <motion.section variants={rise} aria-labelledby="continue-title">
-              {target ? (
-                <div className="surface p-6 sm:p-8 grid gap-5" data-testid="continue-card">
-                  <p className="label label--g">
-                    Kontynuuj · Moduł {target.moduleNo} · {target.lectureNo !== null ? `Wykład ${target.lectureNo}` : "Pytania"}
-                  </p>
-                  <div className="grid gap-1">
-                    <h2 id="continue-title" className="h3">{target.section.title}</h2>
-                    <p className="muted text-[15px]">{cleanTitle(target.module.title)}</p>
-                  </div>
-                  {targetHasQuestions && (
-                    <div className="grid gap-2 max-w-[420px]">
-                      <ProgressLine value={target.section.completionPercentage} label="Postęp w tym temacie" />
-                      <p className="text-[14px] text-[var(--txt2)]">
-                        <span className="num">{Math.round(target.section.completionPercentage || 0)}%</span> ukończone ·{" "}
-                        {target.section.questionCount} {plural(target.section.questionCount ?? 0, "pytanie", "pytania", "pytań")}
-                      </p>
-                    </div>
-                  )}
-                  <div className="flex flex-wrap items-center gap-3 pt-1">
-                    <Button asChild data-testid="action-continue">
-                      <Link href={primaryIsQuiz ? `/quiz?sectionId=${target.section.id}` : `/lecture/${target.section.id}`}>
-                        {primaryIsQuiz ? (targetStartedQuiz ? "Wróć do pytań" : "Rozwiąż pytania") : "Czytaj wykład"}
-                        <ArrowRight aria-hidden="true" />
-                      </Link>
-                    </Button>
-                    {primaryIsQuiz && targetHasLecture && (
-                      <Button asChild variant="ghost">
-                        <Link href={`/lecture/${target.section.id}`}>Wykład</Link>
-                      </Button>
-                    )}
-                    {!primaryIsQuiz && targetHasQuestions && (
-                      <Button asChild variant="ghost">
-                        <Link href={`/quiz?sectionId=${target.section.id}`}>Od razu do pytań</Link>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ) : course.hasContent ? (
-                <div className="surface p-6 sm:p-8 grid gap-4" data-testid="continue-card">
-                  <p className="label label--g">Kurs ukończony</p>
-                  <h2 id="continue-title" className="h3">Wszystkie tematy masz za sobą</h2>
-                  <p className="muted">Utrwal wiedzę w powtórce albo sprawdź się w egzaminie próbnym.</p>
-                  <div>
-                    <Button asChild>
-                      <Link href="/quiz?mode=review">
-                        Zacznij powtórkę
-                        <ArrowRight aria-hidden="true" />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p id="continue-title" className="muted border-t border-[var(--line)] pt-8">
-                  Nie masz jeszcze dostępu do żadnego modułu.
+      {/* Hero jak na landingu: etykieta + tytuł + postęp po lewej, „Kontynuuj” z ilustracją po prawej */}
+      <section
+        className="grid gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16 items-start mb-16 sm:mb-20"
+        aria-labelledby="dashboard-title"
+      >
+        <motion.header className="grid gap-5 content-start lg:pt-6" variants={rise}>
+          <p className="label label--g" data-testid="welcome-message">
+            {user?.firstName ? `Cześć, ${user.firstName}` : "Cześć"}
+          </p>
+          <h1 id="dashboard-title" className="h1">Twój postęp</h1>
+          <p className="lead max-w-[30em]">
+            Tu widzisz, co masz za sobą i od czego zacząć dziś. Postęp liczymy z twoich odpowiedzi na pytania.
+          </p>
+          {!modulesError && course.total > 0 && (
+            <div className="pt-4 max-w-[460px]">
+              <ProgressCard
+                overallProgress={course.overall}
+                completedSections={course.completed}
+                totalSections={course.total}
+              />
+            </div>
+          )}
+          <nav className="chips pt-2" aria-label="Szybkie akcje">
+            <Link href="/quiz?mode=review" className="chip min-h-[44px]" data-testid="action-review">
+              Powtórka
+            </Link>
+            <Link href="/quiz?mode=exam" className="chip min-h-[44px]" data-testid="action-exam">
+              Egzamin próbny
+            </Link>
+            <Link href="/modules" className="chip min-h-[44px]" data-testid="action-course">
+              Cały kurs
+            </Link>
+          </nav>
+        </motion.header>
+
+        <motion.div variants={rise} className="min-w-0">
+          {modulesError ? (
+            <p className="muted border-t border-[var(--line)] pt-8">
+              Nie udało się wczytać kursu. Odśwież stronę i spróbuj jeszcze raz.
+            </p>
+          ) : target && targetArt ? (
+            <section className="surface p-4 sm:p-5 grid gap-6" aria-labelledby="continue-title" data-testid="continue-card">
+              <ModuleFigure art={targetArt} eager stripHeight={64} />
+              <div className="grid gap-5 px-1 sm:px-3 pb-2 sm:pb-3">
+                <p className="label label--g">
+                  Kontynuuj · Moduł {target.moduleNo} · {target.lectureNo !== null ? `Wykład ${target.lectureNo}` : "Pytania"}
                 </p>
-              )}
+                <div className="grid gap-1">
+                  <h2 id="continue-title" className="h3">{target.section.title}</h2>
+                  <p className="muted text-[15px]">{cleanTitle(target.module.title)}</p>
+                </div>
+                {targetHasQuestions && (
+                  <div className="grid gap-2 max-w-[420px]">
+                    <ProgressLine value={target.section.completionPercentage} label="Postęp w tym temacie" />
+                    <p className="text-[14px] text-[var(--txt2)]">
+                      <span className="num">{Math.round(target.section.completionPercentage || 0)}%</span> ukończone ·{" "}
+                      {target.section.questionCount} {plural(target.section.questionCount ?? 0, "pytanie", "pytania", "pytań")}
+                    </p>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button asChild data-testid="action-continue">
+                    <Link href={primaryIsQuiz ? `/quiz?sectionId=${target.section.id}` : `/lecture/${target.section.id}`}>
+                      {primaryIsQuiz ? (targetStartedQuiz ? "Wróć do pytań" : "Rozwiąż pytania") : "Czytaj wykład"}
+                      <ArrowRight aria-hidden="true" />
+                    </Link>
+                  </Button>
+                  {primaryIsQuiz && targetHasLecture && (
+                    <Button asChild variant="ghost">
+                      <Link href={`/lecture/${target.section.id}`}>Wykład</Link>
+                    </Button>
+                  )}
+                  {!primaryIsQuiz && targetHasQuestions && (
+                    <Button asChild variant="ghost">
+                      <Link href={`/quiz?sectionId=${target.section.id}`}>Od razu do pytań</Link>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </section>
+          ) : course.hasContent ? (
+            <section className="surface p-6 sm:p-8 grid gap-4" aria-labelledby="continue-title" data-testid="continue-card">
+              <p className="label label--g">Kurs ukończony</p>
+              <h2 id="continue-title" className="h3">Wszystkie tematy masz za sobą</h2>
+              <p className="muted">Utrwal wiedzę w powtórce albo sprawdź się w egzaminie próbnym.</p>
+              <div>
+                <Button asChild>
+                  <Link href="/quiz?mode=review">
+                    Zacznij powtórkę
+                    <ArrowRight aria-hidden="true" />
+                  </Link>
+                </Button>
+              </div>
+            </section>
+          ) : (
+            <p id="continue-title" className="muted border-t border-[var(--line)] pt-8">
+              Nie masz jeszcze dostępu do żadnego modułu.
+            </p>
+          )}
+        </motion.div>
+      </section>
 
-              <nav className="chips mt-6" aria-label="Szybkie akcje">
-                <Link href="/quiz?mode=review" className="chip min-h-[44px]" data-testid="action-review">
-                  Powtórka
+      {!modulesError && showMethod && introModule && (
+        <motion.section variants={rise} className="mb-16 sm:mb-20" aria-label="Metoda">
+          <details
+            open={isMethodOpen}
+            onToggle={(e) => {
+              const open = (e.currentTarget as HTMLDetailsElement).open;
+              if (open !== isMethodOpen) setMethodOpen(open);
+            }}
+            className="border-y border-[var(--line)]"
+            data-testid="method-block"
+          >
+            <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer grid grid-cols-[minmax(0,1fr)_28px] items-center gap-4 py-6 transition-transform duration-[120ms] ease-out active:scale-[.995] select-none">
+              <span className="grid gap-2">
+                <span className="label label--g">Metoda · Moduł {pad(course.modules.indexOf(introModule) + 1)}</span>
+                <span className="h3">
+                  Serce to orkiestra. <span className="muted">EKG to jej nagranie.</span>
+                </span>
+              </span>
+              <span className="module-i">
+                <PlusIcon />
+              </span>
+            </summary>
+            <div className="pb-8 grid gap-6">
+              <OrchestraMethod header="lead" level={2} />
+              <div>
+                <Link
+                  href={`/modules#m-${introModule.id}`}
+                  className="inline-flex items-center gap-1 text-[15px] text-[var(--puls)] min-h-[44px]"
+                >
+                  {cleanTitle(introModule.title)}: otwórz moduł
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
-                <Link href="/quiz?mode=exam" className="chip min-h-[44px]" data-testid="action-exam">
-                  Egzamin próbny
-                </Link>
-                <Link href="/modules" className="chip min-h-[44px]" data-testid="action-course">
-                  Cały kurs
-                </Link>
-              </nav>
-            </motion.section>
+              </div>
+            </div>
+          </details>
+        </motion.section>
+      )}
 
+      {!modulesError && (
+        <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-16">
+          {/* Lewa kolumna: moduły */}
+          <div className="grid gap-12 content-start min-w-0">
             {course.modules.length > 0 && (
               <motion.section variants={rise} aria-labelledby="modules-title">
                 <div className="flex items-baseline justify-between gap-4 mb-4">
@@ -281,10 +411,11 @@ export default function StudentDashboard() {
                       <li key={module.id} className="contents">
                         <Link
                           href={`/modules#m-${module.id}`}
-                          className="row group py-5 grid-cols-[36px_minmax(0,1fr)_28px] sm:grid-cols-[48px_minmax(0,1fr)_auto_28px]"
+                          className="row group py-4 sm:py-5 gap-3 sm:gap-5 grid-cols-[24px_64px_minmax(0,1fr)_20px] sm:grid-cols-[40px_104px_minmax(0,1fr)_auto_28px]"
                           data-testid={`module-progress-${module.id}`}
                         >
                           <span className="row__n">{pad(mi + 1)}</span>
+                          <ModuleThumb art={getModuleArt(module.title)} />
                           <span className="row__t gap-2">
                             <b className="!text-[1.0625rem] sm:!text-[1.25rem] !leading-snug">{cleanTitle(module.title)}</b>
                             {progress !== null && (
@@ -307,16 +438,6 @@ export default function StudentDashboard() {
 
           {/* Prawa kolumna: liczby z odpowiedzi */}
           <aside className="grid gap-12 content-start" aria-label="Podsumowanie">
-            {course.total > 0 && (
-              <motion.div variants={rise}>
-                <ProgressCard
-                  overallProgress={course.overall}
-                  completedSections={course.completed}
-                  totalSections={course.total}
-                />
-              </motion.div>
-            )}
-
             {stats && stats.totalAttempts > 0 && (
               <motion.section variants={rise} aria-labelledby="stats-title">
                 <h2 id="stats-title" className="label mb-4">Twoje odpowiedzi</h2>

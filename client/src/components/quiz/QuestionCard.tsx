@@ -5,6 +5,8 @@ import { rise } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { QuizQuestion, QuizResult, AnswerData } from "@/types";
 import { QuestionRenderer } from "./questions";
+import { caseKicker } from "./questions/ClinicalCaseQuestion";
+import type { AnyQuestionConfig } from "@shared/clinicalCase";
 
 interface QuestionCardProps {
   question: QuizQuestion;
@@ -57,7 +59,10 @@ export default function QuestionCard({
   const questionType = question.questionType || "multiple_choice";
   const isInteractiveType = questionType !== "multiple_choice" && !!question.questionConfig;
   const imagePosition = (question as QuizQuestion & { imagePosition?: string }).imagePosition;
-  const showImage = !!question.imageUrl && questionType !== "hotspot";
+  const anyConfig = question.questionConfig as AnyQuestionConfig | undefined;
+  const caseConfig = anyConfig?.type === "clinical_case" ? anyConfig.config : undefined;
+  // Hotspot i przypadek rysują obraz same (plansza do wskazywania / zapis przypadku)
+  const showImage = !!question.imageUrl && questionType !== "hotspot" && !caseConfig;
   const answered = showExplanation && !!quizResult;
 
   const correctAnswer =
@@ -68,6 +73,12 @@ export default function QuestionCard({
       className="rounded-[20px] border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)]"
       aria-labelledby="question-title"
     >
+      {caseConfig && (
+        <p className="label label--g mb-4" data-testid="case-kicker">
+          {caseKicker(caseConfig)}
+        </p>
+      )}
+
       {question.title && (
         <h1 id="question-title" className="mb-6 text-[var(--txt)]" style={titleStyle} data-testid="question-title">
           {question.title}
@@ -97,6 +108,7 @@ export default function QuestionCard({
           disabled={showExplanation}
           showResult={showExplanation}
           result={quizResult}
+          onImageClick={onImageClick}
         />
       )}
 
@@ -180,7 +192,7 @@ export default function QuestionCard({
 
               {quizResult.explanation && (
                 <>
-                  <p className="label mt-1">Wyjaśnienie</p>
+                  <p className="label mt-1">{caseConfig ? "Podsumowanie przypadku" : "Wyjaśnienie"}</p>
                   <div
                     className="prose-hk max-w-[46em] text-[16px]"
                     dangerouslySetInnerHTML={sanitizeMarkdown(quizResult.explanation)}

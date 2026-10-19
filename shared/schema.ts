@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, json, jsonb, decimal, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, json, jsonb, decimal, uuid, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -23,6 +23,8 @@ export const users = pgTable("users", {
   passwordResetExpiry: timestamp("password_reset_expiry"),
   stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
+  // Pierwsza interakcja z podpowiedzią przycisku „Zgłoś uwagę” (null = jeszcze pokazujemy)
+  feedbackHintSeenAt: timestamp("feedback_hint_seen_at"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -173,7 +175,8 @@ export type QuestionConfig =
   | { type: 'fill_blank'; config: FillBlankConfig }
   | { type: 'matching'; config: MatchingConfig }
   | { type: 'sorting'; config: SortingConfig }
-  | { type: 'hotspot'; config: HotspotConfig };
+  | { type: 'hotspot'; config: HotspotConfig }
+  | { type: 'clinical_case'; config: import('./clinicalCase').ClinicalCaseConfig };
 
 // Questions
 export const questions = pgTable("questions", {
@@ -294,9 +297,33 @@ export const supportTickets = pgTable("support_tickets", {
   adminResponse: text("admin_response"),
   adminUserId: uuid("admin_user_id").references(() => users.id),
   assignedTo: uuid("assigned_to").references(() => users.id),
+  // Zgłoszenia testerów (beta): kind = support | question | feedback.
+  // Dla kind = feedback: status nowe/w_analizie/wdrozone/odrzucone, priority P0–P2 (albo "medium" = brak),
+  // adminResponse = notatka zespołu widoczna dla zgłaszającego.
+  kind: varchar("kind", { length: 20 }).notNull().default("support"),
+  area: varchar("area", { length: 20 }),
+  feedbackType: varchar("feedback_type", { length: 20 }),
+  pagePath: text("page_path"),
+  context: jsonb("context").$type<FeedbackContext>(),
+  attachments: jsonb("attachments").$type<FeedbackAttachmentMeta[]>().notNull().default([]),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
+}, (t) => [index("support_tickets_kind_created_idx").on(t.kind, t.createdAt)]);
+
+export type FeedbackContext = {
+  userAgent?: string;
+  viewport?: string;
+  appVersion?: string;
+  sectionId?: string;
+  questionId?: string;
+};
+
+export type FeedbackAttachmentMeta = {
+  file: string; // nazwa pliku na dysku (generowana), w katalogu zgłoszenia
+  mime: "image/png" | "image/jpeg" | "image/webp";
+  size: number;
+  name: string; // oryginalna nazwa (tylko do wyświetlenia)
+};
 
 // Audit log for tracking changes
 export const auditLog = pgTable("audit_log", {
@@ -461,7 +488,10 @@ export const insertCertificateSchema = createInsertSchema(certificates).omit({
   issuedAt: true 
 });
 
-export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ 
+export const insertSupportTicketSchema = createInsertSchema(supportTickets, {
+  context: () => z.custom<FeedbackContext>().nullable().optional(),
+  attachments: () => z.custom<FeedbackAttachmentMeta[]>().optional(),
+}).omit({ 
   id: true, 
   createdAt: true, 
   updatedAt: true 

@@ -227,6 +227,46 @@ export class EmailService {
       text: `Gratulacje! Certyfikat nr ${certificateId}, weryfikacja: ${verificationUrl}`,
     };
   }
+
+  /** Powiadomienie zespołu o nowym zgłoszeniu testera (beta) */
+  getFeedbackNotificationTemplate(r: {
+    id: string;
+    userName: string;
+    userEmail: string;
+    areaLabel: string;
+    typeLabel: string;
+    description: string;
+    pagePath?: string | null;
+    attachmentCount: number;
+    viewport?: string;
+    appVersion?: string;
+  }): EmailTemplate {
+    const adminUrl = `${appUrl()}/admin?tab=zgloszenia&report=${encodeURIComponent(r.id)}`;
+    const short = r.description.length > 70 ? `${r.description.slice(0, 70).trimEnd()}…` : r.description;
+    const rows: Array<[string, string]> = [
+      ["Typ", r.typeLabel],
+      ["Obszar", r.areaLabel],
+      ["Od", `${r.userName} · ${r.userEmail}`],
+      ["Strona", r.pagePath || "—"],
+      ["Załączniki", String(r.attachmentCount)],
+    ];
+    if (r.viewport) rows.push(["Ekran", r.viewport]);
+    if (r.appVersion) rows.push(["Wersja", r.appVersion]);
+    const quote = `<p ${P.replace('color:#B8C2C9;', 'color:#F2F6F4;white-space:pre-wrap;border-left:2px solid #3EE6A8;padding-left:16px;')}>${esc(r.description)}</p>`;
+    return {
+      subject: `[Zgłoszenie] ${r.typeLabel}: ${short}`,
+      html: brandEmail({
+        preheader: short,
+        label: "Zgłoszenie z bety",
+        title: esc(r.typeLabel),
+        subtitle: r.areaLabel,
+        body: `${quote}${details(rows)}`,
+        cta: { href: adminUrl, text: "Otwórz w panelu" },
+        reason: "Dostajesz tę wiadomość, bo ten adres odbiera zgłoszenia testerów helloEKG.",
+      }),
+      text: `Nowe zgłoszenie (${r.typeLabel}, ${r.areaLabel}) od ${r.userName} <${r.userEmail}>\nStrona: ${r.pagePath || "—"}\nZałączniki: ${r.attachmentCount}\n\n${r.description}\n\nPanel: ${adminUrl}`,
+    };
+  }
 }
 
 /* ---------- Szablon wiadomości w stylu marki (jak powitanie z listy startowej na helloekg.pl) ---------- */

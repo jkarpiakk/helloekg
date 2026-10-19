@@ -1,14 +1,14 @@
 import { useEffect, useMemo } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { LectureNavigation, type CheckLink, type NextSectionLink } from "@/components/LectureNavigation";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
-import { rise } from "@/lib/motion";
+import { LectureHero } from "@/components/lecture/LectureHero";
+import { chaptersQuery, countWords, pickRhythm, plural, readingMinutes, sortChapters } from "@/components/lecture/lectureData";
 
 interface CourseSection {
   id: string;
@@ -24,13 +24,6 @@ interface CourseModule {
   title: string;
   order: number;
   sections: CourseSection[];
-}
-
-function plural(n: number, one: string, few: string, many: string) {
-  if (n === 1) return one;
-  const d = n % 10;
-  const dd = n % 100;
-  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
 }
 
 const cleanTitle = (title: string) => title.replace(/^\s*moduł\s*\d+\s*[:.–—-]\s*/i, "");
@@ -124,6 +117,21 @@ export default function DynamicLecture() {
     return { ...current, check, next };
   }, [modules, sectionId]);
 
+  // Te same rozdziały co w LectureNavigation (wspólny klucz → jedno zapytanie): do metadanych nagłówka
+  const lectureKnown = ctx ? ctx.section.chapterCount === undefined || ctx.section.chapterCount > 0 : false;
+  const { data: chapterData } = useQuery({
+    ...chaptersQuery(sectionId ?? ""),
+    enabled: isAuthenticated && !!sectionId && lectureKnown,
+  });
+  const meta = useMemo(() => {
+    const chapters = sortChapters(chapterData);
+    if (!chapters.length) return null;
+    const n = chapters.length;
+    const min = readingMinutes(countWords(chapters));
+    return `${n} ${plural(n, "rozdział", "rozdziały", "rozdziałów")} · ~${min} min czytania`;
+  }, [chapterData]);
+  const topic = useMemo(() => (ctx ? pickRhythm(ctx.module.title, ctx.section.title) : null), [ctx]);
+
   if (!isAuthenticated) return null;
 
   if (isLoading) {
@@ -167,15 +175,14 @@ export default function DynamicLecture() {
         Kurs
       </Link>
 
-      <motion.header className="grid gap-4 mt-6 mb-2" variants={rise} initial="hidden" animate="show">
-        <p className="label">
-          Moduł {moduleNo} · {lectureNo !== null ? `Wykład ${lectureNo}` : "Pytania"}
-        </p>
-        <h1 className="h1" data-testid="lecture-title">
-          {section.title}
-        </h1>
-        <p className="muted text-[15px]">{cleanTitle(module.title)}</p>
-      </motion.header>
+      <LectureHero
+        label={`Moduł ${moduleNo} · ${lectureNo !== null ? `Wykład ${lectureNo}` : "Pytania"}`}
+        title={section.title}
+        moduleName={cleanTitle(module.title)}
+        meta={meta}
+        rhythm={topic?.rhythm ?? "sinus"}
+        rhythmLabel={topic?.exact ?? false}
+      />
 
       <LectureNavigation
         key={section.id}
@@ -184,6 +191,7 @@ export default function DynamicLecture() {
         hasLecture={section.chapterCount === undefined ? undefined : section.chapterCount > 0}
         check={check}
         next={next}
+        rhythm={topic?.rhythm}
       />
     </div>
   );
