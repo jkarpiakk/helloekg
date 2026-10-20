@@ -42,7 +42,7 @@ export default function OrderHint({ sectionId }: { sectionId: string }) {
         type="button"
         onClick={() => setClosed(true)}
         aria-label="Zamknij podpowiedź"
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[var(--txt3)] transition-colors hover:text-[var(--txt)] active:scale-95"
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[var(--txt2)] transition-colors hover:text-[var(--txt)] active:scale-95"
       >
         <X className="h-4 w-4" aria-hidden />
       </button>

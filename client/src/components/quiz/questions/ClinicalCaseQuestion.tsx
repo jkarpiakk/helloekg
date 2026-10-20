@@ -303,7 +303,7 @@ export default function ClinicalCaseQuestion({
                             {ok ? "Dobrze." : "Nie tym razem."}
                           </p>
                           <div
-                            className="prose-hk max-w-[46em] text-[.9375rem] text-[var(--txt2)]"
+                            className="prose-hk max-w-[46em] text-[.9375rem]"
                             dangerouslySetInnerHTML={sanitizeMarkdown(step.explanation)}
                           />
                           {!isLast && revealed === i + 1 && (

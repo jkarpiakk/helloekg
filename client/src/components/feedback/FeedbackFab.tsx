@@ -117,6 +117,10 @@ export default function FeedbackFab() {
 
   if (hidden) return null;
 
+  // Na telefonie przy czytaniu (przewijanie w dół) przycisk chowa się w dół ekranu — zasłaniał końce
+  // wierszy wykładu. Wraca tą samą drogą przy przewinięciu w górę, na końcu strony albo przy fokusie.
+  const tucked = narrow && collapsed;
+
   const from = `${path}${search ? `?${search}` : ""}`;
   const href = `/zgloszenie?area=${feedbackAreaForPath(from)}&from=${encodeURIComponent(from)}`;
 
@@ -163,6 +167,8 @@ export default function FeedbackFab() {
         layout
         transition={springSnappy}
         whileTap={press}
+        animate={{ y: tucked ? 88 : 0, opacity: tucked ? 0 : 1 }}
+        onFocus={() => setCollapsed(false)}
         href={href}
         onClick={(e) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -174,7 +180,7 @@ export default function FeedbackFab() {
         title="Zgłoś uwagę"
         data-testid="feedback-fab"
         data-tour="feedback-fab"
-        style={{ ...inset, borderRadius: 999 }}
+        style={{ ...inset, borderRadius: 999, pointerEvents: tucked ? "none" : undefined }}
         className="material-bar fixed z-[45] flex h-12 min-w-12 items-center justify-center gap-2 border border-[var(--line2)] px-[14px] text-[.9375rem] font-medium text-[var(--txt)] no-underline transition-[border-color] duration-150 hover:border-[var(--txt3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--puls)]"
       >
         <motion.span layout="position" className="grid place-items-center">

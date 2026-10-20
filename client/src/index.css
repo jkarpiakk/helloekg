@@ -102,10 +102,14 @@
   --puls-dark: #D5E3DD;
   --on-puls: #F8FAF9;
   --txt: #0C1210;
-  --txt2: #4F5D58;
+  /* #46534F: 7.6:1 na --ink (AAA), jak w ciemnym motywie */
+  --txt2: #46534F;
   --txt3: #7A8783;
   --txt4: #B5C1BC;
   --label: #5F6D68;
+  /* Tekst do czytania (wykład, wyjaśnienia): jaśniejszy od --txt2, ciemniejszy od --txt,
+     żeby długi tekst był wygodny, a pogrubienia nadal się wyróżniały (13:1 na --ink) */
+  --prose: #26302D;
   --alarm: #C93B3A;
   /* Wypełnienie przycisku destrukcyjnego — jasny tekst na nim ≥ 4.5:1 w obu motywach */
   --alarm-solid: #B53130;
@@ -129,10 +133,14 @@
   --puls-dark: #1E4536;
   --on-puls: #07130E;
   --txt: #F2F6F4;
-  --txt2: #8A97A0;
+  /* #9BA7AF: 7.8:1 na --ink (AAA) — drugi plan, podpisy, leady */
+  --txt2: #9BA7AF;
   --txt3: #5C6870;
   --txt4: #3A4550;
-  --label: #76838C;
+  /* #84919A: 6.0:1 — małe etykiety mono */
+  --label: #84919A;
+  /* #C2CBD1: 11.6:1 — tekst wykładu; pogrubienia w --txt (17:1) */
+  --prose: #C2CBD1;
   --alarm: #E24B4A;
   --alarm-solid: #B53130;
   /* #6B7780: 4.0 na --panel, 4.2 na --ink */
@@ -246,7 +254,7 @@
   .material-bar { background: var(--nav-bg); -webkit-backdrop-filter: saturate(140%) blur(18px); backdrop-filter: saturate(140%) blur(18px); }
 
   /* Treść wykładu */
-  .prose-hk { color: var(--txt2); font-size: 1.0625rem; line-height: 1.75; max-width: 42em; }
+  .prose-hk { color: var(--prose); font-size: 1.0625rem; line-height: 1.75; max-width: 42em; }
   .prose-hk > * + * { margin-top: 1.1em; }
   /* Wyrównanie do obu stron + dzielenie wyrazów (lang="pl"), żeby nie było „rzek” odstępów.
      Na wąskim ekranie (≤ 480px) wracamy do lewej — przy ~35 znakach w wierszu justowanie szarpie tekst. */
@@ -254,7 +262,7 @@
   @media (max-width: 480px) { .prose-hk p, .prose-hk li, .prose-hk blockquote { text-align: left; } }
   .prose-hk h2 { color: var(--txt); font: 500 clamp(1.5rem, 1.2rem + 1.2vw, 2rem)/1.15 var(--font-heading); letter-spacing: -.022em; margin-top: 2.2em; }
   .prose-hk h3 { color: var(--txt); font: 500 1.25rem/1.3 var(--font-heading); letter-spacing: -.012em; margin-top: 1.8em; }
-  .prose-hk strong, .prose-hk b { color: var(--txt); font-weight: 500; }
+  .prose-hk strong, .prose-hk b { color: var(--txt); font-weight: 600; }
   .prose-hk a { color: var(--puls); }
   .prose-hk ul, .prose-hk ol { padding-left: 1.3em; display: grid; gap: .45em; }
   .prose-hk ul { list-style: disc; } .prose-hk ol { list-style: decimal; }
@@ -367,8 +375,8 @@
   .material-bar, .modal-overlay { background: var(--ink); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (prefers-contrast: more) {
-  .dark { --line: #3a4550; --line2: #5c6870; --txt2: #c3ccd2; --txt3: #a6b1b8; --label: #a6b1b8; --field-border: #8a97a0; }
-  :root:not(.dark) { --line: #9aa8a2; --line2: #7a8783; --txt2: #2c3633; --txt3: #4f5d58; --label: #3f4b47; --field-border: #4f5d58; }
+  .dark { --line: #3a4550; --line2: #5c6870; --txt2: #c3ccd2; --txt3: #a6b1b8; --label: #a6b1b8; --prose: #e4e9ec; --field-border: #8a97a0; }
+  :root:not(.dark) { --line: #9aa8a2; --line2: #7a8783; --txt2: #2c3633; --txt3: #4f5d58; --label: #3f4b47; --prose: #141b19; --field-border: #4f5d58; }
   /* Materiał staje się pełny, z wyraźną krawędzią */
   .material-bar { background: var(--ink); -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom: 1px solid var(--line2) !important; }
   :focus-visible { outline-width: 3px; outline-offset: 2px; }
