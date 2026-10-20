@@ -89,6 +89,9 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
         let imageUrl: string | null = q.imageUrl ? fixAssets(q.imageUrl) : null;
         let config = q.questionType === "multiple_choice" ? null : fixDeep(q.questionConfig);
         let ok = !unsupported.has(q.externalId);
+        // Pytania z interaktywną wstawką studia (::wstawka → bodyMdApp z data-widget) zostają szkicem,
+        // dopóki kurs nie umie jej narysować — inaczej kursant zobaczyłby pytanie bez kardiomonitora
+        if (q.bodyMdApp || (q.tags ?? []).includes("kardiomonitor") || /::wstawka\b/.test(q.bodyMd ?? "")) ok = false;
         // Hotspot: grafika pytania jest zarazem planszą do klikania
         if (q.questionType === "hotspot" && config?.config) {
           if (!isAsset(config.config.imageUrl) && isAsset(imageUrl)) {
