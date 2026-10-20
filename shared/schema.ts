@@ -70,6 +70,8 @@ export const subscriptions = pgTable("subscriptions", {
 // Course modules
 export const modules = pgTable("modules", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  /** Kod sekcji ze studia (S1…S7) — import aktualizuje moduł w miejscu zamiast tworzyć nowy */
+  externalId: varchar("external_id", { length: 64 }),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
   order: integer("order").notNull(),
@@ -83,6 +85,8 @@ export const modules = pgTable("modules", {
 // Course sections/subsections within modules
 export const sections = pgTable("sections", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  /** Id wykładu ze studia (np. S2_01) albo „S1:utrwalajace” — klucz importu bez kasowania postępów */
+  externalId: varchar("external_id", { length: 64 }),
   moduleId: uuid("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
