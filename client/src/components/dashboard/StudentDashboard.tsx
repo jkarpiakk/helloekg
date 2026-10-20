@@ -23,6 +23,8 @@ interface CourseSection {
   lastActivity?: string | null;
   questionCount?: number;
   chapterCount?: number;
+  /** Ostatnio otwarty rozdział wykładu (GET /api/modules) */
+  lastChapter?: number | null;
 }
 
 interface CourseModule {
@@ -39,6 +41,9 @@ interface Eligibility {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const hasLecture = (s: CourseSection) => (s.chapterCount ?? 0) > 0;
+/** Wykład przeczytany do ostatniego rozdziału (albo tematu bez wykładu) */
+const lectureFinished = (s: CourseSection) =>
+  !hasLecture(s) || (s.lastChapter ?? 0) >= (s.chapterCount ?? 0);
 const hasQuestions = (s: CourseSection) => (s.questionCount ?? 0) > 0;
 
 /** Postęp to odsetek opanowanych pytań — liczymy go tylko z sekcji, które mają pytania */
@@ -176,21 +181,15 @@ export default function StudentDashboard() {
     );
     // Tylko sekcje, w których coś jest — „Kontynuuj” nigdy nie prowadzi do pustej
     const withContent = flat.filter((x) => hasLecture(x.section) || hasQuestions(x.section));
-    // „Zrobione” = wszystkie pytania tematu opanowane (ostatnia odpowiedź na każde poprawna);
-    // sam wykład nie zapisuje postępu
+    // „Zrobione” (do licznika) = wszystkie pytania tematu opanowane
     const isDone = (s: CourseSection) => hasQuestions(s) && (s.completionPercentage || 0) >= 100;
-
-    const lastActive = withContent
-      .filter((x) => x.section.lastActivity)
-      .sort((a, b) => new Date(b.section.lastActivity!).getTime() - new Date(a.section.lastActivity!).getTime())[0];
-
-    let target: (typeof withContent)[number] | null = null;
-    if (lastActive && !isDone(lastActive.section)) {
-      target = lastActive;
-    } else if (lastActive) {
-      const from = withContent.indexOf(lastActive);
-      target = withContent.slice(from + 1).find((x) => !isDone(x.section)) ?? null;
-    }
+    // „Kontynuuj” idzie po kolei, jak kurs: pierwszy temat, w którym zostało coś do zrobienia —
+    // wykład nieprzeczytany do końca albo pytania jeszcze nieruszane. „Pytania utrwalające”
+    // stoją na końcu modułu, więc wypadają dopiero po jego wykładach (a nie dlatego, że ktoś
+    // ostatnio na nie odpowiadał).
+    const isPassed = (s: CourseSection) =>
+      lectureFinished(s) && (!hasQuestions(s) || !!s.lastActivity || (s.completionPercentage || 0) > 0);
+    let target: (typeof withContent)[number] | null = withContent.find((x) => !isPassed(x.section)) ?? null;
     if (!target) target = withContent.find((x) => !isDone(x.section)) ?? null;
 
     const questionSections = flat.filter((x) => hasQuestions(x.section));
@@ -224,7 +223,8 @@ export default function StudentDashboard() {
   // lastActivity zapisuje każda odpowiedź — także błędna, która nie podnosi opanowania
   const targetStartedQuiz =
     targetHasQuestions && ((target?.section.completionPercentage || 0) > 0 || !!target?.section.lastActivity);
-  const primaryIsQuiz = !targetHasLecture || targetStartedQuiz;
+  // Najpierw wykład (dopóki nieprzeczytany do końca), potem pytania tego tematu
+  const primaryIsQuiz = !targetHasLecture || (target ? lectureFinished(target.section) : false);
   const certificate = myCertificates?.[0];
 
 
@@ -236,17 +236,14 @@ export default function StudentDashboard() {
     <motion.div className="wrap pt-12 pb-24 sm:pt-16" variants={stagger(0.05)} initial="hidden" animate="show">
       {/* Powitanie i prowadzenie po aplikacji: components/onboarding/Tour.tsx (montowane w App) */}
 
-      {/* Hero jak na landingu: etykieta + tytuł + postęp po lewej, „Kontynuuj” z ilustracją po prawej */}
-      <section
-        className="grid gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16 items-start mb-16 sm:mb-20"
-        aria-labelledby="dashboard-title"
-      >
-        <motion.header className="grid gap-5 content-start lg:pt-6" variants={rise}>
+      {/* Najpierw „Twój postęp” (tytuł, opis, postęp całego kursu), pod nim spokojnie „Następny krok” */}
+      <section className="grid gap-10 mb-16 sm:mb-20" aria-labelledby="dashboard-title">
+        <motion.header className="grid gap-5 content-start" variants={rise}>
           <p className="label label--g" data-testid="welcome-message">
             {user?.firstName ? `Cześć, ${user.firstName}` : "Cześć"}
           </p>
           <h1 id="dashboard-title" className="h1">Twój postęp</h1>
-          <p className="lead max-w-[30em]">
+          <p className="lead max-w-[36em]">
             Tu widzisz, co masz za sobą i od czego zacząć dziś. Postęp to odsetek opanowanych pytań — tych, w których twoja ostatnia odpowiedź była poprawna.
           </p>
           {!modulesError && course.total > 0 && (
@@ -270,17 +267,16 @@ export default function StudentDashboard() {
           </nav>
           <ExamCountDialog open={examOpen} onOpenChange={setExamOpen} />
         </motion.header>
-
-        <motion.div variants={rise} className="min-w-0">
+        <motion.div variants={rise} className="min-w-0 max-w-[760px]">
           {modulesError ? (
             <p className="muted border-t border-[var(--line)] pt-8">
               Nie udało się wczytać kursu. Odśwież stronę i spróbuj jeszcze raz.
             </p>
           ) : target ? (
-            <section className="surface p-4 sm:p-5 grid gap-6" aria-labelledby="continue-title" data-testid="continue-card" data-tour="continue">
-              <div className="grid gap-5 px-1 sm:px-3 pb-2 sm:pb-3">
-                <p className="label label--g">
-                  Kontynuuj · Moduł {pad(target.moduleNo)} · Temat {pad(target.sectionNo)}
+            <section className="border-t border-[var(--line)] pt-8 grid gap-6" aria-labelledby="continue-title" data-testid="continue-card" data-tour="continue">
+              <div className="grid gap-5">
+                <p className="label">
+                  Następny krok · Moduł {pad(target.moduleNo)} · Temat {pad(target.sectionNo)}
                 </p>
                 <div className="grid gap-1">
                   <h2 id="continue-title" className="h3">{target.section.title}</h2>
