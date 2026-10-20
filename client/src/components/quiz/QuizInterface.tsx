@@ -21,6 +21,7 @@ import QuestionCard, { type AnswerStatus } from "./QuestionCard";
 import ImageLightbox from "./ImageLightbox";
 import ReportErrorDialog from "./ReportErrorDialog";
 import { isTypingTarget } from "./questions/gesture";
+import { pytania } from "@/lib/i18n";
 import type { QuizQuestion, QuizResult, AnswerData, QuestionType } from "@/types";
 
 interface QuizInterfaceProps {
@@ -50,16 +51,55 @@ const TYPE_LABEL: Record<QuestionType | "clinical_case", string> = {
   clinical_case: "Przypadek",
 };
 
-const MODE_LABEL = { learn: "Nauka", review: "Powtórka", exam: "Egzamin próbny" } as const;
+/** Etykieta trybu; quiz tematu dostaje „Moduł 01 · Temat 04” (numeracja jak na liście w Kursie) */
+const MODE_LABEL = { learn: "Temat", review: "Powtórka", exam: "Egzamin próbny" } as const;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** 1 pytanie, 2 pytania, 5 pytań */
-function pytan(n: number) {
-  if (n === 1) return "pytanie";
-  const d = n % 10;
-  const dd = n % 100;
-  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? "pytania" : "pytań";
+/** Nauka/powtórka zatwierdzają odpowiedź od razu po dotknięciu — mówimy o tym raz, przy pierwszym pytaniu */
+const INSTANT_HINT_KEY = "hk-hint-instant-v1";
+function readHintSeen(): boolean {
+  try {
+    return window.localStorage.getItem(INSTANT_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function saveHintSeen() {
+  try {
+    window.localStorage.setItem(INSTANT_HINT_KEY, "1");
+  } catch {
+    /* tryb prywatny — podpowiedź pokaże się jeszcze raz, nic się nie psuje */
+  }
+}
+
+/**
+ * Ile miejsc w pytaniu interaktywnym jest wypełnionych — do licznika obok „Sprawdź”.
+ * Kolejność (sorting) i wskazanie (hotspot) są zawsze „kompletne”, więc bez licznika.
+ */
+function filledCount(question: QuizQuestion | undefined, answer: AnswerData | null): { filled: number; total: number; noun: string } | null {
+  const cfg = question?.questionConfig as any;
+  if (!cfg?.config) return null;
+  const a = answer as any;
+  switch (cfg.type) {
+    case "drag_drop": {
+      const total = cfg.config.targets?.length ?? 0;
+      const filled = new Set((a?.placements ?? []).map((p: { targetId: string }) => p.targetId)).size;
+      return total > 1 ? { filled: Math.min(filled, total), total, noun: "miejsc wypełnionych" } : null;
+    }
+    case "fill_blank": {
+      const total = cfg.config.blanks?.length ?? 0;
+      const filled = (a?.filledBlanks ?? []).filter((b: { value?: string }) => (b.value ?? "").trim() !== "").length;
+      return total > 1 ? { filled: Math.min(filled, total), total, noun: "luk uzupełnionych" } : null;
+    }
+    case "matching": {
+      const total = cfg.config.leftColumn?.length ?? 0;
+      const filled = new Set((a?.pairs ?? []).map((p: { leftId: string }) => p.leftId)).size;
+      return total > 1 ? { filled: Math.min(filled, total), total, noun: "par połączonych" } : null;
+    }
+    default:
+      return null;
+  }
 }
 
 function formatTime(ms: number) {
@@ -68,12 +108,21 @@ function formatTime(ms: number) {
   return m > 0 ? `${m} min ${pad(s % 60)} s` : `${s} s`;
 }
 
-/* Przejście między pytaniami: stare odjeżdża w lewo, nowe wjeżdża z prawej (spójność przestrzenna) */
+/*
+ * Przejście między pytaniami: nowe wjeżdża z prawej OD RAZU (AnimatePresence mode="popLayout"),
+ * stare w tym czasie krótko odpływa w lewo nad nim — bez czekania na koniec wyjścia (spójność przestrzenna,
+ * zero opóźnienia na ścieżce „Dalej”).
+ */
 const stage = {
   initial: { opacity: 0, x: 20 },
   animate: { opacity: 1, x: 0, transition: spring },
-  exit: { opacity: 0, x: -20, transition: springSnappy },
+  exit: { opacity: 0, x: -20, transition: { duration: 0.14, ease: "easeOut" } },
 };
+
+/** Przewiń na górę natychmiast — płynne przewijanie po skosie w trakcie wejścia nowej karty męczy wzrok */
+function jumpToTop() {
+  if (window.scrollY > 0) window.scrollTo({ top: 0, left: window.scrollX, behavior: "instant" as ScrollBehavior });
+}
 
 interface CourseSection {
   id: string;
@@ -114,6 +163,8 @@ interface ExamSummaryData {
 }
 
 type Payload = { questionId: string; selectedIndex: number; timeMs: number; answerData?: AnswerData };
+/** Pobranie następnego pytania w tle; key = JSON klucza zapytania, dla którego jest */
+type Prefetch = { key: string; promise: Promise<QuizQuestion>; data?: QuizQuestion; failed?: boolean };
 
 /** Brak pytania (404) to nie błąd — sesja się skończyła albo nie ma pytań */
 class NoQuestion extends Error {}
@@ -161,8 +212,12 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const [sessionTotal, setSessionTotal] = useState<number | null>(isExam ? null : reviewIds ? Math.min(SESSION_LENGTH, reviewIds.length) : null);
   // Wyniki tej sesji (z odpowiedzi serwera) — do podsumowania
   const [tally, setTally] = useState<Record<number, { questionId: string; isCorrect: boolean; timeMs: number }>>({});
+  /** Pierwsze pytanie nauki/powtórki: podpowiedź, że dotknięcie od razu zatwierdza odpowiedź */
+  const [instantHint, setInstantHint] = useState(() => !isExam && !readHintSeen());
   /** Pytania pokazane w tej sesji — serwer ich nie powtórzy */
   const shownRef = useRef<string[]>([]);
+  /** Następne pytanie pobrane w tle, gdy widać wyjaśnienie / „Zapisano” — „Dalej” pokazuje je od razu */
+  const prefetchRef = useRef<Prefetch | null>(null);
   const lastPayload = useRef<Payload | null>(null);
   const requestNo = useRef(0);
   const advanceTimer = useRef<number | null>(null);
@@ -171,6 +226,10 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   useEffect(() => () => {
     requestNo.current++;
     if (advanceTimer.current) window.clearTimeout(advanceTimer.current);
+    prefetchRef.current = null;
+    // Pytania z tej sesji (także wstawione z pobrania w tle) nie mogą wrócić przy następnym wejściu
+    queryClient.removeQueries({ queryKey: ["/api/quiz/question"] });
+    queryClient.removeQueries({ queryKey: ["/api/exam/question"] });
   }, []);
 
   /* ───────── Dane kursu: długość sesji nauki i „Następny temat” ───────── */
@@ -197,6 +256,23 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     [modulesQuery.data],
   );
   const currentSection = sectionId ? orderedSections.find((s) => s.id === sectionId) : undefined;
+
+  // „Moduł 01 · Temat 04” — te same numery co na liście w Kursie
+  const topicLabel = useMemo(() => {
+    const mods = (modulesQuery.data ?? []).slice().sort((a, b) => a.order - b.order);
+    for (let mi = 0; mi < mods.length; mi++) {
+      const si = mods[mi].sections
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .findIndex((s) => s.id === sectionId);
+      if (si >= 0) return `Moduł ${pad(mi + 1)} · Temat ${pad(si + 1)}`;
+    }
+    return MODE_LABEL.learn;
+  }, [modulesQuery.data, sectionId]);
+  const modeLabel = mode === "learn" ? topicLabel : MODE_LABEL[mode];
+
+  /** Wyjście z sesji: temat wraca do Kursu, powtórka i egzamin do Postępu (onExit w pages/quiz.tsx) */
+  const exitLabel = mode === "learn" ? "Wróć do kursu" : "Wróć do postępu";
 
   /* ───────── Kolejka powtórki: długość sesji i pusty stan ───────── */
   const queueQuery = useQuery({
@@ -243,25 +319,44 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   }, [isExam, examQuestionCount, examSessionId, examInitNonce]);
 
   /* ───────── Bieżące pytanie ───────── */
+  const questionKey = (index: number) =>
+    isExam
+      ? (["/api/exam/question", examSessionId, index] as const)
+      : (["/api/quiz/question", mode, sectionId ?? null, reviewIds?.join(",") ?? null, sessionNo, index] as const);
+
+  /**
+   * Nauka/powtórka: serwer wybiera następne pytanie z pominięciem pokazanych (exclude).
+   * Egzamin: pytanie po indeksie — serwer wydaje najwyżej bieżące, a pytanie nie niesie odpowiedzi,
+   * więc pobranie index+1 po zapisaniu odpowiedzi niczego nie zdradza.
+   */
+  const fetchQuestion = async (index: number): Promise<QuizQuestion> => {
+    let url: string;
+    if (isExam) {
+      url = `/api/exam/question?sessionId=${encodeURIComponent(examSessionId!)}&index=${index}`;
+    } else {
+      const p = new URLSearchParams({ mode });
+      if (mode === "learn" && sectionId) p.set("sectionId", sectionId);
+      if (reviewIds?.length) p.set("ids", reviewIds.join(","));
+      if (shownRef.current.length) p.set("exclude", shownRef.current.join(","));
+      url = `/api/quiz/question?${p.toString()}`;
+    }
+    const res = await fetch(url, { credentials: "include" });
+    if (res.status === 404) throw new NoQuestion();
+    if (!res.ok) throw new Error(`${res.status}`);
+    return (await res.json()) as QuizQuestion;
+  };
+
   const questionQuery = useQuery({
-    queryKey: isExam
-      ? ["/api/exam/question", examSessionId, currentQuestionIndex]
-      : ["/api/quiz/question", mode, sectionId ?? null, reviewIds?.join(",") ?? null, sessionNo, currentQuestionIndex],
-    queryFn: async () => {
-      let url: string;
-      if (isExam) {
-        url = `/api/exam/question?sessionId=${encodeURIComponent(examSessionId!)}&index=${currentQuestionIndex}`;
-      } else {
-        const p = new URLSearchParams({ mode });
-        if (mode === "learn" && sectionId) p.set("sectionId", sectionId);
-        if (reviewIds?.length) p.set("ids", reviewIds.join(","));
-        if (shownRef.current.length) p.set("exclude", shownRef.current.join(","));
-        url = `/api/quiz/question?${p.toString()}`;
+    queryKey: questionKey(currentQuestionIndex),
+    queryFn: ({ queryKey }) => {
+      const index = queryKey[queryKey.length - 1] as number;
+      // Pobranie w tle jeszcze trwa (albo skończyło się 404 = koniec sesji) — czekamy na nie, bez drugiego zapytania
+      const pre = prefetchRef.current;
+      if (pre && pre.key === JSON.stringify(queryKey) && !pre.failed) {
+        prefetchRef.current = null;
+        return pre.promise;
       }
-      const res = await fetch(url, { credentials: "include" });
-      if (res.status === 404) throw new NoQuestion();
-      if (!res.ok) throw new Error(`${res.status}`);
-      return (await res.json()) as QuizQuestion;
+      return fetchQuestion(index);
     },
     enabled: isExam ? !!examSessionId : mode === "review" || !!sectionId,
     // Pytanie nie może się podmienić w trakcie odpowiadania (np. po powrocie do karty)
@@ -298,10 +393,29 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const total = isExam ? examTotalQuestions : sessionTotal ?? SESSION_LENGTH;
   const isLast = currentQuestionIndex + 1 >= total;
 
-  const scrollToTop = () => {
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
-  };
+  const scrollToTop = jumpToTop;
+
+  // Odpowiedź oceniona (nauka/powtórka) albo zapisana (egzamin) → w tle pobierz następne pytanie.
+  // W nauce serwer wybiera kolejne z uwzględnieniem właśnie zapisanej odpowiedzi, więc wynik jest
+  // ten sam, co przy pobraniu po „Dalej” — tylko bez czekania.
+  useEffect(() => {
+    if (status !== "result" && status !== "saved") return;
+    if (isLast || (isExam && !examSessionId)) return;
+    const key = JSON.stringify(questionKey(currentQuestionIndex + 1));
+    if (prefetchRef.current?.key === key) return;
+    const entry: Prefetch = { key, promise: fetchQuestion(currentQuestionIndex + 1) };
+    entry.promise.then(
+      (data) => {
+        entry.data = data;
+      },
+      (error) => {
+        // 404 (koniec pytań) zostaje — „Dalej” od razu pokaże podsumowanie; inny błąd = pobierz jeszcze raz
+        entry.failed = !(error instanceof NoQuestion);
+      },
+    );
+    prefetchRef.current = entry;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, isLast, isExam, examSessionId, currentQuestionIndex, sessionNo]);
 
   const handleNextQuestion = () => {
     if (advanceTimer.current) {
@@ -315,6 +429,15 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       return;
     }
 
+    // Pobrane w tle — wstaw do pamięci zapytań, nowa karta rysuje się w tej samej klatce
+    const nextKey = questionKey(currentQuestionIndex + 1);
+    const pre = prefetchRef.current;
+    if (pre && pre.key === JSON.stringify(nextKey) && pre.data) {
+      queryClient.setQueryData(nextKey, pre.data);
+      prefetchRef.current = null;
+    }
+
+    scrollToTop();
     setCurrentQuestionIndex((i) => i + 1);
     setSelectedAnswer(null);
     setCurrentAnswerData(null);
@@ -322,7 +445,6 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     setQuizResult(null);
     lastPayload.current = null;
     setStartTime(Date.now());
-    setTimeout(scrollToTop, 60);
   };
   const nextRefFn = useRef(handleNextQuestion);
   nextRefFn.current = handleNextQuestion;
@@ -378,13 +500,34 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const isInteractive =
     !!question && !!question.questionType && question.questionType !== "multiple_choice" && !!question.questionConfig;
   const canAnswer = status === "idle" || status === "error";
+  /**
+   * Wybór w egzaminie: dotknięcie zaznacza, „Zapisz odpowiedź” zatwierdza. W egzaminie nie ma wyniku
+   * ani powtórki pytania, więc pomyłka palca byłaby nieodwracalna. W nauce/powtórce dotknięcie od razu
+   * pokazuje wynik — to sedno nauki, a błąd i tak wraca w powtórce (jedna podpowiedź przy pierwszym pytaniu).
+   */
+  const confirmChoice = isExam && !isInteractive;
 
   const handleAnswerSelect = (position: number) => {
     if (!question || !canAnswer) return;
     const answer = question.answers[position];
     if (!answer) return;
     setSelectedAnswer(position); // stan „naciśnięte” od razu
+    if (confirmChoice) {
+      if (status === "error") setStatus("idle");
+      return;
+    }
+    if (instantHint) {
+      setInstantHint(false);
+      saveHintSeen();
+    }
     // Serwer zna odpowiedzi po indeksie z bazy, nie po pozycji na ekranie (odpowiedzi są tasowane)
+    submit({ questionId: question.id, selectedIndex: answer.index, timeMs: Date.now() - startTime });
+  };
+
+  const handleConfirmChoice = () => {
+    if (!question || selectedAnswer === null || !canAnswer) return;
+    const answer = question.answers[selectedAnswer];
+    if (!answer) return;
     submit({ questionId: question.id, selectedIndex: answer.index, timeMs: Date.now() - startTime });
   };
 
@@ -447,6 +590,9 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       if (status === "result" || status === "saved") {
         e.preventDefault();
         handleNextQuestion();
+      } else if (confirmChoice && selectedAnswer !== null && canAnswer) {
+        e.preventDefault();
+        handleConfirmChoice();
       } else if (isInteractive && currentAnswerData && canAnswer) {
         e.preventDefault();
         handleSubmitInteractiveAnswer();
@@ -486,6 +632,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
   const restartSession = () => {
     requestNo.current++;
+    prefetchRef.current = null;
     shownRef.current = [];
     lastPayload.current = null;
     setTally({});
@@ -508,7 +655,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
           title="Nie udało się policzyć wyniku"
           lead="Sprawdź połączenie i spróbuj jeszcze raz."
           primary={{ label: "Spróbuj ponownie", onClick: () => examSummaryQuery.refetch() }}
-          secondary={{ label: "Wróć do kursu", onClick: () => setLocation("/modules") }}
+          secondary={{ label: exitLabel, onClick: () => onExit?.() }}
         />
       );
     }
@@ -525,7 +672,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         timeMs={summary.totalTime}
         message={`Wynik: ${correctAnswers}/${summary.totalQuestions} (${pct}%)`}
         primary={wrongIds.length > 0 ? { label: "Powtórz błędne", onClick: () => reviewThese(wrongIds), testId: "retry-wrong" } : undefined}
-        secondary={{ label: "Wróć do kursu", onClick: () => setLocation("/modules"), testId: "exit-exam" }}
+        secondary={{ label: exitLabel, onClick: () => onExit?.(), testId: "exit-exam" }}
       >
         {summary.review && summary.review.length > 0 && <ExamReview items={summary.review} onImageClick={openLightbox} />}
         {lightbox && <ImageLightbox imageUrl={lightbox.url} origin={lightbox.origin} onClose={() => setLightbox(null)} />}
@@ -544,11 +691,11 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         ? "Nie udzielono jeszcze żadnej odpowiedzi."
         : wrong === 0
           ? "Wszystkie odpowiedzi poprawne."
-          : `Do powtórki: ${wrong} ${pytan(wrong)}.`;
+          : `Do powtórki: ${pytania(wrong)}.`;
 
     let primary: SummaryAction | undefined;
     const extra: SummaryAction[] = [];
-    const backToCourse: SummaryAction = { label: "Wróć do kursu", onClick: () => setLocation("/modules"), testId: "exit-exam" };
+    const backToCourse: SummaryAction = { label: exitLabel, onClick: () => onExit?.(), testId: "exit-exam" };
 
     if (mode === "learn") {
       const refreshing = modulesQuery.isFetching;
@@ -577,7 +724,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
     return (
       <Summary
-        modeLabel={MODE_LABEL[mode]}
+        modeLabel={modeLabel}
         correct={correct}
         total={results.length}
         timeMs={results.reduce((s, r) => s + r.timeMs, 0)}
@@ -597,7 +744,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         title="Nie udało się rozpocząć egzaminu"
         lead={examInitError}
         primary={{ label: "Spróbuj ponownie", onClick: () => setExamInitNonce((n) => n + 1) }}
-        secondary={{ label: "Wróć do kursu", onClick: () => setLocation("/modules") }}
+        secondary={{ label: exitLabel, onClick: () => onExit?.() }}
       />
     );
   }
@@ -617,10 +764,10 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   if (noMoreQuestions && currentQuestionIndex === 0) {
     return (
       <StateCard
-        label={MODE_LABEL[mode]}
+        label={modeLabel}
         title="Brak pytań do pokazania"
-        lead={isExam ? "Nie udało się wczytać pytań egzaminu. Rozpocznij egzamin od nowa." : "W tej sekcji nie ma jeszcze pytań. Wybierz inną sekcję w kursie."}
-        primary={{ label: "Wróć do kursu", onClick: () => onExit?.(), testId: "back-to-dashboard" }}
+        lead={isExam ? "Nie udało się wczytać pytań egzaminu. Rozpocznij egzamin od nowa." : "Ten temat nie ma jeszcze pytań. Wybierz inny temat w Kursie."}
+        primary={{ label: exitLabel, onClick: () => onExit?.(), testId: "back-to-dashboard" }}
       />
     );
   }
@@ -628,7 +775,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   if (loadError || (mode === "review" && !reviewIds && queueQuery.isError)) {
     return (
       <StateCard
-        label={MODE_LABEL[mode]}
+        label={modeLabel}
         title="Nie udało się wczytać pytania"
         lead="Sprawdź połączenie i spróbuj jeszcze raz. Twoje dotychczasowe odpowiedzi są zapisane."
         primary={{
@@ -639,7 +786,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
           },
           testId: "retry-load",
         }}
-        secondary={{ label: "Wróć do kursu", onClick: () => setLocation("/modules") }}
+        secondary={{ label: exitLabel, onClick: () => onExit?.() }}
       />
     );
   }
@@ -652,6 +799,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
   // Klucz = pozycja w sesji: ładowanie i treść dzielą jedno wejście, bez podwójnego przesunięcia
   const stageKey = `stage-${sessionNo}-${currentQuestionIndex}`;
+  const filled = isInteractive && canAnswer ? filledCount(question, currentAnswerData) : null;
 
   return (
     <div className="min-h-screen bg-[var(--ink)]">
@@ -681,8 +829,9 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         </div>
       </div>
 
-      <div className="wrap wrap--narrow safe-bottom py-7 sm:py-10">
-        <AnimatePresence mode="wait" initial={false}>
+      <div className="wrap wrap--narrow safe-bottom relative py-7 sm:py-10">
+        {/* popLayout: nowa karta wchodzi od razu, stara wychodzi nad nią (bez czekania na koniec wyjścia) */}
+        <AnimatePresence mode="popLayout" initial={false}>
           <motion.div key={stageKey} variants={stage} initial="initial" animate="animate" exit="exit">
             {shownQuestion && !questionQuery.isFetching ? (
               <motion.div key={shownQuestion.id} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: springSnappy }}>
@@ -692,14 +841,24 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                   status={status}
                   showPending={slow}
                   examMode={isExam}
+                  answerHint={
+                    instantHint && !isInteractive ? "Odpowiedź liczy się po dotknięciu." : undefined
+                  }
                   quizResult={quizResult || undefined}
                   onAnswerSelect={handleAnswerSelect}
                   onAnswerChange={handleAnswerChange}
                   onImageClick={openLightbox}
                 />
 
+                {/* Telefon: licznik wypełnionych miejsc nad przyciskami — w jednym wierszu się nie mieści */}
+                {filled && (
+                  <p className="mt-4 text-right text-[14px] text-[var(--txt2)] sm:hidden" aria-live="polite">
+                    <FilledText {...filled} />
+                  </p>
+                )}
+
                 {/* Nawigacja: jedno główne działanie na ekranie */}
-                <nav className="mt-5 flex items-center justify-between gap-3" aria-label="Nawigacja quizu">
+                <nav className={`${filled ? "mt-3 sm:mt-5" : "mt-5"} flex items-center justify-between gap-3`} aria-label="Nawigacja quizu">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -711,24 +870,40 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                     Zgłoś błąd
                   </Button>
 
-                  {status === "error" && (!isInteractive ? selectedAnswer !== null : !!currentAnswerData) ? (
-                    <Button onClick={retrySave} data-testid="retry-save" className="gap-2">
-                      <RotateCcw aria-hidden />
-                      Spróbuj ponownie
-                    </Button>
-                  ) : status === "result" || status === "saved" ? (
+                  {status === "result" || status === "saved" ? (
                     <Button ref={nextRef} onClick={handleNextQuestion} data-testid="next-question" className="gap-2">
                       {isLast ? "Pokaż wynik" : "Dalej"}
                       <ArrowRight aria-hidden />
                     </Button>
-                  ) : isInteractive ? (
+                  ) : confirmChoice ? (
+                    // Egzamin, wybór: zatwierdzenie zaznaczonej odpowiedzi (po błędzie zapisu — ta sama akcja)
                     <Button
-                      onClick={handleSubmitInteractiveAnswer}
-                      disabled={!currentAnswerData || status === "pending"}
-                      data-testid="submit-interactive-answer"
+                      onClick={handleConfirmChoice}
+                      disabled={selectedAnswer === null || status === "pending"}
+                      data-testid="confirm-answer"
                     >
-                      {status === "pending" && slow ? (isExam ? "Zapisuję…" : "Sprawdzam…") : isExam ? "Zapisz odpowiedź" : "Sprawdź"}
+                      {status === "pending" && slow ? "Zapisuję…" : "Zapisz odpowiedź"}
                     </Button>
+                  ) : status === "error" && (!isInteractive ? selectedAnswer !== null : !!currentAnswerData) ? (
+                    <Button onClick={retrySave} data-testid="retry-save" className="gap-2">
+                      <RotateCcw aria-hidden />
+                      Spróbuj ponownie
+                    </Button>
+                  ) : isInteractive ? (
+                    <div className="flex items-center gap-3">
+                      {filled && (
+                        <p className="hidden text-[14px] text-[var(--txt2)] sm:block" aria-live="polite" data-testid="filled-count">
+                          <FilledText {...filled} />
+                        </p>
+                      )}
+                      <Button
+                        onClick={handleSubmitInteractiveAnswer}
+                        disabled={!currentAnswerData || status === "pending"}
+                        data-testid="submit-interactive-answer"
+                      >
+                        {status === "pending" && slow ? (isExam ? "Zapisuję…" : "Sprawdzam…") : isExam ? "Zapisz odpowiedź" : "Sprawdź"}
+                      </Button>
+                    </div>
                   ) : (
                     <p className="label hidden sm:block" aria-hidden>
                       Klawisze 1–4 lub A–D
@@ -768,6 +943,15 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 }
 
 /* ───────── Elementy pomocnicze ───────── */
+
+/** „2 z 5 miejsc wypełnionych” */
+function FilledText({ filled, total, noun }: { filled: number; total: number; noun: string }) {
+  return (
+    <>
+      <span className="num text-[var(--txt)]">{filled}</span> z <span className="num">{total}</span> {noun}
+    </>
+  );
+}
 
 function QuietLoader({ label }: { label: string }) {
   return (

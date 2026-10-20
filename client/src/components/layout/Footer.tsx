@@ -17,7 +17,7 @@ export default function Footer() {
             <Link
               href={isAuthenticated ? "/dashboard" : "/"}
               className="inline-flex w-fit rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="helloEKG — strona główna"
+              aria-label={isAuthenticated ? "helloEKG — Postęp" : "helloEKG — wejście do bety"}
             >
               <Logo animated={false} />
             </Link>
@@ -31,7 +31,7 @@ export default function Footer() {
               <p className="label mb-1">Kurs</p>
               {isAuthenticated ? (
                 <>
-                  <Link href="/modules" className={linkClass}>Moduły</Link>
+                  <Link href="/modules" className={linkClass}>Kurs</Link>
                   <Link href="/dashboard" className={linkClass}>Postęp</Link>
                   <Link href="/quiz?mode=review" className={linkClass}>Powtórka</Link>
                 </>
@@ -42,8 +42,9 @@ export default function Footer() {
 
             <div className="grid content-start">
               <p className="label mb-1">Konto</p>
+              {/* Postęp jest już w kolumnie „Kurs” — tu tylko to, co dotyczy konta */}
               {isAuthenticated ? (
-                <Link href="/dashboard" className={linkClass}>Twój postęp</Link>
+                <Link href="/zgloszenie?area=inne" className={linkClass}>Zgłoś uwagę</Link>
               ) : (
                 <>
                   <Link href="/?auth=login" className={linkClass}>Zaloguj się</Link>

@@ -1,7 +1,7 @@
 import { 
   users, plans, subscriptions, modules, sections, questions, attempts, 
   progress, certificates, supportTickets, auditLog, blogPosts, demoQuestions, homePageContent,
-  userStats, dailyActivities, achievements, userAchievements,
+  userStats, dailyActivities, achievements, userAchievements, lectureReads, type LectureRead,
   type User, type InsertUser, type Plan, type InsertPlan,
   type Subscription, type InsertSubscription, type Module, type InsertModule,
   type Section, type InsertSection, type Question, type InsertQuestion, 
@@ -61,6 +61,8 @@ export interface IStorage {
   getUserAttempts(userId: string, questionId?: string): Promise<Attempt[]>;
   getUserProgress(userId: string): Promise<Progress[]>;
   updateProgress(userId: string, sectionId: string, completionPercentage: number): Promise<Progress>;
+  getLectureReads(userId: string): Promise<LectureRead[]>;
+  upsertLectureRead(userId: string, sectionId: string, chapterOrder: number, chaptersTotal: number): Promise<LectureRead>;
   
   // Certificates
   createCertificate(certificate: InsertCertificate): Promise<Certificate>;
@@ -475,6 +477,23 @@ export class DatabaseStorage implements IStorage {
 
   async getUserProgress(userId: string): Promise<Progress[]> {
     return db.select().from(progress).where(eq(progress.userId, userId));
+  }
+
+  // Miejsce w wykładzie (ostatni otwarty rozdział) — jedno zapytanie na użytkownika
+  async getLectureReads(userId: string): Promise<LectureRead[]> {
+    return db.select().from(lectureReads).where(eq(lectureReads.userId, userId));
+  }
+
+  async upsertLectureRead(userId: string, sectionId: string, chapterOrder: number, chaptersTotal: number): Promise<LectureRead> {
+    const [row] = await db
+      .insert(lectureReads)
+      .values({ userId, sectionId, chapterOrder, chaptersTotal })
+      .onConflictDoUpdate({
+        target: [lectureReads.userId, lectureReads.sectionId],
+        set: { chapterOrder, chaptersTotal, updatedAt: sql`now()` },
+      })
+      .returning();
+    return row;
   }
 
   async updateProgress(userId: string, sectionId: string, completionPercentage: number): Promise<Progress> {

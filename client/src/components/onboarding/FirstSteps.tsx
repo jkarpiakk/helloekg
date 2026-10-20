@@ -1,5 +1,5 @@
 /**
- * „Pierwsze kroki” — karta na górze panelu. Każdy punkt odhacza się z prawdziwych danych:
+ * „Pierwsze kroki” — karta na ekranie Postęp. Każdy punkt odhacza się z prawdziwych danych:
  * - wykład: kliknięcie w punkt / „Zaczynam” w instrukcji, albo postęp > 0 w którejkolwiek sekcji,
  * - 5 pytań: `stats.totalAttempts` z GET /api/progress,
  * - powtórka: kliknięcie w punkt (serwer nie udostępnia liczby odpowiedzi w trybie powtórki),
@@ -12,6 +12,7 @@ import { Link } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { pytania } from "@/lib/i18n";
 import { rise, stagger } from "@/lib/motion";
 import {
   STEPS_EVENT,
@@ -92,7 +93,7 @@ export default function FirstSteps() {
       },
       {
         key: "answers",
-        title: `Odpowiedz na ${ANSWERS_GOAL} pytań`,
+        title: `Odpowiedz na ${pytania(ANSWERS_GOAL)}`,
         desc: "Po każdej odpowiedzi zobaczysz wyjaśnienie.",
         href: firstQuiz ? `/quiz?sectionId=${firstQuiz.id}` : "/modules",
         done: answered >= ANSWERS_GOAL,

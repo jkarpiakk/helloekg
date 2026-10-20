@@ -10,12 +10,56 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useTranslation } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Search, Shield, Eye, Ban, CheckCircle, UserX, Mail, Edit, UserPlus, CreditCard } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { User } from "@shared/schema";
+
+/** Błąd z apiRequest ma postać „<status>: <treść>”; treść to zwykle JSON { error } */
+function parseApiError(error: unknown): { status: number | null; message: string | null } {
+  const raw = error instanceof Error ? error.message : String(error ?? "");
+  const m = raw.match(/^(\d{3}):\s*([\s\S]*)$/);
+  if (!m) return { status: null, message: raw || null };
+  let message: string | null = m[2] || null;
+  try {
+    const body = JSON.parse(m[2]);
+    if (body && typeof body.error === "string") message = body.error;
+  } catch {
+    /* treść nie jest JSON-em */
+  }
+  return { status: Number(m[1]), message };
+}
+
+type UserAction = "status" | "role" | "subscription" | "create";
+
+/** Kody serwera → konkretny komunikat: co się stało i co zrobić */
+function describeUserError(error: unknown, action: UserAction): string {
+  const { status, message } = parseApiError(error);
+  switch (status) {
+    case 400:
+      if (action === "subscription") return "Czas subskrypcji musi wynosić od 1 do 24 miesięcy.";
+      if (action === "create") return message ?? "Sprawdź dane: e-mail, hasło (8–128 znaków), imię, nazwisko i rolę.";
+      return message ?? "Nieprawidłowa rola lub status. Odśwież stronę i spróbuj ponownie.";
+    case 401:
+      return "Sesja wygasła. Zaloguj się ponownie.";
+    case 403:
+      // Serwer mówi, czego brakuje (np. „Tylko właściciel może…”, „Nie możesz zmieniać własnej roli”)
+      return `${message ?? "Nie masz uprawnień do tej operacji"}.`.replace(/\.\.$/, ".");
+    case 404:
+      return "Nie znaleziono tego konta — mogło zostać usunięte. Odśwież listę.";
+    case 409:
+      return `${message ?? "To ostatni właściciel"}. Najpierw nadaj rolę właściciela innemu kontu.`.replace(/\.\. /, ". ");
+    default:
+      return message && status !== null && status < 500
+        ? message
+        : "Coś poszło nie tak po stronie serwera. Spróbuj ponownie za chwilę.";
+  }
+}
+
+const formatDate = (value: unknown) => (value ? new Date(value as string).toLocaleDateString("pl-PL") : null);
 
 interface UserStats {
   totalUsers: number;
@@ -42,6 +86,12 @@ export default function UserManager() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { t } = useTranslation();
   const { toast } = useToast();
+  // Przyciski tylko dla ról, którym serwer pozwala: konta tworzy właściciel,
+  // subskrypcje nadaje właściciel/support, status zmienia właściciel/admin
+  const { hasRole, canManageUsers, isAdmin } = useAuth();
+  const canCreateUsers = hasRole("owner");
+  const canGrant = canManageUsers;
+  const canChangeStatus = isAdmin;
 
   const createUserForm = useForm<CreateUserForm>({
     resolver: zodResolver(createUserSchema),
@@ -83,18 +133,21 @@ export default function UserManager() {
       const response = await apiRequest("PUT", `/api/admin/users/${userId}`, { status });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast({
-        title: "Sukces",
-        description: "Status użytkownika został zaktualizowany",
+        title: variables.status === "suspended" ? "Konto zawieszone" : "Konto przywrócone",
+        description:
+          variables.status === "suspended"
+            ? "Ta osoba nie zaloguje się, dopóki nie przywrócisz konta."
+            : "Ta osoba może znów się logować.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats/users"] });
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd",
-        description: error.message || "Nie udało się zaktualizować statusu użytkownika",
+        title: "Nie udało się zmienić statusu",
+        description: describeUserError(error, "status"),
         variant: "destructive",
       });
     },
@@ -115,8 +168,8 @@ export default function UserManager() {
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd",
-        description: error.message || "Nie udało się zaktualizować roli użytkownika",
+        title: "Nie udało się zmienić roli",
+        description: describeUserError(error, "role"),
         variant: "destructive",
       });
     },
@@ -138,8 +191,8 @@ export default function UserManager() {
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd",
-        description: error.message || "Nie udało się zarządzać subskrypcją",
+        title: "Nie udało się zmienić subskrypcji",
+        description: describeUserError(error, "subscription"),
         variant: "destructive",
       });
     },
@@ -163,8 +216,8 @@ export default function UserManager() {
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd",
-        description: error.message || "Nie udało się utworzyć użytkownika",
+        title: "Nie udało się utworzyć konta",
+        description: describeUserError(error, "create"),
         variant: "destructive",
       });
     },
@@ -189,7 +242,20 @@ export default function UserManager() {
     );
   };
 
-  const getStatusBadge = (emailVerified: boolean, subscription?: any) => {
+  const getStatusBadge = (emailVerified: boolean, suspendedAt?: unknown, subscription?: any) => {
+    if (suspendedAt) {
+      return (
+        <Badge
+          variant="outline"
+          className="border-[var(--alarm)] text-[var(--alarm)]"
+          title={`Zawieszone ${formatDate(suspendedAt) ?? ""}`.trim()}
+          data-testid="status-suspended"
+        >
+          <Ban className="h-3 w-3 mr-1" aria-hidden="true" />
+          Zawieszone
+        </Badge>
+      );
+    }
     if (!emailVerified) {
       return <Badge variant="outline" className="text-yellow-600">Niezweryfikowany</Badge>;
     }
@@ -216,6 +282,7 @@ export default function UserManager() {
             Moderacja użytkowników, zarządzanie rolami i subskrypcjami
           </p>
         </div>
+        {canCreateUsers && (
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button data-testid="add-user-button">
@@ -318,6 +385,7 @@ export default function UserManager() {
             </Form>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Statistics */}
@@ -406,8 +474,8 @@ export default function UserManager() {
                   <SelectItem value="all">Wszystkie statusy</SelectItem>
                   <SelectItem value="verified">Zweryfikowani</SelectItem>
                   <SelectItem value="unverified">Niezweryfikowani</SelectItem>
-                  <SelectItem value="active">Aktywna subskrypcja</SelectItem>
-                  <SelectItem value="inactive">Brak subskrypcji</SelectItem>
+                  <SelectItem value="active">Aktywne (niezawieszone)</SelectItem>
+                  <SelectItem value="suspended">Zawieszone</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -452,7 +520,7 @@ export default function UserManager() {
                       {getRoleBadge(user.role)}
                     </td>
                     <td className="p-4">
-                      {getStatusBadge(user.emailVerified)}
+                      {getStatusBadge(user.emailVerified, user.suspendedAt)}
                     </td>
                     <td className="p-4 text-muted-foreground">
                       {new Date(user.createdAt).toLocaleDateString('pl-PL')}
@@ -482,10 +550,10 @@ export default function UserManager() {
                         </Button>
                         {user.role !== "owner" && (
                           <>
+                            {canGrant && (
                             <Button 
                               size="sm" 
                               variant="ghost"
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
                               onClick={() => manageSubscriptionMutation.mutate({ 
                                 userId: user.id, 
                                 action: "grant",
@@ -493,22 +561,28 @@ export default function UserManager() {
                               })}
                               disabled={manageSubscriptionMutation.isPending}
                               title="Nadaj subskrypcję (1 miesiąc)"
+                              aria-label="Nadaj subskrypcję na 1 miesiąc"
                               data-testid={`grant-subscription-${user.id}`}
                             >
                               <CreditCard className="h-4 w-4" />
                             </Button>
+                            )}
+                            {canChangeStatus && (
                             <Button 
                               size="sm" 
                               variant="ghost"
                               onClick={() => updateUserStatusMutation.mutate({ 
                                 userId: user.id, 
-                                status: user.emailVerified ? "suspended" : "verified" 
+                                status: user.suspendedAt ? "active" : "suspended" 
                               })}
                               disabled={updateUserStatusMutation.isPending}
+                              title={user.suspendedAt ? "Przywróć konto" : "Zawieś konto"}
+                              aria-label={user.suspendedAt ? "Przywróć konto" : "Zawieś konto"}
                               data-testid={`toggle-user-${user.id}`}
                             >
-                              {user.emailVerified ? <Ban className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                              {user.suspendedAt ? <CheckCircle className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
                             </Button>
+                            )}
                           </>
                         )}
                       </div>
@@ -557,6 +631,15 @@ export default function UserManager() {
                   <label className="text-sm font-medium">Rola</label>
                   <div className="mt-1">
                     {getRoleBadge(selectedUser.role)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {getStatusBadge(selectedUser.emailVerified, selectedUser.suspendedAt)}
+                    {selectedUser.suspendedAt && (
+                      <span className="text-sm text-muted-foreground">od {formatDate(selectedUser.suspendedAt)}</span>
+                    )}
                   </div>
                 </div>
                 <div>

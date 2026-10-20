@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, json, jsonb, decimal, uuid, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, json, jsonb, decimal, uuid, index, primaryKey } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -276,6 +276,18 @@ export const progress = pgTable("progress", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+// Miejsce w wykładzie: ostatnio otwarty rozdział per użytkownik i sekcja (wznowienie czytania)
+export const lectureReads = pgTable("lecture_reads", {
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sectionId: uuid("section_id").notNull().references(() => sections.id, { onDelete: "cascade" }),
+  /** Numer rozdziału od 1 (jak w adresie #rozdzial-N) */
+  chapterOrder: integer("chapter_order").notNull(),
+  chaptersTotal: integer("chapters_total").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+}, (t) => [primaryKey({ columns: [t.userId, t.sectionId] })]);
+
+export type LectureRead = typeof lectureReads.$inferSelect;
 
 // Certificates
 export const certificates = pgTable("certificates", {

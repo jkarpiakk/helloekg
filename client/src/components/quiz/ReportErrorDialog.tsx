@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,26 @@ interface ReportErrorDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Szkice zgłoszeń per pytanie — „Anuluj”, zamknięcie okna czy przejście do innego pytania
+ * nie kasują wpisanego tekstu; szkic znika dopiero po wysłaniu (żyje do przeładowania strony).
+ */
+const drafts = new Map<string, string>();
+
 export default function ReportErrorDialog({ questionId, open, onOpenChange }: ReportErrorDialogProps) {
-  const [message, setMessage] = useState("");
+  const [message, setMessageState] = useState(() => drafts.get(questionId) ?? "");
   const [touched, setTouched] = useState(false);
+  const setMessage = (value: string) => {
+    setMessageState(value);
+    if (value.trim()) drafts.set(questionId, value);
+    else drafts.delete(questionId);
+  };
+
+  // Inne pytanie → jego własny szkic (albo puste pole)
+  useEffect(() => {
+    setMessageState(drafts.get(questionId) ?? "");
+    setTouched(false);
+  }, [questionId]);
   const { toast } = useToast();
 
   const reportMutation = useMutation({
@@ -22,12 +39,13 @@ export default function ReportErrorDialog({ questionId, open, onOpenChange }: Re
       const response = await apiRequest("POST", "/api/report-error", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       toast({
         title: "Zgłoszenie wysłane",
         description: "Dzięki — sprawdzimy to pytanie.",
       });
-      setMessage("");
+      drafts.delete(vars.questionId);
+      if (vars.questionId === questionId) setMessageState("");
       setTouched(false);
       onOpenChange(false);
     },
@@ -83,10 +101,16 @@ export default function ReportErrorDialog({ questionId, open, onOpenChange }: Re
               aria-describedby={touched && empty ? "error-report-hint" : undefined}
               data-testid="error-report-message"
             />
-            {touched && empty && (
+            {touched && empty ? (
               <p id="error-report-hint" className="text-[14px] text-[var(--txt2)]">
                 Napisz choć jedno zdanie, żebyśmy wiedzieli, co poprawić.
               </p>
+            ) : (
+              !empty && (
+                <p className="text-[14px] text-[var(--txt3)]" data-testid="error-report-draft-note">
+                  Opis zostaje do wysłania — „Anuluj” go nie usuwa.
+                </p>
+              )
             )}
           </div>
 
@@ -95,7 +119,7 @@ export default function ReportErrorDialog({ questionId, open, onOpenChange }: Re
               type="button"
               variant="ghost"
               onClick={() => {
-                setMessage("");
+                // Bez kasowania: opis czeka na wysłanie przy ponownym otwarciu
                 setTouched(false);
                 onOpenChange(false);
               }}

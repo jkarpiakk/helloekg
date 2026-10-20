@@ -37,6 +37,21 @@ function safeFrom(raw: string | null): string | null {
   return raw.slice(0, 500);
 }
 
+/** „Wróć do …” nazwane miejscem, do którego prowadzi (dopełniacz) */
+function backTarget(path: string): string {
+  const p = path.split(/[?#]/)[0];
+  const q = new URLSearchParams(path.includes("?") ? path.slice(path.indexOf("?") + 1).split("#")[0] : "");
+  if (p === "/modules") return "kursu";
+  if (p === "/dashboard") return "postępu";
+  if (p.startsWith("/lecture")) return "wykładu";
+  if (p === "/quiz") {
+    if (q.has("sectionId") || q.has("section")) return "pytań";
+    return q.get("mode") === "exam" ? "egzaminu" : "powtórki";
+  }
+  if (p.startsWith("/certificate")) return "certyfikatu";
+  return "poprzedniej strony";
+}
+
 function readAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -188,7 +203,7 @@ export default function FeedbackPage() {
           <Button asChild variant="ghost" size="sm" className="-ml-3 mb-6 gap-1.5 px-3">
             <Link href={from} data-testid="feedback-back">
               <ArrowLeft aria-hidden />
-              Wróć
+              Wróć do {backTarget(from)}
             </Link>
           </Button>
         )}
@@ -215,11 +230,11 @@ export default function FeedbackPage() {
               <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                 {from ? (
                   <Button asChild>
-                    <Link href={from}>Wróć do poprzedniej strony</Link>
+                    <Link href={from}>Wróć do {backTarget(from)}</Link>
                   </Button>
                 ) : (
                   <Button asChild>
-                    <Link href="/dashboard">Wróć do kursu</Link>
+                    <Link href="/modules">Wróć do kursu</Link>
                   </Button>
                 )}
                 <Button variant="outline" onClick={() => setSent(false)} data-testid="feedback-another">

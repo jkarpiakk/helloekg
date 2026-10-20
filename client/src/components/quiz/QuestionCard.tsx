@@ -23,8 +23,13 @@ interface QuestionCardProps {
   status: AnswerStatus;
   /** Pokaż „Sprawdzam…” — dopiero gdy serwer odpowiada dłużej niż ~300 ms */
   showPending: boolean;
-  /** Egzamin: bez poprawności i wyjaśnienia, tylko „Zapisano” */
+  /**
+   * Egzamin: bez poprawności i wyjaśnienia, tylko „Zapisano”.
+   * Wybór odpowiedzi tylko ją zaznacza — zapisuje dopiero „Zapisz odpowiedź”.
+   */
   examMode?: boolean;
+  /** Jednolinijkowa podpowiedź nad odpowiedziami (np. przy pierwszym pytaniu: „Odpowiedź liczy się po dotknięciu.”) */
+  answerHint?: string;
   quizResult?: QuizResult;
   onAnswerSelect: (position: number) => void;
   onAnswerChange?: (answer: AnswerData) => void;
@@ -64,6 +69,7 @@ export default function QuestionCard({
   status,
   showPending,
   examMode = false,
+  answerHint,
   quizResult,
   onAnswerSelect,
   onAnswerChange,
@@ -129,12 +135,19 @@ export default function QuestionCard({
       )}
 
       {/* Wybór odpowiedzi — wiersze `.opt` jak w quizie na landingu */}
+      {!isInteractiveType && answerHint && !answered && (
+        <p className="mb-3 text-[14px] text-[var(--txt2)]" data-testid="answer-hint">
+          {answerHint}
+        </p>
+      )}
       {!isInteractiveType && (
         <div className="grid gap-[10px]" role="group" aria-label="Odpowiedzi" data-testid="answer-options">
           {question.answers.map((answer, index) => {
             const isRight = answered && index === correctPosition;
             const isWrong = answered && index === selectedAnswer && !isRight;
             const isDim = answered && !isRight && !isWrong;
+            // Egzamin: zaznaczenie przed zapisem — wyraźne, ale neutralne (zieleń podpowiadałaby „dobrze”)
+            const isExamPick = examMode && selectedAnswer === index;
             return (
               <button
                 key={index}
@@ -145,6 +158,8 @@ export default function QuestionCard({
                   isWrong && "is-wrong",
                   isDim && "is-dim",
                   !answered && selectedAnswer === index && "is-picked",
+                  isExamPick &&
+                    "!border-[var(--txt2)] bg-[color-mix(in_srgb,var(--txt)_5%,transparent)] [&_.opt__key]:border-[var(--txt2)] [&_.opt__key]:text-[var(--txt)]",
                 )}
                 disabled={locked}
                 aria-pressed={selectedAnswer === index}
@@ -159,6 +174,7 @@ export default function QuestionCard({
                   {answer.text}
                   {isRight && <span className="sr-only"> — poprawna odpowiedź</span>}
                   {isWrong && <span className="sr-only"> — twoja odpowiedź, błędna</span>}
+                  {isExamPick && status !== "saved" && <span className="sr-only"> — zaznaczona</span>}
                 </span>
                 <span className="opt__mark" aria-hidden>
                   {isRight && <Check className="h-[18px] w-[18px]" strokeWidth={2.25} />}

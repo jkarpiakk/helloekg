@@ -9,6 +9,7 @@ import { ProgressLine } from "@/components/dashboard/ProgressCard";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
+import { plural, pytania } from "@/lib/i18n";
 
 interface ModuleSection {
   id: string;
@@ -39,20 +40,13 @@ const pad = (n: number) => String(n).padStart(2, "0");
 /** „Moduł 3: Zawał serca” → „Zawał serca” — numer i tak stoi obok */
 const cleanTitle = (title: string) => title.replace(/^\s*moduł\s*\d+\s*[:.–—-]\s*/i, "");
 
-function plural(n: number, one: string, few: string, many: string) {
-  if (n === 1) return one;
-  const d = n % 10;
-  const dd = n % 100;
-  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
-}
-
 /** Co naprawdę jest w sekcji: „Wykład · 10 rozdziałów · 20 pytań” */
 function sectionContent(s: ModuleSection) {
   const ch = s.chapterCount ?? 0;
   const q = s.questionCount ?? 0;
   const parts: string[] = [];
   if (ch > 0) parts.push(ch === 1 ? "Wykład" : `Wykład · ${ch} ${plural(ch, "rozdział", "rozdziały", "rozdziałów")}`);
-  if (q > 0) parts.push(`${q} ${plural(q, "pytanie", "pytania", "pytań")}`);
+  if (q > 0) parts.push(pytania(q));
   return parts.join(" · ");
 }
 
@@ -106,7 +100,7 @@ export default function Modules() {
     [modules],
   );
 
-  // Wejście z linku #m-… (np. z panelu postępu): przewiń do otwartego modułu
+  // Wejście z linku #m-… (np. z Postępu): przewiń do otwartego modułu
   useEffect(() => {
     if (!sorted.length) return;
     const hash = window.location.hash;
@@ -170,9 +164,10 @@ export default function Modules() {
             const questions = module.sections.reduce((acc, s) => acc + (s.questionCount ?? 0), 0);
             const metaParts: string[] = [];
             if (lectures) metaParts.push(`${lectures} ${plural(lectures, "wykład", "wykłady", "wykładów")}`);
-            if (questions) metaParts.push(`${questions} ${plural(questions, "pytanie", "pytania", "pytań")}`);
+            if (questions) metaParts.push(pytania(questions));
             if (progress !== null) metaParts.push(`${Math.round(progress)}% opanowane`);
-            const meta = module.isLocked ? "Zablokowany" : metaParts.join(" · ") || "Wkrótce";
+            // isLocked to flaga admina (moduł wyłączony w becie), nie warunek „ukończ poprzedni”
+            const meta = module.isLocked ? "Jeszcze niedostępny" : metaParts.join(" · ") || "Wkrótce";
             const isOpen = openIds.has(module.id);
 
             return (
@@ -211,7 +206,7 @@ export default function Modules() {
                   )}
 
                   {module.isLocked ? (
-                    <p className="muted pb-2">Ukończ poprzedni moduł, żeby odblokować ten.</p>
+                    <p className="muted pb-2">Ten moduł nie jest jeszcze dostępny w becie.</p>
                   ) : count === 0 ? (
                     <p className="muted pb-2">W tym module nie ma jeszcze materiałów.</p>
                   ) : (

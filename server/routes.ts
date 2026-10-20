@@ -1032,6 +1032,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
       const qBySection = new Map(questionCounts.map((r) => [r.sectionId, Number(r.n)]));
       const chBySection = new Map(chapterCounts.map((r) => [r.sectionId, Number(r.n)]));
+      // Miejsce w wykładach tego użytkownika — jedno zapytanie dla wszystkich sekcji
+      const readBySection = new Map(
+        (await storage.getLectureReads(req.user!.id)).map((r) => [r.sectionId, r]),
+      );
 
       // Build modules with sections and progress
       const modulesWithSections = await Promise.all(
@@ -1052,6 +1056,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lastActivity: progress?.lastActivity,
               questionCount: qBySection.get(section.id) ?? 0,
               chapterCount: chBySection.get(section.id) ?? 0,
+              // Ostatnio otwarty rozdział (od 1) i liczba rozdziałów w chwili czytania; null = nie czytano
+              lastChapter: readBySection.get(section.id)?.chapterOrder ?? null,
+              chaptersTotal: readBySection.get(section.id)?.chaptersTotal ?? null,
             };
           });
           
@@ -1075,6 +1082,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Modules fetch error:", error);
       res.status(500).json({ error: "Błąd podczas pobierania modułów" });
+    }
+  });
+
+  // ── Miejsce w wykładzie (wznowienie czytania) ─────────────────────────────
+  const lectureReadSchema = z.object({
+    chapterOrder: z.number().int().min(1).max(1000),
+    chaptersTotal: z.number().int().min(1).max(1000),
+  }).refine((d) => d.chapterOrder <= d.chaptersTotal, { message: "chapterOrder > chaptersTotal", path: ["chapterOrder"] });
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  app.get("/api/lecture-reads", requireAuth, async (req, res) => {
+    try {
+      const rows = await storage.getLectureReads(req.user!.id);
+      res.json(rows.map((r) => ({
+        sectionId: r.sectionId,
+        chapterOrder: r.chapterOrder,
+        chaptersTotal: r.chaptersTotal,
+        updatedAt: r.updatedAt,
+      })));
+    } catch (error) {
+      console.error("Lecture reads fetch error:", error);
+      res.status(500).json({ error: "Błąd podczas pobierania miejsca w wykładach" });
+    }
+  });
+
+  app.put("/api/lecture-reads/:sectionId", requireAuth, async (req, res) => {
+    const { sectionId } = req.params;
+    if (!UUID_RE.test(sectionId)) {
+      return res.status(400).json({ error: "Nieprawidłowy identyfikator sekcji" });
+    }
+    const parsed = lectureReadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Nieprawidłowe dane", details: parsed.error.flatten() });
+    }
+    try {
+      const row = await storage.upsertLectureRead(req.user!.id, sectionId, parsed.data.chapterOrder, parsed.data.chaptersTotal);
+      res.json({ sectionId: row.sectionId, chapterOrder: row.chapterOrder, chaptersTotal: row.chaptersTotal, updatedAt: row.updatedAt });
+    } catch (error: any) {
+      // Klucz obcy: nie ma takiej sekcji
+      const code = error?.code ?? error?.cause?.code;
+      if (code === "23503") {
+        return res.status(404).json({ error: "Sekcja nie znaleziona" });
+      }
+      console.error("Lecture read save error:", error);
+      res.status(500).json({ error: "Błąd podczas zapisywania miejsca w wykładzie" });
     }
   });
 

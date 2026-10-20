@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
-import { ArrowRight, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { Rhythm } from "@/components/ekg/EkgCanvas";
@@ -42,6 +42,28 @@ interface LectureNavigationProps {
   onComplete?: () => void;
 }
 
+/** Zapamiętane miejsce w wykładzie (GET /api/lecture-reads) */
+interface LectureRead {
+  sectionId: string;
+  chapterOrder: number;
+  chaptersTotal: number;
+}
+
+const READS_KEY = ["/api/lecture-reads"] as const;
+const SAVE_DELAY_MS = 1000;
+
+const hasChapterHash = () => typeof window !== "undefined" && /^#rozdzial-\d+$/.test(window.location.hash);
+
+/** Zapis miejsca; keepalive — żądanie przeżyje zamknięcie karty */
+const saveRead = (sectionId: string, chapterOrder: number, chaptersTotal: number, keepalive = false) =>
+  fetch(`/api/lecture-reads/${sectionId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chapterOrder, chaptersTotal }),
+    credentials: "include",
+    keepalive,
+  });
+
 const readHashIndex = () => {
   const m = typeof window !== "undefined" ? window.location.hash.match(/^#rozdzial-(\d+)$/) : null;
   return m ? Math.max(0, parseInt(m[1], 10) - 1) : 0;
@@ -65,11 +87,28 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
   const articleRef = useRef<HTMLElement>(null);
   const { user } = useAuth();
   const canSeeGaps = !!user && GAP_ROLES.includes(user.role);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     ...chaptersQuery(sectionId),
     enabled: hasLecture !== false,
   });
+
+  // Wznowienie: bez numeru rozdziału w adresie wracamy tam, gdzie czytelnik skończył
+  const [openedWithHash] = useState(hasChapterHash);
+  const reads = useQuery({
+    queryKey: READS_KEY,
+    queryFn: async () => {
+      const res = await fetch("/api/lecture-reads", { credentials: "include" });
+      if (!res.ok) throw new Error(String(res.status));
+      return (await res.json()) as LectureRead[];
+    },
+    staleTime: 0,
+    retry: false,
+    enabled: hasLecture !== false && !openedWithHash,
+  });
+  /** null = jeszcze nie zdecydowano; dopóki null, nie zapisujemy (nie nadpiszemy zapamiętanego miejsca rozdziałem 1) */
+  const [resumed, setResumed] = useState<null | { chapter: number; total: number } | false>(openedWithHash ? false : null);
 
   const chapters = useMemo(() => sortChapters(data), [data]);
   const total = chapters.length;
@@ -78,11 +117,72 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
   const isLast = safeIndex === total - 1;
   const html = useMemo(() => (chapter ? renderMarkdown(chapter.contentMd) : ""), [chapter]);
 
+  // Zapis miejsca: 1 s po zmianie rozdziału; przy zamknięciu karty / wyjściu z wykładu — od razu (keepalive)
+  const pending = useRef<{ chapter: number; total: number } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flush = useCallback(
+    (keepalive: boolean) => {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+      const p = pending.current;
+      if (!p) return;
+      pending.current = null;
+      saveRead(sectionId, p.chapter, p.total, keepalive)
+        .then((res) => {
+          if (!res.ok) return;
+          // Panel „Twój postęp” pobierze świeże „Czytaj dalej” przy następnym wejściu
+          queryClient.invalidateQueries({ queryKey: ["/api/modules"], refetchType: "none" });
+        })
+        .catch(() => {});
+    },
+    [sectionId, queryClient],
+  );
+
+  useEffect(() => {
+    if (resumed === null || !total) return;
+    const p = { chapter: safeIndex + 1, total };
+    pending.current = p;
+    // Pamięć podręczna od razu: powrót do wykładu w tej samej sesji trafia we właściwe miejsce
+    queryClient.setQueryData<LectureRead[]>(READS_KEY, (prev) => [
+      ...(prev ?? []).filter((r) => r.sectionId !== sectionId),
+      { sectionId, chapterOrder: p.chapter, chaptersTotal: p.total },
+    ]);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => flush(false), SAVE_DELAY_MS);
+  }, [safeIndex, total, resumed, sectionId, flush, queryClient]);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush(true);
+    };
+    const onPageHide = () => flush(true);
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+      flush(true);
+    };
+  }, [flush]);
+
+  // Notka „Wracasz do rozdziału…” znika, gdy czytelnik sam zmieni rozdział albo ją zamknie
+  const [noteOpen, setNoteOpen] = useState(true);
+  const showResumeNote = !!resumed && noteOpen && safeIndex === resumed.chapter - 1;
+
   // Nowa sekcja → od pierwszego rozdziału (chyba że link wskazuje konkretny)
   useEffect(() => {
     setIndex(readHashIndex());
     setCompleted(new Set());
   }, [sectionId]);
+
+  // Link do rozdziału w tym samym wykładzie (zmienia się tylko #rozdzial-N) — przejdź do niego
+  useEffect(() => {
+    const onHash = () => {
+      if (/^#rozdzial-\d+$/.test(window.location.hash)) setIndex(readHashIndex());
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   // Numer rozdziału w adresie: odświeżenie strony nie gubi miejsca
   useEffect(() => {
@@ -93,6 +193,19 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
       window.history.replaceState(window.history.state, "", url);
     }
   }, [safeIndex, total]);
+
+  // Decyzja o wznowieniu — raz, gdy znamy rozdziały i zapamiętane miejsce
+  useEffect(() => {
+    if (resumed !== null || !total) return;
+    if (reads.isPending && reads.fetchStatus !== "idle") return;
+    const saved = reads.data?.find((r) => r.sectionId === sectionId);
+    if (saved && saved.chapterOrder > 1 && saved.chapterOrder <= total) {
+      setIndex(saved.chapterOrder - 1);
+      setResumed({ chapter: saved.chapterOrder, total });
+    } else {
+      setResumed(false);
+    }
+  }, [resumed, total, reads.isPending, reads.fetchStatus, reads.data, sectionId]);
 
   /** Wysokość nawigacji i przyklejonej belki — o tyle treść jest przykryta od góry */
   const coverH = useCallback(() => {
@@ -139,7 +252,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
     return () => window.removeEventListener("keydown", onKey);
   }, [goTo, safeIndex]);
 
-  if (isLoading && hasLecture !== false) {
+  if ((isLoading || (resumed === null && total > 0)) && hasLecture !== false) {
     return (
       <div className="min-h-[40vh] grid place-items-center" data-testid="loading-lecture">
         <LoadingSpinner size="lg" />
@@ -281,6 +394,46 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
           </ol>
         </details>
       )}
+
+      <AnimatePresence initial={false}>
+        {showResumeNote && resumed && (
+          <motion.div
+            key="resume-note"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15, ease: "easeIn" } }}
+            className="mt-6 flex items-center gap-2 border-b border-[var(--line)] pb-3 text-[.875rem] text-[var(--txt2)]"
+            role="status"
+            data-testid="resume-note"
+          >
+            <p className="min-w-0 flex-1">
+              Wracasz do rozdziału <span className="num">{resumed.chapter}</span> z <span className="num">{resumed.total}</span>
+              <span aria-hidden="true"> · </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setNoteOpen(false);
+                  goTo(0);
+                }}
+                className="inline-flex min-h-[44px] items-center text-[var(--txt)] underline decoration-[var(--line2)] underline-offset-4 transition-[transform,color] duration-150 hover:decoration-[var(--txt2)] active:scale-[.97]"
+                data-testid="button-restart-lecture"
+              >
+                Zacznij od początku
+              </button>
+            </p>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setNoteOpen(false)}
+              aria-label="Zamknij informację"
+              className="shrink-0"
+              data-testid="button-dismiss-resume"
+            >
+              <X aria-hidden="true" />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div ref={topRef} className="pt-10" />
 

@@ -1,10 +1,11 @@
 /**
  * Instrukcja „na start” — kroki prowadzenia po aplikacji (coach marks).
- * Cele to atrybuty `data-tour="…"` na prawdziwych elementach (Header, panel postępu, kurs, wykład,
+ * Cele to atrybuty `data-tour="…"` na prawdziwych elementach (Header, Postęp, Kurs, wykład,
  * przycisk zgłoszeń). Krok może mieć kilka celów — wygrywa pierwszy widoczny (np. link „Kurs” na
  * komputerze, a na telefonie najpierw „Kurs” w otwartym menu, inaczej przycisk menu).
  */
 import { WELCOME_EVENT, readStore, writeStore } from "./onboardingStore";
+import { countLabel } from "@/lib/i18n";
 
 /** Ponowne uruchomienie instrukcji (np. „Obejrzyj instrukcję jeszcze raz”) */
 export const TOUR_EVENT = WELCOME_EVENT;
@@ -60,6 +61,12 @@ export const isLecturePath = (p: string) => /^\/lecture\/[^/]+/.test(p);
 
 const q = (s: string) => document.querySelector(s);
 
+/** Liczba modułów z prawdziwej listy w Kursie (wiersze `details#m-…`); bez listy — bez liczby */
+function modulesSentence(): string {
+  const n = typeof document === "undefined" ? 0 : document.querySelectorAll('details[id^="m-"]').length;
+  return n > 0 ? `Kurs ma ${countLabel(n, "moduł", "moduły", "modułów")}.` : "Kurs ma kilka modułów.";
+}
+
 export const TOUR_STEPS: TourStep[] = [
   {
     id: "welcome",
@@ -108,7 +115,10 @@ export const TOUR_STEPS: TourStep[] = [
     id: "module-first",
     kind: "action",
     title: "Moduły",
-    body: "Kurs ma 7 modułów. Kliknij pierwszy, żeby zobaczyć jego tematy.",
+    // Getter: liczba liczona przy pokazaniu kroku (krok jest na /modules, lista już narysowana)
+    get body() {
+      return `${modulesSentence()} Kliknij pierwszy, żeby zobaczyć jego tematy.`;
+    },
     targets: [{ selector: '[data-tour="module-first"]', hint: "Kliknij pierwszy moduł" }],
     route: isModules,
     resume: "modules",

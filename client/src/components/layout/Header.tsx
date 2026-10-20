@@ -38,6 +38,9 @@ type NavItem = {
   isActive: (path: string, search: URLSearchParams) => boolean;
 };
 
+/** Quiz tematu (/quiz?sectionId=…, stary ?section=…) należy do Kursu — tak jak wykład */
+const isSectionQuiz = (p: string, s: URLSearchParams) => p === "/quiz" && (s.has("sectionId") || s.has("section"));
+
 /** Nawigacja zalogowanego w becie (docs/design-system.md → Architektura informacji) */
 const NAV_ITEMS: NavItem[] = [
   {
@@ -45,7 +48,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Kurs",
     testId: "modules",
     tour: "kurs",
-    isActive: (p) => p === "/modules" || p.startsWith("/lecture"),
+    isActive: (p, s) => p === "/modules" || p.startsWith("/lecture") || isSectionQuiz(p, s),
   },
   {
     href: "/dashboard",
@@ -59,7 +62,8 @@ const NAV_ITEMS: NavItem[] = [
     label: "Powtórka",
     testId: "review",
     tour: "powtorka",
-    isActive: (p, s) => p === "/quiz" && s.get("mode") === "review",
+    // Ekran powtórki i sesja powtórki; /quiz bez parametrów też pokazuje powtórkę. Egzamin — żaden punkt
+    isActive: (p, s) => p === "/quiz" && !isSectionQuiz(p, s) && s.get("mode") !== "exam",
   },
 ];
 
@@ -176,7 +180,7 @@ export default function Header() {
           href={isAuthenticated ? "/dashboard" : "/"}
           className="flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="logo-link"
-          aria-label="helloEKG — strona główna"
+          aria-label={isAuthenticated ? "helloEKG — Postęp" : "helloEKG — wejście do bety"}
         >
           <Logo replayKey={location} />
         </Link>

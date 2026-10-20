@@ -71,29 +71,39 @@ export function plural(n: number, one: string, few: string, many: string) {
 }
 
 /**
- * Rytm ozdobnego zapisu dobrany do tematu. `exact` = rysunek odpowiada tematowi,
- * więc wolno pokazać podpis rytmu; w przeciwnym razie linia jest tylko ozdobnikiem marki.
- * Silnik nie ma np. Mobitz II, BBB, częstoskurczów z szerokimi QRS — wtedy zostaje rytm zatokowy.
+ * Pasek EKG w nagłówku wykładu z podpisem „tak wygląda rytm, o którym jest ten wykład”.
+ * To twierdzenie merytoryczne, więc tylko przy jednoznacznym dopasowaniu tytułu SEKCJI
+ * (tytuł modułu się nie liczy). Zasady:
+ *  - wykluczenia wygrywają: bloki odnóg/wiązek (odnog, LBBB, RBBB, BBB, wiązk, hemiblok, śródkomor),
+ *    Mobitz II, rytmy komorowe (migotanie/trzepotanie komór, częstoskurcz, VT/VF), stymulatory —
+ *    silnik ich nie rysuje, a podobne słowa („całkowity”, „blok”, „II stopnia”) myliłyby się z blokiem AV;
+ *  - blok AV wymaga słów „AV” albo „przedsionkowo-komorowy” razem ze stopniem (sam „całkowity” nie wystarcza);
+ *  - pasuje dokładnie jeden wzorzec — dwa lub więcej (np. „migotanie i trzepotanie”) = brak paska.
+ * Zwraca `exact: false`, gdy nie ma pewności — wtedy nagłówek nie pokazuje paska ani podpisu.
  */
-export function pickRhythm(moduleTitle: string, sectionTitle: string): { rhythm: Rhythm; exact: boolean } {
-  const s = (sectionTitle ?? "").toLowerCase();
-  const m = (moduleTitle ?? "").toLowerCase();
-  const pick = (t: string): Rhythm | null => {
-    if (/mobitz\s*(ii|2)\b/.test(t)) return null;
-    if (/wenckebach|mobitz\s*(i|1)\b/.test(t)) return "wenckebach";
-    if (/iii\s*stopnia|całkowit/.test(t)) return "avb3";
-    if (/\bi\s*stopnia/.test(t)) return "avb1";
-    if (/trzepotan/.test(t) && !/migotan/.test(t)) return "aflutter";
-    if (/migotani[ea]\s+(i\s+trzepotani[ea]\s+)?przedsionk/.test(t)) return "af";
-    if (/bradykardi|bradyarytmi/.test(t)) return "brady";
-    return null;
-  };
-  const exact = pick(s);
-  if (exact) return { rhythm: exact, exact: true };
-  if (/arytmi|zaburzenia rytmu/.test(m) && !/mobitz/.test(s)) return { rhythm: "af", exact: false };
-  // Podpis „rytm zatokowy” tylko tam, gdzie temat dotyczy rytmu; gdzie indziej (STEMI, BBB…)
-  // prawidłowy zapis z podpisem mógłby sugerować, że tak wygląda omawiany obraz
-  return { rhythm: "sinus", exact: /rytm|częstoś/.test(s) };
+const RHYTHM_EXCLUDE =
+  /odnog|\b[lr]?bbb\b|wiązk|hemiblok|śródkomor|mobitz\s*(ii|2)\b|ii\s+stopnia\s+typu\s+(2|ii)\b|(migotani|trzepotani)[a-zęą]*\s+komór|częstoskurcz|\bv[tf]\b|torsade|stymul|kardiowerter|\bicd\b|preekscytac|wpw/i;
+
+const AV_BLOCK = /\bav\b|przedsionkowo[-\s]?komorow/;
+
+const RHYTHM_PATTERNS: Array<[Rhythm, (t: string) => boolean]> = [
+  ["avb1", (t) => AV_BLOCK.test(t) && /\bi\s+stopnia|pierwszego\s+stopnia/.test(t)],
+  ["wenckebach", (t) => /wenckebach/.test(t) || (AV_BLOCK.test(t) && /mobitz\s*(i|1)\b/.test(t))],
+  ["avb3", (t) => AV_BLOCK.test(t) && /\biii\s+stopnia|trzeciego\s+stopnia|całkowit/.test(t)],
+  // „Migotanie i trzepotanie przedsionków” trafia w oba → niejednoznaczne → brak paska
+  ["af", (t) => /migotani[ea]\s+(i\s+trzepotani[ea]\s+)?przedsionk/.test(t)],
+  ["aflutter", (t) => /trzepotani[ea]\s+(i\s+migotani[ea]\s+)?przedsionk/.test(t)],
+  ["brady", (t) => /bradykardi[aię]\s+zatokow/.test(t)],
+  ["tachy", (t) => /tachykardi[aię]\s+zatokow/.test(t)],
+  ["sinus", (t) => /\brytm\s+zatokow/.test(t)],
+];
+
+export function pickRhythm(_moduleTitle: string, sectionTitle: string): { rhythm: Rhythm; exact: boolean } {
+  const t = (sectionTitle ?? "").toLowerCase().replace(/\s+/g, " ");
+  const none = { rhythm: "sinus" as Rhythm, exact: false };
+  if (!t || RHYTHM_EXCLUDE.test(t)) return none;
+  const hits = RHYTHM_PATTERNS.filter(([, test]) => test(t)).map(([r]) => r);
+  return hits.length === 1 ? { rhythm: hits[0], exact: true } : none;
 }
 
 /** Role, które widzą luki w treści (grafiki w przygotowaniu) */

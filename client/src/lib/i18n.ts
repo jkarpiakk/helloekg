@@ -1,5 +1,28 @@
 import type { Locale, I18nKeys } from "@/types";
 
+/* ───────── Liczebniki (polska odmiana) ─────────
+ * 1 → one, 2–4 (poza 12–14) → few, reszta (0, 5–21, 25…) → many.
+ *   plural(n, "pytanie", "pytania", "pytań")
+ *   countLabel(3, "pytanie", "pytania", "pytań") → "3 pytania"
+ */
+export function plural(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(Math.trunc(n));
+  if (abs === 1) return one;
+  const d = abs % 10;
+  const dd = abs % 100;
+  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
+}
+
+/** Liczba + odmieniony rzeczownik: „1 pytanie”, „3 pytania”, „12 pytań” */
+export const countLabel = (n: number, one: string, few: string, many: string) => `${n} ${plural(n, one, few, many)}`;
+
+/** „1 pytanie”, „2 pytania”, „5 pytań” */
+export const pytania = (n: number) => countLabel(n, "pytanie", "pytania", "pytań");
+
+/** Kolejka powtórki: „1 pytanie czeka”, „3 pytania czekają”, „12 pytań czeka” */
+export const pytaniaCzekaja = (n: number) =>
+  `${n} ${plural(n, "pytanie czeka", "pytania czekają", "pytań czeka")}`;
+
 // Polish translations (active)
 const plTranslations: I18nKeys = {
   common: {
@@ -28,11 +51,11 @@ const plTranslations: I18nKeys = {
   nav: {
     home: "Strona główna",
     blog: "Blog",
-    courses: "Kursy", 
+    courses: "Kurs",
     pricing: "Cennik",
     about: "O nas",
-    dashboard: "Panel",
-    quiz: "Quiz",
+    dashboard: "Postęp",
+    quiz: "Powtórka",
     progress: "Postęp",
     certificates: "Certyfikaty",
     admin: "Administracja",

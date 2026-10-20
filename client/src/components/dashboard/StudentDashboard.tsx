@@ -10,6 +10,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { rise, stagger } from "@/lib/motion";
 import ProgressCard, { ProgressLine } from "./ProgressCard";
+import ExamCountDialog from "./ExamCountDialog";
+import { pytania } from "@/lib/i18n";
 import { isIntroModule } from "@/components/course/moduleArt";
 import type { Certificate, UserProgress, WeakArea } from "@/types";
 
@@ -46,20 +48,13 @@ function moduleProgress(sections: CourseSection[]) {
   return withQ.reduce((acc, s) => acc + (s.completionPercentage || 0), 0) / withQ.length;
 }
 
-function plural(n: number, one: string, few: string, many: string) {
-  if (n === 1) return one;
-  const d = n % 10;
-  const dd = n % 100;
-  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many;
-}
-
 const cleanTitle = (title: string) => title.replace(/^\s*moduł\s*\d+\s*[:.–—-]\s*/i, "");
 
 /* ── Onboarding (FirstSteps) ─────────────────────────────────────────────
  * Pliki tworzy osobno inny etap prac. `import.meta.glob` zwraca pusty obiekt, gdy pliku nie ma,
  * więc build i HMR działają także bez nich; gdy się pojawią, Vite sam je podepnie.
  * Ładowane leniwie (React.lazy + Suspense fallback null) i odgrodzone granicą błędu —
- * usterka w onboardingu nie może zabrać całego panelu postępu. */
+ * usterka w onboardingu nie może zabrać całego ekranu Postępu. */
 const onboardingLoaders = import.meta.glob("../onboarding/FirstSteps.tsx");
 const Nothing: ComponentType = () => null;
 
@@ -96,10 +91,19 @@ function PlusIcon() {
   );
 }
 
+
+/** „Czytaj dalej · Rozdział 4 z 9”, gdy kursant przerwał wykład w środku; inaczej „Czytaj wykład” */
+function readLabel(section: { lastChapter?: number | null; chapterCount?: number }) {
+  const total = section.chapterCount ?? 0;
+  const last = section.lastChapter ? Math.min(section.lastChapter, total || section.lastChapter) : 0;
+  return last > 1 && last <= total ? `Czytaj dalej · Rozdział ${last} z ${total}` : "Czytaj wykład";
+}
+
 export default function StudentDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  // null = jeszcze nie ruszany: decyduje stan kursu (otwarte dla kogoś, kto nie zaczął modułu 1)
+  // Egzamin próbny: wybór liczby pytań od razu tutaj, bez przystanku na /quiz
+  const [examOpen, setExamOpen] = useState(false);
 
   // Moduły z sekcjami i postępem — z nich „Kontynuuj” i lista modułów
   const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({
@@ -145,7 +149,7 @@ export default function StudentDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/certificates/my"] });
       queryClient.invalidateQueries({ queryKey: ["/api/certificates/eligibility"] });
-      toast({ title: "Certyfikat gotowy", description: "Znajdziesz go w panelu postępu." });
+      toast({ title: "Certyfikat gotowy", description: "Link do niego jest tutaj, w Postępie." });
     },
     onError: (error: any) => {
       toast({
@@ -161,15 +165,15 @@ export default function StudentDashboard() {
       .slice()
       .sort((a, b) => a.order - b.order)
       .map((m) => ({ ...m, sections: m.sections.slice().sort((a, b) => a.order - b.order) }));
-    const flat = sortedModules.flatMap((m, mi) => {
-      let lectureNo = 0;
-      return m.sections.map((s) => ({
+    // Numer tematu = pozycja w module, tak jak na liście w Kursie („Moduł 01 · Temat 04”)
+    const flat = sortedModules.flatMap((m, mi) =>
+      m.sections.map((s, si) => ({
         section: s,
         module: m,
         moduleNo: mi + 1,
-        lectureNo: hasLecture(s) ? ++lectureNo : null,
-      }));
-    });
+        sectionNo: si + 1,
+      })),
+    );
     // Tylko sekcje, w których coś jest — „Kontynuuj” nigdy nie prowadzi do pustej
     const withContent = flat.filter((x) => hasLecture(x.section) || hasQuestions(x.section));
     // „Zrobione” = wszystkie pytania tematu opanowane (ostatnia odpowiedź na każde poprawna);
@@ -260,13 +264,11 @@ export default function StudentDashboard() {
             <Link href="/quiz?mode=review" className="chip min-h-[44px]" data-testid="action-review">
               Powtórka
             </Link>
-            <Link href="/quiz?mode=exam" className="chip min-h-[44px]" data-testid="action-exam">
+            <button type="button" className="chip min-h-[44px]" onClick={() => setExamOpen(true)} data-testid="action-exam">
               Egzamin próbny
-            </Link>
-            <Link href="/modules" className="chip min-h-[44px]" data-testid="action-course">
-              Cały kurs
-            </Link>
+            </button>
           </nav>
+          <ExamCountDialog open={examOpen} onOpenChange={setExamOpen} />
         </motion.header>
 
         <motion.div variants={rise} className="min-w-0">
@@ -278,7 +280,7 @@ export default function StudentDashboard() {
             <section className="surface p-4 sm:p-5 grid gap-6" aria-labelledby="continue-title" data-testid="continue-card" data-tour="continue">
               <div className="grid gap-5 px-1 sm:px-3 pb-2 sm:pb-3">
                 <p className="label label--g">
-                  Kontynuuj · Moduł {target.moduleNo} · {target.lectureNo !== null ? `Wykład ${target.lectureNo}` : "Pytania"}
+                  Kontynuuj · Moduł {pad(target.moduleNo)} · Temat {pad(target.sectionNo)}
                 </p>
                 <div className="grid gap-1">
                   <h2 id="continue-title" className="h3">{target.section.title}</h2>
@@ -289,14 +291,16 @@ export default function StudentDashboard() {
                     <ProgressLine value={target.section.completionPercentage} label="Opanowane w tym temacie" />
                     <p className="text-[14px] text-[var(--txt2)]">
                       <span className="num">{Math.round(target.section.completionPercentage || 0)}%</span> opanowane ·{" "}
-                      {target.section.questionCount} {plural(target.section.questionCount ?? 0, "pytanie", "pytania", "pytań")}
+                      {pytania(target.section.questionCount ?? 0)}
                     </p>
                   </div>
                 )}
                 <div className="flex flex-wrap items-center gap-3">
                   <Button asChild data-testid="action-continue">
                     <Link href={primaryIsQuiz ? `/quiz?sectionId=${target.section.id}` : `/lecture/${target.section.id}`}>
-                      {primaryIsQuiz ? (targetStartedQuiz ? "Wróć do pytań" : "Rozwiąż pytania") : "Czytaj wykład"}
+                      {primaryIsQuiz
+                        ? (targetStartedQuiz ? "Wróć do pytań" : "Rozwiąż pytania")
+                        : readLabel(target.section)}
                       <ArrowRight aria-hidden="true" />
                     </Link>
                   </Button>
@@ -321,7 +325,7 @@ export default function StudentDashboard() {
               <div>
                 <Button asChild>
                   <Link href="/quiz?mode=review">
-                    Zacznij powtórkę
+                    Otwórz powtórkę
                     <ArrowRight aria-hidden="true" />
                   </Link>
                 </Button>
@@ -352,12 +356,7 @@ export default function StudentDashboard() {
           <div className="grid gap-12 content-start min-w-0">
             {course.modules.length > 0 && (
               <motion.section variants={rise} aria-labelledby="modules-title">
-                <div className="flex items-baseline justify-between gap-4 mb-4">
-                  <h2 id="modules-title" className="label">Moduły</h2>
-                  <Link href="/modules" className="inline-flex min-h-11 items-center text-[14px] text-[var(--txt2)] hover:text-[var(--txt)]">
-                    Otwórz kurs
-                  </Link>
-                </div>
+                <h2 id="modules-title" className="label mb-4">Moduły</h2>
                 <ul className="rows">
                   {course.modules.map((module, mi) => {
                     const progress = moduleProgress(module.sections);
@@ -418,7 +417,7 @@ export default function StudentDashboard() {
                   ))}
                 </ul>
                 <Link href="/quiz?mode=review" className="inline-flex min-h-11 items-center mt-2 text-[14px] text-[var(--puls)]">
-                  Powtórz te pytania
+                  Otwórz powtórkę
                 </Link>
               </motion.section>
             )}

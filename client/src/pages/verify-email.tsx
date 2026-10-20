@@ -70,7 +70,7 @@ export default function VerifyEmail() {
 
   const continueAction = isAuthenticated ? (
     <Button asChild>
-      <Link href="/dashboard">Przejdź do kursu</Link>
+      <Link href="/modules">Przejdź do kursu</Link>
     </Button>
   ) : (
     <Button asChild>
@@ -89,7 +89,9 @@ export default function VerifyEmail() {
         lead="Link z e-maila jest niepełny. Otwórz go jeszcze raz albo skopiuj w całości do paska adresu."
       >
         <Button asChild>
-          <Link href="/">Wróć na stronę główną</Link>
+          <Link href={isAuthenticated ? "/modules" : "/?auth=login"}>
+            {isAuthenticated ? "Przejdź do kursu" : "Zaloguj się"}
+          </Link>
         </Button>
       </Screen>
     );

@@ -20,12 +20,14 @@ export default function NotFound() {
           Nie ma takiej strony
         </motion.h1>
         <motion.p variants={rise} className="lead mt-4">
-          Link mógł się zmienić albo zawiera literówkę. Wróć do kursu i wybierz, co chcesz otworzyć.
+          {isAuthenticated
+            ? "Link mógł się zmienić albo zawiera literówkę. Wróć do kursu i wybierz, co chcesz otworzyć."
+            : "Link mógł się zmienić albo zawiera literówkę. Zaloguj się i wybierz temat w kursie."}
         </motion.p>
         <motion.div variants={rise} className="mt-8">
           <Button asChild>
-            <Link href={isAuthenticated ? "/dashboard" : "/"}>
-              {isAuthenticated ? "Wróć do kursu" : "Wróć na stronę główną"}
+            <Link href={isAuthenticated ? "/modules" : "/?auth=login"}>
+              {isAuthenticated ? "Wróć do kursu" : "Zaloguj się"}
             </Link>
           </Button>
         </motion.div>
