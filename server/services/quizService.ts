@@ -960,39 +960,43 @@ export class QuizService {
     return wrongIds.filter(id => published.has(id));
   }
 
-  async getUserWeakAreas(userId: string): Promise<Array<{ tag: string; successRate: number; questionCount: number }>> {
+  /**
+   * „Do poprawy” na Postępie: TEMATY (nie wewnętrzne tagi studia), w których ostatnie odpowiedzi
+   * na pytania wypadają najsłabiej. Liczymy ostatnią odpowiedź na każde pytanie — tak jak opanowanie.
+   */
+  async getUserWeakAreas(userId: string): Promise<Array<{ tag: string; sectionId: string; successRate: number; questionCount: number }>> {
     const userAttempts = await storage.getUserAttempts(userId);
-    const questions = await storage.getAllQuestions("published"); // Get all questions
-    
-    const tagStats = new Map<string, { correct: number; total: number }>();
-    
-    for (const attempt of userAttempts) {
-      const question = questions.find(q => q.id === attempt.questionId);
-      if (!question || !question.tags) continue;
-      
-      for (const tag of question.tags) {
-        if (!tagStats.has(tag)) {
-          tagStats.set(tag, { correct: 0, total: 0 });
-        }
-        
-        const stats = tagStats.get(tag)!;
-        stats.total++;
-        if (attempt.isCorrect) {
-          stats.correct++;
-        }
-      }
+    const published = await storage.getAllQuestions("published");
+    const byId = new Map(published.map(q => [q.id, q]));
+    const latest = new Map<string, { isCorrect: boolean; at: number }>();
+    for (const a of userAttempts) {
+      const at = new Date(a.createdAt as any).getTime();
+      const prev = latest.get(a.questionId);
+      if (!prev || at >= prev.at) latest.set(a.questionId, { isCorrect: !!a.isCorrect, at });
     }
-    
-    const weakAreas = Array.from(tagStats.entries())
-      .filter(([_, stats]) => stats.total >= 3) // Only include tags with at least 3 attempts
-      .map(([tag, stats]) => ({
-        tag,
-        successRate: stats.correct / stats.total,
-        questionCount: stats.total
+    const perSection = new Map<string, { correct: number; total: number }>();
+    for (const [qid, l] of Array.from(latest.entries())) {
+      const q = byId.get(qid);
+      if (!q) continue;
+      const st = perSection.get(q.sectionId) ?? { correct: 0, total: 0 };
+      st.total++;
+      if (l.isCorrect) st.correct++;
+      perSection.set(q.sectionId, st);
+    }
+    const sections = await storage.getSections();
+    const mods = await storage.getModules();
+    const modTitle = new Map(mods.map(m => [m.id, m.title]));
+    // „Pytania utrwalające” są w kilku modułach — dopisujemy moduł, żeby było wiadomo które
+    const titleOf = new Map(sections.map(s => [s.id, /utrwal/i.test(s.title) ? `${s.title} · ${modTitle.get(s.moduleId) ?? ""}`.replace(/ · $/, "") : s.title]));
+    return Array.from(perSection.entries())
+      .filter(([, st]) => st.total >= 3 && st.correct / st.total < 0.8)
+      .map(([sectionId, st]) => ({
+        tag: titleOf.get(sectionId) ?? "Temat",
+        sectionId,
+        successRate: st.correct / st.total,
+        questionCount: st.total,
       }))
-      .sort((a, b) => a.successRate - b.successRate); // Sort by lowest success rate first
-    
-    return weakAreas;
+      .sort((a, b) => a.successRate - b.successRate);
   }
 }
 

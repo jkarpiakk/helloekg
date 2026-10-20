@@ -13,6 +13,7 @@ import ProgressCard, { ProgressLine } from "./ProgressCard";
 import ExamCountDialog from "./ExamCountDialog";
 import { pytania } from "@/lib/i18n";
 import { isIntroModule } from "@/components/course/moduleArt";
+import { courseItems, nextStep, type OrderModule } from "@/lib/courseOrder";
 import type { Certificate, UserProgress, WeakArea } from "@/types";
 
 interface CourseSection {
@@ -183,14 +184,10 @@ export default function StudentDashboard() {
     const withContent = flat.filter((x) => hasLecture(x.section) || hasQuestions(x.section));
     // „Zrobione” (do licznika) = wszystkie pytania tematu opanowane
     const isDone = (s: CourseSection) => hasQuestions(s) && (s.completionPercentage || 0) >= 100;
-    // „Kontynuuj” idzie po kolei, jak kurs: pierwszy temat, w którym zostało coś do zrobienia —
-    // wykład nieprzeczytany do końca albo pytania jeszcze nieruszane. „Pytania utrwalające”
-    // stoją na końcu modułu, więc wypadają dopiero po jego wykładach (a nie dlatego, że ktoś
-    // ostatnio na nie odpowiadał).
-    const isPassed = (s: CourseSection) =>
-      lectureFinished(s) && (!hasQuestions(s) || !!s.lastActivity || (s.completionPercentage || 0) > 0);
-    let target: (typeof withContent)[number] | null = withContent.find((x) => !isPassed(x.section)) ?? null;
-    if (!target) target = withContent.find((x) => !isDone(x.section)) ?? null;
+    // „Następny krok” — wspólna reguła kolejności kursu (lib/courseOrder): pierwszy nieprzerobiony
+    // temat; „Pytania utrwalające” stoją na końcu modułu, więc wypadają dopiero po jego wykładach
+    const step = nextStep(courseItems(sortedModules as unknown as OrderModule[]));
+    const target = step ? withContent.find((x) => x.section.id === step.section.id) ?? null : null;
 
     const questionSections = flat.filter((x) => hasQuestions(x.section));
     const overall = questionSections.length
@@ -403,12 +400,14 @@ export default function StudentDashboard() {
                 <h2 id="weak-title" className="label mb-4">Do poprawy</h2>
                 <ul className="rows">
                   {weakAreas.slice(0, 3).map((area) => (
-                    <li
-                      key={area.tag}
-                      className="border-b border-[var(--line)] py-3 flex items-center justify-between gap-4 text-[15px]"
-                    >
-                      <span className="min-w-0 truncate text-[var(--txt)]">{area.tag}</span>
-                      <span className="num text-[var(--txt2)] shrink-0">{Math.round(area.successRate * 100)}% poprawnych</span>
+                    <li key={area.sectionId ?? area.tag} className="border-b border-[var(--line)]">
+                      <Link
+                        href={area.sectionId ? `/quiz?sectionId=${area.sectionId}` : "/quiz?mode=review"}
+                        className="flex min-h-11 items-center justify-between gap-4 py-3 text-[15px] no-underline transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.99]"
+                      >
+                        <span className="min-w-0 truncate text-[var(--txt)]">{area.tag}</span>
+                        <span className="num text-[var(--txt2)] shrink-0">{Math.round(area.successRate * 100)}% poprawnych</span>
+                      </Link>
                     </li>
                   ))}
                 </ul>

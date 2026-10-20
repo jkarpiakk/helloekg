@@ -121,7 +121,9 @@ export interface UserProgress {
 }
 
 export interface WeakArea {
+  /** Nazwa tematu (dawniej: tag pytania) */
   tag: string;
+  sectionId?: string;
   successRate: number;
   questionCount: number;
 }

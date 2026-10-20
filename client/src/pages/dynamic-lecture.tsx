@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { LectureHero } from "@/components/lecture/LectureHero";
+import OrderHint from "@/components/course/OrderHint";
 import { chaptersQuery, countWords, pickRhythm, plural, readingMinutes, sortChapters } from "@/components/lecture/lectureData";
 
 interface CourseSection {
@@ -175,6 +176,7 @@ export default function DynamicLecture() {
         Kurs
       </Link>
 
+      {sectionId && <OrderHint sectionId={sectionId} />}
       <LectureHero
         label={`Moduł ${moduleNo} · ${lectureNo !== null ? `Wykład ${lectureNo}` : "Pytania"}`}
         title={section.title}

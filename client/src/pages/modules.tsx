@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Check, ChevronRight, Lock } from "lucide-react";
+import { courseItems, nextStep, type OrderModule } from "@/lib/courseOrder";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Button } from "@/components/ui/button";
 import { ProgressLine } from "@/components/dashboard/ProgressCard";
@@ -90,6 +91,9 @@ export default function Modules() {
     // Postęp zmienia się po każdym quizie — przy wejściu na ekran zawsze dociągnij świeży
     refetchOnMount: "always",
   });
+  // Miękka kolejność kursu: ten sam „Następny krok” co na Postępie
+  const nextId = nextStep(courseItems(modules as unknown as OrderModule[] | undefined))?.section.id;
+
 
   const sorted = useMemo(
     () =>
@@ -218,6 +222,7 @@ export default function Modules() {
                             key={section.id}
                             index={si + 1}
                             section={section}
+                            isNext={nextId === section.id}
                             tourFirst={section === module.sections.find((x) => (x.chapterCount ?? 0) > 0)}
                           />
                         ))}
@@ -234,7 +239,7 @@ export default function Modules() {
   );
 }
 
-function SectionRow({ index, section, tourFirst }: { index: number; section: ModuleSection; tourFirst?: boolean }) {
+function SectionRow({ index, section, tourFirst, isNext }: { index: number; section: ModuleSection; tourFirst?: boolean; isNext?: boolean }) {
   const pct = Math.round(section.completionPercentage || 0);
   const hasLecture = (section.chapterCount ?? 0) > 0;
   const hasQuestions = (section.questionCount ?? 0) > 0;
@@ -277,6 +282,12 @@ function SectionRow({ index, section, tourFirst }: { index: number; section: Mod
           </Link>
         )}
         <span className="!text-[14px] flex flex-wrap items-center gap-x-2">
+          {isNext && (
+            <>
+              <span className="label label--g !text-[.75rem]" data-testid="section-next">Następny krok</span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
           {isEmpty ? (
             <span>Materiały w przygotowaniu</span>
           ) : (

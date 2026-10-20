@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import OrderHint from "@/components/course/OrderHint";
 import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -96,6 +97,12 @@ export default function Quiz() {
   if (runningMode) {
     const moduleId = sectionId ? modules?.find((m) => m.sections.some((s) => s.id === sectionId))?.id : undefined;
     return (
+      <>
+      {runningMode === "learn" && sectionId && (
+        <div className="wrap wrap--narrow pt-6">
+          <OrderHint sectionId={sectionId} />
+        </div>
+      )}
       <QuizInterface
         key={`${runningMode}-${sectionId ?? ""}-${examCount ?? ""}-${reviewIds?.join(",") ?? ""}`}
         sectionId={runningMode === "learn" ? sectionId || undefined : undefined}
@@ -105,6 +112,7 @@ export default function Quiz() {
         // Nazwy przycisków wyjścia w QuizInterface: temat → „Wróć do kursu”, reszta → „Wróć do postępu”
         onExit={() => setLocation(runningMode === "learn" ? (moduleId ? `/modules#m-${moduleId}` : "/modules") : "/dashboard")}
       />
+      </>
     );
   }
 
