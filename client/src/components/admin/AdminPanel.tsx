@@ -9,7 +9,7 @@ import QuestionManager from "./QuestionManager";
 import CourseManager from "./CourseManager";
 import UserManager from "./UserManager";
 import SupportManager from "./SupportManager";
-import AnalyticsManager from "./AnalyticsManager";
+import LearningAnalytics from "./LearningAnalytics";
 import BlogManager from "./BlogManager";
 import DemoQuestionManager from "./DemoQuestionManager";
 import HomePageContentManager from "./HomePageContentManager";
@@ -130,7 +130,7 @@ export default function AdminPanel() {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <AnalyticsManager />
+            <LearningAnalytics />
           </TabsContent>
 
           <TabsContent value="future">

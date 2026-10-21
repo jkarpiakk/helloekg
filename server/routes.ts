@@ -3338,6 +3338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   (await import("./feedbackRoutes")).registerFeedbackRoutes(app); // zgłoszenia testerów (beta)
+  (await import("./learningAnalyticsRoutes")).registerLearningAnalyticsRoutes(app); // panel nauki (admin → Statystyki)
   const httpServer = createServer(app);
   return httpServer;
 }
