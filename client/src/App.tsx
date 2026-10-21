@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
-import { Switch, Route, Redirect } from "wouter";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -89,6 +89,29 @@ function BlogRedirect() {
   return <RouteLoader />;
 }
 
+/**
+ * Nowa strona zaczyna się od góry. Wouter (pushState) nie przewija sam, więc wejście w pytania
+ * z przewiniętej listy kursu otwierało quiz w połowie (zgłoszenie JK 21.10). Wyjątki: „wstecz”
+ * (przeglądarka przywraca miejsce) i adresy z #kotwicą (wykład sam ustawia rozdział).
+ */
+function ScrollToTopOnNavigate() {
+  const [path] = useLocation();
+  const search = useSearch();
+  const fromHistory = useRef(false);
+  useEffect(() => {
+    const onPop = () => { fromHistory.current = true; };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  useEffect(() => {
+    const back = fromHistory.current;
+    fromHistory.current = false;
+    if (back || window.location.hash) return;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, [path, search]);
+  return null;
+}
+
 function AppContent() {
   const { data: user, isLoading } = useQuery({
     queryKey: ["/api/auth/me"],
@@ -108,6 +131,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <ScrollToTopOnNavigate />
       {/* Dolny odstęp: pływający „Zgłoś uwagę” nie zasłania ostatnich linii treści */}
       <main className="pb-24">
         <Suspense fallback={<RouteLoader />}>

@@ -61,7 +61,11 @@ const gfxLines = (s: string) =>
     if (!g?.assetPath) return "";
     const alt = (g.altText || g.title || "").replace(/[\[\]\n\r]/g, " ").trim();
     return `![${alt}](${g.assetPath})`;
-  }).replace(/\n{3,}/g, "\n\n");
+  })
+    // Wstawki interaktywne w wyjaśnieniach (przypisane w studiu 21.10): kurs ich jeszcze nie rysuje,
+    // więc linia znika, zamiast pokazać się kursantowi jako tekst. Zostają w studiu do podpięcia.
+    .replace(/^::wstawka[ \t].*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n");
 const fixAssets = (s: string) => gfxLines(s).replace(ASSET_RE, "$1/content-assets/$2");
 const fixDeep = (v: any): any =>
   typeof v === "string" ? fixAssets(v)
