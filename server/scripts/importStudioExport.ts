@@ -48,7 +48,21 @@ const unsupported = new Set<string>(
 );
 
 const ASSET_RE = /(^|[("'\s])assets\/([0-9a-f]{64}\.[a-z0-9]+)/g;
-const fixAssets = (s: string) => s.replace(ASSET_RE, "$1/content-assets/$2");
+/**
+ * Linia `::grafika GFX-NNNN` w treści lub wyjaśnieniu pytania → obrazek z paczki eksportu
+ * (studio zamienia ją tylko w wykładach). Kod bez pliku: linia znika, zamiast pokazać się jako tekst.
+ */
+const studioGraphics: Array<{ code: string; assetPath: string | null; altText: string | null; title: string }> =
+  fs.existsSync(path.join(dir, "graphics.json")) ? JSON.parse(fs.readFileSync(path.join(dir, "graphics.json"), "utf8")) : [];
+const gfxByCode = new Map(studioGraphics.map((g) => [g.code, g]));
+const gfxLines = (s: string) =>
+  s.replace(/^::grafika[ \t]+(GFX-\d+)[ \t]*$/gim, (_m, code: string) => {
+    const g = gfxByCode.get(code.toUpperCase());
+    if (!g?.assetPath) return "";
+    const alt = (g.altText || g.title || "").replace(/[\[\]\n\r]/g, " ").trim();
+    return `![${alt}](${g.assetPath})`;
+  }).replace(/\n{3,}/g, "\n\n");
+const fixAssets = (s: string) => gfxLines(s).replace(ASSET_RE, "$1/content-assets/$2");
 const fixDeep = (v: any): any =>
   typeof v === "string" ? fixAssets(v)
   : Array.isArray(v) ? v.map(fixDeep)
@@ -83,6 +97,30 @@ function splitChapters(title: string, md: string): Array<{ title: string; conten
   return chapters.length ? chapters : [{ title, contentMd: body.trim() }];
 }
 
+
+/**
+ * Kolejność pytań w temacie kursu (kurs podaje nowe pytania od najniższego `order`):
+ * kolejność ze studia, a przy remisie przeplatanie typów zaczynając od ABCD. Studio numeruje
+ * pytania utrwalające osobno w każdym typie (1-5), więc temat nie zaczyna się już od pięciu
+ * drag&drop pod rząd (zgłoszenie JK 21.10).
+ */
+const TYPE_PRIORITY = ["multiple_choice", "matching", "sorting", "fill_blank", "drag_drop", "clinical_case", "hotspot"];
+function courseOrder(qs: any[]): Map<string, number> {
+  const groups = new Map<string, any[]>();
+  for (const q of qs) {
+    const key = q.lectureExternalId || "_loose";
+    groups.set(key, [...(groups.get(key) ?? []), q]);
+  }
+  const pos = new Map<string, number>();
+  for (const g of Array.from(groups.values())) {
+    g.slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)
+        || TYPE_PRIORITY.indexOf(a.questionType) - TYPE_PRIORITY.indexOf(b.questionType)
+        || a.externalId.localeCompare(b.externalId))
+      .forEach((q, i) => pos.set(q.externalId, i));
+  }
+  return pos;
+}
 
 /** Wiersz pytania kursu z pytania studia (wspólne dla obu trybów) */
 function questionRow(q: any, i: number, sectionId: string | undefined, authorId: string, stats: { published: number; draft: number }) {
@@ -198,10 +236,11 @@ async function sync(authorId: string) {
           looseId = await upsertSection(LOOSE(s.code), lecs.length ? "Pytania utrwalające" : s.title);
         }
 
+        const pos = courseOrder(qs);
         for (let i = 0; i < qs.length; i++) {
           const q = qs[i];
           seenQ.add(q.externalId);
-          const row = questionRow(q, i, (q.lectureExternalId && sectionByLecture.get(q.lectureExternalId)) || looseId, authorId, st);
+          const row = questionRow(q, pos.get(q.externalId) ?? i, (q.lectureExternalId && sectionByLecture.get(q.lectureExternalId)) || looseId, authorId, st);
           if (!row.sectionId) throw new Error(`Pytanie bez tematu: ${q.externalId}`);
           const [existing] = await tx.select({ id: questions.id }).from(questions)
             .where(sql`${questions.tags}::jsonb ? ${"studio:" + q.externalId}`).limit(1);
@@ -299,8 +338,9 @@ async function main() {
       const qs = studioQuestions
         .filter((q) => q.sectionCode === s.code)
         .sort((a, b) => a.externalId.localeCompare(b.externalId));
+      const pos = courseOrder(qs);
       const rows = qs.map((q, i) =>
-        questionRow(q, i, (q.lectureExternalId && sectionByLecture.get(q.lectureExternalId)) || looseSectionId, author.id, stats),
+        questionRow(q, pos.get(q.externalId) ?? i, (q.lectureExternalId && sectionByLecture.get(q.lectureExternalId)) || looseSectionId, author.id, stats),
       );
       if (rows.some((r) => !r.sectionId)) throw new Error(`Pytanie bez sekcji w ${s.code}`);
       for (let i = 0; i < rows.length; i += 200) {

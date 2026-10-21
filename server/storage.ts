@@ -336,12 +336,13 @@ export class DatabaseStorage implements IStorage {
     if (status) {
       return db.select().from(questions)
         .where(and(eq(questions.sectionId, sectionId), eq(questions.status, status)))
-        .orderBy(asc(questions.createdAt));
+        .orderBy(asc(questions.order), asc(questions.createdAt));
     }
     
+    // Kolejność z importu (przeplatane typy, ABCD na początku), potem data utworzenia
     return db.select().from(questions)
       .where(eq(questions.sectionId, sectionId))
-      .orderBy(asc(questions.createdAt));
+      .orderBy(asc(questions.order), asc(questions.createdAt));
   }
 
   async getAllQuestions(status?: string): Promise<Question[]> {
