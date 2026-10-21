@@ -1,26 +1,20 @@
 import { useState } from "react";
 
-/** Podpis z alt tylko wtedy, gdy alt jest zdaniem, a nie nazwą pliku czy „image” */
-export const captionFromAlt = (alt: string) => {
-  const a = (alt ?? "").trim();
-  if (a.length < 4 || !/\s/.test(a) || /\.(png|jpe?g|webp|gif|svg)$/i.test(a)) return "";
-  return a;
-};
-
 export type OpenImage = (src: string, alt: string, origin: HTMLElement) => void;
 
 /**
- * Ilustracja wykładu: zaokrąglenie 12, cienka linia, podpis z alt, leniwe ładowanie.
+ * Ilustracja wykładu: zaokrąglenie 12, cienka linia, leniwe ładowanie.
+ * Bez widocznego podpisu: alt to opis dla czytników ekranu (pełny, „jak dla niewidomego”),
+ * a nie podpis dla widzącego — grafika i tak ma napisy w sobie (decyzja JK 21.10).
  * Dotknięcie otwiera podgląd, który wyrasta z miniatury (ImageLightbox).
  */
 export function LectureFigure({ src, alt, onOpen }: { src: string; alt: string; onOpen: OpenImage }) {
-  const caption = captionFromAlt(alt);
   const [failed, setFailed] = useState(false);
 
   if (failed) return null;
 
   return (
-    <figure className="grid justify-items-center gap-2.5" data-testid="lecture-figure">
+    <figure className="grid justify-items-center" data-testid="lecture-figure">
       <button
         type="button"
         onClick={(e) => {
@@ -28,8 +22,9 @@ export function LectureFigure({ src, alt, onOpen }: { src: string; alt: string; 
           if (img) onOpen(src, alt, img);
         }}
         className="block max-w-full cursor-zoom-in rounded-[12px] transition-transform duration-[120ms] ease-out active:scale-[.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--puls)]"
-        aria-label={caption ? `Powiększ ilustrację: ${caption}` : "Powiększ ilustrację"}
       >
+        {/* nazwa przycisku = „Powiększ ilustrację.” + alt obrazka (czytnik słyszy pełny opis) */}
+        <span className="sr-only">Powiększ ilustrację. </span>
         <img
           src={src}
           alt={alt}
@@ -40,9 +35,6 @@ export function LectureFigure({ src, alt, onOpen }: { src: string; alt: string; 
           className="!m-0 block h-auto max-w-full !rounded-[12px] !border !border-[var(--line)] bg-[var(--panel)]"
         />
       </button>
-      {caption && (
-        <figcaption className="max-w-[36em] text-center text-[.875rem] leading-[1.5] text-[var(--txt2)]">{caption}</figcaption>
-      )}
     </figure>
   );
 }
