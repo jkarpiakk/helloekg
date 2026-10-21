@@ -1,0 +1,6 @@
+[Unit]
+Description=Kopia bazy kursu helloEKG
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/helloekg-kurs-backup.sh
