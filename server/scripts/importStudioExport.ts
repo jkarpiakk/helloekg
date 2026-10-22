@@ -62,9 +62,10 @@ const gfxLines = (s: string) =>
     const alt = (g.altText || g.title || "").replace(/[\[\]\n\r]/g, " ").trim();
     return `![${alt}](${g.assetPath})`;
   })
-    // Wstawki interaktywne w wyjaśnieniach (przypisane w studiu 21.10): kurs ich jeszcze nie rysuje,
-    // więc linia znika, zamiast pokazać się kursantowi jako tekst. Zostają w studiu do podpięcia.
-    .replace(/^::wstawka[ \t].*$/gim, "")
+    // Wstawki w wyjaśnieniach: kurs rysuje je jako zwiniętą kartę (Wyjasnienie.tsx), ale tylko linie
+    // z własnym zaproszeniem — tak wchodzą wpisy z zaakceptowanej tabeli 3b (etap 5b). Linie bez
+    // zaproszenia (przypisania agenta z 21.10, przed akceptacją JK) dalej znikają.
+    .replace(/^::wstawka[ \t].*$/gim, (linia) => (/\bzaproszenie="[^"]+"/.test(linia) ? linia : ""))
     .replace(/\n{3,}/g, "\n\n");
 const fixAssets = (s: string) => gfxLines(s).replace(ASSET_RE, "$1/content-assets/$2");
 const fixDeep = (v: any): any =>

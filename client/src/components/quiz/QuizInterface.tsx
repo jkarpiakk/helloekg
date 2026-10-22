@@ -1,3 +1,4 @@
+import { Wyjasnienie } from "./Wyjasnienie";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -1164,10 +1165,9 @@ function ExamReview({ items, onImageClick }: { items: ExamReviewItem[]; onImageC
                       <summary className="label cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:text-[var(--txt)]">
                         Wyjaśnienie
                       </summary>
-                      <div
-                        className="prose-hk mt-2 max-w-[46em] text-[16px]"
-                        dangerouslySetInnerHTML={sanitizeMarkdown(item.explanation)}
-                      />
+                      <div className="mt-2">
+                        <Wyjasnienie md={item.explanation} className="prose-hk max-w-[46em] text-[16px]" />
+                      </div>
                     </details>
                   )}
                 </div>

@@ -365,6 +365,34 @@
 }
 @media (prefers-reduced-transparency: reduce) { .hk-scrim { background: rgba(5, 8, 11, .9); -webkit-backdrop-filter: none; backdrop-filter: none; } }
 
+/* ===== Wstawka interaktywna pod wyjaśnieniem pytania: „Zobacz to na żywo” (etap 2, 22.10) =====
+   Telefon pierwszy: cała karta to jeden cel dotyku (≥ 44 px). Nic nie rusza się samo. */
+.hk-live { border: 1px solid var(--line2); border-radius: 14px; background: var(--panel); overflow: hidden; }
+.hk-live__toggle { appearance: none; width: 100%; min-height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) 36px; align-items: center; gap: 14px;
+  padding: 14px 16px; background: transparent; border: 0; color: inherit; text-align: left; cursor: pointer; font: inherit;
+  transition: background-color .2s, transform .12s ease-out; -webkit-tap-highlight-color: transparent; }
+.hk-live__toggle:hover { background: var(--tint); }
+.hk-live__toggle:active { transform: scale(.995); }
+.hk-live__toggle:focus-visible { outline: 2px solid var(--puls); outline-offset: -2px; border-radius: 14px; }
+.hk-live__text { display: grid; gap: 4px; min-width: 0; }
+.hk-live__invite { color: var(--txt); font-size: .9375rem; line-height: 1.5; text-wrap: pretty; }
+.hk-live__chev { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line2); display: grid; place-items: center; transition: transform .35s var(--ease), border-color .2s; }
+.hk-live__chev::before { content: ""; width: 8px; height: 8px; border-right: 1.5px solid var(--txt2); border-bottom: 1.5px solid var(--txt2); transform: translateY(-2px) rotate(45deg); }
+.hk-live__toggle[aria-expanded="true"] .hk-live__chev { transform: rotate(180deg); border-color: var(--puls-deep); }
+.hk-live__panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .35s var(--ease); }
+.hk-live__toggle[aria-expanded="true"] + .hk-live__panel { grid-template-rows: 1fr; }
+.hk-live__inner { min-height: 0; overflow: hidden; }
+.hk-live__host { padding: 0 10px 10px; }
+.hk-live__host:empty::before { content: "Wczytuję wstawkę…"; display: block; padding: 18px 8px; color: var(--txt2); font: 400 .8125rem/1.4 var(--font-mono); }
+@media (max-width: 480px) {
+  .hk-live__toggle { padding: 12px 12px 12px 14px; gap: 10px; }
+  .hk-live__host { padding: 0 4px 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hk-live__panel, .hk-live__chev { transition: none; }
+  .hk-live__toggle:active { transform: none; }
+}
+
 /* ===== Dostępność: trzy niezależne sygnały (Apple HIG) ===== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }

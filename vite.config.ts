@@ -34,6 +34,8 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
+      // Wstawki interaktywne skopiowane ze studia importują '@helloekg/shared' (scripts/sync-wstawki.sh)
+      "@helloekg/shared": path.resolve(import.meta.dirname, "client", "src", "wstawki-shared.ts"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
   },

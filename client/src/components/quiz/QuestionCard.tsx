@@ -1,3 +1,4 @@
+import { Wyjasnienie } from "./Wyjasnienie";
 import { motion } from "framer-motion";
 import { Check, Maximize2, X } from "lucide-react";
 import { sanitizeMarkdown, sanitizeHtml } from "@/lib/sanitize";
@@ -257,11 +258,7 @@ export default function QuestionCard({
           {quizResult!.explanation && (
             <>
               <p className="label mt-1">{caseConfig ? "Podsumowanie przypadku" : "Wyjaśnienie"}</p>
-              <div
-                className="prose-hk max-w-[46em] text-[16px]"
-                dangerouslySetInnerHTML={sanitizeMarkdown(quizResult!.explanation)}
-                data-testid="explanation-content"
-              />
+              <Wyjasnienie md={quizResult!.explanation} className="prose-hk max-w-[46em] text-[16px]" testId="explanation-content" />
             </>
           )}
 
