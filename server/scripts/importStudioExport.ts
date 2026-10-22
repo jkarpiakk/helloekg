@@ -135,6 +135,8 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
         // Pytania z interaktywną wstawką studia (::wstawka → bodyMdApp z data-widget) zostają szkicem,
         // dopóki kurs nie umie jej narysować — inaczej kursant zobaczyłby pytanie bez kardiomonitora
         if (q.bodyMdApp || (q.tags ?? []).includes("kardiomonitor") || /::wstawka\b/.test(q.bodyMd ?? "")) ok = false;
+        // Archiwum (bank Q-N, decyzja JK 22.10): w kursie szkic, odpowiedzi testerów zostają
+        if ((q.tags ?? []).includes("ARCHIWUM")) ok = false;
         // Hotspot: grafika pytania jest zarazem planszą do klikania
         if (q.questionType === "hotspot" && config?.config) {
           if (!isAsset(config.config.imageUrl) && isAsset(imageUrl)) {
