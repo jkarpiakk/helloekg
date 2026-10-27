@@ -10,3 +10,4 @@ Playwright nie jest zależnością projektu, żeby nie obciążać instalacji na
 
 Dawny pełny zestaw (`ux.js`, 43/38 kroków) żył w katalogu tymczasowym sesji i zginął przy czyszczeniu systemu 27.10; do odtworzenia tutaj.
 - `luki.cjs`: pytania „Uzupełnij luki” (Q-0044, Q-0034 i po jednym z każdej sekcji): pole w miejscu znacznika `{{blank:id}}`, tekst nierozcięty, „Poprawnie” przy swojej luce, „0,3” i „0.3” uznane; `BASE`/`DB` zmieniają adres i bazę.
+- `certyfikat.cjs`: postęp „X z Y tematów” w Postępie, formularz imienia i nazwiska po opanowaniu wszystkich tematów (walidacja), odbiór, arkusz z nazwiskiem, druk na 1 stronie A4. Zakłada i kasuje konto tymczasowe. Po zmianie kodu serwera zrestartuj podgląd (serwer nie przeładowuje się sam).

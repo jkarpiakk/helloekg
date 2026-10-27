@@ -50,6 +50,15 @@ import { users, modules, sections, questions, attempts, progress, subscriptions,
 import { eq, or, and, gte, desc, count, ilike, avg, sql, isNull, isNotNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
+/** Imię i nazwisko na certyfikat: litery (także polskie), spacja, łącznik, apostrof */
+const namePart = (label: string) =>
+  z.string().trim().min(1, `Podaj ${label}`).max(60, `${label[0].toUpperCase()}${label.slice(1)} jest za długie`)
+    .regex(/^[\p{L}][\p{L}\p{M} '’.-]*$/u, `Sprawdź ${label}: tylko litery, spacja albo łącznik`);
+const certificateNameSchema = z.object({
+  firstName: namePart("imię").optional(),
+  lastName: namePart("nazwisko").optional(),
+});
+
 // Blog validation schemas
 const blogQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
@@ -1360,21 +1369,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Certificate endpoints
   app.get("/api/certificates/eligibility", requireAuth, async (req, res) => {
     try {
-      const isEligible = await certificateService.isEligibleForCertificate(req.user!.id);
-      const userStats = await storage.getUserStatistics(req.user!.id);
-      const progress = await storage.getUserProgress(req.user!.id);
-      const sections = await storage.getSections();
-      
-      const completedModules = progress.filter(p => parseFloat(p.completionPercentage) >= 100).length;
-      const totalModules = sections.length;
-      
+      const { mastered, required, isEligible } = await certificateService.getCompletion(req.user!.id);
+      const user = await storage.getUser(req.user!.id);
       res.json({
         isEligible,
-        successRate: userStats.successRate,
-        completedModules,
-        totalModules,
-        requiredSuccessRate: 0.8,
-        requiredModules: totalModules
+        masteredSections: mastered,
+        requiredSections: required,
+        firstName: user?.firstName ?? "",
+        lastName: user?.lastName ?? "",
       });
     } catch (error) {
       console.error("Certificate eligibility error:", error);
@@ -1394,7 +1396,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/certificates/generate", requireAuth, async (req, res) => {
     try {
-      const result = await certificateService.generateCertificate(req.user!.id);
+      const parsed = certificateNameSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Sprawdź imię i nazwisko" });
+      }
+      const { firstName, lastName } = parsed.data;
+      const result = await certificateService.generateCertificate(
+        req.user!.id,
+        firstName && lastName ? { firstName, lastName } : undefined,
+      );
       res.json(result);
     } catch (error: any) {
       console.error("Certificate generation error:", error);

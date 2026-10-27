@@ -4,18 +4,21 @@ import { ArrowLeft, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/lib/auth";
 import type { Certificate } from "@/types";
 import CertificateSheet, { CertificatePrintCopy, type CertificateSheetProps } from "@/components/certificate/CertificateSheet";
 
 /** Certyfikat kursanta (tylko własny, po zalogowaniu): arkusz A4 i druk do PDF. */
 export default function CertificatePage() {
   const { certificateId } = useParams<{ certificateId: string }>();
-  const { user } = useAuth();
 
   const { data: myCertificates, isLoading } = useQuery<Certificate[]>({
     queryKey: ["/api/certificates/my"],
     queryFn: async () => (await apiRequest("GET", "/api/certificates/my")).json(),
+  });
+  // Imię i nazwisko prosto z serwera (zapisane przy odbiorze certyfikatu)
+  const { data: holder } = useQuery<{ firstName: string; lastName: string }>({
+    queryKey: ["/api/certificates/eligibility"],
+    queryFn: async () => (await apiRequest("GET", "/api/certificates/eligibility")).json(),
   });
   const { data: modules } = useQuery({
     queryKey: ["/api/modules"],
@@ -46,7 +49,7 @@ export default function CertificatePage() {
     );
   }
 
-  const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() || user?.email || "";
+  const name = [holder?.firstName, holder?.lastName].filter(Boolean).join(" ").trim();
   const sheet: CertificateSheetProps = {
     name,
     certificateId: certificate.certificateId,

@@ -1,20 +1,20 @@
 import { Component, Suspense, lazy, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { Link } from "wouter";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/lib/auth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
 import ProgressCard, { ProgressLine } from "./ProgressCard";
 import ExamCountDialog from "./ExamCountDialog";
+import CertificateCard from "./CertificateCard";
 import { pytania } from "@/lib/i18n";
 import { isIntroModule } from "@/components/course/moduleArt";
 import { courseItems, nextStep, type OrderModule } from "@/lib/courseOrder";
-import type { Certificate, UserProgress, WeakArea } from "@/types";
+import type { UserProgress, WeakArea } from "@/types";
 
 interface CourseSection {
   id: string;
@@ -34,10 +34,6 @@ interface CourseModule {
   order: number;
   completionPercentage: number;
   sections: CourseSection[];
-}
-
-interface Eligibility {
-  isEligible?: boolean;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -107,7 +103,6 @@ function readLabel(section: { lastChapter?: number | null; chapterCount?: number
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const { toast } = useToast();
   // Egzamin próbny: wybór liczby pytań od razu tutaj, bez przystanku na /quiz
   const [examOpen, setExamOpen] = useState(false);
 
@@ -129,41 +124,6 @@ export default function StudentDashboard() {
       return response.json() as Promise<{ progress: unknown[]; stats: UserProgress; weakAreas: WeakArea[] }>;
     },
     refetchOnMount: "always",
-  });
-
-  const { data: certificateEligibility } = useQuery<Eligibility>({
-    queryKey: ["/api/certificates/eligibility"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/certificates/eligibility");
-      return response.json();
-    },
-  });
-
-  const { data: myCertificates } = useQuery<Certificate[]>({
-    queryKey: ["/api/certificates/my"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/certificates/my");
-      return response.json();
-    },
-  });
-
-  const generateCertificateMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/certificates/generate");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/certificates/my"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/certificates/eligibility"] });
-      toast({ title: "Certyfikat gotowy", description: "Link do niego jest tutaj, w Postępie." });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Nie udało się wygenerować certyfikatu",
-        description: error?.message || "Spróbuj jeszcze raz za chwilę.",
-        variant: "destructive",
-      });
-    },
   });
 
   const course = useMemo(() => {
@@ -222,7 +182,6 @@ export default function StudentDashboard() {
     targetHasQuestions && ((target?.section.completionPercentage || 0) > 0 || !!target?.section.lastActivity);
   // Najpierw wykład (dopóki nieprzeczytany do końca), potem pytania tego tematu
   const primaryIsQuiz = !targetHasLecture || (target ? lectureFinished(target.section) : false);
-  const certificate = myCertificates?.[0];
 
 
   // „Metoda” (orkiestra) — dla tych, którzy nie skończyli jeszcze modułu wprowadzającego
@@ -417,37 +376,7 @@ export default function StudentDashboard() {
               </motion.section>
             )}
 
-            {certificate ? (
-              <motion.section variants={rise} className="surface p-6 grid gap-3" aria-labelledby="cert-title">
-                <p className="label label--g">Certyfikat</p>
-                <h2 id="cert-title" className="h3">Twój certyfikat jest gotowy</h2>
-                <p className="muted text-[15px]">
-                  Wydany {new Date(certificate.issuedAt).toLocaleDateString("pl-PL")}
-                </p>
-                <div>
-                  <Button asChild variant="outline" size="sm" data-testid="button-view-certificate">
-                    <Link href={`/certificate/${certificate.certificateId}`}>Zobacz certyfikat</Link>
-                  </Button>
-                </div>
-              </motion.section>
-            ) : certificateEligibility?.isEligible ? (
-              <motion.section variants={rise} className="surface p-6 grid gap-3" aria-labelledby="cert-title">
-                <p className="label label--g">Certyfikat</p>
-                <h2 id="cert-title" className="h3">Możesz odebrać certyfikat</h2>
-                <p className="muted text-[15px]">Spełniasz warunki ukończenia kursu.</p>
-                <div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => generateCertificateMutation.mutate()}
-                    disabled={generateCertificateMutation.isPending}
-                    data-testid="button-generate-certificate"
-                  >
-                    {generateCertificateMutation.isPending ? "Generuję…" : "Wygeneruj certyfikat"}
-                  </Button>
-                </div>
-              </motion.section>
-            ) : null}
+            <CertificateCard />
           </aside>
         </div>
       )}

@@ -10,29 +10,26 @@ export class CertificateService {
     return `EKG-${hex.slice(0, 8)}-${hex.slice(8)}`;
   }
 
-  async isEligibleForCertificate(userId: string): Promise<boolean> {
-    // Check if user completed required modules and has minimum score
-    const userStats = await storage.getUserStatistics(userId);
-    const progress = await storage.getUserProgress(userId);
-    
-    // Requirements: at least 80% success rate and completed all modules
-    const requiredSuccessRate = 0.8;
-    if (userStats.successRate < requiredSuccessRate) {
-      return false;
-    }
-
-    // Wymagane są tylko tematy z pytaniami — postęp (opanowanie) liczy się z odpowiedzi,
-    // więc temat z samym wykładem nigdy nie miałby 100% i blokowałby certyfikat na zawsze
-    const published = await storage.getAllQuestions("published");
-    const requiredSectionIds = new Set(published.map((q) => q.sectionId));
-    const mastered = new Set(
-      progress.filter((p) => parseFloat(p.completionPercentage) >= 100).map((p) => p.sectionId),
-    );
-    return requiredSectionIds.size > 0 && Array.from(requiredSectionIds).every((id) => mastered.has(id));
+  /**
+   * Warunek ukończenia (decyzja JK 28.10): każdy temat z opublikowanymi pytaniami opanowany,
+   * czyli ostatnia odpowiedź na każde jego pytanie poprawna. Dawne pomyłki się nie liczą.
+   * Temat z samym wykładem nie jest wymagany (nie da się go „opanować” odpowiedziami).
+   */
+  async getCompletion(userId: string): Promise<{ mastered: number; required: number; isEligible: boolean }> {
+    const [published, progress] = await Promise.all([storage.getAllQuestions("published"), storage.getUserProgress(userId)]);
+    const required = new Set(published.map((q) => q.sectionId));
+    const done = new Set(progress.filter((p) => parseFloat(p.completionPercentage) >= 100).map((p) => p.sectionId));
+    const mastered = Array.from(required).filter((id) => done.has(id)).length;
+    return { mastered, required: required.size, isEligible: required.size > 0 && mastered === required.size };
   }
 
-  async generateCertificate(userId: string): Promise<{ certificateId: string; pdfUrl: string }> {
-    const user = await storage.getUser(userId);
+  async isEligibleForCertificate(userId: string): Promise<boolean> {
+    return (await this.getCompletion(userId)).isEligible;
+  }
+
+  /** `name` = imię i nazwisko tak, jak mają stać na certyfikacie (zapisywane w koncie). */
+  async generateCertificate(userId: string, name?: { firstName: string; lastName: string }): Promise<{ certificateId: string; pdfUrl: string }> {
+    let user = await storage.getUser(userId);
     if (!user) {
       throw new Error("Użytkownik nie znaleziony");
     }
@@ -52,17 +49,22 @@ export class CertificateService {
       };
     }
 
+    if (name) user = await storage.updateUser(userId, name);
+    if (!user.firstName?.trim() || !user.lastName?.trim()) {
+      throw new Error("Podaj imię i nazwisko, które mają być na certyfikacie");
+    }
+
     const certificateId = this.generateCertificateId();
-    const userStats = await storage.getUserStatistics(userId);
     
     // Generate PDF (simplified - would use a PDF library like puppeteer or pdfkit)
-    const pdfUrl = await this.generateCertificatePDF(user, certificateId, userStats.successRate);
+    const pdfUrl = await this.generateCertificatePDF(user, certificateId);
 
     // Save certificate to database
     await storage.createCertificate({
       userId,
       certificateId,
-      score: userStats.successRate.toString(),
+      // Ukończenie = pełne opanowanie wszystkich tematów
+      score: "1",
       pdfUrl,
     });
 
@@ -84,7 +86,7 @@ export class CertificateService {
     return { certificateId, pdfUrl };
   }
 
-  private async generateCertificatePDF(user: User, certificateId: string, score: number): Promise<string> {
+  private async generateCertificatePDF(user: User, certificateId: string): Promise<string> {
     // This would typically use a PDF generation library
     // For now, return a placeholder URL
     const fileName = `certificate-${certificateId}.pdf`;
@@ -96,7 +98,6 @@ export class CertificateService {
     // - Certificate ID
     // - Date of issue
     // - EKG Academy branding
-    // - Score achieved
     
     return pdfUrl;
   }
