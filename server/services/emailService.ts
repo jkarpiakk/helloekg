@@ -127,7 +127,7 @@ export class EmailService {
         firstName,
         certificateId,
         certificateUrl,
-        subject: 'Gratulacje! Otrzymałeś certyfikat — helloEKG',
+        subject: 'Gratulacje! Twój certyfikat helloEKG',
         isCertificate: true
       });
     } else {
@@ -218,13 +218,13 @@ export class EmailService {
     return {
       subject: "Twój certyfikat helloEKG",
       html: brandEmail({
-        preheader: "Ukończyłeś kurs — certyfikat jest gotowy.",
+        preheader: "Kurs ukończony, certyfikat jest gotowy.",
         label: "Certyfikat",
         title: greeting(firstName, "gratulacje."),
-        subtitle: "Ukończyłeś kurs helloEKG.",
+        subtitle: "Kurs helloEKG ukończony.",
         body: `<p ${P}>Certyfikat znajdziesz po zalogowaniu w helloEKG.</p>${details([["Numer certyfikatu", certificateId]])}`,
         cta: { href: certificateUrl, text: "Zobacz certyfikat" },
-        reason: "Dostajesz tę wiadomość, bo ukończyłeś kurs helloEKG.",
+        reason: "Dostajesz tę wiadomość, bo kurs helloEKG na Twoim koncie jest ukończony.",
       }),
       text: `Gratulacje! Certyfikat nr ${certificateId}: ${certificateUrl}`,
     };
