@@ -121,17 +121,17 @@ export class EmailService {
     }
   }
 
-  async sendCertificate(to: string, firstName: string, certificateId: string, verificationUrl: string): Promise<void> {
+  async sendCertificate(to: string, firstName: string, certificateId: string, certificateUrl: string): Promise<void> {
     if (this.useSendGrid) {
       await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
         firstName,
         certificateId,
-        verificationUrl,
+        certificateUrl,
         subject: 'Gratulacje! Otrzymałeś certyfikat — helloEKG',
         isCertificate: true
       });
     } else {
-      const template = this.getCertificateTemplate(firstName, certificateId, verificationUrl);
+      const template = this.getCertificateTemplate(firstName, certificateId, certificateUrl);
       await this.sendEmail(to, template);
     }
   }
@@ -214,7 +214,7 @@ export class EmailService {
     };
   }
 
-  getCertificateTemplate(firstName: string, certificateId: string, verificationUrl: string): EmailTemplate {
+  getCertificateTemplate(firstName: string, certificateId: string, certificateUrl: string): EmailTemplate {
     return {
       subject: "Twój certyfikat helloEKG",
       html: brandEmail({
@@ -222,11 +222,11 @@ export class EmailService {
         label: "Certyfikat",
         title: greeting(firstName, "gratulacje."),
         subtitle: "Ukończyłeś kurs helloEKG.",
-        body: `<p ${P}>Twój certyfikat ma unikalny numer i można go zweryfikować online.</p>${details([["Numer certyfikatu", certificateId]])}`,
-        cta: { href: verificationUrl, text: "Zobacz certyfikat" },
+        body: `<p ${P}>Certyfikat znajdziesz po zalogowaniu w helloEKG.</p>${details([["Numer certyfikatu", certificateId]])}`,
+        cta: { href: certificateUrl, text: "Zobacz certyfikat" },
         reason: "Dostajesz tę wiadomość, bo ukończyłeś kurs helloEKG.",
       }),
-      text: `Gratulacje! Certyfikat nr ${certificateId}, weryfikacja: ${verificationUrl}`,
+      text: `Gratulacje! Certyfikat nr ${certificateId}: ${certificateUrl}`,
     };
   }
 

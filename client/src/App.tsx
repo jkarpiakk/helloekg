@@ -20,7 +20,6 @@ import Modules from "@/pages/modules";
 import VerifyEmail from "@/pages/verify-email";
 import ResetPassword from "@/pages/reset-password";
 import ForgotPassword from "@/pages/forgot-password";
-import VerifyCertificate from "@/pages/verify-certificate";
 import NotFound from "@/pages/not-found";
 
 // Ciężkie widoki poza głównym bundle (React.lazy + Suspense)
@@ -157,7 +156,6 @@ function AppContent() {
           <Route path="/zgloszenie" component={FeedbackPage} />
           <Route path="/certificate/preview" component={CertificatePreviewPage} />
           <Route path="/certificate/:certificateId" component={CertificatePage} />
-          <Route path="/verify/:certificateId" component={VerifyCertificate} />
           <Route component={NotFound} />
         </Switch>
         </Suspense>

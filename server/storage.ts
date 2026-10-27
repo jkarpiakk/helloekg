@@ -66,7 +66,6 @@ export interface IStorage {
   
   // Certificates
   createCertificate(certificate: InsertCertificate): Promise<Certificate>;
-  getCertificateByPublicId(certificateId: string): Promise<Certificate | undefined>;
   getUserCertificates(userId: string): Promise<Certificate[]>;
   
   // Analytics
@@ -531,14 +530,6 @@ export class DatabaseStorage implements IStorage {
   async createCertificate(certificate: InsertCertificate): Promise<Certificate> {
     const [newCertificate] = await db.insert(certificates).values(certificate).returning();
     return newCertificate;
-  }
-
-  async getCertificateByPublicId(certificateId: string): Promise<Certificate | undefined> {
-    const [certificate] = await db
-      .select()
-      .from(certificates)
-      .where(eq(certificates.certificateId, certificateId));
-    return certificate || undefined;
   }
 
   async getUserCertificates(userId: string): Promise<Certificate[]> {

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Award, ArrowLeft, CheckCircle } from "lucide-react";
+import { Award, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 
 export default function CertificatePreviewPage() {
@@ -79,17 +79,6 @@ export default function CertificatePreviewPage() {
                 month: 'long', 
                 day: 'numeric' 
               })}</p>
-            </div>
-          </div>
-
-          {/* Verification */}
-          <div className="border-t-2 border-gray-300 pt-6">
-            <div className="flex items-center justify-center gap-3 text-green-700">
-              <CheckCircle className="h-6 w-6" />
-              <p className="text-sm">
-                Certyfikat można zweryfikować pod adresem:{" "}
-                <span className="font-mono">{window.location.origin}/verify/{previewData.certificateId}</span>
-              </p>
             </div>
           </div>
 

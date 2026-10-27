@@ -3,7 +3,7 @@ import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { apiRequest } from "@/lib/queryClient";
-import { Award, Printer, Download, ArrowLeft, CheckCircle } from "lucide-react";
+import { Award, Printer, Download, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import type { Certificate } from "@/types";
 import { useAuth } from "@/lib/auth";
@@ -122,17 +122,6 @@ export default function CertificatePage() {
                 month: 'long', 
                 day: 'numeric' 
               })}</p>
-            </div>
-          </div>
-
-          {/* Verification */}
-          <div className="border-t-2 border-gray-300 pt-6">
-            <div className="flex items-center justify-center gap-3 text-green-700">
-              <CheckCircle className="h-6 w-6" />
-              <p className="text-sm">
-                Certyfikat można zweryfikować pod adresem:{" "}
-                <span className="font-mono">{window.location.origin}/verify/{certificate.certificateId}</span>
-              </p>
             </div>
           </div>
 

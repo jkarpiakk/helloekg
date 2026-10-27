@@ -1402,22 +1402,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/certificates/verify/:certificateId", async (req, res) => {
-    try {
-      const { certificateId } = req.params;
-      const verification = await certificateService.verifyCertificate(certificateId);
-      
-      if (!verification) {
-        return res.status(404).json({ error: "Certyfikat nie znaleziony" });
-      }
-
-      res.json(verification);
-    } catch (error) {
-      console.error("Certificate verification error:", error);
-      res.status(500).json({ error: "Błąd podczas weryfikacji certyfikatu" });
-    }
-  });
-
   // ====== GAMIFICATION ENDPOINTS ======
   
   // Pobierz statystyki użytkownika (XP, poziom, streak)

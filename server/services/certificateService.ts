@@ -67,11 +67,11 @@ export class CertificateService {
     });
 
     // Send email notification
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify/${certificateId}`;
+    const certificateUrl = `${process.env.FRONTEND_URL}/certificate/${certificateId}`;
     const emailTemplate = emailService.getCertificateTemplate(
       user.firstName,
       certificateId,
-      verificationUrl
+      certificateUrl
     );
     
     try {
@@ -95,38 +95,10 @@ export class CertificateService {
     // - User name
     // - Certificate ID
     // - Date of issue
-    // - QR code with verification URL
     // - EKG Academy branding
     // - Score achieved
     
     return pdfUrl;
-  }
-
-  async verifyCertificate(certificateId: string) {
-    const certificate = await storage.getCertificateByPublicId(certificateId);
-    if (!certificate) {
-      return null;
-    }
-
-    const user = await storage.getUser(certificate.userId);
-    if (!user) {
-      return null;
-    }
-
-    // Publiczna weryfikacja: tylko imię i nazwisko, kurs, data, numer (+ ważność).
-    // Bez wyniku, zawodu, userId i innych pól wewnętrznych.
-    return {
-      certificate: {
-        certificateId: certificate.certificateId,
-        issuedAt: certificate.issuedAt,
-        course: "Kurs EKG — helloEKG",
-      },
-      user: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-      isValid: certificate.isValid && (!certificate.expiresAt || new Date() < certificate.expiresAt),
-    };
   }
 }
 
