@@ -2,6 +2,8 @@ import { createElement, Fragment, useCallback, useMemo, useState, type ReactNode
 import ImageLightbox from "@/components/quiz/ImageLightbox";
 import { EkgCanvas, isRhythm } from "@/components/ekg/EkgCanvas";
 import OrchestraMethod from "@/components/course/OrchestraMethod";
+import { WstawkaOtwarta } from "@/components/quiz/WstawkaOtwarta";
+import { isWstawka, parsujOpcjeWstawki } from "@helloekg/shared";
 import { InlineLectureImage, LectureFigure, type OpenImage } from "./LectureFigure";
 
 /**
@@ -82,6 +84,14 @@ function renderNode(n: ChildNode, ctx: Ctx, key: string, dropBlank: boolean): Re
       return (
         <div key={key} className="not-prose my-10 border-y border-[var(--line)] py-8 [text-align:left]">
           <OrchestraMethod header="none" level={3} />
+        </div>
+      );
+    }
+    // Wstawki ze studia (etap 5a): ten sam kod co w studiu, ładowany przy zbliżeniu do ekranu
+    if (isWstawka(w)) {
+      return (
+        <div key={key} className="not-prose my-8 [text-align:left]">
+          <WstawkaOtwarta id={w} opts={parsujOpcjeWstawki(el.getAttribute("data-opts") ?? "")} />
         </div>
       );
     }

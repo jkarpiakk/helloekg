@@ -61,12 +61,15 @@ const gfxLines = (s: string) =>
     if (!g?.assetPath) return "";
     const alt = (g.altText || g.title || "").replace(/[\[\]\n\r]/g, " ").trim();
     return `![${alt}](${g.assetPath})`;
-  })
-    // Wstawki w wyjaśnieniach: kurs rysuje je jako zwiniętą kartę (Wyjasnienie.tsx), ale tylko linie
-    // z własnym zaproszeniem — tak wchodzą wpisy z zaakceptowanej tabeli 3b (etap 5b). Linie bez
-    // zaproszenia (przypisania agenta z 21.10, przed akceptacją JK) dalej znikają.
-    .replace(/^::wstawka[ \t].*$/gim, (linia) => (/\bzaproszenie="[^"]+"/.test(linia) ? linia : ""))
-    .replace(/\n{3,}/g, "\n\n");
+  }).replace(/\n{3,}/g, "\n\n");
+/**
+ * Wstawki w wyjaśnieniach: kurs rysuje je jako zwiniętą kartę (Wyjasnienie.tsx), ale tylko linie
+ * z własnym zaproszeniem — tak wchodzą wpisy z zaakceptowanej tabeli 3b (etap 5b). Linie bez
+ * zaproszenia (przypisania agenta z 21.10, przed akceptacją JK) znikają. Treści pytania to nie dotyczy
+ * (monitor `pytanie=tak` w treści rysuje WstawkaOtwarta).
+ */
+const wyjasnienieKursu = (s: string) =>
+  fixAssets(s).replace(/^::wstawka[ \t].*$/gim, (linia) => (/\bzaproszenie="[^"]+"/.test(linia) ? linia : "")).replace(/\n{3,}/g, "\n\n");
 const fixAssets = (s: string) => gfxLines(s).replace(ASSET_RE, "$1/content-assets/$2");
 const fixDeep = (v: any): any =>
   typeof v === "string" ? fixAssets(v)
@@ -134,7 +137,9 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
         let ok = !unsupported.has(q.externalId);
         // Pytania z interaktywną wstawką studia (::wstawka → bodyMdApp z data-widget) zostają szkicem,
         // dopóki kurs nie umie jej narysować — inaczej kursant zobaczyłby pytanie bez kardiomonitora
-        if (q.bodyMdApp || (q.tags ?? []).includes("kardiomonitor") || /::wstawka\b/.test(q.bodyMd ?? "")) ok = false;
+        // Monitor w treści (::wstawka) kurs rysuje od 27.10 (WstawkaOtwarta). Szkicem zostają pytania
+        // z tagiem kardiomonitor (bank drugiej sesji, Q-0001…Q-0028) — czekają na decyzję JK.
+        if ((q.tags ?? []).includes("kardiomonitor")) ok = false;
         // Archiwum (bank Q-N, decyzja JK 22.10): w kursie szkic, odpowiedzi testerów zostają
         if ((q.tags ?? []).includes("ARCHIWUM")) ok = false;
         // Hotspot: grafika pytania jest zarazem planszą do klikania
@@ -165,7 +170,7 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
           bodyMd: fixAssets(q.bodyMd),
           imageUrl,
           answers: q.answers ?? [],
-          explanationMd: fixAssets(q.explanationMd ?? ""),
+          explanationMd: wyjasnienieKursu(q.explanationMd ?? ""),
           tags: [...(q.tags ?? []), `studio:${q.externalId}`],
           difficulty: q.difficulty ?? "medium",
           status: published ? "published" : "draft",

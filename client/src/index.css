@@ -384,6 +384,9 @@
 .hk-live__inner { min-height: 0; overflow: hidden; }
 .hk-live__host { padding: 0 10px 10px; }
 .hk-live__host:empty::before { content: "Wczytuję wstawkę…"; display: block; padding: 18px 8px; color: var(--txt2); font: 400 .8125rem/1.4 var(--font-mono); }
+.hk-wstawka { max-width: 100%; }
+.hk-wstawka__host:empty { min-height: 320px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
+.hk-wstawka__blad { margin: 0; padding: 14px 16px; border: 1px solid var(--line2); border-radius: 12px; color: var(--txt2); font-size: .9375rem; }
 @media (max-width: 480px) {
   .hk-live__toggle { padding: 12px 12px 12px 14px; gap: 10px; }
   .hk-live__host { padding: 0 4px 4px; }

@@ -1,4 +1,5 @@
 import { Wyjasnienie } from "./Wyjasnienie";
+import { WstawkaOtwarta, wyciagnijWstawki } from "./WstawkaOtwarta";
 import { motion } from "framer-motion";
 import { Check, Maximize2, X } from "lucide-react";
 import { sanitizeMarkdown, sanitizeHtml } from "@/lib/sanitize";
@@ -83,6 +84,7 @@ export default function QuestionCard({
   const caseConfig = anyConfig?.type === "clinical_case" ? anyConfig.config : undefined;
   // Hotspot i przypadek rysują obraz same (plansza do wskazywania / zapis przypadku)
   const showImage = !!question.imageUrl && questionType !== "hotspot" && !caseConfig;
+  const tresc = wyciagnijWstawki(question.bodyMd ?? "");
   // Wynik widać tylko w nauce/powtórce i tylko z odpowiedzi serwera
   const answered = status === "result" && !!quizResult && !examMode;
   const locked = status === "pending" || status === "result" || status === "saved";
@@ -110,16 +112,20 @@ export default function QuestionCard({
 
       {showImage && imagePosition !== "below" && <QuestionImage url={question.imageUrl!} onOpen={onImageClick} />}
 
-      {question.bodyMd && (
+      {tresc.tekst && (
         <div
           className="prose-hk mb-6 max-w-none text-[var(--txt)]"
           // Bez tytułu treść pytania JEST tytułem — w skali `.q__title` z landingu
           style={question.title ? undefined : { ...titleStyle, color: "var(--txt)", textWrap: "pretty" }}
           id={question.title ? undefined : "question-title"}
-          dangerouslySetInnerHTML={sanitizeHtml(question.bodyMd)}
+          dangerouslySetInnerHTML={sanitizeHtml(tresc.tekst)}
           data-testid="question-body"
         />
       )}
+      {/* Monitor w treści pytania (::wstawka kardiomonitor … pytanie=tak) — otwarty, bez rozpoznania */}
+      {tresc.wstawki.map((w, i) => (
+        <div key={i} className="mb-6"><WstawkaOtwarta id={w.id} opts={w.opts} wPytaniu /></div>
+      ))}
 
       {showImage && imagePosition === "below" && <QuestionImage url={question.imageUrl!} onOpen={onImageClick} />}
 
