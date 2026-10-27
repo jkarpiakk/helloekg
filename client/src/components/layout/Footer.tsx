@@ -74,27 +74,6 @@ export default function Footer() {
 
         <div className="mt-12 flex flex-col gap-2 border-t border-[var(--line)] pt-6 text-[.8125rem] text-[var(--label)] md:flex-row md:justify-between md:gap-6">
           <p>© 2026 helloEKG · Wersja beta</p>
-          {/* Atrybucja wymagana licencją CC BY 4.0 modelu serca 3D (symulator) */}
-          <p data-testid="heart-model-attribution">
-            Model serca 3D:{" "}
-            <a
-              href="https://sketchfab.com/3d-models/anatomically-correct-human-heart-54fa880728d14c11afff78be8721620a"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 transition-colors hover:text-[var(--txt)]"
-            >
-              Pigcraft
-            </a>
-            ,{" "}
-            <a
-              href="https://creativecommons.org/licenses/by/4.0/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 transition-colors hover:text-[var(--txt)]"
-            >
-              CC BY 4.0
-            </a>
-          </p>
         </div>
       </div>
     </footer>
