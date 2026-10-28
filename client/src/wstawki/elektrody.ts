@@ -8,6 +8,7 @@
 import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, drag, exercise, h, options, rng, s, setA, shell, spring, type Spring, type WstawkaOpts } from './core/ui.js';
 import type { Beat, LeadName } from './core/model.js';
 import { svgNaRastrze } from './core/obrazy.js';
+import { dzwiekDla } from './core/dzwiek.js';
 import {
   MIEJSCA, NAZWA, ODPOWIEDZI, POPRAWNE, WIDOK, WYJASNIENIE, ZAMIANY, jakaZamiana, kablNa, napiecie, obraz, ocena, opisObrazu,
   podlaczenieZ, sasiednie, serce, stanZadania, zadania, zamien, type Miejsce, type Odpowiedz, type Podlaczenie, type ZamianaId, type Zadanie,
@@ -115,6 +116,8 @@ export function mountElektrody(host: HTMLElement, opts: WstawkaOpts): () => void
     glide(k, POS[p[k]], v);
     if (other !== k) glide(other, POS[p[other]]);
     update(true, true);
+    // zatrzask tylko na właściwym miejscu; zła pozycja bez dźwięku (żeby nie podpowiadać)
+    if (p[k] === k || (other !== k && p[other] === other)) dzwiekDla(svg).zatrzask();
   };
   const toVb = (e: PointerEvent) => {
     const r = svg.getBoundingClientRect();

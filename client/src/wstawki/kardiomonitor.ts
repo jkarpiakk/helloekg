@@ -46,7 +46,7 @@ export function mountKardiomonitor(host: HTMLElement, opts: WstawkaOpts): () => 
       stNeutralne: true,
       alarm: wybrany.alarm ? { ...wybrany.alarm, tekst: 'Alarm' } : undefined,
     };
-    const m = kardiomonitor(box, sc);
+    const m = kardiomonitor(box, sc, { pytanie: !odkryte });
     box.append(h('div', { class: 'hw-row', style: 'margin-top:8px;align-items:center' },
       graj(m),
       h('span', { class: 'hw-note', text: odkryte ? `Na monitorze: ${wybrany.nazwa.charAt(0).toLowerCase()}${wybrany.nazwa.slice(1)}.` : 'Zatrzymaj zapis, żeby zmierzyć odstępy w kratkach.' })));
@@ -60,7 +60,7 @@ export function mountKardiomonitor(host: HTMLElement, opts: WstawkaOpts): () => 
     intro: wybrany ? wybrany.opis : 'Wybierz scenariusz. Monitor liczy częstość z zespołów QRS, a fala SpO₂ pojawia się tylko wtedy, gdy pobudzenie daje tętno.',
   });
   const box = h('div', {});
-  const m = kardiomonitor(box, sc0);
+  const m = kardiomonitor(box, sc0, { przyciskDzwieku: false });
   const opis = h('p', { class: 'hw-why', text: sc0.opis });
   const sterowanie = h('div', { class: 'hw-row' }, graj(m));
   if (!wybrany) {

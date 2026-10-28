@@ -10,6 +10,7 @@
  */
 import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, exercise, h, loop, options, paper, reducedMotion, s, setA, shell, shuffle, surface, trace, type Surface, type WstawkaOpts } from './core/ui.js';
 import { scenaPrzenikana } from './core/obrazy.js';
+import { tor } from './core/dzwiek.js';
 import { Strip, bgFlutter, monitor, pComps, playToggle, vBeat, type Monitor, type StripEvent } from './core/rytm.js';
 import type { Beat, Comp, LeadName } from './core/model.js';
 import {
@@ -142,11 +143,21 @@ export function mountAdenozyna(host: HTMLElement, opts: WstawkaOpts): () => void
    * przesunięcie trzyma ciągłość czasu, więc trwający manewr i wydruk zostają.
    */
   let off = 0;
+  // ton QRS w odtwarzaniu: słychać częstoskurcz, pauzę po adenozynie i powrót rytmu zatokowego
+  const snd = tor(monBox, { ciagly: true });
+  let prevT = NaN;
+  const dzwiekQrs = (t: number, dt: number) => {
+    // tylko płynne odtwarzanie (krok pętli ≤ 0,06 s); przebudowa i wypełnianie na starcie bez dźwięku
+    const plynnie = dt > 0 && dt <= 0.06 && t > prevT && t - prevT < 0.2;
+    const t0 = prevT; prevT = t;
+    if (!plynnie || !snd.aktywny()) return;
+    for (const e of strip.inRange(t0, t)) if (e.kind === 'QRS' && e.at > t0 && e.at <= t) snd.qrs();
+  };
   const makeMon = (): Monitor => monitor(monBox, {
     seconds: SEC, mode: 'sweep', height: 150, scale: 'fit', base: 0.6, fitMv: 1.5,
     signal: (t) => strip.volt(t + off, lead),
     label: 'Kardiomonitor z wąskim częstoskurczem',
-    tick: (now) => { fill(now + off); onTick(now + off); },
+    tick: (now, dt) => { fill(now + off); dzwiekQrs(now + off, dt); onTick(now + off); },
   });
   let mon = makeMon();
   const clock = () => mon.now() + off;

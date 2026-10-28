@@ -9,6 +9,7 @@ import { C, ensureStyle, h, loop, reducedMotion, type MountFn } from './ui.js';
 import { LEADS, stAt, type LeadName } from './model.js';
 import { Strip, type QEvent } from './rytm.js';
 import type { Generator } from './rytmy.js';
+import { przyciskDzwieku, tor } from './dzwiek.js';
 
 export interface Scenariusz {
   id: string;
@@ -50,6 +51,13 @@ export interface KardiomonitorOpts {
   wiersz?: number;
   /** Zatrzymaj od razu (np. w ćwiczeniu do chwili odpowiedzi). */
   pauza?: boolean;
+  /**
+   * Monitor w treści pytania: alarm milczy, a ton QRS ma stałą wysokość (bez saturacji),
+   * żeby dźwięk nie podpowiadał rozpoznania.
+   */
+  pytanie?: boolean;
+  /** Własny przełącznik dźwięku na pasku (domyślnie tak; nie, gdy monitor siedzi we wstawce z przełącznikiem w nagłówku). */
+  przyciskDzwieku?: boolean;
 }
 
 const CSS = `
@@ -133,6 +141,7 @@ export function kardiomonitor(parent: HTMLElement, sc0: Scenariusz, o: Kardiomon
   const pauzaBtn = kompakt ? h('button', { type: 'button', class: 'km__pauza' }) : null;
   if (kompakt) { zegar.hidden = true; }
   if (pauzaBtn) bar.append(pauzaBtn);
+  if (o.przyciskDzwieku !== false) bar.append(przyciskDzwieku({ maly: true }));
   const alarm = h('div', { class: 'km__alarm', role: 'status' }, h('i', { 'aria-hidden': 'true' }), h('span', {}));
   const canvas = h('canvas', { 'aria-hidden': 'true' });
   const traces = h('div', { class: 'km__traces' }, canvas);
@@ -140,6 +149,9 @@ export function kardiomonitor(parent: HTMLElement, sc0: Scenariusz, o: Kardiomon
   const body = h('div', { class: 'km__body' }, traces, vit);
   const el = h('figure', { class: 'km' + (kompakt ? ' km--kompakt' : ''), role: 'img', style: 'margin:0' }, bar, alarm, body);
   parent.append(el);
+  // dźwięk ciągły: z kilku widocznych monitorów gra tylko najbardziej widoczny
+  const snd = tor(el, { ciagly: true });
+  let alarmNext = 0;
 
   // parametry
   const heart = h('span', { class: 'km__heart', html: SERCE });
@@ -313,6 +325,22 @@ export function kardiomonitor(parent: HTMLElement, sc0: Scenariusz, o: Kardiomon
     }
   }
 
+  /** Dźwięki z odcinka (prev, t]: ton każdego QRS (monitor liczy zespoły, więc w PEA też piszczy), iglice, alarm. */
+  function dzwiek(prev: number, t: number) {
+    if (!snd.aktywny()) return;
+    const spo2 = o.pytanie ? null : sc.spo2;
+    for (const e of strip.inRange(prev, t)) {
+      if (e.at <= prev || e.at > t) continue;
+      if (e.kind === 'QRS') snd.qrs(spo2);
+      else if (e.kind === 'spike') snd.iglica();
+    }
+    // alarm wysokiego priorytetu (VF, VT, asystolia); w pytaniu cisza, żeby nie podpowiadał
+    if (!o.pytanie && sc.alarm && t >= (sc.alarm.od ?? 0) && t >= alarmNext) {
+      const d = snd.alarm('wysoki');
+      if (d) alarmNext = t + d + 1.9;
+    }
+  }
+
   // zegar
   let zegarS = 0;
   const ustawZegar = () => {
@@ -328,6 +356,7 @@ export function kardiomonitor(parent: HTMLElement, sc0: Scenariusz, o: Kardiomon
 
   function start(nowy: Scenariusz) {
     sc = nowy;
+    alarmNext = 0;
     strip.clear(); strip.backgrounds.length = 0;
     gen = sc.rytm();
     // pełny ekran od razu: najpierw szerokość ekranu w sekundach, potem przewinięcie o prawie cały obieg
@@ -348,6 +377,7 @@ export function kardiomonitor(parent: HTMLElement, sc0: Scenariusz, o: Kardiomon
     now += dt;
     gen(strip, now + 3);
     strip.prune(now - sec - 8);
+    dzwiek(prev, now);
     const s0 = Math.floor(prev / sec) * sec, s1 = Math.floor(now / sec) * sec;
     if (s1 !== s0) {
       rysujOdcinek(lastX, W, s0);

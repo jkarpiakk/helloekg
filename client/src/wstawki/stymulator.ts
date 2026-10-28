@@ -16,6 +16,7 @@ import {
 } from './stymulator.dane.js';
 import { falaVF } from './nzk.dane.js';
 import { scena } from './core/obrazy.js';
+import { tor } from './core/dzwiek.js';
 
 type Tryby = 'konsola' | 'usterki' | 'icd' | 'cwiczenie';
 type Temat = Exclude<Tryby, 'cwiczenie'>;
@@ -125,7 +126,7 @@ interface Engine {
 }
 
 interface PaceEngine extends Engine { kind: 'pace'; sim: Stymulator; dodajSzum(now: number): void }
-interface IcdEngine extends Engine { kind: 'icd'; icd: Icd }
+interface IcdEngine extends Engine { kind: 'icd'; icd: Icd; /** Chwile wyładowań (do dźwięku wstrząsu). */ szoki: readonly number[] }
 
 /** Bieżący przesuw (od lewej krawędzi do pióra) jeszcze raz, pełną zielenią i grubszą kreską. */
 function jasnyPrzesuw(ctx: CanvasRenderingContext2D, m: MonitorMap, f: (t: number) => number, sek = SEK): void {
@@ -242,7 +243,7 @@ function icdEngine(scen: IcdScen, now: number, liczyT: boolean, magnes: boolean)
     }
   };
   const eng: IcdEngine = {
-    kind: 'icd', icd, strip,
+    kind: 'icd', icd, strip, szoki,
     tick(n) { icd.advance(n + LOOK); pull(); strip.prune(n - 12); while (det.length && det[0]!.at < n - 12) det.shift(); },
     overlay(ctx, m, marks) {
       if (!marks) return;
@@ -303,6 +304,21 @@ export function mountStymulator(host: HTMLElement, opts: WstawkaOpts): () => voi
   const screen = h('div', { class: 'hw-screen' },
     h('div', { class: 'hw-mbar' }, h('span', {}, h('i', { class: 'hw-dot' }), 'II · 25 mm/s · 1 s = 5 dużych kratek'), status));
   let lastRead = -1, ready = false, lastTags = '';
+  // dźwięk w odtwarzaniu: iglica (dzwoneczek), ton QRS po wychwycie, wstrząs ICD; brak wychwytu = sama iglica i cisza
+  const snd = tor(screen, { ciagly: true });
+  let prevT = NaN;
+  const dzwiekStym = (t: number, dt: number) => {
+    // tylko płynne odtwarzanie (krok pętli ≤ 0,06 s); historia budowana przy zmianie stanu bez dźwięku
+    const plynnie = dt > 0 && dt <= 0.06 && t > prevT && t - prevT < 0.2;
+    const t0 = prevT; prevT = t;
+    if (!plynnie || !eng || !snd.aktywny()) return;
+    for (const e of eng.strip.inRange(t0, t)) {
+      if (e.at <= t0 || e.at > t) continue;
+      if (e.kind === 'spike') snd.iglica();
+      else if (e.kind === 'QRS') snd.qrs();
+    }
+    if (eng.kind === 'icd') for (const s of (eng as IcdEngine).szoki) if (s > t0 && s <= t) snd.wstrzas();
+  };
   const mon = monitor(screen, {
     seconds: SEK, height: 260, scale: 'fit', base: 0.44, fitMv: 2,
     label: 'Kardiomonitor, odprowadzenie II, zapis pacjenta ze stymulatorem',
@@ -321,9 +337,10 @@ export function mountStymulator(host: HTMLElement, opts: WstawkaOpts): () => voi
       }
       eng.overlay(ctx, m, marks);
     },
-    tick: (now) => {
+    tick: (now, dt) => {
       if (!eng) eng = build(now);
       eng.tick(now);
+      dzwiekStym(now, dt);
       if (ready && Math.abs(now - lastRead) > 0.12) { lastRead = now; readout(now); }
     },
   });

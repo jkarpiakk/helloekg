@@ -10,6 +10,7 @@ import {
 } from './core/ui.js';
 import { LEADS, LIMB, axisCategory, beat, frontalAxis, qrsNet, volt, type Beat, type LeadName, type V3 } from './core/model.js';
 import { OBRAZY } from './core/obrazy.js';
+import { dzwiekDla } from './core/dzwiek.js';
 
 const R = 132, VL = 112;
 const P = (d: number, r: number): [number, number] => [r * Math.cos(rad(d)), r * Math.sin(rad(d))];
@@ -262,7 +263,7 @@ export function mountKompasOsi(host: HTMLElement, opts: WstawkaOpts): () => void
       return k === 'n' ? rnd(-10, 70) : k === 'l' ? rnd(-70, -50) : k === 'r' ? rnd(110, 160) : rnd(-160, -110);
     },
     show: (t) => {
-      stopSp(); morf = 'norma'; target = t; locked = false; ruszony = false; theta = 0;
+      stopSp(); morf = 'norma'; target = t; locked = false; ruszony = false; theta = 0; tikTheta = null;
       setA(ghost, { visibility: 'hidden' }); setA(ghostT, { visibility: 'hidden' }); drawNow();
     },
     prompt: 'Odczytaj oś z sześciu zespołów QRS. Ustaw wektor tak, żeby do nich pasował, i naciśnij „Sprawdź”.',
@@ -287,6 +288,24 @@ export function mountKompasOsi(host: HTMLElement, opts: WstawkaOpts): () => void
   });
   ex.miejsce.append(h('div', { class: 'hw-tags' }, h('span', { class: 'hw-tag' }, 'Twoje ustawienie ', ustawB)));
   /** Kursant ruszył wektor: w ćwiczeniu odblokuj „Sprawdź”. */
+  /* dźwięk: trzask przy każdym odprowadzeniu kończynowym (co 30°), mocniejszy przy I, II i aVF (0°, +60°, +90°) */
+  const snd = dzwiekDla(body);
+  let tikTheta: number | null = null;
+  const tikKompas = () => {
+    const p = tikTheta; tikTheta = theta;
+    if (p === null) return;
+    const d = normDeg(theta - p);
+    if (!d || Math.abs(d) > 120) return;
+    const lo = Math.min(p, p + d), hi = Math.max(p, p + d);
+    let ile = 0, mocny = false;
+    for (let k = Math.ceil(lo / 30) * 30; k <= hi; k += 30) {
+      if (k === p) continue;
+      ile++;
+      if ([0, 60, 90].includes(normDeg(k))) mocny = true;
+    }
+    if (ile) snd.tik(mocny);
+  };
+
   const zmienil = () => { if (mode === 'task' && !ruszony) { ruszony = true; ex.odswiez(); } };
 
   const right = h('div', {}, grid, cap, read, ex.el);
@@ -294,6 +313,7 @@ export function mountKompasOsi(host: HTMLElement, opts: WstawkaOpts): () => void
 
   function drawNow() {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    tikKompas();
     const a = kat();
     const shown = mode === 'task' && target !== null ? target : theta;
     const [vx, vy] = P(theta, VL);

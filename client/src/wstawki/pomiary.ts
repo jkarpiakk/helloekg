@@ -16,6 +16,7 @@ import {
   TRYB_SPRAWDZ, TRYB_UCZ, type Spring, type WstawkaOpts,
 } from './core/ui.js';
 import { beat, volt, type Beat, type LeadName } from './core/model.js';
+import { dzwiekDla } from './core/dzwiek.js';
 import {
   CIAG_300, CORNELL_PRZYKLAD, MIARY, OKNO_START, QTC_K, QTC_M, QTC_RYZYKO, SOKOLOW_PRZYKLAD, TOLERANCJA_S,
   bazett, cornell, czestosc60, czestoscZOkna, dlugosc, fridericia, kratki, liczQrs, losujZapis, napiecie, ocenaPQ, ocenaQRS,
@@ -872,9 +873,23 @@ export function mountPomiary(host: HTMLElement, opts: WstawkaOpts): () => void {
     uwaga.hidden = st.tryb !== 'cwiczenie' || st.odkryte || brak.length === 0;
     uwaga.textContent = `Jeszcze bez pomiaru: ${brak.join(', ')}.`;
   }
-  function update() { draw(); placeHandles(); texts(); }
+  /* dźwięk cyrkla: cichy tyk co mała kratka, mocniejszy co duża (5 małych); liczy się zmiana rozwarcia, nie przesuw */
+  const snd = dzwiekDla(body);
+  let tikCal: Para | null = null, tikMale = 0;
+  function tikCyrkiel() {
+    const c = activeCal();
+    const n = c && scene?.kind === 'h' ? Math.round(kratki(dlugosc(c), scene.speed).male) : 0;
+    if (c && c === tikCal && n !== tikMale) {
+      let mocny = false;
+      for (let k = Math.min(n, tikMale) + 1; k <= Math.max(n, tikMale); k++) if (k % 5 === 0) mocny = true;
+      snd.tik(mocny);
+    }
+    tikCal = c; tikMale = n;
+  }
+  function update() { draw(); placeHandles(); texts(); tikCyrkiel(); }
   function refresh(withFade: boolean) {
     stopSpr();
+    tikCal = null;
     if (withFade) przenik();
     layout(); update();
   }

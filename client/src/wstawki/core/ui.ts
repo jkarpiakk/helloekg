@@ -7,6 +7,8 @@
  * więc wstawka wygląda tak samo w studiu i w kursie, niezależnie od motywu strony.
  */
 
+import { dzwiekDla, przyciskDzwieku } from './dzwiek.js';
+
 /* ─────────── styl ─────────── */
 
 const CSS = `
@@ -26,6 +28,14 @@ border:1px solid var(--hw-line);border-radius:18px;padding:clamp(14px,3cqi,26px)
 .hw :focus-visible{outline:2px solid var(--hw-puls);outline-offset:3px;border-radius:6px}
 .hw-stack{display:grid;gap:16px}
 .hw-head{display:grid;gap:6px;max-width:46em}
+.hw-top{display:flex;gap:10px 16px;justify-content:space-between;align-items:flex-start}
+.hw-top>.hw-head{flex:1;min-width:0}
+.hw-snd{display:inline-flex;align-items:center;gap:7px;flex:none;padding:0 14px}
+.hw-snd .hw-snd-x{display:none}
+.hw-snd[aria-pressed="false"] .hw-snd-fale{display:none}
+.hw-snd[aria-pressed="false"] .hw-snd-x{display:inline}
+.hw-chip.hw-snd--maly{position:relative;min-height:32px;padding:0 10px;font:500 12px/1 var(--hw-f-m);letter-spacing:.06em;text-transform:uppercase}
+.hw-chip.hw-snd--maly::after{content:"";position:absolute;inset:-6px -2px}
 .hw-label{font:500 12px/1.4 var(--hw-f-m);letter-spacing:.09em;text-transform:uppercase;color:var(--hw-label)}
 .hw-label--g{color:var(--hw-puls)}
 .hw-title{font:500 clamp(19px,3.4cqi,24px)/1.18 var(--hw-f-d);letter-spacing:-.015em;text-wrap:balance}
@@ -166,10 +176,13 @@ export function shell(host: HTMLElement, o: { label: string; title: string; intr
   const body = h('div', { class: 'hw-stack' });
   const root = h('section', { class: 'hw', 'aria-label': o.title },
     h('div', { class: 'hw-stack' },
-      h('header', { class: 'hw-head' },
-        h('p', { class: 'hw-label hw-label--g', text: o.label }),
-        h('h3', { class: 'hw-title', text: o.title }),
-        o.intro ? h('p', { class: 'hw-intro', text: o.intro }) : null,
+      h('div', { class: 'hw-top' },
+        h('header', { class: 'hw-head' },
+          h('p', { class: 'hw-label hw-label--g', text: o.label }),
+          h('h3', { class: 'hw-title', text: o.title }),
+          o.intro ? h('p', { class: 'hw-intro', text: o.intro }) : null,
+        ),
+        przyciskDzwieku(),
       ),
       body,
     ),
@@ -555,7 +568,7 @@ export function exercise<R>(o: {
     if (!cur || checked || check.disabled) return;
     const r = o.check(cur);
     checked = true;
-    if (r.ok) score++;
+    if (r.ok) { score++; dzwiekDla(el).dobrze(); }
     verdict.className = 'hw-verdict ' + (r.ok ? 'hw-ok' : r.near ? 'hw-warn' : 'hw-bad');
     verdict.textContent = r.verdict ?? werdykt(r);
     why.innerHTML = r.why;

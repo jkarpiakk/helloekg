@@ -10,6 +10,7 @@
 import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, exercise, h, options, reducedMotion, shell, trace, type WstawkaOpts } from './core/ui.js';
 import { Strip, monitor, pComps, playToggle, vBeat, type MonitorMap } from './core/rytm.js';
 import { type Beat, type Comp, type LeadName, type V3 } from './core/model.js';
+import { tor } from './core/dzwiek.js';
 import { ODPOWIEDZI, RYTMY, WIELO_CYKL, artefakt, falaVF, liniaAsystolii, uderzenia, wielo, zestaw, type RytmId } from './nzk.dane.js';
 
 const SEK = 6;
@@ -151,12 +152,22 @@ export function mountNzk(host: HTMLElement, opts: WstawkaOpts): () => void {
   const mbarR = h('b');
   const screen = h('div', { class: 'hw-screen' }, h('div', { class: 'hw-mbar' }, mbarL, mbarR));
   let built = false;
+  // dźwięk: ton każdego QRS w odtwarzaniu (w PEA monitor piszczy, choć tętna nie ma; w VF i asystolii cisza)
+  const snd = tor(screen, { ciagly: true });
+  let prevT = NaN;
+  const dzwiekQrs = (t: number, dt: number) => {
+    // tylko płynne odtwarzanie (krok pętli ≤ 0,06 s); budowa zapisu przy zmianie rytmu bez dźwięku
+    const plynnie = dt > 0 && dt <= 0.06 && t > prevT && t - prevT < 0.2;
+    const t0 = prevT; prevT = t;
+    if (!plynnie || !snd.aktywny()) return;
+    for (const at of beatsAt) if (at > t0 && at <= t) snd.qrs();
+  };
   const mon = monitor(screen, {
     seconds: SEK, height: 200, scale: 'fit', base: 0.55, fitMv: 1.6,
     label: 'Kardiomonitor pacjenta w zatrzymaniu krążenia',
     signal: (t) => strip.volt(t, lead) * (gain ? 2 : 1),
     overlay: (ctx, m) => { jasnyPrzesuw(ctx, m, (t) => strip.volt(t, lead) * (gain ? 2 : 1)); drawPeaks(ctx, m); },
-    tick: (now) => { if (!built) { built = true; build(now); } feed(now); },
+    tick: (now, dt) => { if (!built) { built = true; build(now); } feed(now); dzwiekQrs(now, dt); },
   });
   const play = playToggle(mon);
   const restart = () => { build(mon.now()); mon.redraw(); };
@@ -252,9 +263,21 @@ export function mountNzk(host: HTMLElement, opts: WstawkaOpts): () => void {
   ex.miejsce.append(opt.el);
   const exPanel = h('div', { class: 'hw-grid' }, ex.el);
 
+  /* metronom uciśnięć 110/min (w zakresie 100 do 120/min; zatwierdził JK 28.10): dźwięk i błysk kropki w tym samym takcie */
+  const metKropka = h('i', { class: 'hw-dot', 'aria-hidden': 'true', style: 'margin:0 0 0 2px;opacity:.25' });
+  const metBtn = h('button', { class: 'hw-chip hw-chip--sm', type: 'button', 'aria-pressed': 'false', style: 'display:inline-flex;align-items:center;gap:8px' }, 'Metronom 110/min', metKropka);
+  let metIv: ReturnType<typeof setInterval> | null = null;
+  const takt = () => { snd.tik(true); metKropka.animate?.([{ opacity: 1 }, { opacity: 0.25 }], { duration: 260, easing: 'ease-out' }); };
+  const metronom = (on: boolean) => {
+    if (metIv) { clearInterval(metIv); metIv = null; }
+    if (on) { takt(); metIv = setInterval(takt, 60000 / 110); }
+    metBtn.setAttribute('aria-pressed', String(on));
+  };
+  metBtn.addEventListener('click', () => { const on = !metIv; metronom(on); live(on ? 'Metronom włączony, 110 na minutę.' : 'Metronom wyłączony.'); });
+
   const modeCh = chips([{ v: 'zobacz', label: TRYB_UCZ }, { v: 'zadanie', label: TRYB_SPRAWDZ }] as const, mode, (v) => setMode(v), { label: 'Tryb wstawki' });
   body.append(
-    h('div', { class: 'hw-bar' }, modeCh.el, play),
+    h('div', { class: 'hw-bar' }, modeCh.el, h('div', { class: 'hw-row', style: 'gap:8px' }, metBtn, play)),
     rytmCh.el,
     h('div', { class: 'hw-2col hw-2col--wide-l', style: 'align-items:start' },
       h('div', { class: 'hw-grid' }, screen, tools, h('p', { class: 'hw-note', text: 'Częstość i wysokość fal są poglądowe. Patrz na kształt, powtarzalność i pacjenta.' })),
@@ -291,6 +314,7 @@ export function mountNzk(host: HTMLElement, opts: WstawkaOpts): () => void {
   setMode(mode);
   mounted = true;
   return () => {
+    metronom(false);
     fade.stop();
     mon.destroy();
     host.replaceChildren();

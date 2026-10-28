@@ -22,6 +22,7 @@ import {
   type Blok, type Czolo, type Faza, type Hier, type Plan, type Scen, type Sciezka, type Seg, type Stan, type Strefa, type Tryb, type Zrodlo,
 } from './droga-impulsu.dane.js';
 import { scenaPrzenikana, svgNaRastrze, type ObrazId } from './core/obrazy.js';
+import { dzwiekDla } from './core/dzwiek.js';
 
 type Widok = Tryb | 'cwiczenie';
 type Str = 'sa' | 'przedsionki' | 'av' | 'his' | 'odnogi' | 'purkinje' | 'komory';
@@ -1016,11 +1017,16 @@ export function mountDrogaImpulsu(host: HTMLElement, opts: WstawkaOpts): () => v
     paintNow(st);
   }
 
+  // dźwięk w odtwarzaniu: takt dyrygenta na początku P, stuk na początku QRS (w zwolnionym tempie słychać postój w bramie AV)
+  const snd = dzwiekDla(body);
   const lp = loop(body, (_t, dt) => {
     if (!playing || dt <= 0) return;
     const ok = curScen().okno;
+    const f0 = faza(curScen(), tCur).faza;
     tCur += dt * speed;
     if (tCur >= ok) tCur -= ok;
+    const f1 = faza(curScen(), tCur).faza;
+    if (f1 !== f0) { if (f1 === 'P') snd.tik(true); else if (f1 === 'QRS') snd.stuk(); }
     render();
   });
   cleanups.push(() => lp.stop());

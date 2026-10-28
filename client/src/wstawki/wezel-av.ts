@@ -17,6 +17,7 @@ import {
   TRYB_SPRAWDZ, TRYB_UCZ, type Spring, type WstawkaOpts,
 } from './core/ui.js';
 import { scena, type ObrazId } from './core/obrazy.js';
+import { dzwiekDla, tor } from './core/dzwiek.js';
 import { Strip, monitor, pComps, playToggle, vBeat, type Monitor, type MonitorMap } from './core/rytm.js';
 import type { Beat } from './core/model.js';
 import {
@@ -219,6 +220,20 @@ export function mountWezelAv(host: HTMLElement, opts: WstawkaOpts): () => void {
   const sceneCap = h('figcaption', { class: 'wav-cap' });
   const sceneWrap = h('figure', { class: 'wav-scene' }, scene.el, sceneCap);
   let m: Monitor | null = null;
+  // dźwięk w odtwarzaniu: cichy takt każdego P, stuk przewiedzionego QRS; zablokowany P bez stuku (słychać „dziurę”)
+  const snd = tor(stripBox, { ciagly: true });
+  let prevT = NaN;
+  function dzwiekAv(t: number, dt: number) {
+    // tylko płynne odtwarzanie (krok pętli ≤ 0,06 s); skoki osi czasu i wypełnianie na starcie bez dźwięku
+    const plynnie = dt > 0 && dt <= 0.06 && t > prevT && t - prevT < 0.2;
+    const t0 = prevT; prevT = t;
+    if (!plynnie || !snd.aktywny()) return;
+    for (let k = Math.floor(t0 / sc.pp); k <= Math.floor(t / sc.pp) + 1; k++) {
+      const at = sc.cykl(k).at;
+      if (at > t0 && at <= t) snd.tik(false);
+    }
+    for (const v of sc.komory(t0, t)) if (v.at > t0 && v.at <= t) snd.stuk();
+  }
   const lad = surface(ladderBox, { height: LAD_H, label: 'Diagram drabinkowy: przedsionki, brama AV z pęczkiem Hisa i komory' }, () => m?.redraw());
 
   /* cyrkiel: ramiona w ułamku szerokości ekranu (cyrkiel stoi, papier może się przesuwać).
@@ -238,7 +253,7 @@ export function mountWezelAv(host: HTMLElement, opts: WstawkaOpts): () => void {
     signal: (t) => strip.volt(t + off, 'II'),
     overlay: (ctx, map) => drawOverlay(ctx, map),
     label: 'Pasek EKG z odprowadzenia II',
-    tick: (now) => ensure(now + off - SEC - 1, now + off + 1),
+    tick: (now, dt) => { ensure(now + off - SEC - 1, now + off + 1); dzwiekAv(now + off, dt); },
   });
   const mon: Monitor = m;
   const przenikPasek = migawka(stripBox, () => stripBox.querySelector('canvas'), null);
@@ -647,7 +662,19 @@ export function mountWezelAv(host: HTMLElement, opts: WstawkaOpts): () => void {
     return `${fmtNum(boxes, boxes % 1 ? 1 : 0)} ${kratek} = ${f2(sec)} s`;
   };
   const calMsg = () => `Cyrkiel: ${kratekOpis(Math.abs(cal.b - cal.a) * SEC)}.`;
+  /* dźwięk cyrkla: cichy tyk co mała kratka (0,04 s), mocniejszy co duża */
+  let tikMale: number | null = null;
+  function tikCal() {
+    const n = cal.on ? Math.round(Math.abs(cal.b - cal.a) * SEC / KRATKA) : null;
+    if (n !== null && tikMale !== null && n !== tikMale) {
+      let mocny = false;
+      for (let k = Math.min(n, tikMale) + 1; k <= Math.max(n, tikMale); k++) if (k % 5 === 0) mocny = true;
+      dzwiekDla(body).tik(mocny);
+    }
+    tikMale = n;
+  }
   function placeCal() {
+    tikCal();
     for (const [el, v] of [[legA, cal.a], [legB, cal.b], [legM, (cal.a + cal.b) / 2]] as const) {
       el.hidden = !cal.on;
       el.style.left = `${v * 100}%`;
