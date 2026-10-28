@@ -60,19 +60,39 @@ function gotowy(): AudioContext | null {
 
 /* ─────────── tory wstawek ─────────── */
 
-interface Tor { el: Element; gain: GainNode | null; ciagly: boolean; widac: number }
+interface Tor { el: Element; gain: GainNode | null; ciagly: boolean; widac: number; /** był już na stronie (odpięty po tym = do usunięcia) */ byl: boolean; /** IntersectionObserver już coś zgłosił */ io: boolean }
 const tory = new Set<Tor>();
+
+/** Ułamek elementu widoczny w oknie, liczony od razu (zanim IntersectionObserver odda pierwszy wpis). */
+function zmierz(t: Tor): void {
+  if (!t.el.isConnected) return;
+  t.byl = true;
+  const r = t.el.getBoundingClientRect();
+  const wys = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+  const szer = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+  t.widac = wys > 0 && szer > 0 ? Math.max(0.01, r.height ? wys / r.height : 1) : 0;
+}
+
+/** Zwalnia tory wstawek, które zniknęły ze strony (nawigacja w kursie bez przeładowania). */
+function sprzatnij(): void {
+  for (const t of tory) {
+    if (t.byl && !t.el.isConnected) { io?.unobserve(t.el); t.gain?.disconnect(); tory.delete(t); }
+  }
+}
 
 /** Czy tor może teraz grać: widać go na ekranie, a dźwięk ciągły tylko z najbardziej widocznego toru ciągłego. */
 function moze(t: Tor): boolean {
+  if (!t.io) zmierz(t);
   if (t.widac <= 0 || !on || document.hidden) return false;
   if (!t.ciagly) return true;
+  sprzatnij();
   let naj: Tor | null = null;
   for (const x of tory) if (x.ciagly && x.widac > 0 && (!naj || x.widac > naj.widac)) naj = x;
   return naj === t;
 }
 
 function aktualizuj(): void {
+  sprzatnij();
   if (!ac) return;
   for (const t of tory) t.gain?.gain.setTargetAtTime(moze(t) ? 1 : 0, ac.currentTime, 0.04);
 }
@@ -82,7 +102,8 @@ const io = typeof IntersectionObserver !== 'undefined'
     for (const w of wpisy) {
       const t = [...tory].find((x) => x.el === w.target);
       if (!t) continue;
-      if (!w.target.isConnected) { io?.unobserve(w.target); t.gain?.disconnect(); tory.delete(t); continue; }
+      t.io = true;
+      if (w.target.isConnected) t.byl = true;
       t.widac = w.isIntersecting ? Math.max(0.01, w.intersectionRatio) : 0;
     }
     aktualizuj();
@@ -119,7 +140,8 @@ export interface Dzwiek {
  * z kilku widocznych naraz gra tylko najbardziej widoczne.
  */
 export function tor(el: Element, o: { ciagly?: boolean } = {}): Dzwiek {
-  const t: Tor = { el, gain: null, ciagly: !!o.ciagly, widac: 0 };
+  const t: Tor = { el, gain: null, ciagly: !!o.ciagly, widac: 0, byl: false, io: false };
+  zmierz(t);
   tory.add(t);
   io?.observe(el);
 

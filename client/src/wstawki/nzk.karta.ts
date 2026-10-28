@@ -52,7 +52,7 @@ export const KARTA: Karta = {
     'Artefakt ruchowy w II (3-7 Hz, do ~0,9 mV) nałożony na rytm zatokowy ~80/min; w I prawie niewidoczny.',
   ],
   doOkaJK: [
-    'Wstawka pokazuje wyłącznie rozpoznanie i klasyfikację z tekstu; żadnych kroków RKO, energii, leków ani sekwencji leczenia. Jedyna wzmianka o RKO to dosłowne zdanie z S6_05 przy asystolii i odłączonym przewodzie (sprawdzanie w krótkiej przerwie). Etykiety VT brzmią „VT bez tętna, …”, bo klasyfikacja dotyczy VT bez tętna.',
+    'Wstawka pokazuje wyłącznie rozpoznanie i klasyfikację z tekstu; żadnych kroków RKO, energii, leków ani sekwencji leczenia. Jedyna wzmianka o RKO to dosłowne zdanie z S6_05 przy asystolii i odłączonym przewodzie (sprawdzanie w krótkiej przerwie). Wyjątek: przycisk „Metronom 110/min” (takt uciśnięć, dźwięk i błysk kropki) to decyzja JK z 28.10.2026, bez cytatu z wykładu; tekst wykładów nie podaje częstości uciśnięć. Etykiety VT brzmią „VT bez tętna, …”, bo klasyfikacja dotyczy VT bez tętna.',
     'Częstości i amplitudy rytmów są poglądowe (tekst ich nie podaje) i nie są podpisane liczbami; na monitorze stoi o tym notka.',
     'Pułapka „Odłączony przewód”: płaska linia, a po „Sprawdź elektrody” migotanie komór. Tekst mówi tylko, że odłączony przewód daje obraz jak asystolia; wybór VF jako rytmu „pod spodem” to decyzja dydaktyczna. W karcie rytm ma rozpoznanie VF; nie ma go w ćwiczeniu.',
     '„Zwiększ wzmocnienie” podwaja amplitudę na ekranie, bez podpisu liczbą. Drobne VF po wzmocnieniu wyraźnie odróżnia się od asystolii.',
