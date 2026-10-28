@@ -46,7 +46,7 @@ const registerSchema = z.object({
   privacyAccepted: z.boolean().refine(val => val === true, "Zaznacz, aby założyć konto"),
   marketingConsent: z.boolean().default(false),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Hasła się różnią — wpisz to samo hasło w obu polach",
+  message: "Hasła się różnią. Wpisz to samo hasło w obu polach",
   path: ["confirmPassword"],
 });
 
@@ -186,7 +186,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
         return;
       }
       loginForm.reset({ email: vars.email, password: "" });
-      setLoginNotice("Konto gotowe — zaloguj się");
+      setLoginNotice("Konto gotowe, zaloguj się");
       setShowPassword(false);
       if (onSwitchMode) onSwitchMode("login");
       else setMode("login");

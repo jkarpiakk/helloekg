@@ -20,7 +20,7 @@ export function LoadingSpinner({ size = "md", className }: LoadingSpinnerProps) 
         className
       )}
       role="status"
-      aria-label="Loading"
+      aria-label="Ładowanie"
       data-testid="loading-spinner"
     >
       <span className="sr-only">Ładowanie...</span>

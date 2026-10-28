@@ -52,7 +52,7 @@ export default function ForgotPassword() {
             </motion.h1>
             <motion.p variants={rise} className="lead mt-4">
               Jeśli ten adres jest powiązany z kontem, za chwilę dostaniesz e-mail z linkiem do ustawienia
-              nowego hasła. Link działa 60 minut — nie widzisz wiadomości? Zajrzyj do spamu.
+              nowego hasła. Link działa 60 minut. Nie widzisz wiadomości? Zajrzyj do spamu.
             </motion.p>
             <motion.div variants={rise} className="mt-8">
               <Button asChild>

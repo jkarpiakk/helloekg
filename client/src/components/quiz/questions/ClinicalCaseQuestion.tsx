@@ -315,7 +315,7 @@ export default function ClinicalCaseQuestion({
                             </div>
                           )}
                           {isLast && !showResult && (
-                            <p className="label">Wszystkie kroki za Tobą — sprawdź wynik przypadku.</p>
+                            <p className="label">Wszystkie kroki za tobą. Sprawdź wynik przypadku.</p>
                           )}
                         </motion.div>
                       )}

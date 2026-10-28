@@ -224,7 +224,7 @@ export default function QuestionCard({
             Nie zapisano odpowiedzi
           </p>
           <p className="text-[15px] text-[var(--txt2)]">
-            Sprawdź połączenie i wyślij jeszcze raz{isInteractiveType ? "" : " — możesz też zmienić wybór"}.
+            Sprawdź połączenie i wyślij jeszcze raz{isInteractiveType ? "" : ". Możesz też zmienić wybór"}.
           </p>
         </section>
       )}
@@ -249,7 +249,7 @@ export default function QuestionCard({
               {quizResult!.isCorrect
                 ? "Dobrze."
                 : isInteractiveType && quizResult!.partialScore !== undefined && quizResult!.partialScore > 0
-                  ? `Częściowo dobrze — ${Math.round(quizResult!.partialScore * 100)}%.`
+                  ? `Częściowo dobrze: ${Math.round(quizResult!.partialScore * 100)}%.`
                   : "Nie tym razem."}
             </span>
           </p>

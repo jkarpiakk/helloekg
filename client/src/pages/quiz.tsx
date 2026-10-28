@@ -168,7 +168,7 @@ export default function Quiz() {
         ) : (
           <>
             <p className="muted max-w-[34em]" data-testid="review-empty">
-              Nic do powtórki — wszystkie błędne pytania już poprawione.
+              Nic do powtórki. Wszystkie błędne pytania już poprawione.
             </p>
             <Button variant="outline" onClick={() => setLocation("/modules")} data-testid="button-switch-to-learn">
               Przejdź do kursu
@@ -185,7 +185,7 @@ export default function Quiz() {
       >
         <h2 id="exam-title" className="h3">Egzamin próbny</h2>
         <p className="muted max-w-[34em]">
-          Losowe pytania z całego kursu. W trakcie nie widzisz, czy odpowiedź jest dobra — wynik i wyjaśnienia dostajesz na końcu.
+          Losowe pytania z całego kursu. W trakcie nie widzisz, czy odpowiedź jest dobra. Wynik i wyjaśnienia dostajesz na końcu.
         </p>
         <Button variant="outline" onClick={() => setExamDialog(true)} data-testid="button-open-exam">
           Rozpocznij egzamin próbny

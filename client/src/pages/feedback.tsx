@@ -104,7 +104,7 @@ export default function FeedbackPage() {
     descTouched && descTrimmed.length < FEEDBACK_MIN_DESCRIPTION
       ? descTrimmed.length === 0
         ? "Opisz, co się stało albo czego ci brakuje."
-        : `Dopisz jeszcze ${FEEDBACK_MIN_DESCRIPTION - descTrimmed.length} zn. — jedno pełne zdanie wystarczy.`
+        : `Dopisz jeszcze ${FEEDBACK_MIN_DESCRIPTION - descTrimmed.length} zn. Jedno pełne zdanie wystarczy.`
       : "";
 
   function addFiles(list: FileList | File[]) {
@@ -225,7 +225,7 @@ export default function FeedbackPage() {
               <p className="label label--g">Zgłoszenie wysłane</p>
               <h1 className="h2">Dzięki. Mamy to.</h1>
               <p className="lead">
-                Czytamy każde zgłoszenie. Status zobaczysz poniżej w „Twoich zgłoszeniach” — tam też pojawi się nasza notatka, gdy coś poprawimy.
+                Czytamy każde zgłoszenie. Status zobaczysz poniżej w „Twoich zgłoszeniach”. Tam też pojawi się nasza notatka, gdy coś poprawimy.
               </p>
               <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                 {from ? (
@@ -264,7 +264,7 @@ export default function FeedbackPage() {
                 <p className="label">Beta · Zgłoszenie</p>
                 <h1 className="h2">Zgłoś uwagę</h1>
                 <p className="lead">
-                  Błąd w treści, coś nie działa, pomysł — wszystko się przyda. Zgłoszenie podpisze się twoim kontem, nie musisz podawać danych.
+                  Błąd w treści, coś nie działa, pomysł: wszystko się przyda. Zgłoszenie podpisze się twoim kontem, nie musisz podawać danych.
                 </p>
               </motion.header>
 
@@ -436,7 +436,7 @@ export default function FeedbackPage() {
                 )}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="max-w-[34em] text-[.8125rem] leading-[1.55] text-[var(--txt2)]">
-                    Dołączymy też adres strony{from ? <> (<span className="font-mono">{from.split("?")[0]}</span>)</> : null}, przeglądarkę i rozmiar ekranu — to pomaga odtworzyć problem.
+                    Dołączymy też adres strony{from ? <> (<span className="font-mono">{from.split("?")[0]}</span>)</> : null}, przeglądarkę i rozmiar ekranu. To pomaga odtworzyć problem.
                   </p>
                   <Button type="submit" disabled={submit.isPending} className="w-full sm:w-auto" data-testid="feedback-submit">
                     {submit.isPending ? "Wysyłam…" : "Wyślij zgłoszenie"}

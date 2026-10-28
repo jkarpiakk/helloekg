@@ -18,7 +18,7 @@ const resetPasswordFormSchema = z.object({
   password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
   confirmPassword: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Hasła się różnią — wpisz to samo hasło w obu polach",
+  message: "Hasła się różnią. Wpisz to samo hasło w obu polach",
   path: ["confirmPassword"],
 });
 
@@ -121,7 +121,7 @@ export default function ResetPassword() {
         label="Nieprawidłowy link"
         labelClass="text-[var(--alarm)]"
         title="Ten link nie działa"
-        lead="Link do zmiany hasła jest niepełny lub uszkodzony. Poproś o nowy — wyślemy go na twój adres e-mail."
+        lead="Link do zmiany hasła jest niepełny lub uszkodzony. Poproś o nowy, wyślemy go na twój adres e-mail."
       >
         <Button asChild>
           <Link href="/forgot-password">Poproś o nowy link</Link>

@@ -11,10 +11,10 @@ type AuthMode = "login" | "register";
 
 /** Co jest w kursie — tylko prawdziwe liczby (stan bety: 7 modułów, 28 wykładów, ~800 pytań) */
 const INSIDE = [
-  { n: "01", title: "7 modułów", text: "Ułożonych od podstaw, krok po kroku — każdy buduje na poprzednim." },
+  { n: "01", title: "7 modułów", text: "Ułożonych od podstaw, krok po kroku. Każdy buduje na poprzednim." },
   { n: "02", title: "28 wykładów", text: "Krótkie rozdziały do czytania we własnym tempie." },
   { n: "03", title: "Około 800 pytań", text: "Każde z wyjaśnieniem, dlaczego ta odpowiedź jest poprawna." },
-  { n: "04", title: "Powtórki", text: "Wracają pytania, które sprawiły ci trudność — aż wiedza się utrwali." },
+  { n: "04", title: "Powtórki", text: "Wracają pytania, które sprawiły ci trudność, aż wiedza się utrwali." },
 ];
 
 export default function Home() {
@@ -119,7 +119,7 @@ export default function Home() {
         >
           <p className="label mb-3">Dla testerów</p>
           <p className="text-[1.0625rem] leading-relaxed text-[var(--txt2)]">
-            To wersja beta — kurs działa, ale wciąż go dopracowujemy. Jeśli coś jest niejasne albo nie działa,
+            To wersja beta. Kurs działa, ale wciąż go dopracowujemy. Jeśli coś jest niejasne albo nie działa,
             daj znać przyciskiem „Zgłoś błąd” przy pytaniu lub napisz na{" "}
             <a
               href="mailto:kontakt@helloekg.pl"

@@ -38,7 +38,7 @@ export function LectureHero({
       {rhythmLabel && (
         <motion.figure variants={rise} className="mt-3 grid gap-2">
           <EkgCanvas rhythm={rhythm} height={90} label={rhythmLabel} />
-          <figcaption className="text-[.875rem] text-[var(--txt2)]">Żywy zapis: {EKG_RHYTHM_LABELS[rhythm]} — tak wygląda rytm, o którym jest ten wykład.</figcaption>
+          <figcaption className="text-[.875rem] text-[var(--txt2)]">Żywy zapis: {EKG_RHYTHM_LABELS[rhythm]}. Tak wygląda rytm, o którym jest ten wykład.</figcaption>
         </motion.figure>
       )}
     </motion.header>

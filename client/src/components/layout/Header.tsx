@@ -180,7 +180,7 @@ export default function Header() {
           href={isAuthenticated ? "/dashboard" : "/"}
           className="flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="logo-link"
-          aria-label={isAuthenticated ? "helloEKG — Postęp" : "helloEKG — wejście do bety"}
+          aria-label={isAuthenticated ? "helloEKG: Postęp" : "helloEKG: wejście do bety"}
         >
           <Logo replayKey={location} />
         </Link>

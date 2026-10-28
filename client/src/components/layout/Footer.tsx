@@ -17,7 +17,7 @@ export default function Footer() {
             <Link
               href={isAuthenticated ? "/dashboard" : "/"}
               className="inline-flex w-fit rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={isAuthenticated ? "helloEKG — Postęp" : "helloEKG — wejście do bety"}
+              aria-label={isAuthenticated ? "helloEKG: Postęp" : "helloEKG: wejście do bety"}
             >
               <Logo animated={false} />
             </Link>

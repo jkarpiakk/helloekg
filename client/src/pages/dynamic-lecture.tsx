@@ -81,7 +81,7 @@ export default function DynamicLecture() {
       check = {
         href: `/quiz?sectionId=${current.section.id}`,
         sectionId: current.section.id,
-        title: "Sprawdź się — pytania do tego wykładu",
+        title: "Sprawdź się: pytania do tego wykładu",
         note: `${current.section.questionCount} ${plural(current.section.questionCount ?? 0, "pytanie", "pytania", "pytań")}. Odpowiedzi od razu pokażą, co już umiesz, a co warto powtórzyć.`,
       };
     } else {
@@ -93,7 +93,7 @@ export default function DynamicLecture() {
         check = {
           href: `/quiz?sectionId=${review.section.id}`,
           sectionId: review.section.id,
-          title: "Sprawdź się — pytania utrwalające do tego modułu",
+          title: "Sprawdź się: pytania utrwalające do tego modułu",
           note: `Ten wykład nie ma osobnych pytań. ${review.section.questionCount} ${plural(review.section.questionCount ?? 0, "pytanie", "pytania", "pytań")} z całego modułu czeka w „${review.section.title}”.`,
         };
       }

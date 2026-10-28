@@ -200,7 +200,7 @@ export default function StudentDashboard() {
           </p>
           <h1 id="dashboard-title" className="h1">Twój postęp</h1>
           <p className="lead max-w-[36em]">
-            Tu widzisz, co masz za sobą i od czego zacząć dziś. Postęp to odsetek opanowanych pytań — tych, w których twoja ostatnia odpowiedź była poprawna.
+            Tu widzisz, co masz za sobą i od czego zacząć dziś. Postęp to odsetek opanowanych pytań, czyli tych, w których twoja ostatnia odpowiedź była poprawna.
           </p>
           {!modulesError && course.total > 0 && (
             <div className="pt-4 max-w-[460px]">

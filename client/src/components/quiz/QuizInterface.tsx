@@ -756,7 +756,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       <StateCard
         label={MODE_LABEL.review}
         title="Nic do powtórki"
-        lead="Nic do powtórki — wszystkie błędne pytania już poprawione."
+        lead="Nic do powtórki. Wszystkie błędne pytania już poprawione."
         primary={{ label: "Przejdź do kursu", onClick: () => setLocation("/modules"), testId: "back-to-course" }}
       />
     );
@@ -1139,7 +1139,7 @@ function ExamReview({ items, onImageClick }: { items: ExamReviewItem[]; onImageC
                     {item.isCorrect
                       ? "Poprawnie"
                       : !isChoice && item.partialScore !== undefined && item.partialScore > 0
-                        ? `Częściowo — ${Math.round(item.partialScore * 100)}%`
+                        ? `Częściowo: ${Math.round(item.partialScore * 100)}%`
                         : "Błędnie"}
                   </p>
 

@@ -170,19 +170,19 @@ export const TOUR_STEPS: TourStep[] = [
     id: "feedback-fab",
     kind: "info",
     title: "Zgłoś uwagę",
-    body: "Coś nie działa albo jest niejasne? Daj znać tutaj — czytam każde zgłoszenie.",
+    body: "Coś nie działa albo jest niejasne? Daj znać tutaj, czytam każde zgłoszenie.",
     targets: [{ selector: '[data-tour="feedback-fab"]' }],
   },
   {
     id: "nav-powtorka",
     kind: "info",
     title: "Powtórka",
-    body: "Błędne odpowiedzi wracają w Powtórce. Gotowe — możesz czytać dalej.",
+    body: "Błędne odpowiedzi wracają w Powtórce. Gotowe, możesz czytać dalej.",
     targets: [
       { selector: '[data-tour="nav-powtorka"]' },
       {
         selector: '[data-tour="menu-button"]',
-        body: "Błędne odpowiedzi wracają w Powtórce — znajdziesz ją w menu. Gotowe, możesz czytać dalej.",
+        body: "Błędne odpowiedzi wracają w Powtórce, znajdziesz ją w menu. Gotowe, możesz czytać dalej.",
       },
     ],
     primary: "Koniec",

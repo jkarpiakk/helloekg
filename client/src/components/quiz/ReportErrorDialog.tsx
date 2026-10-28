@@ -42,7 +42,7 @@ export default function ReportErrorDialog({ questionId, open, onOpenChange }: Re
     onSuccess: (_data, vars) => {
       toast({
         title: "Zgłoszenie wysłane",
-        description: "Dzięki — sprawdzimy to pytanie.",
+        description: "Dzięki, sprawdzimy to pytanie.",
       });
       drafts.delete(vars.questionId);
       if (vars.questionId === questionId) setMessageState("");
@@ -107,8 +107,8 @@ export default function ReportErrorDialog({ questionId, open, onOpenChange }: Re
               </p>
             ) : (
               !empty && (
-                <p className="text-[14px] text-[var(--txt3)]" data-testid="error-report-draft-note">
-                  Opis zostaje do wysłania — „Anuluj” go nie usuwa.
+                <p className="text-[14px] text-[var(--txt2)]" data-testid="error-report-draft-note">
+                  Opis zostaje do wysłania. „Anuluj” go nie usuwa.
                 </p>
               )
             )}

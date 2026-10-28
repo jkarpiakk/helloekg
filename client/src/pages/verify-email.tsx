@@ -119,7 +119,7 @@ export default function VerifyEmail() {
         label="Weryfikacja nieudana"
         labelClass="text-[var(--alarm)]"
         title="Nie udało się potwierdzić adresu"
-        lead={`${(error as Error)?.message || "Link mógł wygasnąć."} Zaloguj się — jeśli konto nadal wymaga potwierdzenia, poprosisz o nowy link.`}
+        lead={`${(error as Error)?.message || "Link mógł wygasnąć."} Zaloguj się. Jeśli konto nadal wymaga potwierdzenia, poprosisz o nowy link.`}
       >
         {continueAction}
       </Screen>
