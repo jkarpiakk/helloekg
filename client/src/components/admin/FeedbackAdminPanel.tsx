@@ -220,7 +220,8 @@ function FeedbackDetail({ report }: { report: AdminFeedbackReport }) {
     ["Typ", typeLabelOf(report)],
     ["Obszar", feedbackAreaLabel(report.area)],
   ];
-  if (report.pagePath)
+  // link tylko do ścieżki w aplikacji (stare zgłoszenia mogły mieć „//host”)
+  if (report.pagePath && /^\/(?![\/\\])/.test(report.pagePath))
     meta.push([
       "Strona",
       <a href={report.pagePath} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 break-all font-mono text-[13px] text-[var(--puls)]">

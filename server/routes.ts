@@ -30,6 +30,7 @@ import {
   loginEmailBlockedFor,
   recordLoginFailure,
   clearLoginFailures,
+  mailDoAdresuDozwolony,
 } from "./middleware/rateLimit";
 import {
   loginSchema,
@@ -49,6 +50,7 @@ import { db } from "./db";
 import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters, blogPosts } from "@shared/schema";
 import { eq, or, and, gte, desc, count, ilike, avg, sql, isNull, isNotNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey, stripeSource } from "./stripeClient";
+import { linkZMaila } from "./mailLinks";
 
 /** Imię i nazwisko na certyfikat: litery (także polskie), spacja, łącznik, apostrof */
 const namePart = (label: string) =>
@@ -238,7 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw err;
       }
 
-      const verificationUrl = `${process.env.FRONTEND_URL || "http://localhost:5000"}/verify-email?token=${verificationToken}`;
+      const verificationUrl = linkZMaila("/verify-email", verificationToken);
       try {
         await emailService.sendEmailVerification(user.email, user.firstName, verificationUrl);
       } catch (emailError) {
@@ -280,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       // Limit nieudanych prób na konto (niezależnie od limitu per IP)
-      const blockedFor = await loginEmailBlockedFor(email);
+      const blockedFor = await loginEmailBlockedFor(email, req.ip);
       if (blockedFor) {
         auditSafe({
           actorId: null,
@@ -300,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await authService.authenticateUser(email, password);
       if (!user) {
-        await recordLoginFailure(email);
+        await recordLoginFailure(email, req.ip);
         auditSafe({
           actorId: null,
           action: "login_failed",
@@ -326,7 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: ACCOUNT_SUSPENDED_MESSAGE, code: "ACCOUNT_SUSPENDED" });
       }
 
-      await clearLoginFailures(email);
+      await clearLoginFailures(email, req.ip);
 
       // Regenerate session ID before storing credentials (prevents session fixation)
       try {
@@ -398,6 +400,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ta sama odpowiedź niezależnie od tego, czy konto istnieje / jest już zweryfikowane
       const genericResponse = { message: "Jeśli konto istnieje i nie jest jeszcze zweryfikowane, wysłaliśmy nowy link weryfikacyjny" };
 
+      // najwyżej 3 maile na godzinę na adres (limit na IP da się obejść, skrzynka ofiary nie)
+      if (!(await mailDoAdresuDozwolony(email, "weryfikacja"))) return res.json(genericResponse);
+
       const user = await storage.getUserByEmail(email);
       if (!user || user.emailVerified) {
         return res.json(genericResponse);
@@ -407,15 +412,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newToken = authService.generateToken();
       await storage.updateUser(user.id, { emailVerificationToken: newToken });
 
-      const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/verify-email?token=${newToken}`;
-      
-      try {
-        await emailService.sendEmailVerification(user.email, user.firstName, verificationUrl);
-      } catch (emailError) {
-        console.error("Failed to resend verification email:", emailError);
-      }
+      const verificationUrl = linkZMaila("/verify-email", newToken);
 
+      // odpowiedź od razu, mail w tle: czas odpowiedzi nie zdradza, czy konto istnieje
       res.json(genericResponse);
+      emailService.sendEmailVerification(user.email, user.firstName, verificationUrl)
+        .catch((emailError) => console.error("Failed to resend verification email:", emailError));
     } catch (error: any) {
       console.error("Resend verification error:", error);
       res.status(500).json({ error: "Błąd podczas wysyłania e-maila" });
@@ -430,6 +432,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { email } = parsed.data;
+      const odpowiedz = { message: "Jeśli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła" };
+      // najwyżej 3 maile na godzinę na adres; ponad limit bez nowego tokenu (ważny link z poprzedniego maila zostaje)
+      if (!(await mailDoAdresuDozwolony(email, "reset"))) return res.json(odpowiedz);
       const resetToken = await authService.initiatePasswordReset(email);
 
       auditSafe({
@@ -442,19 +447,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get("User-Agent"),
       });
 
+      // odpowiedź od razu, mail w tle: czas odpowiedzi nie zdradza, czy konto istnieje
+      res.json(odpowiedz);
       if (resetToken) {
-        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}`;
-        try {
-          const user = await storage.getUserByEmail(email);
-          if (user) {
-            await emailService.sendPasswordReset(user.email, user.firstName, resetUrl);
-          }
-        } catch (emailError) {
-          console.error("Failed to send password reset email:", emailError);
-        }
+        const resetUrl = linkZMaila("/reset-password", resetToken);
+        storage.getUserByEmail(email)
+          .then((user) => user && emailService.sendPasswordReset(user.email, user.firstName, resetUrl))
+          .catch((emailError) => console.error("Failed to send password reset email:", emailError));
       }
-
-      res.json({ message: "Jeśli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła" });
     } catch (error: any) {
       console.error("Forgot password error:", error);
       res.status(500).json({ error: "Wystąpił błąd. Spróbuj ponownie później" });
@@ -626,6 +626,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /** Komunikat błędu dla kursanta: własne komunikaty aplikacji tak, błędy bazy (mają `code`) nigdy. */
+  const bladDlaKlienta = (error: any, domyslny: string): string =>
+    error && typeof error.message === "string" && !error.code ? error.message : domyslny;
+  /** Odpowiedź interaktywna (luki, przeciąganie, kolejność): rozsądny rozmiar, bez dowolnie długich napisów. */
+  const odpowiedzZaDuza = (answerData: unknown): boolean =>
+    answerData !== undefined && JSON.stringify(answerData).length > 4000;
+
   /**
    * Adres, na który Stripe wraca po płatności: APP_BASE_URL z konfiguracji serwera (za nginx req.protocol to http,
    * a nagłówek Host przychodzi od klienta), a bez niej, jak dotąd, z żądania.
@@ -666,6 +673,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!plan) {
         return res.status(404).json({ error: "Plan nie znaleziony" });
+      }
+      if (!(parseFloat(plan.price) > 0)) {
+        return res.status(400).json({ error: "Ten plan nie jest dostępny do zakupu" });
       }
 
       const stripe = await getUncachableStripeClient();
@@ -769,6 +779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Finalize payment - auto-create account for guests
   app.post("/api/stripe/finalize-payment", paymentRateLimit, async (req, res) => {
+    if (bezStripe(res)) return;
     try {
       const { sessionId } = req.body;
       
@@ -832,7 +843,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if subscription already exists
-      const existingSubscription = await storage.getUserActiveSubscription(user.id);
+      // prawdziwa subskrypcja z bazy (w otwartej becie dostęp „beta” nie może blokować zapisu płatności)
+      const existingSubscription = await storage.getStoredActiveSubscription(user.id);
       let subscription;
       
       if (!existingSubscription) {
@@ -898,6 +910,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!plan) {
         return res.status(404).json({ error: "Plan nie znaleziony" });
+      }
+      if (!(parseFloat(plan.price) > 0)) {
+        return res.status(400).json({ error: "Ten plan nie jest dostępny do zakupu" });
       }
 
       const stripe = await getUncachableStripeClient();
@@ -967,7 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (userId === req.user!.id) {
           // Check if subscription was already created by webhook (idempotency)
-          const existingSubscription = await storage.getUserActiveSubscription(userId);
+          const existingSubscription = await storage.getStoredActiveSubscription(userId);
           if (existingSubscription) {
             console.log(`Subscription already exists for user ${userId}, skipping creation`);
             return res.json({ 
@@ -1267,7 +1282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { sessionId, questionId, selectedIndex, timeMs, answerData } = req.body;
 
-      if (!sessionId || typeof questionId !== 'string' || typeof timeMs !== 'number') {
+      if (!sessionId || typeof questionId !== 'string' || typeof timeMs !== 'number' || odpowiedzZaDuza(answerData)) {
         return res.status(400).json({ error: "Nieprawidłowe dane" });
       }
 
@@ -1289,7 +1304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error: any) {
       console.error("Exam answer submission error:", error);
-      res.status(400).json({ error: error.message || "Błąd podczas zapisywania odpowiedzi" });
+      res.status(400).json({ error: bladDlaKlienta(error, "Błąd podczas zapisywania odpowiedzi") });
     }
   });
 
@@ -1318,7 +1333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { questionId, selectedIndex, timeMs, mode = "learn", answerData } = req.body;
 
-      if (typeof questionId !== 'string' || typeof timeMs !== 'number') {
+      if (typeof questionId !== 'string' || typeof timeMs !== 'number' || odpowiedzZaDuza(answerData)) {
         return res.status(400).json({ error: "Nieprawidłowe dane" });
       }
 
@@ -1350,7 +1365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Answer submission error:", error);
-      res.status(400).json({ error: error.message || "Błąd podczas zapisywania odpowiedzi" });
+      res.status(400).json({ error: bladDlaKlienta(error, "Błąd podczas zapisywania odpowiedzi") });
     }
   });
 
@@ -1423,7 +1438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error: any) {
       console.error("Certificate generation error:", error);
-      res.status(400).json({ error: error.message || "Błąd podczas generowania certyfikatu" });
+      res.status(400).json({ error: bladDlaKlienta(error, "Błąd podczas generowania certyfikatu") });
     }
   });
 
@@ -2077,10 +2092,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Support endpoints
   app.post("/api/support/tickets", apiRateLimit, async (req, res) => {
     try {
-      const { subject, message } = req.body;
-      
-      if (!subject || !message) {
+      const { subject, message } = req.body ?? {};
+
+      if (typeof subject !== "string" || typeof message !== "string" || !subject.trim() || !message.trim()) {
         return res.status(400).json({ error: "Temat i wiadomość są wymagane" });
+      }
+      if (subject.length > 200 || message.length > 5000) {
+        return res.status(400).json({ error: "Temat do 200 znaków, wiadomość do 5000 znaków" });
       }
 
       const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
@@ -2254,9 +2272,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (actor.id === id) {
           return res.status(403).json({ error: "Nie możesz zmieniać własnej roli" });
         }
-        // Nadawanie/odbieranie ról admin/owner — tylko właściciel
-        if (!actorIsOwner && (PRIVILEGED_ROLES.includes(role) || PRIVILEGED_ROLES.includes(target.role))) {
-          return res.status(403).json({ error: "Tylko właściciel może nadawać i odbierać role administratora i właściciela" });
+        // Role nadaje i odbiera tylko właściciel: support (dostęp bez płatności) i recenzent (dane kursantów)
+        // też dają uprawnienia, których admin sam nie ma, więc admin nie może ich rozdawać, np. własnemu drugiemu kontu
+        if (!actorIsOwner) {
+          return res.status(403).json({ error: "Role nadaje i odbiera tylko właściciel" });
         }
         // Nigdy nie zostawiamy systemu bez właściciela
         if (target.role === "owner" && (await countOwners({ activeOnly: false })) <= 1) {
@@ -2358,7 +2377,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             price: "0",
             durationDays: 30,
             currency: "PLN",
-            isActive: true,
+            // plan techniczny do dostępu nadanego ręcznie: niewidoczny w cenniku i niedostępny w kasie
+            isActive: false,
           }).returning();
           planId = newPlan.id;
         } else {
@@ -2795,7 +2815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Lecture image upload endpoints
-  app.post("/api/objects/upload", requireAuth, async (req, res) => {
+  app.post("/api/objects/upload", requireAuth, requireReviewer, async (req, res) => {
     try {
       const { ObjectStorageService } = await import("./objectStorage");
       const objectStorageService = new ObjectStorageService();
@@ -2807,7 +2827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/lecture-images", requireAuth, async (req, res) => {
+  app.put("/api/lecture-images", requireAuth, requireReviewer, async (req, res) => {
     if (!req.body.imageURL) {
       return res.status(400).json({ error: "imageURL jest wymagane" });
     }

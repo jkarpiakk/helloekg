@@ -295,6 +295,8 @@ async function main() {
       lastName: "Import",
       role: "reviewer",
       emailVerified: true,
+      // konto techniczne: zawieszone, żeby reset hasła na ten adres nie dał nikomu roli recenzenta
+      suspendedAt: new Date(),
     } as any).returning();
   }
 

@@ -186,7 +186,8 @@ export function registerFeedbackRoutes(app: Express) {
         });
       }
 
-      const pagePath = input.pagePath?.startsWith("/") ? input.pagePath : null;
+      // tylko ścieżka w aplikacji: „//host” i „/\\host” przeglądarka potraktowałaby jako inny serwis
+      const pagePath = input.pagePath && /^\/(?![\/\\])/.test(input.pagePath) ? input.pagePath : null;
       const ids = pagePath ? feedbackIdsFromPath(pagePath) : {};
       const context: FeedbackContext = {
         userAgent: (req.get("User-Agent") || "").slice(0, 400) || undefined,

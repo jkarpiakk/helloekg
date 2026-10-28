@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { auditLog } from '@shared/schema';
 import { authService } from './auth';
 import { emailService } from './services/emailService';
+import { linkZMaila } from './mailLinks';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string, uuid: string): Promise<void> {
@@ -117,7 +118,7 @@ export class WebhookHandlers {
         // their new account.  Link uses the same 60-min reset flow as Fix 2.
         const plainToken = await authService.initiatePasswordReset(user.email);
         if (plainToken) {
-          const setPasswordUrl = `${frontendUrl}/reset-password?token=${plainToken}`;
+          const setPasswordUrl = linkZMaila("/reset-password", plainToken);
           try {
             await emailService.sendGuestPaymentConfirmation(
               user.email,

@@ -69,7 +69,8 @@ export class CertificateService {
     });
 
     // Send email notification
-    const certificateUrl = `${process.env.FRONTEND_URL}/certificate/${certificateId}`;
+    const base = (process.env.FRONTEND_URL || process.env.APP_BASE_URL || "http://localhost:5000").replace(/\/+$/, "");
+    const certificateUrl = `${base}/certificate/${certificateId}`;
     const emailTemplate = emailService.getCertificateTemplate(
       user.firstName,
       certificateId,

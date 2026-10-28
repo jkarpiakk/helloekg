@@ -37,9 +37,11 @@ const reject = (res: Response) =>
   res.status(403).json({ error: "Żądanie odrzucone (nieprawidłowe pochodzenie). Odśwież stronę i spróbuj ponownie." });
 
 export function csrfOriginCheck(req: Request, res: Response, next: NextFunction) {
-  if (SAFE_METHODS.has(req.method) || !req.path.startsWith("/api")) return next();
+  // Express dopasowuje trasy bez względu na wielkość liter, więc „/API/…” też musi przejść kontrolę
+  const sciezka = req.path.toLowerCase();
+  if (SAFE_METHODS.has(req.method) || !sciezka.startsWith("/api")) return next();
 
-  const isWebhook = req.path.startsWith(WEBHOOK_PREFIX);
+  const isWebhook = sciezka.startsWith(WEBHOOK_PREFIX);
 
   const fetchSite = req.get("sec-fetch-site");
   if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
