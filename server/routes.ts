@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -48,7 +48,7 @@ import {
 import { db } from "./db";
 import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters, blogPosts } from "@shared/schema";
 import { eq, or, and, gte, desc, count, ilike, avg, sql, isNull, isNotNull } from "drizzle-orm";
-import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { getUncachableStripeClient, getStripePublishableKey, stripeSource } from "./stripeClient";
 
 /** Imię i nazwisko na certyfikat: litery (także polskie), spacja, łącznik, apostrof */
 const namePart = (label: string) =>
@@ -626,8 +626,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /**
+   * Adres, na który Stripe wraca po płatności: APP_BASE_URL z konfiguracji serwera (za nginx req.protocol to http,
+   * a nagłówek Host przychodzi od klienta), a bez niej, jak dotąd, z żądania.
+   */
+  const adresPowrotu = (req: Request) => (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  /** Płatności wyłączone (brak kluczy Stripe): 503 z jasnym komunikatem zamiast ogólnego błędu. */
+  const bezStripe = (res: Response) => {
+    if (stripeSource()) return false;
+    res.status(503).json({ error: "Płatności nie są jeszcze włączone" });
+    return true;
+  };
+
   // Get Stripe publishable key for frontend
   app.get("/api/stripe/config", async (req, res) => {
+    if (bezStripe(res)) return;
     try {
       const publishableKey = await getStripePublishableKey();
       res.json({ publishableKey });
@@ -639,6 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Guest checkout - create account and checkout in one step
   app.post("/api/stripe/guest-checkout", paymentRateLimit, async (req, res) => {
+    if (bezStripe(res)) return;
     try {
       const { email, planId } = req.body;
       
@@ -736,8 +750,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: `${req.protocol}://${req.get('host')}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.protocol}://${req.get('host')}/?payment=cancelled`,
+        success_url: `${adresPowrotu(req)}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${adresPowrotu(req)}/?payment=cancelled`,
         metadata: {
           email: email,
           planId: plan.id,
@@ -874,6 +888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create Stripe Checkout session
   app.post("/api/stripe/checkout", requireAuth, async (req, res) => {
+    if (bezStripe(res)) return;
     try {
       const { planId } = req.body;
       
@@ -919,8 +934,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: `${req.protocol}://${req.get('host')}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.protocol}://${req.get('host')}/?payment=cancelled`,
+        success_url: `${adresPowrotu(req)}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${adresPowrotu(req)}/?payment=cancelled`,
         metadata: {
           userId: req.user!.id,
           planId: plan.id,

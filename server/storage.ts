@@ -31,6 +31,8 @@ export interface IStorage {
   getActivePlans(): Promise<Plan[]>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   getUserActiveSubscription(userId: string): Promise<Subscription | undefined>;
+  /** Aktywna subskrypcja zapisana w bazie (opłacona), z pominięciem dostępu „beta” z BETA_OPEN_ACCESS. */
+  getStoredActiveSubscription(userId: string): Promise<Subscription | undefined>;
   updateSubscriptionStatus(id: string, status: string): Promise<Subscription>;
   
   // Course content
@@ -211,6 +213,10 @@ export class DatabaseStorage implements IStorage {
         paymentProvider: "beta",
       } as unknown as Subscription;
     }
+    return this.getStoredActiveSubscription(userId);
+  }
+
+  async getStoredActiveSubscription(userId: string): Promise<Subscription | undefined> {
     const [subscription] = await db
       .select()
       .from(subscriptions)

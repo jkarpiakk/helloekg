@@ -49,7 +49,8 @@ export class WebhookHandlers {
     try {
       // Idempotency guard — if a subscription already exists do nothing.
       // This ensures repeated webhook deliveries produce no side effects.
-      const existingSubscription = await storage.getUserActiveSubscription(userId);
+      // Tylko prawdziwa subskrypcja z bazy: w otwartej becie każdy ma też dostęp „beta”, a płatność ma go zastąpić
+      const existingSubscription = await storage.getStoredActiveSubscription(userId);
       if (existingSubscription) {
         console.log(`User ${userId} already has active subscription, skipping`);
         return;

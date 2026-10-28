@@ -8,6 +8,7 @@ Playwright nie jest zależnością projektu, żeby nie obciążać instalacji na
 
 - `wstawki-wyklady-pytania.cjs`: wstawki w wykładach (S1_00 pl.8, S2_02 pl.1 i pl.3), monitor w treści pytania Q-INT (nie zdradza rozpoznania), telefon i komputer.
 - `dzwiek.cjs`: dźwięk wstawek (domyślnie cisza, przełącznik pamiętany między wykładami, droga impulsu, cyrkiel w pomiarach, monitor w pytaniu: ton QRS bez alarmu), telefon i komputer. Przechwytuje Web Audio w przeglądarce testowej.
+- `stripe.cjs`: Stripe z kluczy w konfiguracji serwera. Potrzebuje dwóch podglądów: bez kluczy (:5055) i z fałszywymi kluczami testowymi (:5056, `sk_test_…`, `STRIPE_WEBHOOK_SECRET=whsec_lokalny_test_000`). Sprawdza 503 bez kluczy, podpis webhooka, aktywację dostępu po `checkout.session.completed` (raz), także w otwartej becie. Ze Stripe się nie łączy.
 
 Dawny pełny zestaw (`ux.js`, 43/38 kroków) żył w katalogu tymczasowym sesji i zginął przy czyszczeniu systemu 27.10; do odtworzenia tutaj.
 - `luki.cjs`: pytania „Uzupełnij luki” (Q-0044, Q-0034 i po jednym z każdej sekcji): pole w miejscu znacznika `{{blank:id}}`, tekst nierozcięty, „Poprawnie” przy swojej luce, „0,3” i „0.3” uznane; `BASE`/`DB` zmieniają adres i bazę.
