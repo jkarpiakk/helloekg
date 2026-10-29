@@ -51,6 +51,7 @@ import { users, modules, sections, questions, attempts, progress, subscriptions,
 import { eq, or, and, gte, desc, count, ilike, avg, sql, isNull, isNotNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey, stripeSource } from "./stripeClient";
 import { linkZMaila } from "./mailLinks";
+import { aktywujPlatnosc } from "./platnosci";
 
 /** Imię i nazwisko na certyfikat: litery (także polskie), spacja, łącznik, apostrof */
 const namePart = (label: string) =>
@@ -626,9 +627,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  /** Komunikat błędu dla kursanta: własne komunikaty aplikacji tak, błędy bazy (mają `code`) nigdy. */
+  /**
+   * Komunikat błędu dla kursanta: własne komunikaty aplikacji tak, błędy bazy nigdy. Błąd bazy ma `code`,
+   * a od drizzle-orm 0.45 przychodzi opakowany (DrizzleQueryError „Failed query: …”, kod w `cause`).
+   */
   const bladDlaKlienta = (error: any, domyslny: string): string =>
-    error && typeof error.message === "string" && !error.code ? error.message : domyslny;
+    error && typeof error.message === "string" && !error.code && !error.cause && error.name !== "DrizzleQueryError"
+      ? error.message
+      : domyslny;
   /** Odpowiedź interaktywna (luki, przeciąganie, kolejność): rozsądny rozmiar, bez dowolnie długich napisów. */
   const odpowiedzZaDuza = (answerData: unknown): boolean =>
     answerData !== undefined && JSON.stringify(answerData).length > 4000;
@@ -657,13 +663,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Guest checkout - create account and checkout in one step
+  // Zakup gościa: sama sesja Stripe; konto powstaje po płatności (server/platnosci.ts)
   app.post("/api/stripe/guest-checkout", paymentRateLimit, async (req, res) => {
     if (bezStripe(res)) return;
     try {
-      const { email, planId } = req.body;
-      
-      if (!email || !planId) {
+      const planId = req.body?.planId;
+      const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+      if (!planId || !z.string().email().max(255).safeParse(email).success) {
         return res.status(400).json({ error: "Email i plan są wymagane" });
       }
 
@@ -679,74 +685,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const stripe = await getUncachableStripeClient();
-      
-      // Check if user exists
-      let user = await storage.getUserByEmail(email);
-      let customerId: string | undefined;
-      
-      if (user) {
-        // User exists - use their Stripe customer or create one
-        if (user.stripeCustomerId) {
-          customerId = user.stripeCustomerId;
-        } else {
-          const customer = await stripe.customers.create({
-            email: user.email,
-            name: user.firstName ? `${user.firstName} ${user.lastName}` : email,
-            metadata: { userId: user.id }
-          });
-          customerId = customer.id;
-          await storage.updateUserStripeCustomerId(user.id, customer.id);
-        }
-      } else {
-        // New guest - create account FIRST so the webhook can activate the
-        // subscription even if the browser is closed after payment.
-        const randomPassword = crypto.randomBytes(32).toString('hex');
-        const passwordHash = await bcrypt.hash(randomPassword, 12);
 
-        let newUser;
-        try {
-          newUser = await storage.createUser({
-            email,
-            password: passwordHash,
-            firstName: email.split('@')[0],
-            lastName: '',
-            emailVerified: true,
-            role: 'student'
-          });
-
-          await storage.createAuditLog({
-            actorId: newUser.id,
-            action: 'user_registered_via_guest_checkout',
-            entityType: 'user',
-            entityId: newUser.id,
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent')
-          });
-        } catch (createError) {
-          // Race: a concurrent request may have created this account first.
-          // Fall back to the existing user instead of returning a false 500.
-          const existing = await storage.getUserByEmail(email);
-          if (!existing) throw createError;
-          newUser = existing;
-        }
-
-        user = newUser;
-
-        if (newUser.stripeCustomerId) {
-          customerId = newUser.stripeCustomerId;
-        } else {
-          const customer = await stripe.customers.create({
-            email: email,
-            metadata: { userId: newUser.id }
-          });
-          customerId = customer.id;
-          await storage.updateUserStripeCustomerId(newUser.id, customer.id);
-        }
-      }
-
-      // Create checkout session
+      // Konto gościa powstaje dopiero po płatności (server/platnosci.ts); tu tylko sesja Stripe z adresem.
       const session = await stripe.checkout.sessions.create({
-        customer: customerId,
+        customer_email: email,
+        customer_creation: 'always',
         payment_method_types: ['card'],
         line_items: [{
           price_data: {
@@ -763,10 +706,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success_url: `${adresPowrotu(req)}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${adresPowrotu(req)}/?payment=cancelled`,
         metadata: {
-          email: email,
+          guestEmail: email,
           planId: plan.id,
           durationDays: plan.durationDays.toString(),
-          userId: user.id
         }
       });
 
@@ -777,119 +719,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Finalize payment - auto-create account for guests
+  // Strona powrotu po płatności (także gościa): aktywacja z sesji pobranej ze Stripe, idempotentna
   app.post("/api/stripe/finalize-payment", paymentRateLimit, async (req, res) => {
     if (bezStripe(res)) return;
     try {
-      const { sessionId } = req.body;
-      
-      if (!sessionId) {
+      const sessionId = req.body?.sessionId;
+      if (typeof sessionId !== "string" || !/^cs_[A-Za-z0-9_]{10,250}$/.test(sessionId)) {
         return res.status(400).json({ error: "Brak ID sesji" });
       }
 
       const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-      if (session.payment_status !== 'paid') {
+      const wynik = await aktywujPlatnosc(session);
+      if (!wynik) {
         return res.status(400).json({ error: "Płatność nie została zrealizowana" });
-      }
-
-      const { email, planId, durationDays, userId, isGuest } = session.metadata || {};
-      
-      if (!email || !planId) {
-        return res.status(400).json({ error: "Brakujące dane sesji" });
-      }
-
-      let user;
-      let isNewAccount = false;
-      
-      // Check if user already exists or was created
-      if (userId && userId !== '') {
-        user = await storage.getUser(userId);
-      }
-      
-      if (!user) {
-        // Check by email
-        user = await storage.getUserByEmail(email);
-      }
-      
-      if (!user) {
-        // Create new account for guest - generate random password
-        const randomPassword = crypto.randomBytes(32).toString('hex');
-        const hashedPassword = await bcrypt.hash(randomPassword, 12);
-        
-        const [newUser] = await db.insert(users).values({
-          email: email,
-          password: hashedPassword,
-          firstName: '',
-          lastName: '',
-          role: 'student',
-          emailVerified: true, // Auto-verify since they paid
-          stripeCustomerId: session.customer as string || undefined,
-        }).returning();
-        
-        user = newUser;
-        isNewAccount = true;
-        
-        // Create audit log
-        await storage.createAuditLog({
-          actorId: user.id,
-          action: "user_registered_via_payment",
-          entityType: "user",
-          entityId: user.id,
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent')
-        });
-      }
-
-      // Check if subscription already exists
-      // prawdziwa subskrypcja z bazy (w otwartej becie dostęp „beta” nie może blokować zapisu płatności)
-      const existingSubscription = await storage.getStoredActiveSubscription(user.id);
-      let subscription;
-      
-      if (!existingSubscription) {
-        // Create subscription
-        const startDate = new Date();
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + parseInt(durationDays || '30'));
-
-        subscription = await storage.createSubscription({
-          userId: user.id,
-          planId,
-          startDate,
-          endDate,
-          status: "active",
-          paymentProvider: "stripe"
-        });
-
-        // Send confirmation email
-        const plan = await storage.getActivePlans().then(plans => 
-          plans.find(p => p.id === planId)
-        );
-        
-        if (plan) {
-          try {
-            await emailService.sendSubscriptionConfirmation(
-              user.email,
-              user.firstName || 'Użytkowniku',
-              plan.name,
-              endDate.toLocaleDateString('pl-PL')
-            );
-          } catch (emailError) {
-            console.error("Failed to send subscription email:", emailError);
-          }
-        }
-      } else {
-        subscription = existingSubscription;
       }
 
       res.json({
         success: true,
-        isNewAccount,
-        email: user.email,
+        isNewAccount: wynik.hasloZMaila,
+        email: wynik.user.email,
         subscription: {
-          startDate: subscription.startDate,
-          endDate: subscription.endDate
+          startDate: wynik.subscription.startDate,
+          endDate: wynik.subscription.endDate
         }
       });
     } catch (error: any) {
@@ -965,70 +817,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Handle successful payment (called after checkout.session.completed webhook)
+  // Strona powrotu zalogowanego kursanta: to samo co webhook, jeśli webhook jeszcze nie dotarł
   app.post("/api/stripe/payment-success", requireAuth, async (req, res) => {
+    if (bezStripe(res)) return;
     try {
-      const { sessionId } = req.body;
-      
-      if (!sessionId) {
+      const sessionId = req.body?.sessionId;
+      if (typeof sessionId !== "string" || !/^cs_[A-Za-z0-9_]{10,250}$/.test(sessionId)) {
         return res.status(400).json({ error: "Brak ID sesji" });
       }
 
       const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-      if (session.payment_status === 'paid' && session.metadata) {
-        const { userId, planId, durationDays } = session.metadata;
-        
-        if (userId === req.user!.id) {
-          // Check if subscription was already created by webhook (idempotency)
-          const existingSubscription = await storage.getStoredActiveSubscription(userId);
-          if (existingSubscription) {
-            console.log(`Subscription already exists for user ${userId}, skipping creation`);
-            return res.json({ 
-              success: true, 
-              subscription: { 
-                startDate: existingSubscription.startDate, 
-                endDate: existingSubscription.endDate 
-              } 
-            });
-          }
-
-          const plan = await storage.getActivePlans().then(plans => 
-            plans.find(p => p.id === planId)
-          );
-
-          if (plan) {
-            const startDate = new Date();
-            const endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + parseInt(durationDays || plan.durationDays.toString()));
-
-            await storage.createSubscription({
-              userId,
-              planId,
-              startDate,
-              endDate,
-              status: "active",
-              paymentProvider: "stripe"
-            });
-
-            // Send confirmation email via SendGrid
-            const user = await storage.getUser(userId);
-            if (user) {
-              try {
-                await emailService.sendSubscriptionConfirmation(
-                  user.email,
-                  user.firstName,
-                  plan.name,
-                  endDate.toLocaleDateString('pl-PL')
-                );
-              } catch (emailError) {
-                console.error("Failed to send subscription email:", emailError);
-              }
-            }
-
-            return res.json({ success: true, subscription: { startDate, endDate } });
-          }
+      // tylko płatność tego konta: sesja zalogowanego zakupu niesie jego userId
+      if (session.metadata?.userId === req.user!.id) {
+        const wynik = await aktywujPlatnosc(session);
+        if (wynik) {
+          return res.json({
+            success: true,
+            subscription: { startDate: wynik.subscription.startDate, endDate: wynik.subscription.endDate },
+          });
         }
       }
 
@@ -1407,6 +1215,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requiredSections: required,
         firstName: user?.firstName ?? "",
         lastName: user?.lastName ?? "",
+        // certyfikat wymaga potwierdzonego adresu (certificateService.generateCertificate)
+        emailVerified: !!user?.emailVerified,
+        email: user?.email ?? "",
       });
     } catch (error) {
       console.error("Certificate eligibility error:", error);
@@ -1498,20 +1309,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Use freeze error:", error);
       res.status(500).json({ error: "Błąd podczas używania zamrożenia" });
-    }
-  });
-
-  // Pobierz ranking (leaderboard)
-  app.get("/api/gamification/leaderboard", requireAuth, async (req, res) => {
-    try {
-      const requested = parseInt(req.query.limit as string, 10);
-      const limit = Number.isFinite(requested) ? Math.min(50, Math.max(1, requested)) : 10;
-      const leaderboard = await gamificationService.getLeaderboard(limit);
-      // Bez userId — ranking widzą wszyscy zalogowani
-      res.json(leaderboard.map(({ userId: _uid, ...entry }) => entry));
-    } catch (error) {
-      console.error("Leaderboard error:", error);
-      res.status(500).json({ error: "Błąd podczas pobierania rankingu" });
     }
   });
 

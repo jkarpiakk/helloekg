@@ -116,11 +116,14 @@ export class AuthService {
 
     const hashedPassword = await this.hashPassword(newPassword);
 
-    // Clear the token and set the new password
+    // Clear the token and set the new password. Link z maila dowodzi, że adres należy do tej osoby,
+    // więc ustawienie hasła z niego potwierdza też e-mail (np. konto założone przy zakupie gościa).
     await storage.updateUser(user.id, {
       password: hashedPassword,
       passwordResetToken: null,
       passwordResetExpiry: null,
+      emailVerified: true,
+      emailVerificationToken: null,
     });
 
     // Invalidate all existing sessions so old sessions can no longer be used

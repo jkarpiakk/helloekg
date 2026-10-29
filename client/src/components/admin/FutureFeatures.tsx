@@ -102,7 +102,6 @@ export default function FutureFeatures() {
                   <li>✅ Osiągnięcia (12 domyślnych: streak, accuracy, volume)</li>
                   <li>✅ Heatmapa aktywności (styl GitHub)</li>
                   <li>✅ Animacje confetti przy odblokowaniu osiągnięć</li>
-                  <li>⏳ Ranking użytkowników (opcjonalny)</li>
                   <li>⏳ Email notifications (dzienny digest, alerty)</li>
                 </ul>
               </div>

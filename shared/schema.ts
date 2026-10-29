@@ -64,6 +64,8 @@ export const subscriptions = pgTable("subscriptions", {
   paymentProvider: varchar("payment_provider", { length: 50 }).notNull(),
   invoiceUrl: text("invoice_url"),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
+  /** Sesja Stripe Checkout, z której powstała subskrypcja: jedna sesja = jeden zapis (ponowne użycie nie daje kolejnych dni) */
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }).unique(),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

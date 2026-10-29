@@ -15,6 +15,8 @@ interface Eligibility {
   requiredSections: number;
   firstName: string;
   lastName: string;
+  emailVerified: boolean;
+  email: string;
 }
 
 /** Komunikat z odpowiedzi serwera („400: {"error":"…"}”) albo ogólny */
@@ -36,6 +38,9 @@ export default function CertificateCard() {
   const { data: elig } = useQuery<Eligibility>({
     queryKey: ["/api/certificates/eligibility"],
     queryFn: async () => (await apiRequest("GET", "/api/certificates/eligibility")).json(),
+    // potwierdzenie adresu zwykle w innej karcie (link z maila): po powrocie stan ma się odświeżyć
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
   const { data: mine } = useQuery<Certificate[]>({
     queryKey: ["/api/certificates/my"],
@@ -56,11 +61,21 @@ export default function CertificateCard() {
       const r = await apiRequest("POST", "/api/certificates/generate", { firstName, lastName });
       return r.json() as Promise<{ certificateId: string }>;
     },
-    onSuccess: ({ certificateId }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/certificates/my"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/certificates/eligibility"] });
+    onSuccess: async ({ certificateId }) => {
+      // arkusz bierze imię i nazwisko z tych zapytań: najpierw świeże dane, potem przejście
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["/api/certificates/my"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/certificates/eligibility"] }),
+      ]);
       setLocation(`/certificate/${certificateId}`);
     },
+    onError: (e: unknown) => setError(serverMessage(e)),
+  });
+
+  const [linkSent, setLinkSent] = useState(false);
+  const resend = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/auth/resend-verification", { email: elig?.email })).json(),
+    onSuccess: () => setLinkSent(true),
     onError: (e: unknown) => setError(serverMessage(e)),
   });
 
@@ -97,6 +112,33 @@ export default function CertificateCard() {
           Certyfikat odbierzesz, gdy opanujesz {left === 1 ? "ostatni temat" : "wszystkie tematy"}: ostatnia odpowiedź na
           każde pytanie musi być poprawna. Dawne pomyłki się nie liczą.
         </p>
+      </motion.section>
+    );
+  }
+
+  if (!elig.emailVerified) {
+    return (
+      <motion.section variants={rise} className="surface p-6 grid gap-3" aria-labelledby="cert-title" data-testid="certificate-verify-email">
+        <p className="label label--g">Certyfikat</p>
+        <h2 id="cert-title" className="h3">Kurs ukończony. Potwierdź adres e-mail</h2>
+        <p className="muted text-[15px]">
+          Certyfikat wydajemy na potwierdzony adres. Kliknij link w mailu od helloEKG wysłanym na{" "}
+          <span className="text-[var(--txt)]">{elig.email}</span>, a potem wróć tutaj.
+        </p>
+        {error && (
+          <p className="text-[14px] text-[var(--alarm)]" role="alert">
+            {error}
+          </p>
+        )}
+        <div role="status">
+          {linkSent ? (
+            <p className="text-[15px] text-[var(--txt)]">Wysłaliśmy nowy link. Zajrzyj też do spamu.</p>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => { setError(null); resend.mutate(); }} disabled={resend.isPending} data-testid="button-resend-verification">
+              {resend.isPending ? "Wysyłam…" : "Wyślij link jeszcze raz"}
+            </Button>
+          )}
+        </div>
       </motion.section>
     );
   }

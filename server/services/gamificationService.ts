@@ -426,32 +426,6 @@ export async function getUserAchievements(userId: string): Promise<{
   return { unlocked, locked };
 }
 
-// Pobierz ranking użytkowników (top 10)
-export async function getLeaderboard(limit: number = 10): Promise<Array<{
-  userId: string;
-  firstName: string;
-  lastName: string;
-  level: number;
-  xp: number;
-  currentStreak: number;
-}>> {
-  const result = await db
-    .select({
-      userId: userStats.userId,
-      firstName: sql<string>`users.first_name`,
-      lastName: sql<string>`users.last_name`,
-      level: userStats.level,
-      xp: userStats.xp,
-      currentStreak: userStats.currentStreak,
-    })
-    .from(userStats)
-    .innerJoin(sql`users`, sql`users.id = ${userStats.userId}`)
-    .orderBy(desc(userStats.xp))
-    .limit(limit);
-  
-  return result as any;
-}
-
 // Nazwa poziomu na podstawie numeru
 export function getLevelName(level: number): string {
   if (level <= 5) return "Student Medycyny";

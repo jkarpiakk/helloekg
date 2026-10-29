@@ -38,6 +38,10 @@ export class CertificateService {
     if (!isEligible) {
       throw new Error("Nie spełniasz wymagań do otrzymania certyfikatu");
     }
+    // certyfikat tylko dla potwierdzonego adresu: inaczej konto założone na cudzy e-mail dostałoby cudzy certyfikat
+    if (!user.emailVerified) {
+      throw new Error("Potwierdź adres e-mail, żeby odebrać certyfikat. Link znajdziesz w mailu od helloEKG.");
+    }
 
     // Check if user already has a certificate
     const existingCertificates = await storage.getUserCertificates(userId);

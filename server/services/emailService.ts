@@ -11,7 +11,7 @@ interface SendGridDynamicData {
 }
 
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter: ReturnType<typeof nodemailer.createTransport>;
   private useSendGrid: boolean;
   private sendGridApiKey: string | undefined;
 
@@ -84,7 +84,7 @@ export class EmailService {
       await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
         firstName,
         verificationUrl,
-        subject: 'Potwierdź swój adres e-mail — helloEKG'
+        subject: 'Potwierdź adres e-mail w helloEKG'
       });
     } else {
       const template = this.getEmailVerificationTemplate(firstName, verificationUrl);
@@ -97,7 +97,7 @@ export class EmailService {
       await this.sendViaSendGrid(to, 'd-5f81b219d046408fb87a30768ac6a66f', {
         firstName,
         resetUrl,
-        subject: 'Reset hasła — helloEKG',
+        subject: 'Ustaw nowe hasło w helloEKG',
         isPasswordReset: true
       });
     } else {
@@ -112,7 +112,7 @@ export class EmailService {
         firstName,
         planName,
         endDate,
-        subject: 'Potwierdzenie płatności — helloEKG',
+        subject: 'Płatność potwierdzona: helloEKG',
         isSubscription: true
       });
     } else {
@@ -138,14 +138,14 @@ export class EmailService {
 
   getEmailVerificationTemplate(firstName: string, verificationUrl: string): EmailTemplate {
     return {
-      subject: "Potwierdź adres e-mail — helloEKG",
+      subject: "Potwierdź adres e-mail w helloEKG",
       html: brandEmail({
         preheader: "Jedno kliknięcie i Twoje konto w helloEKG jest gotowe.",
         label: "Konto · wersja beta",
         title: greeting(firstName, "potwierdź adres e-mail."),
         body: `<p ${P}>Dziękujemy za założenie konta w helloEKG. Kliknij przycisk poniżej, żeby potwierdzić, że ten adres należy do Ciebie.</p>`,
         cta: { href: verificationUrl, text: "Potwierdź adres e-mail" },
-        note: "Link jest ważny przez 24 godziny. Jeśli to nie Ty zakładałeś konto, zignoruj tę wiadomość.",
+        note: "Link jest ważny przez 24 godziny. Jeśli nie zakładasz konta w helloEKG, zignoruj tę wiadomość.",
         reason: "Dostajesz tę wiadomość, bo ktoś założył konto z tym adresem na kurs.helloekg.pl.",
       }),
       text: `Potwierdź adres e-mail w helloEKG: ${verificationUrl}\n\nLink jest ważny przez 24 godziny.`,
@@ -154,23 +154,23 @@ export class EmailService {
 
   getPasswordResetTemplate(firstName: string, resetUrl: string): EmailTemplate {
     return {
-      subject: "Ustaw nowe hasło — helloEKG",
+      subject: "Ustaw nowe hasło w helloEKG",
       html: brandEmail({
         preheader: "Link do ustawienia nowego hasła jest ważny przez godzinę.",
         label: "Konto · nowe hasło",
         title: greeting(firstName, "ustaw nowe hasło."),
         body: `<p ${P}>Otrzymaliśmy prośbę o zmianę hasła do Twojego konta w helloEKG. Kliknij przycisk i wpisz nowe hasło.</p>`,
         cta: { href: resetUrl, text: "Ustaw nowe hasło" },
-        note: "Link jest ważny przez 1 godzinę. Jeśli nie prosiłeś o zmianę, zignoruj tę wiadomość — Twoje hasło zostaje bez zmian.",
+        note: "Link jest ważny przez 1 godzinę. Jeśli to nie Twoja prośba, zignoruj tę wiadomość: hasło zostaje bez zmian.",
         reason: "Dostajesz tę wiadomość, bo na kurs.helloekg.pl poproszono o zmianę hasła do tego konta.",
       }),
-      text: `Ustaw nowe hasło w helloEKG: ${resetUrl}\n\nLink jest ważny przez 1 godzinę. Jeśli nie prosiłeś o zmianę, zignoruj tę wiadomość.`,
+      text: `Ustaw nowe hasło w helloEKG: ${resetUrl}\n\nLink jest ważny przez 1 godzinę. Jeśli to nie Twoja prośba, zignoruj tę wiadomość.`,
     };
   }
 
   getSubscriptionConfirmationTemplate(firstName: string, planName: string, endDate: string): EmailTemplate {
     return {
-      subject: "Płatność potwierdzona — helloEKG",
+      subject: "Płatność potwierdzona: helloEKG",
       html: brandEmail({
         preheader: "Twój dostęp do kursu jest aktywny.",
         label: "Płatność · potwierdzenie",
@@ -199,7 +199,7 @@ export class EmailService {
     setPasswordUrl: string
   ): EmailTemplate {
     return {
-      subject: "Płatność potwierdzona — ustaw hasło do helloEKG",
+      subject: "Płatność potwierdzona: ustaw hasło do helloEKG",
       html: brandEmail({
         preheader: "Ustaw hasło, żeby zalogować się do kursu.",
         label: "Płatność · potwierdzenie",
@@ -207,7 +207,7 @@ export class EmailService {
         subtitle: "Zostało ustawić hasło.",
         body: `<p ${P}>Dziękujemy za zakup. Żeby się zalogować, ustaw hasło do swojego konta.</p>${details([["Plan", planName], ["Aktywny do", endDate]])}`,
         cta: { href: setPasswordUrl, text: "Ustaw hasło i zaloguj się" },
-        note: "Link jest ważny przez 1 godzinę. Jeśli to nie Ty płaciłeś, napisz do nas: kontakt@helloekg.pl.",
+        note: "Link jest ważny przez 1 godzinę. Jeśli nie zamawiasz kursu, napisz do nas: kontakt@helloekg.pl.",
         reason: "Dostajesz tę wiadomość, bo opłacono dostęp do kursu helloEKG z tym adresem.",
       }),
       text: `Płatność potwierdzona. Plan: ${planName}, aktywny do: ${endDate}. Ustaw hasło: ${setPasswordUrl}`,
@@ -249,7 +249,7 @@ export class EmailService {
       ["Typ", r.typeLabel],
       ["Obszar", r.areaLabel],
       ["Od", `${r.userName} · ${r.userEmail}`],
-      ["Strona", r.pagePath || "—"],
+      ["Strona", r.pagePath || "brak"],
       ["Załączniki", String(r.attachmentCount)],
     ];
     if (r.viewport) rows.push(["Ekran", r.viewport]);
@@ -266,7 +266,7 @@ export class EmailService {
         cta: { href: adminUrl, text: "Otwórz w panelu" },
         reason: "Dostajesz tę wiadomość, bo ten adres odbiera zgłoszenia testerów helloEKG.",
       }),
-      text: `Nowe zgłoszenie (${r.typeLabel}, ${r.areaLabel}) od ${r.userName} <${r.userEmail}>\nStrona: ${r.pagePath || "—"}\nZałączniki: ${r.attachmentCount}\n\n${r.description}\n\nPanel: ${adminUrl}`,
+      text: `Nowe zgłoszenie (${r.typeLabel}, ${r.areaLabel}) od ${r.userName} <${r.userEmail}>\nStrona: ${r.pagePath || "brak"}\nZałączniki: ${r.attachmentCount}\n\n${r.description}\n\nPanel: ${adminUrl}`,
     };
   }
 }

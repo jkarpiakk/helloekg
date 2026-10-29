@@ -30,6 +30,15 @@ const sql = (q) => execSync(`ssh helloekg-studio "sudo -u postgres psql -d ${DB}
         // wszystkie tematy z pytaniami opanowane
         sql(`INSERT INTO progress (user_id, section_id, completion_percentage) SELECT '${id}', s.id, 100 FROM sections s WHERE EXISTS (SELECT 1 FROM questions q WHERE q.section_id = s.id AND q.status = 'published')`);
         await pg.goto(`${B}/dashboard`, { waitUntil: "networkidle" }); await pg.waitForTimeout(1200);
+        // adres niepotwierdzony: zamiast formularza prośba o potwierdzenie, serwer też nie wydaje
+        const prosba = await pg.locator('[data-testid="certificate-verify-email"]').innerText().catch(() => "");
+        ok(`${nazwa}: niepotwierdzony adres: prośba o potwierdzenie z adresem`, prosba.includes("Potwierdź adres e-mail") && prosba.includes(email), prosba.slice(0, 80).replace(/\n/g, " "));
+        const odmowa = await pg.evaluate(async () => { const r = await fetch("/api/certificates/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ firstName: "Zofia", lastName: "Żak" }) }); return [r.status, (await r.json()).error]; });
+        ok(`${nazwa}: serwer nie wydaje certyfikatu bez potwierdzenia`, odmowa[0] === 400 && /Potwierdź adres/.test(odmowa[1]), JSON.stringify(odmowa));
+        await pg.click('[data-testid="button-resend-verification"]'); await pg.waitForTimeout(1000);
+        ok(`${nazwa}: link wysłany ponownie`, /Wysłaliśmy nowy link/.test(await pg.locator('[data-testid="certificate-verify-email"]').innerText()));
+        sql(`UPDATE users SET email_verified = true WHERE id = '${id}'`);
+        await pg.goto(`${B}/dashboard`, { waitUntil: "networkidle" }); await pg.waitForTimeout(1200);
         const widac = await pg.locator('[data-testid="certificate-claim"]').isVisible();
         ok(`${nazwa}: formularz odbioru po opanowaniu`, widac, widac ? "" : JSON.stringify(await pg.evaluate(async () => (await fetch("/api/certificates/eligibility")).json())));
         if (!widac) { await pg.screenshot({ path: "certyfikat-blad.png", fullPage: true }); throw new Error("brak formularza"); }
@@ -46,8 +55,8 @@ const sql = (q) => execSync(`ssh helloekg-studio "sudo -u postgres psql -d ${DB}
         await pg.click('[data-testid="button-view-certificate"]'); await pg.waitForURL(/\/certificate\//);
       }
       await pg.waitForTimeout(1500);
-      const imie = await pg.locator(".cert-sheet").first().evaluate((s) => [...s.querySelectorAll("text")].map((t) => t.textContent).includes("Zofia Wąsowicz-Żak"));
-      ok(`${nazwa}: imię i nazwisko na arkuszu`, imie);
+      const teksty = await pg.locator(".cert-sheet").first().evaluate((s) => [...s.querySelectorAll("text")].map((t) => t.textContent)).catch((e) => ["brak arkusza: " + e.message.split("\n")[0]]);
+      ok(`${nazwa}: imię i nazwisko na arkuszu`, teksty.includes("Zofia Wąsowicz-Żak"), teksty.includes("Zofia Wąsowicz-Żak") ? "" : teksty.join(" | ").slice(0, 200));
       await pg.screenshot({ path: `certyfikat-${nazwa}.png` });
       if (nazwa === "komputer") {
         await pg.emulateMedia({ media: "print" });

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/lib/auth";
+import { queryClient } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
 
 /** Wąska kolumna wyśrodkowana: etykieta, tytuł, opis, jedno działanie */
@@ -62,6 +63,8 @@ export default function VerifyEmail() {
       if (!response.ok) {
         throw new Error(data.error || 'Błąd weryfikacji');
       }
+      queryClient.invalidateQueries({ queryKey: ['/api/certificates/eligibility'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       return data;
     },
     enabled: !!token,
