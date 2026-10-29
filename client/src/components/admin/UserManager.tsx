@@ -72,7 +72,7 @@ const createUserSchema = z.object({
   password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
   firstName: z.string().min(2, "Imię musi mieć co najmniej 2 znaki"),
   lastName: z.string().min(2, "Nazwisko musi mieć co najmniej 2 znaki"),
-  role: z.enum(["student", "reviewer", "admin", "owner"]).default("student"),
+  role: z.enum(["student", "reviewer", "admin", "owner"]),
 });
 
 type CreateUserForm = z.infer<typeof createUserSchema>;

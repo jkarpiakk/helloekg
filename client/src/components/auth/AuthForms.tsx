@@ -38,17 +38,19 @@ const registerSchema = z.object({
   email: emailField,
   password: passwordField,
   confirmPassword: z.string().min(1, "Wpisz hasło jeszcze raz"),
-  firstName: z.string().optional().default(""),
-  lastName: z.string().optional().default(""),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   profession: z.string().optional(),
   // Regulamin dojdzie przed startem płatnej wersji — w becie wymagamy tylko polityki prywatności
   termsAccepted: z.boolean().optional(),
   privacyAccepted: z.boolean().refine(val => val === true, "Zaznacz, aby założyć konto"),
-  marketingConsent: z.boolean().default(false),
+  marketingConsent: z.boolean().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Hasła się różnią. Wpisz to samo hasło w obu polach",
   path: ["confirmPassword"],
 });
+
+type RegisterValues = z.infer<typeof registerSchema>;
 
 /** apiRequest rzuca błąd w formacie „401: {"error": "..."}” — wyciągamy samą treść */
 function readableError(error: unknown, fallback: string): string {
@@ -139,7 +141,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
     },
   });
 
-  const registerForm = useForm<RegisterForm>({
+  const registerForm = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
     mode: "onTouched",
     defaultValues: {
@@ -205,15 +207,21 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
     loginMutation.mutate(data);
   };
 
-  const onRegisterSubmit = (data: RegisterForm) => {
-    registerMutation.mutate(data);
+  const onRegisterSubmit = (data: RegisterValues) => {
+    registerMutation.mutate({
+      ...data,
+      firstName: data.firstName ?? "",
+      lastName: data.lastName ?? "",
+      termsAccepted: data.termsAccepted ?? false,
+      marketingConsent: data.marketingConsent ?? false,
+    });
   };
 
   const header = (label: string, title: string, lead: string) => (
     <motion.div variants={rise} className="space-y-3 pr-10">
       <p className="label">{label}</p>
       <h2 className="h3 text-[var(--txt)]">{title}</h2>
-      <p className="text-[.9375rem] leading-relaxed text-[var(--txt2)]">{lead}</p>
+      <p className="text-sub leading-relaxed text-[var(--txt2)]">{lead}</p>
     </motion.div>
   );
 
@@ -246,7 +254,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
           <motion.p
             variants={rise}
             role="status"
-            className="rounded-[12px] border border-[var(--puls-deep)] bg-[var(--tint)] px-4 py-3 text-[.9375rem] text-[var(--txt)]"
+            className="rounded-lg border border-[var(--puls-deep)] bg-[var(--tint)] px-4 py-3 text-sub text-[var(--txt)]"
             data-testid="login-notice"
           >
             {loginNotice}
@@ -285,7 +293,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
                       <FormLabel className={fieldLabel}>Hasło</FormLabel>
                       <button
                         type="button"
-                        className="-my-3 inline-flex min-h-11 items-center text-[.8125rem] text-[var(--txt2)] underline-offset-4 hover:text-[var(--txt)] hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="-my-3 inline-flex min-h-11 items-center text-note text-[var(--txt2)] underline-offset-4 hover:text-[var(--txt)] hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => {
                           setShowForgotPassword((open) => !open);
                           setForgotSent(false);
@@ -323,7 +331,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
                     transition={spring}
                     className="overflow-hidden"
                   >
-                    <div className="space-y-3 rounded-[12px] border border-[var(--line)] p-4">
+                    <div className="space-y-3 rounded-lg border border-[var(--line)] p-4">
                       {forgotSent ? (
                         <div className="space-y-3" role="status">
                           <p className="text-sm text-[var(--txt)]">

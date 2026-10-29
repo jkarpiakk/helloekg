@@ -65,7 +65,7 @@ function sniffImage(buf: Buffer): FeedbackAttachmentMeta["mime"] | null {
 }
 
 const enumOf = <T extends readonly { value: string }[]>(items: T, message: string) =>
-  z.enum(items.map((i) => i.value) as [T[number]["value"], ...T[number]["value"][]], { errorMap: () => ({ message }) });
+  z.enum(items.map((i) => i.value) as [T[number]["value"], ...T[number]["value"][]], { error: message });
 
 const createSchema = z.object({
   description: z.string().trim().min(FEEDBACK_MIN_DESCRIPTION, "Opisz uwagę w co najmniej 10 znakach.").max(FEEDBACK_MAX_DESCRIPTION),
@@ -91,9 +91,9 @@ const createSchema = z.object({
 
 const patchSchema = z.object({
   status: z
-    .enum(FEEDBACK_STATUSES.map((s) => s.value) as [FeedbackStatus, ...FeedbackStatus[]], { errorMap: () => ({ message: "Nieznany status." }) })
+    .enum(FEEDBACK_STATUSES.map((s) => s.value) as [FeedbackStatus, ...FeedbackStatus[]], { error: "Nieznany status." })
     .optional(),
-  priority: z.enum(FEEDBACK_PRIORITIES, { errorMap: () => ({ message: "Priorytet: P0, P1, P2 albo brak." }) }).nullable().optional(),
+  priority: z.enum(FEEDBACK_PRIORITIES, { error: "Priorytet: P0, P1, P2 albo brak." }).nullable().optional(),
   adminNote: z.string().max(5000).nullable().optional(),
 });
 
