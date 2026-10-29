@@ -21,7 +21,7 @@ export function LectureFigure({ src, alt, onOpen }: { src: string; alt: string; 
           const img = e.currentTarget.querySelector("img");
           if (img) onOpen(src, alt, img);
         }}
-        className="block max-w-full cursor-zoom-in rounded-[12px] transition-transform duration-[120ms] ease-out active:scale-[.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--puls)]"
+        className="block max-w-full cursor-zoom-in rounded-lg transition-transform duration-[120ms] ease-out active:scale-[.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--puls)]"
       >
         {/* nazwa przycisku = „Powiększ ilustrację.” + alt obrazka (czytnik słyszy pełny opis) */}
         <span className="sr-only">Powiększ ilustrację. </span>
@@ -32,7 +32,7 @@ export function LectureFigure({ src, alt, onOpen }: { src: string; alt: string; 
           decoding="async"
           draggable={false}
           onError={() => setFailed(true)}
-          className="!m-0 block h-auto max-w-full !rounded-[12px] !border !border-[var(--line)] bg-[var(--panel)]"
+          className="!m-0 block h-auto max-w-full !rounded-lg !border !border-[var(--line)] bg-[var(--panel)]"
         />
       </button>
     </figure>

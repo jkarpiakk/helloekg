@@ -59,7 +59,7 @@ type Rect = { x: number; y: number; w: number; h: number };
 type Side = "center" | "below" | "above" | "dock-bottom" | "dock-top";
 
 const TOUR_CSS = `
-.tour-hole{position:fixed;left:0;top:0;border-radius:14px;pointer-events:none;
+.tour-hole{position:fixed;left:0;top:0;border-radius:16px;pointer-events:none;
   box-shadow:0 0 0 200vmax var(--tour-dim,rgba(3,5,8,.8))}
 .tour-frame{position:absolute;inset:0;border-radius:inherit;border:1px solid color-mix(in srgb,var(--puls) 55%,transparent)}
 .tour-ring{position:absolute;inset:0;border-radius:inherit;border:1px solid var(--puls)}
@@ -274,7 +274,7 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
       aria-labelledby={titleId}
       aria-describedby={bodyId}
       tabIndex={-1}
-      className={`tour-material pointer-events-auto fixed left-0 top-0 rounded-[16px] p-5 text-[var(--txt)] outline-none ${
+      className={`tour-material pointer-events-auto fixed left-0 top-0 rounded-2xl p-5 text-[var(--txt)] outline-none ${
         mobile ? "w-[calc(100vw-32px)] max-w-[480px]" : "w-[min(340px,calc(100vw-32px))]"
       }`}
       style={{ x, y: py, transformOrigin: origin }}
@@ -287,15 +287,15 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
         <motion.span className="tour-arrow" data-edge={edgeTop ? "top" : "bottom"} style={{ x: arrowX, rotate: 45 }} aria-hidden="true" />
       )}
       <p className="label label--g">{label}</p>
-      <h2 id={titleId} className="mt-2 font-heading text-[1.1875rem] font-medium leading-snug tracking-[-0.012em]">
+      <h2 id={titleId} className="mt-2 font-heading text-heading font-medium leading-snug tracking-[-0.012em]">
         {step.title}
       </h2>
-      <p id={bodyId} className="mt-1.5 text-[.9375rem] leading-[1.55] text-[var(--txt2)]">
+      <p id={bodyId} className="mt-1.5 text-sub leading-[1.55] text-[var(--txt2)]">
         {body}
       </p>
 
       {step.kind === "action" && hint && (
-        <p className="mt-4 flex items-center gap-2 text-[.875rem] font-medium text-[var(--puls)]" data-testid="tour-hint">
+        <p className="mt-4 flex items-center gap-2 text-ui font-medium text-[var(--puls)]" data-testid="tour-hint">
           <motion.span
             className="inline-grid place-items-center"
             animate={reduce ? undefined : { y: edgeTop ? [0, -3, 0] : [0, 3, 0] }}
@@ -314,7 +314,7 @@ function CoachCard({ step, target, label, geomRef, cardRef, mobile, reduce, nudg
           onClick={onSkip}
           aria-keyshortcuts="Escape"
           title="Esc"
-          className="-ml-1 inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-1 text-[.8125rem] text-[var(--txt2)] transition-[transform,color] duration-100 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--puls)]"
+          className="-ml-1 inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-1 text-note text-[var(--txt2)] transition-[transform,color] duration-100 hover:text-[var(--txt)] active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--puls)]"
           data-testid="tour-skip"
         >
           Pomiń instrukcję
@@ -812,7 +812,7 @@ function Tour({ userId }: { userId: string }) {
         {paused && !quiet && (
           <motion.div
             key="tour-pill"
-            className="tour-material fixed z-[60] flex items-center rounded-full py-1 pl-1 pr-1 text-[.875rem]"
+            className="tour-material fixed z-[60] flex items-center rounded-full py-1 pl-1 pr-1 text-ui"
             style={{
               left: "max(16px, calc(env(safe-area-inset-left) + 12px))",
               bottom: "max(16px, calc(env(safe-area-inset-bottom) + 12px))",

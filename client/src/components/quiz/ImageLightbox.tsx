@@ -324,7 +324,7 @@ export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powię
       <div className="pointer-events-none absolute inset-0 grid place-items-center p-4">
         <div
           ref={panelRef}
-          className="pointer-events-auto relative grid w-full max-w-[min(980px,calc(100vw-32px))] grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-[16px] border border-[var(--line2)] bg-[var(--panel)] opacity-0 will-change-transform"
+          className="pointer-events-auto relative grid w-full max-w-[min(980px,calc(100vw-32px))] grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[var(--line2)] bg-[var(--panel)] opacity-0 will-change-transform"
           style={{ transformOrigin: "50% 50%" }}
         >
           <img
@@ -351,7 +351,7 @@ export default function ImageLightbox({ imageUrl, onClose, origin, alt = "Powię
           >
             <X className="h-4 w-4" />
           </button>
-          <div ref={barRef} className="border-t border-[var(--line)] px-4 py-2.5 text-center text-[.8125rem] text-[var(--txt2)]">
+          <div ref={barRef} className="border-t border-[var(--line)] px-4 py-2.5 text-center text-note text-[var(--txt2)]">
             <span className="[@media(hover:hover)_and_(pointer:fine)]:hidden">Przeciągnij w dół, aby zamknąć</span>
             <span className="hidden [@media(hover:hover)_and_(pointer:fine)]:inline">Esc albo kliknięcie obok zamyka podgląd</span>
           </div>

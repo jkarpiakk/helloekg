@@ -361,7 +361,7 @@ export default function Header() {
                       <li key={item.href} className="border-b border-[var(--line)]">
                         <Link
                           href={item.href}
-                          className={`flex h-12 items-center text-[.9375rem] transition-colors decoration-2 underline-offset-[6px] active:opacity-70 ${
+                          className={`flex h-12 items-center text-sub transition-colors decoration-2 underline-offset-[6px] active:opacity-70 ${
                             active ? "text-[var(--txt)] underline decoration-[var(--puls)]" : "text-[var(--txt2)]"
                           }`}
                           aria-current={active ? "page" : undefined}
@@ -378,7 +378,7 @@ export default function Header() {
                   <li className="border-b border-[var(--line)]">
                     <button
                       type="button"
-                      className="flex h-12 w-full items-center text-left text-[.9375rem] text-[var(--txt2)] active:opacity-70"
+                      className="flex h-12 w-full items-center text-left text-sub text-[var(--txt2)] active:opacity-70"
                       onClick={() => {
                         setIsMobileMenuOpen(false);
                         openAuth("login");

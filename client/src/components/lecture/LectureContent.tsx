@@ -131,7 +131,7 @@ function renderNode(n: ChildNode, ctx: Ctx, key: string, dropBlank: boolean): Re
 function GapNote({ text }: { text: string }) {
   return (
     <div
-      className="rounded-[12px] border border-dashed border-[var(--line2)] px-4 py-3 text-center font-mono text-[.75rem] uppercase tracking-[.16em] text-[var(--label)]"
+      className="rounded-lg border border-dashed border-[var(--line2)] px-4 py-3 text-center font-mono text-meta uppercase tracking-[.16em] text-[var(--label)]"
       data-testid="gfx-pending"
     >
       {text}
@@ -170,7 +170,7 @@ function RecallCard({ el, ctx }: { el: Element; ctx: Ctx }) {
 
   return (
     <details
-      className="!rounded-[16px] !border-[var(--line)] bg-[var(--panel)] !px-0 !pb-0"
+      className="!rounded-2xl !border-[var(--line)] bg-[var(--panel)] !px-0 !pb-0"
       data-testid={isRecall ? "recall-card" : "details-card"}
     >
       <summary className="!flex min-h-[44px] select-none items-start justify-between gap-4 !px-5 !py-5 !font-normal transition-transform duration-[120ms] ease-out after:!hidden active:scale-[.995] sm:!px-6">
@@ -178,11 +178,11 @@ function RecallCard({ el, ctx }: { el: Element; ctx: Ctx }) {
           {isRecall && <span className="label label--g">Przypomnij sobie</span>}
           {questionHtml ? (
             <span
-              className="font-heading text-[1.125rem] font-medium leading-[1.35] tracking-[-0.012em] text-[var(--txt)] [text-wrap:pretty]"
+              className="font-heading text-item font-medium leading-[1.35] tracking-[-0.012em] text-[var(--txt)] [text-wrap:pretty]"
               dangerouslySetInnerHTML={{ __html: questionHtml }}
             />
           ) : (
-            <span className="font-heading text-[1.125rem] font-medium leading-[1.35] tracking-[-0.012em] text-[var(--txt)]">
+            <span className="font-heading text-item font-medium leading-[1.35] tracking-[-0.012em] text-[var(--txt)]">
               Pokaż odpowiedź
             </span>
           )}

@@ -28,7 +28,7 @@ export default function OrderHint({ sectionId }: { sectionId: string }) {
 
   return (
     <aside
-      className="mb-8 flex items-start gap-3 rounded-[12px] border border-[var(--line2)] bg-[var(--panel)] px-4 py-3 text-[.9375rem] leading-relaxed text-[var(--txt2)]"
+      className="mb-8 flex items-start gap-3 rounded-lg border border-[var(--line2)] bg-[var(--panel)] px-4 py-3 text-sub leading-relaxed text-[var(--txt2)]"
       data-testid="order-hint"
     >
       <p className="min-w-0 flex-1">

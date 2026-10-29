@@ -5,7 +5,7 @@ import { spring } from "@/lib/motion";
 /**
  * „Metoda — Serce to orkiestra. EKG to jej nagranie.” — port sekcji `.method` z landingu
  * (helloekg.pl). Ilustracja układu bodźcoprzewodzącego z podświetleniami SVG + jeden cykl EKG,
- * w którym aktywny fragment świeci na zielono. Teksty medyczne przepisane 1:1 z landingu.
+ * w którym aktywny fragment zmienia kolor na zielony. Teksty medyczne przepisane 1:1 z landingu.
  *
  * Różnica wobec landingu: tam kroki przełącza przewijanie (scrollytelling, bez autoprzewijania),
  * tu — przyciski P / PQ / QRS / ST / QT (aria-pressed, strzałki ←/→), bo w kursie ta sekcja
@@ -92,25 +92,24 @@ const STYLES = `
 .om__head .h2,.om__head .h3{margin:0}
 .om__grid{display:grid;gap:20px}
 @container (min-width:720px){.om__grid{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:clamp(28px,4vw,56px);align-items:start}}
-.om__card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:clamp(12px,2.4cqi,28px);display:grid;gap:8px}
+.om__card{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:clamp(12px,2.4cqi,28px);display:grid;gap:8px}
 @container (max-width:519px){.om__card{grid-template-columns:.8fr 1fr;align-items:center;padding:10px 12px}}
-.om .csimg{position:relative;margin:0;width:100%;aspect-ratio:16/10;border-radius:10px;overflow:hidden;background:var(--ink)}
+.om .csimg{position:relative;margin:0;width:100%;aspect-ratio:16/10;border-radius:12px;overflow:hidden;background:var(--ink)}
 .om .csimg img,.om .csimg__fx{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
-.om .csimg__fx ellipse{fill:var(--puls);opacity:0;filter:blur(40px);transition:opacity .7s var(--ease)}
-.om .fx-path{fill:none;stroke:var(--puls);stroke-width:9;stroke-linecap:round;stroke-linejoin:round;opacity:0;filter:drop-shadow(0 0 10px var(--puls));transition:opacity .6s}
-.om .fx-dot{opacity:0;transition:opacity .4s}
-.om .fx-dot circle:first-child{fill:var(--puls);opacity:.25;transform-box:fill-box;transform-origin:center;animation:om-ping 1.6s var(--ease) infinite}
+.om .csimg__fx ellipse{fill:var(--puls);stroke:var(--puls);fill-opacity:.1;stroke-width:3;stroke-opacity:.7;stroke-dasharray:2 12;stroke-linecap:round;opacity:0;transition:opacity .45s var(--ease)}
+.om .fx-path{fill:none;stroke:var(--puls);stroke-width:9;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity .45s var(--ease)}
+.om .fx-dot{opacity:0;transition:opacity .4s var(--ease)}
+.om .fx-dot circle:first-child{fill:none;stroke:var(--puls);stroke-width:4}
 .om .fx-dot circle:last-child{fill:var(--puls)}
-@keyframes om-ping{from{transform:scale(.6);opacity:.5}to{transform:scale(1.8);opacity:0}}
-.om[data-step=p] .fx-atria{opacity:.14}
+.om[data-step=p] .fx-atria{opacity:1}
 .om[data-step=p] .fx-sa,.om[data-step=p] .fx-d-sa{opacity:1}
 .om[data-step=pr] .fx-d-av{opacity:1}
 .om[data-step=pr] .fx-sa{opacity:.35}
 .om[data-step=qrs] .fx-his,.om[data-step=qrs] .fx-d-his,.om[data-step=qrs] .fx-d-pk{opacity:1}
-.om[data-step=qrs] .fx-vent{opacity:.12}
-.om[data-step=st] .fx-vent{opacity:.2}
+.om[data-step=qrs] .fx-vent{opacity:1}
+.om[data-step=st] .fx-vent{opacity:1}
 .om[data-step=st] .fx-his{opacity:.3}
-.om[data-step=t] .fx-vent{opacity:.08}
+.om[data-step=t] .fx-vent{opacity:.5}
 .om[data-step=t] .fx-his{opacity:.15}
 .om .complex{width:100%;height:auto;max-height:240px;display:block}
 .om .complex__grid line{stroke:var(--line);stroke-width:1}
@@ -130,7 +129,6 @@ const STYLES = `
 .om__title{margin:0}
 .om__clinic{padding-top:14px;border-top:1px solid var(--line);font-size:15px!important}
 .om__clinic .label{display:block;margin-bottom:6px}
-@media(prefers-reduced-motion:reduce){.om .fx-dot circle:first-child{animation:none}}
 `;
 
 export default function OrchestraMethod({

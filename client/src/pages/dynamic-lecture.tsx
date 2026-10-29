@@ -169,7 +169,7 @@ export default function DynamicLecture() {
     <div className="wrap wrap--narrow pt-6 pb-24 sm:pt-10">
       <Link
         href={`/modules#m-${module.id}`}
-        className="inline-flex items-center gap-2 min-h-[44px] -ml-1 px-1 text-[15px] text-[var(--txt2)] no-underline transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.97]"
+        className="inline-flex items-center gap-2 min-h-[44px] -ml-1 px-1 text-sub text-[var(--txt2)] no-underline transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.97]"
         data-testid="button-back"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />

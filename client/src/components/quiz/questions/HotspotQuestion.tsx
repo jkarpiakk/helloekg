@@ -62,6 +62,8 @@ export default function HotspotQuestion({
   // Znacznik pokazany od razu przy naciśnięciu; zatwierdzany przy puszczeniu bez przesunięcia
   const [pending, setPending] = useState<{ x: number; y: number } | null>(null);
   const press = useRef<{ pid: number; sx: number; sy: number; x: number; y: number } | null>(null);
+  // Celownik z klawiatury (strzałki przesuwają, Enter wskazuje); widoczny tylko przy fokusie z klawiatury
+  const [aim, setAim] = useState<{ x: number; y: number } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
   const toPercent = (clientX: number, clientY: number) => {
@@ -141,6 +143,40 @@ export default function HotspotQuestion({
     setPending(null);
   };
 
+  const clamp = (v: number) => Math.min(100, Math.max(0, v));
+
+  const onFocus = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (disabled || e.target !== e.currentTarget || !e.currentTarget.matches(":focus-visible")) return;
+    const last = clickCoordinates[clickCoordinates.length - 1];
+    setAim(last ? { ...last } : { x: 50, y: 50 });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const step = e.shiftKey ? 10 : 2;
+    const move: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    };
+    if (move[e.key]) {
+      e.preventDefault();
+      const [dx, dy] = move[e.key];
+      setAim((a) => {
+        const from = a ?? { x: 50, y: 50 };
+        return { x: clamp(from.x + dx), y: clamp(from.y + dy) };
+      });
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (aim) commitPoint(aim.x, aim.y);
+      else setAim({ x: 50, y: 50 });
+    } else if ((e.key === "Backspace" || e.key === "Delete") && clickCoordinates.length > 0) {
+      e.preventDefault();
+      handleClear();
+    }
+  };
+
   const handleClear = () => {
     setClickedHotspots(new Set());
     setClickCoordinates([]);
@@ -209,7 +245,7 @@ export default function HotspotQuestion({
 
       <div
         className={cn(
-          "relative select-none overflow-hidden rounded-[12px] border bg-[var(--panel)] transition-[border-color] duration-200",
+          "relative select-none overflow-hidden rounded-[12px] border bg-[var(--panel)] transition-[border-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ink)]",
           disabled ? "border-[var(--line)]" : "cursor-crosshair border-[var(--line2)] hover:border-[var(--txt3)]",
         )}
         onPointerDown={onPointerDown}
@@ -217,12 +253,23 @@ export default function HotspotQuestion({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
         onPointerLeave={onPointerCancel}
+        tabIndex={disabled ? -1 : 0}
+        role={disabled ? undefined : "application"}
+        aria-roledescription={disabled ? undefined : "zapis do wskazania"}
+        aria-label={
+          disabled
+            ? undefined
+            : "Zapis EKG. Strzałki przesuwają celownik, z klawiszem Shift szybciej. Enter wskazuje miejsce, Backspace czyści wskazania."
+        }
+        onFocus={onFocus}
+        onBlur={() => setAim(null)}
+        onKeyDown={onKeyDown}
         data-testid="hotspot-container"
       >
         <img
           ref={imageRef}
           src={config.imageUrl}
-          alt="Zapis EKG — wskaż właściwe miejsce"
+          alt="Zapis EKG do wskazania właściwego miejsca"
           draggable={false}
           className="block h-auto w-full"
           data-testid="hotspot-image"
@@ -259,6 +306,16 @@ export default function HotspotQuestion({
             </span>
           );
         })}
+        {aim && (
+          <span
+            className="pointer-events-none absolute h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-[var(--txt)]"
+            style={{ left: `${aim.x}%`, top: `${aim.y}%` }}
+            aria-hidden
+            data-testid="hotspot-aim"
+          >
+            <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--txt)]" />
+          </span>
+        )}
         {pending && (
           <span
             className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[var(--txt)] bg-[color-mix(in_srgb,var(--ink)_60%,transparent)]"
@@ -303,7 +360,9 @@ export default function HotspotQuestion({
       <div className="flex min-h-[44px] items-center justify-between gap-3" data-testid="hotspot-status">
         <p className="text-[.875rem] text-[var(--txt2)]" aria-live="polite">
           {clickCoordinates.length === 0
-            ? "Nic jeszcze nie wskazano."
+            ? aim
+              ? "Strzałki przesuwają celownik, Enter wskazuje miejsce."
+              : "Nic jeszcze nie wskazano."
             : clickedHotspots.size > 0
               ? `Wskazano obszar${config.allowMultiple ? ` (${clickedHotspots.size})` : ""}.`
               : "Wskazano miejsce poza obszarami."}

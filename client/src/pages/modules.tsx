@@ -6,7 +6,7 @@ import { Check, ChevronRight, Lock } from "lucide-react";
 import { courseItems, nextStep, type OrderModule } from "@/lib/courseOrder";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Button } from "@/components/ui/button";
-import { ProgressLine } from "@/components/dashboard/ProgressCard";
+import { ProgressLine } from "@/components/ui/progress-line";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
@@ -191,7 +191,7 @@ export default function Modules() {
                   <span className="label label--g num">{pad(mi + 1)}</span>
                   <span className="row__t">
                     <b>{cleanTitle(module.title)}</b>
-                    <span className="label !text-[11px] sm:hidden mt-1">{meta}</span>
+                    <span className="label !text-meta sm:hidden mt-1">{meta}</span>
                   </span>
                   <span className="label hidden sm:inline-flex items-center gap-2">
                     {module.isLocked && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -204,7 +204,7 @@ export default function Modules() {
 
                 <div className="pb-8 grid gap-8 sm:gap-10 sm:pl-[60px]">
                   {module.description && (
-                    <p className="text-[16px] sm:text-[17px] leading-[1.7] text-[var(--txt2)] max-w-[42em]">
+                    <p className="text-body sm:text-read leading-[1.7] text-[var(--txt2)] max-w-[42em]">
                       {module.description}
                     </p>
                   )}
@@ -271,20 +271,20 @@ function SectionRow({ index, section, tourFirst, isNext }: { index: number; sect
       </span>
       <span className="row__t gap-2">
         {isEmpty ? (
-          <b className="!text-[1.0625rem] sm:!text-[1.1875rem] !leading-snug text-[var(--txt2)]">{section.title}</b>
+          <b className="!text-read sm:!text-item !leading-snug text-[var(--txt2)]">{section.title}</b>
         ) : (
           <Link
             href={primaryHref}
             className="text-[var(--txt)] no-underline after:absolute after:inset-0 after:content-[''] rounded-sm"
             data-testid={`section-link-${section.id}`}
           >
-            <b className="!text-[1.0625rem] sm:!text-[1.1875rem] !leading-snug">{section.title}</b>
+            <b className="!text-read sm:!text-item !leading-snug">{section.title}</b>
           </Link>
         )}
-        <span className="!text-[14px] flex flex-wrap items-center gap-x-2">
+        <span className="!text-ui flex flex-wrap items-center gap-x-2">
           {isNext && (
             <>
-              <span className="label label--g !text-[.75rem]" data-testid="section-next">Następny krok</span>
+              <span className="label label--g !text-meta" data-testid="section-next">Następny krok</span>
               <span aria-hidden="true">·</span>
             </>
           )}

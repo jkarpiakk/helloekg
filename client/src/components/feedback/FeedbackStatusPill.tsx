@@ -21,7 +21,7 @@ export default function FeedbackStatusPill({ status, className = "" }: { status:
   const Icon = ICON[s];
   return (
     <span
-      className={`inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 font-mono text-[.75rem] uppercase tracking-[.12em] ${STYLE[s]} ${className}`}
+      className={`inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 font-mono text-meta uppercase tracking-[.12em] ${STYLE[s]} ${className}`}
       data-testid={`feedback-status-${s}`}
     >
       <Icon className="h-3 w-3" aria-hidden />

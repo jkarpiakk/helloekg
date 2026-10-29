@@ -273,7 +273,7 @@ export default function PlacementBoard({
               if (e.target === e.currentTarget) onPoolTap();
             }}
             className={cn(
-              "grid min-h-[68px] content-start gap-2 rounded-[12px] border border-dashed p-2 transition-colors duration-200",
+              "grid min-h-[68px] content-start gap-2 rounded-lg border border-dashed p-2 transition-colors duration-200",
               hover === POOL || (selection?.kind === "piece" && placedIn(selection.id))
                 ? "border-[var(--txt3)] bg-[var(--tint)]"
                 : "border-[var(--line2)]",
@@ -281,7 +281,7 @@ export default function PlacementBoard({
           >
             {poolPieces.map((p) => renderPiece(p))}
             {poolPieces.length === 0 && (
-              <p className="px-3 py-4 text-[.875rem] text-[var(--txt2)]" onClick={onPoolTap}>
+              <p className="px-3 py-4 text-ui text-[var(--txt2)]" onClick={onPoolTap}>
                 {showResult ? "Wszystkie elementy rozmieszczone." : "Wszystko rozmieszczone. Przeciągnij tu element, aby go odłożyć."}
               </p>
             )}
@@ -300,23 +300,23 @@ export default function PlacementBoard({
               const awaiting = !disabled && (selection?.kind === "piece" || draggingId) && !occupant;
               return (
                 <li key={slot.id} className="grid gap-2">
-                  <div className="flex items-center gap-3 text-[.9375rem] leading-snug text-[var(--txt)]">
+                  <div className="flex items-center gap-3 text-sub leading-snug text-[var(--txt)]">
                     {slot.imageUrl && (
                       <img
                         src={slot.imageUrl}
                         alt=""
-                        className="h-10 w-10 shrink-0 rounded-[8px] border border-[var(--line)] object-cover"
+                        className="h-10 w-10 shrink-0 rounded-sm border border-[var(--line)] object-cover"
                       />
                     )}
                     <span className="min-w-0 flex-1">{slot.label}</span>
                     {slot.result === "right" && (
-                      <span className="inline-flex items-center gap-1 text-[.8125rem] text-[var(--puls)]">
+                      <span className="inline-flex items-center gap-1 text-note text-[var(--puls)]">
                         <Check className="h-4 w-4" aria-hidden />
                         <span>Dobrze</span>
                       </span>
                     )}
                     {slot.result === "wrong" && (
-                      <span className="inline-flex items-center gap-1 text-[.8125rem] text-[var(--alarm)]">
+                      <span className="inline-flex items-center gap-1 text-note text-[var(--alarm)]">
                         <X className="h-4 w-4" aria-hidden />
                         <span>Błąd</span>
                       </span>
@@ -326,7 +326,7 @@ export default function PlacementBoard({
                     data-slot-id={slot.id}
                     data-testid={slotTestId?.(slot.id)}
                     className={cn(
-                      "relative flex min-h-[60px] items-stretch gap-2 rounded-[12px] border p-1.5 transition-[border-color,background-color] duration-200",
+                      "relative flex min-h-[60px] items-stretch gap-2 rounded-lg border p-1.5 transition-[border-color,background-color] duration-200",
                       slot.result === "right" && "border-[var(--puls-deep)] bg-[var(--tint)]",
                       slot.result === "wrong" && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)]",
                       !slot.result && (isHover || isSelected)
@@ -345,7 +345,7 @@ export default function PlacementBoard({
                               move(occupant.id, POOL);
                               setSelection(null);
                             }}
-                            className="grid w-11 shrink-0 place-items-center rounded-[8px] text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.94]"
+                            className="grid w-11 shrink-0 place-items-center rounded-sm text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.94]"
                             aria-label={`Odłóż „${occupant.content}” z powrotem`}
                             data-testid={`remove-btn-${slot.id}`}
                           >
@@ -360,14 +360,14 @@ export default function PlacementBoard({
                         onClick={() => onSlotTap(slot.id)}
                         aria-pressed={isSelected}
                         aria-label={`Miejsce: ${slot.label}. ${selectedPiece ? `Wstaw „${selectedPiece.content}”.` : "Puste."}`}
-                        className="flex flex-1 items-center justify-center rounded-[8px] px-3 text-[.875rem] text-[var(--txt2)] transition-colors duration-200 hover:text-[var(--txt)] disabled:cursor-default"
+                        className="flex flex-1 items-center justify-center rounded-sm px-3 text-ui text-[var(--txt2)] transition-colors duration-200 hover:text-[var(--txt)] disabled:cursor-default"
                       >
                         {showResult ? "Puste" : selectedPiece ? "Wstaw tutaj" : "Upuść tutaj"}
                       </button>
                     )}
                   </div>
                   {slot.result === "wrong" && slot.correctText && (
-                    <p className="text-[.875rem] text-[var(--txt2)]">
+                    <p className="text-ui text-[var(--txt2)]">
                       <span className="label mr-2">Poprawnie</span>
                       {slot.correctText}
                     </p>
@@ -380,7 +380,7 @@ export default function PlacementBoard({
       </div>
 
       {!disabled && (
-        <p className="min-h-[1.5em] text-[.875rem] text-[var(--txt2)]" aria-live="polite">
+        <p className="min-h-[1.5em] text-ui text-[var(--txt2)]" aria-live="polite">
           {selectedPiece
             ? `Wybrano „${selectedPiece.content}”. Wskaż miejsce${placedIn(selectedPiece.id) ? " albo dotknij pulę, aby odłożyć" : ""}.`
             : selectedSlot
@@ -641,7 +641,7 @@ function Piece({
       aria-disabled={disabled || undefined}
       data-testid={testId}
       className={cn(
-        "relative flex min-h-[48px] w-full select-none items-center gap-3 rounded-[10px] border bg-[var(--panel)] px-3.5 py-2.5 text-left text-[.9375rem] leading-snug text-[var(--txt)] transition-[border-color,background-color,color] duration-200",
+        "relative flex min-h-[48px] w-full select-none items-center gap-3 rounded-lg border bg-[var(--panel)] px-3.5 py-2.5 text-left text-sub leading-snug text-[var(--txt)] transition-[border-color,background-color,color] duration-200",
         disabled ? "cursor-default" : "cursor-grab touch-pan-y touch-pinch-zoom [-webkit-touch-callout:none] active:cursor-grabbing",
         state === "right" && "border-[var(--puls-deep)] bg-[var(--tint)]",
         state === "wrong" && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)] text-[var(--txt2)]",
@@ -663,7 +663,7 @@ function Piece({
           src={piece.imageUrl}
           alt=""
           draggable={false}
-          className="h-10 w-10 shrink-0 rounded-[8px] border border-[var(--line)] object-cover"
+          className="h-10 w-10 shrink-0 rounded-sm border border-[var(--line)] object-cover"
         />
       )}
       <span className="min-w-0 flex-1">{piece.content}</span>

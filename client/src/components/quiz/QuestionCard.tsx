@@ -52,12 +52,12 @@ function QuestionImage({ url, onOpen }: { url: string; onOpen: (url: string, ori
     <button
       type="button"
       onClick={(e) => onOpen(url, e.currentTarget)}
-      className="group relative mb-6 block w-full overflow-hidden rounded-[12px] border border-[var(--line)] bg-[var(--ink)] transition-[transform,border-color] duration-200 ease-out hover:border-[var(--line2)] active:scale-[.99]"
+      className="group relative mb-6 block w-full overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--ink)] transition-[transform,border-color] duration-200 ease-out hover:border-[var(--line2)] active:scale-[.99]"
       aria-label="Powiększ zapis EKG"
       data-testid="question-image"
     >
       <img src={url} alt="Zapis EKG" className="block max-h-[60vh] w-full object-contain" />
-      <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-[12px] text-[var(--txt2)] transition-colors duration-200 group-hover:text-[var(--txt)]">
+      <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-meta text-[var(--txt2)] transition-colors duration-200 group-hover:text-[var(--txt)]">
         <Maximize2 className="h-3.5 w-3.5" aria-hidden />
         Powiększ
       </span>
@@ -95,7 +95,7 @@ export default function QuestionCard({
 
   return (
     <article
-      className="rounded-[20px] border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)]"
+      className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)]"
       aria-labelledby="question-title"
     >
       {caseConfig && (
@@ -143,7 +143,7 @@ export default function QuestionCard({
 
       {/* Wybór odpowiedzi — wiersze `.opt` jak w quizie na landingu */}
       {!isInteractiveType && answerHint && !answered && (
-        <p className="mb-3 text-[14px] text-[var(--txt2)]" data-testid="answer-hint">
+        <p className="mb-3 text-ui text-[var(--txt2)]" data-testid="answer-hint">
           {answerHint}
         </p>
       )}
@@ -219,11 +219,11 @@ export default function QuestionCard({
           role="alert"
           data-testid="answer-save-error"
         >
-          <p className="flex items-start gap-2.5 text-[17px] font-medium leading-snug text-[var(--txt)]">
+          <p className="flex items-start gap-2.5 text-read font-medium leading-snug text-[var(--txt)]">
             <X className="mt-0.5 h-5 w-5 shrink-0 text-[var(--alarm)]" strokeWidth={2.25} aria-hidden />
             Nie zapisano odpowiedzi
           </p>
-          <p className="text-[15px] text-[var(--txt2)]">
+          <p className="text-sub text-[var(--txt2)]">
             Sprawdź połączenie i wyślij jeszcze raz{isInteractiveType ? "" : ". Możesz też zmienić wybór"}.
           </p>
         </section>
@@ -239,7 +239,7 @@ export default function QuestionCard({
           aria-live="polite"
           data-testid="explanation-panel"
         >
-          <p className="flex items-start gap-2.5 text-[17px] font-medium leading-snug text-[var(--txt)]" data-testid="result-title">
+          <p className="flex items-start gap-2.5 text-read font-medium leading-snug text-[var(--txt)]" data-testid="result-title">
             {quizResult!.isCorrect ? (
               <Check className="mt-0.5 h-5 w-5 shrink-0 text-[var(--puls)]" strokeWidth={2.25} aria-hidden />
             ) : (
@@ -255,7 +255,7 @@ export default function QuestionCard({
           </p>
 
           {correctAnswer && !quizResult!.isCorrect && (
-            <p className="text-[15px] text-[var(--txt)]">
+            <p className="text-sub text-[var(--txt)]">
               <span className="label mr-2">Poprawna odpowiedź</span>
               {letter(correctPosition)}. {correctAnswer.text}
             </p>
@@ -264,7 +264,7 @@ export default function QuestionCard({
           {quizResult!.explanation && (
             <>
               <p className="label mt-1">{caseConfig ? "Podsumowanie przypadku" : "Wyjaśnienie"}</p>
-              <Wyjasnienie md={quizResult!.explanation} className="prose-hk max-w-[46em] text-[16px]" testId="explanation-content" />
+              <Wyjasnienie md={quizResult!.explanation} className="prose-hk max-w-[46em] text-body" testId="explanation-content" />
             </>
           )}
 

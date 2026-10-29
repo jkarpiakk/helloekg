@@ -41,12 +41,12 @@ export function EkgCanvas({
 
   return (
     <figure
-      className={`relative overflow-hidden rounded-[12px] border border-[var(--line)] ${className}`}
+      className={`relative overflow-hidden rounded-lg border border-[var(--line)] ${className}`}
       style={{ background: "#070a0e" }}
     >
       <canvas ref={ref} height={height} role="img" aria-label={`Żywy zapis EKG: ${EKG_RHYTHM_LABELS[rhythm]}`} />
       {label && (
-        <figcaption className="label pointer-events-none absolute left-3 top-2.5 text-[10px]">
+        <figcaption className="label pointer-events-none absolute left-3 top-2.5">
           {EKG_RHYTHM_LABELS[rhythm]}
         </figcaption>
       )}

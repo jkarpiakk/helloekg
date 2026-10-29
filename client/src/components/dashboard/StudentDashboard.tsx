@@ -8,7 +8,8 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
-import ProgressCard, { ProgressLine } from "./ProgressCard";
+import ProgressCard from "./ProgressCard";
+import { ProgressLine } from "@/components/ui/progress-line";
 import ExamCountDialog from "./ExamCountDialog";
 import CertificateCard from "./CertificateCard";
 import { pytania } from "@/lib/i18n";
@@ -236,12 +237,12 @@ export default function StudentDashboard() {
                 </p>
                 <div className="grid gap-1">
                   <h2 id="continue-title" className="h3">{target.section.title}</h2>
-                  <p className="muted text-[15px]">{cleanTitle(target.module.title)}</p>
+                  <p className="muted text-sub">{cleanTitle(target.module.title)}</p>
                 </div>
                 {targetHasQuestions && (
                   <div className="grid gap-2 max-w-[420px]">
                     <ProgressLine value={target.section.completionPercentage} label="Opanowane w tym temacie" />
-                    <p className="text-[14px] text-[var(--txt2)]">
+                    <p className="text-ui text-[var(--txt2)]">
                       <span className="num">{Math.round(target.section.completionPercentage || 0)}%</span> opanowane ·{" "}
                       {pytania(target.section.questionCount ?? 0)}
                     </p>
@@ -322,12 +323,12 @@ export default function StudentDashboard() {
                         >
                           <span className="row__n">{pad(mi + 1)}</span>
                           <span className="row__t gap-2">
-                            <b className="!text-[1.0625rem] sm:!text-[1.25rem] !leading-snug">{cleanTitle(module.title)}</b>
+                            <b className="!text-read sm:!text-heading !leading-snug">{cleanTitle(module.title)}</b>
                             {progress !== null && (
                               <ProgressLine value={pct} label={`Postęp: ${cleanTitle(module.title)}`} className="max-w-[320px]" />
                             )}
                           </span>
-                          <span className="num text-[15px] text-[var(--txt2)] hidden sm:block">{progress !== null ? `${pct}%` : ""}</span>
+                          <span className="num text-sub text-[var(--txt2)] hidden sm:block">{progress !== null ? `${pct}%` : ""}</span>
                           <ChevronRight
                             className="h-4 w-4 text-[var(--txt3)] transition-colors group-hover:text-[var(--txt)]"
                             aria-hidden="true"
@@ -362,7 +363,7 @@ export default function StudentDashboard() {
                     <li key={area.sectionId ?? area.tag} className="border-b border-[var(--line)]">
                       <Link
                         href={area.sectionId ? `/quiz?sectionId=${area.sectionId}` : "/quiz?mode=review"}
-                        className="flex min-h-11 items-center justify-between gap-4 py-3 text-[15px] no-underline transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.99]"
+                        className="flex min-h-11 items-center justify-between gap-4 py-3 text-sub no-underline transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.99]"
                       >
                         <span className="min-w-0 truncate text-[var(--txt)]">{area.tag}</span>
                         <span className="num text-[var(--txt2)] shrink-0">{Math.round(area.successRate * 100)}% poprawnych</span>
@@ -370,7 +371,7 @@ export default function StudentDashboard() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/quiz?mode=review" className="inline-flex min-h-11 items-center mt-2 text-[14px] text-[var(--puls)]">
+                <Link href="/quiz?mode=review" className="inline-flex min-h-11 items-center mt-2 text-ui text-[var(--puls)]">
                   Otwórz powtórkę
                 </Link>
               </motion.section>
@@ -387,8 +388,8 @@ export default function StudentDashboard() {
 function Stat({ label, value, testId }: { label: string; value: string; testId: string }) {
   return (
     <div className="grid gap-1 py-4 pr-3">
-      <dt className="text-[13px] text-[var(--txt2)]">{label}</dt>
-      <dd className="num text-[1.5rem] leading-none text-[var(--txt)]" data-testid={testId}>
+      <dt className="text-note text-[var(--txt2)]">{label}</dt>
+      <dd className="num text-figure leading-none text-[var(--txt)]" data-testid={testId}>
         {value}
       </dd>
     </div>

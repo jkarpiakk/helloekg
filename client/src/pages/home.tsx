@@ -118,7 +118,7 @@ export default function Home() {
           className="max-w-[42em] border-l-2 border-[var(--puls-deep)] pl-5"
         >
           <p className="label mb-3">Dla testerów</p>
-          <p className="text-[1.0625rem] leading-relaxed text-[var(--txt2)]">
+          <p className="text-read leading-relaxed text-[var(--txt2)]">
             To wersja beta. Kurs działa, ale wciąż go dopracowujemy. Jeśli coś jest niejasne albo nie działa,
             daj znać przyciskiem „Zgłoś błąd” przy pytaniu lub napisz na{" "}
             <a

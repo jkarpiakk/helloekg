@@ -61,7 +61,7 @@ export default function Logo({ className = "", markSize = 26, showWordmark = tru
         )}
       </svg>
       {showWordmark && (
-        <span className="font-heading text-[1.125rem] font-medium leading-none tracking-[-0.015em] whitespace-nowrap">
+        <span className="font-heading text-item font-medium leading-none tracking-[-0.015em] whitespace-nowrap">
           hello<b className="font-semibold">EKG</b>
         </span>
       )}

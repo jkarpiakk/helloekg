@@ -64,7 +64,7 @@ export default function MatchingQuestion({
         disabled={disabled}
         showResult={showResult}
         poolLabel="Kolumna B"
-        slotsLabel="Kolumna A — dopasuj"
+        slotsLabel="Kolumna A: dopasuj"
         pieceTestId={(id) => `right-item-${id}`}
         slotTestId={(id) => `left-item-${id}`}
         poolTestId="matching-right"

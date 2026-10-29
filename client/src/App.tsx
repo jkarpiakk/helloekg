@@ -9,7 +9,7 @@ import { authService } from "./lib/auth";
 import { LoadingSpinner } from "./components/ui/loading-spinner";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { MotionConfig, useReducedMotion } from "framer-motion";
+import { MotionConfig } from "framer-motion";
 import { spring } from "@/lib/motion";
 
 // Pages
@@ -35,15 +35,10 @@ import Footer from "@/components/layout/Footer";
 import FeedbackFab from "@/components/feedback/FeedbackFab";
 import Tour from "@/components/onboarding/Tour";
 
-// Loader zgodny z marką: sygnet H z szybszym impulsem jako fallback Suspense
-const LOADER_H_PATH =
-  "M4,50 L18,50 L26,14 L34,86 L40,50 L60,50 L66,14 L74,86 L80,50 L96,50";
-
 const LOADER_DELAY_MS = 300;
 
-/** Pokazuje się dopiero po 300 ms — szybkie wczytanie trasy nie miga loaderem */
+/** Fallback Suspense: ten sam sygnet co przy ładowaniu danych, ale dopiero po 300 ms — szybkie wczytanie trasy nie miga loaderem */
 function RouteLoader() {
-  const reduce = useReducedMotion();
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), LOADER_DELAY_MS);
@@ -54,28 +49,8 @@ function RouteLoader() {
   if (!visible) return <div className="min-h-[50vh]" aria-hidden="true" />;
 
   return (
-    <div className="min-h-[50vh] flex items-center justify-center" role="status" aria-label="Ładowanie">
-      <svg width={56} height={56} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path
-          d={LOADER_H_PATH}
-          style={{ stroke: reduce ? "var(--puls)" : "var(--puls-dark)" }}
-          strokeWidth={7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {/* „Ogranicz ruch”: bez biegnącego impulsu — sam nieruchomy sygnet */}
-        {!reduce && (
-          <path
-            d={LOADER_H_PATH}
-            style={{ stroke: "var(--puls)", animationDuration: "1.4s" }}
-            strokeWidth={7}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray="90 450"
-            className="logo-pulse-path"
-          />
-        )}
-      </svg>
+    <div className="min-h-[50vh] flex items-center justify-center">
+      <LoadingSpinner size="lg" />
     </div>
   );
 }

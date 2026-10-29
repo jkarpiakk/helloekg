@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="w-8 h-8 text-destructive" />
             </div>
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="text-2xl font-medium text-foreground">
                 Coś poszło nie tak
               </h1>
               <p className="text-muted-foreground">

@@ -282,14 +282,14 @@ export default function FeedbackPage() {
                   rows={5}
                   maxLength={5000}
                   placeholder="Np. w wykładzie o bloku przedsionkowo-komorowym II stopnia opis Mobitza I i II jest zamieniony."
-                  className="min-h-[140px] text-[1rem] leading-[1.6]"
+                  className="min-h-[140px] text-body leading-[1.6]"
                   aria-invalid={descError ? true : undefined}
                   aria-describedby="feedback-description-hint"
                   data-testid="feedback-description"
                 />
                 <p
                   id="feedback-description-hint"
-                  className={`text-[.875rem] ${descError ? "text-[var(--alarm)]" : "text-[var(--txt2)]"}`}
+                  className={`text-ui ${descError ? "text-[var(--alarm)]" : "text-[var(--txt2)]"}`}
                   role={descError ? "alert" : undefined}
                 >
                   {descError || "Napisz, co widzisz i czego oczekiwano. Co najmniej 10 znaków."}
@@ -337,8 +337,8 @@ export default function FeedbackPage() {
                           />
                         </span>
                         <span className="grid gap-0.5">
-                          <span className="text-[.9375rem] font-medium text-[var(--txt)]">{t.label}</span>
-                          <span className="text-[.875rem] text-[var(--txt2)]">{t.description}</span>
+                          <span className="text-sub font-medium text-[var(--txt)]">{t.label}</span>
+                          <span className="text-ui text-[var(--txt2)]">{t.description}</span>
                         </span>
                         <span className="opt__mark" aria-hidden>
                           {on && <Check className="h-4 w-4 text-[var(--puls)]" />}
@@ -375,8 +375,8 @@ export default function FeedbackPage() {
                     <ImagePlus className="h-5 w-5" aria-hidden />
                   </span>
                   <span className="grid gap-0.5">
-                    <span className="text-[.9375rem] font-medium text-[var(--txt)]">Przeciągnij, wklej albo wybierz plik</span>
-                    <span className="text-[.875rem] text-[var(--txt2)]">PNG, JPG lub WEBP · do 5 MB · najwyżej {FEEDBACK_MAX_FILES} pliki</span>
+                    <span className="text-sub font-medium text-[var(--txt)]">Przeciągnij, wklej albo wybierz plik</span>
+                    <span className="text-ui text-[var(--txt2)]">PNG, JPG lub WEBP · do 5 MB · najwyżej {FEEDBACK_MAX_FILES} pliki</span>
                   </span>
                   <input
                     ref={fileInput}
@@ -394,7 +394,7 @@ export default function FeedbackPage() {
 
 
                 {fileError && (
-                  <p className="text-[.875rem] text-[var(--alarm)]" role="alert">
+                  <p className="text-ui text-[var(--alarm)]" role="alert">
                     {fileError}
                   </p>
                 )}
@@ -412,7 +412,7 @@ export default function FeedbackPage() {
                           className="relative overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--panel)]"
                         >
                           <img src={f.url} alt={f.file.name} className="aspect-[4/3] w-full object-cover" />
-                          <span className="block truncate px-2.5 py-1.5 text-[.75rem] text-[var(--txt2)]">{f.file.name}</span>
+                          <span className="block truncate px-2.5 py-1.5 text-meta text-[var(--txt2)]">{f.file.name}</span>
                           <button
                             type="button"
                             onClick={() => removeFile(f.id)}
@@ -430,12 +430,12 @@ export default function FeedbackPage() {
 
               <motion.div variants={rise} className="grid gap-4 border-t border-[var(--line)] pt-6">
                 {submit.isError && (
-                  <p className="text-[.9375rem] text-[var(--alarm)]" role="alert" data-testid="feedback-error">
+                  <p className="text-sub text-[var(--alarm)]" role="alert" data-testid="feedback-error">
                     {(submit.error as Error).message}
                   </p>
                 )}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="max-w-[34em] text-[.8125rem] leading-[1.55] text-[var(--txt2)]">
+                  <p className="max-w-[34em] text-note leading-[1.55] text-[var(--txt2)]">
                     Dołączymy też adres strony{from ? <> (<span className="font-mono">{from.split("?")[0]}</span>)</> : null}, przeglądarkę i rozmiar ekranu. To pomaga odtworzyć problem.
                   </p>
                   <Button type="submit" disabled={submit.isPending} className="w-full sm:w-auto" data-testid="feedback-submit">
@@ -462,8 +462,8 @@ export default function FeedbackPage() {
                   <div className="grid grid-cols-[36px_minmax(0,1fr)_auto] items-start gap-3 sm:grid-cols-[48px_minmax(0,1fr)_auto] sm:gap-4">
                     <span className="row__n pt-1 num">{String(mine.reports.length - i).padStart(2, "0")}</span>
                     <div className="grid min-w-0 gap-1">
-                      <p className="line-clamp-2 text-[.9375rem] leading-[1.5] text-[var(--txt)]">{r.description}</p>
-                      <p className="text-[.8125rem] text-[var(--txt2)]">
+                      <p className="line-clamp-2 text-sub leading-[1.5] text-[var(--txt)]">{r.description}</p>
+                      <p className="text-note text-[var(--txt2)]">
                         {r.kind === "question" ? "Błąd w pytaniu" : feedbackTypeLabel(r.type)} · {feedbackAreaLabel(r.area)} · {fmtDate(r.createdAt)}
                         {r.attachmentCount > 0 && ` · ${r.attachmentCount} zrzut${r.attachmentCount === 1 ? "" : "y"}`}
                       </p>
@@ -471,7 +471,7 @@ export default function FeedbackPage() {
                     <FeedbackStatusPill status={r.status} />
                   </div>
                   {r.adminNote && (
-                    <p className="ml-[48px] border-l-2 border-[var(--puls-deep)] pl-3 text-[.875rem] leading-[1.55] text-[var(--txt2)] sm:ml-[64px]">
+                    <p className="ml-[48px] border-l-2 border-[var(--puls-deep)] pl-3 text-ui leading-[1.55] text-[var(--txt2)] sm:ml-[64px]">
                       <span className="label mr-2">Zespół</span>
                       {r.adminNote}
                     </p>

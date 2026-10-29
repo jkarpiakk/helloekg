@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Check, Flag, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ProgressLine } from "@/components/ui/progress-line";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -793,7 +794,6 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   }
 
   const done = currentQuestionIndex + (status === "result" || status === "saved" ? 1 : 0);
-  const progress = total > 0 ? Math.min(100, (done / total) * 100) : 0;
   const typeLabel = question
     ? TYPE_LABEL[(question.questionType || "multiple_choice") as keyof typeof TYPE_LABEL] ?? null
     : null;
@@ -817,16 +817,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
           </p>
         </div>
         <div className="wrap wrap--narrow pb-3">
-          <div
-            className="progress"
-            role="progressbar"
-            aria-label="Postęp sesji"
-            aria-valuemin={0}
-            aria-valuemax={total || undefined}
-            aria-valuenow={done}
-          >
-            <span style={{ "--w": progress / 100 } as React.CSSProperties} />
-          </div>
+          <ProgressLine value={done} max={total} label="Postęp sesji" />
         </div>
       </div>
 
@@ -853,7 +844,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
                 {/* Telefon: licznik wypełnionych miejsc nad przyciskami — w jednym wierszu się nie mieści */}
                 {filled && (
-                  <p className="mt-4 text-right text-[14px] text-[var(--txt2)] sm:hidden" aria-live="polite">
+                  <p className="mt-4 text-right text-ui text-[var(--txt2)] sm:hidden" aria-live="polite">
                     <FilledText {...filled} />
                   </p>
                 )}
@@ -893,7 +884,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                   ) : isInteractive ? (
                     <div className="flex items-center gap-3">
                       {filled && (
-                        <p className="hidden text-[14px] text-[var(--txt2)] sm:block" aria-live="polite" data-testid="filled-count">
+                        <p className="hidden text-ui text-[var(--txt2)] sm:block" aria-live="polite" data-testid="filled-count">
                           <FilledText {...filled} />
                         </p>
                       )}
@@ -968,13 +959,13 @@ function QuietLoader({ label }: { label: string }) {
 function QuestionSkeleton() {
   return (
     <div
-      className="grid gap-3 rounded-[20px] border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)]"
+      className="grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)]"
       role="status"
       aria-label="Ładuję pytanie"
     >
-      <div className="mb-3 h-7 w-3/4 rounded-[8px] bg-[var(--line)]" />
+      <div className="mb-3 h-7 w-3/4 rounded-sm bg-[var(--line)]" />
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="h-14 rounded-[10px] border border-[var(--line)]" />
+        <div key={i} className="h-14 rounded-lg border border-[var(--line)]" />
       ))}
     </div>
   );
@@ -998,7 +989,7 @@ function StateCard({
 }) {
   return (
     <div className="wrap wrap--narrow py-16">
-      <section className="grid gap-4 rounded-[20px] border border-[var(--line)] bg-[var(--panel)] p-[clamp(24px,4vw,48px)]" data-testid="quiz-state">
+      <section className="grid gap-4 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(24px,4vw,48px)]" data-testid="quiz-state">
         <p className="label">{label}</p>
         <h1 className="h2">{title}</h1>
         <p className="lead">{lead}</p>
@@ -1044,7 +1035,7 @@ function Summary({
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0, transition: spring }}
-        className="grid gap-5 rounded-[20px] border border-[var(--puls-dark)] bg-[var(--panel)] p-[clamp(24px,4vw,48px)]"
+        className="grid gap-5 rounded-2xl border border-[var(--puls-dark)] bg-[var(--panel)] p-[clamp(24px,4vw,48px)]"
         data-testid="quiz-summary"
       >
         <p className="label">Podsumowanie · {modeLabel}</p>
@@ -1112,10 +1103,10 @@ function ExamReview({ items, onImageClick }: { items: ExamReviewItem[]; onImageC
               <div className="flex items-start gap-3">
                 <span className="label num shrink-0 pt-1">{pad(i + 1)}</span>
                 <div className="grid min-w-0 gap-3">
-                  {item.title && <p className="text-[17px] font-medium leading-snug text-[var(--txt)]">{item.title}</p>}
+                  {item.title && <p className="text-read font-medium leading-snug text-[var(--txt)]">{item.title}</p>}
                   {item.bodyMd && (
                     <div
-                      className="prose-hk max-w-[46em] text-[16px] text-[var(--txt)]"
+                      className="prose-hk max-w-[46em] text-body text-[var(--txt)]"
                       dangerouslySetInnerHTML={sanitizeHtml(item.bodyMd)}
                     />
                   )}
@@ -1123,14 +1114,14 @@ function ExamReview({ items, onImageClick }: { items: ExamReviewItem[]; onImageC
                     <button
                       type="button"
                       onClick={(e) => onImageClick(item.imageUrl!, e.currentTarget)}
-                      className="block w-full max-w-[420px] overflow-hidden rounded-[10px] border border-[var(--line)] bg-[var(--ink)] active:scale-[.99]"
+                      className="block w-full max-w-[420px] overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--ink)] active:scale-[.99]"
                       aria-label="Powiększ zapis EKG"
                     >
                       <img src={item.imageUrl} alt="Zapis EKG" className="block max-h-[220px] w-full object-contain" />
                     </button>
                   )}
 
-                  <p className="flex items-center gap-2 text-[15px] text-[var(--txt)]">
+                  <p className="flex items-center gap-2 text-sub text-[var(--txt)]">
                     {item.isCorrect ? (
                       <Check className="h-4 w-4 shrink-0 text-[var(--puls)]" strokeWidth={2.25} aria-hidden />
                     ) : (
@@ -1144,7 +1135,7 @@ function ExamReview({ items, onImageClick }: { items: ExamReviewItem[]; onImageC
                   </p>
 
                   {isChoice && (
-                    <dl className="grid gap-1.5 text-[15px]">
+                    <dl className="grid gap-1.5 text-sub">
                       <div className="flex flex-wrap gap-x-2">
                         <dt className="label">Twoja odpowiedź</dt>
                         <dd className={item.isCorrect ? "text-[var(--txt)]" : "text-[var(--txt2)]"}>
@@ -1166,7 +1157,7 @@ function ExamReview({ items, onImageClick }: { items: ExamReviewItem[]; onImageC
                         Wyjaśnienie
                       </summary>
                       <div className="mt-2">
-                        <Wyjasnienie md={item.explanation} className="prose-hk max-w-[46em] text-[16px]" />
+                        <Wyjasnienie md={item.explanation} className="prose-hk max-w-[46em] text-body" />
                       </div>
                     </details>
                   )}

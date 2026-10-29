@@ -14,6 +14,7 @@ import { Check, ChevronRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { pytania } from "@/lib/i18n";
 import { rise, stagger } from "@/lib/motion";
+import { ProgressLine } from "@/components/ui/progress-line";
 import {
   STEPS_EVENT,
   firstLectureHref,
@@ -145,13 +146,13 @@ export default function FirstSteps() {
               Pierwsze kroki
             </h2>
             <div className="flex items-center gap-1">
-              <span className="num text-[15px] text-[var(--txt)]" aria-label={`Zrobione ${doneCount} z ${items.length}`}>
+              <span className="num text-sub text-[var(--txt)]" aria-label={`Zrobione ${doneCount} z ${items.length}`}>
                 {doneCount}/{items.length}
               </span>
               <button
                 type="button"
                 onClick={() => markStep(userId, "dismissed")}
-                className="ml-2 inline-flex h-11 items-center rounded-full px-3 text-[14px] text-[var(--txt2)] transition-[transform,color] duration-150 hover:text-[var(--txt)] active:scale-[.97]"
+                className="ml-2 inline-flex h-11 items-center rounded-full px-3 text-ui text-[var(--txt2)] transition-[transform,color] duration-150 hover:text-[var(--txt)] active:scale-[.97]"
                 aria-label="Ukryj pierwsze kroki"
                 data-testid="first-steps-hide"
               >
@@ -160,16 +161,7 @@ export default function FirstSteps() {
             </div>
           </header>
 
-          <div
-            className="progress mt-3"
-            role="progressbar"
-            aria-label="Pierwsze kroki"
-            aria-valuemin={0}
-            aria-valuemax={items.length}
-            aria-valuenow={doneCount}
-          >
-            <span style={{ "--w": doneCount / items.length } as React.CSSProperties} />
-          </div>
+          <ProgressLine value={doneCount} max={items.length} label="Pierwsze kroki" className="mt-3" />
 
           <motion.ul className="mt-4 border-t border-[var(--line)]" variants={stagger(0.04)}>
             {items.map((item) => (
@@ -192,13 +184,13 @@ export default function FirstSteps() {
                   </span>
                   <span className="grid min-w-0 gap-0.5">
                     <b
-                      className={`font-heading text-[16px] font-medium leading-snug tracking-[-0.01em] ${
+                      className={`font-heading text-body font-medium leading-snug tracking-[-0.01em] ${
                         item.done ? "text-[var(--txt2)] line-through decoration-[var(--txt3)]" : "text-[var(--txt)]"
                       }`}
                     >
                       {item.title}
                     </b>
-                    <span className="text-[14px] text-[var(--txt2)]">{item.desc}</span>
+                    <span className="text-ui text-[var(--txt2)]">{item.desc}</span>
                     <span className="sr-only">{item.done ? "Zrobione." : "Do zrobienia."}</span>
                   </span>
                   <span className="label num">{item.meta && !item.done ? item.meta : ""}</span>
@@ -211,7 +203,7 @@ export default function FirstSteps() {
           <button
             type="button"
             onClick={startTour}
-            className="mt-3 inline-flex min-h-[44px] items-center text-[14px] text-[var(--txt2)] underline decoration-[var(--line2)] underline-offset-4 transition-colors hover:text-[var(--txt)]"
+            className="mt-3 inline-flex min-h-[44px] items-center text-ui text-[var(--txt2)] underline decoration-[var(--line2)] underline-offset-4 transition-colors hover:text-[var(--txt)]"
             data-testid="first-steps-welcome"
           >
             Obejrzyj instrukcję jeszcze raz

@@ -366,7 +366,7 @@ export default function SortingQuestion({
               onPointerDown={onPointerDown(itemId)}
               data-testid={`sortable-item-${itemId}`}
               className={cn(
-                "relative grid select-none grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-3.5 rounded-[10px] border bg-[var(--panel)] py-2 pl-4 pr-1.5 text-[.9375rem] leading-snug transition-[border-color,background-color,color] duration-200",
+                "relative grid select-none grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-3.5 rounded-lg border bg-[var(--panel)] py-2 pl-4 pr-1.5 text-sub leading-snug transition-[border-color,background-color,color] duration-200",
                 disabled ? "cursor-default" : "cursor-grab touch-pan-y touch-pinch-zoom [-webkit-touch-callout:none] active:cursor-grabbing",
                 isCorrect && "border-[var(--puls-deep)] bg-[var(--tint)]",
                 isIncorrect && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)] text-[var(--txt2)]",
@@ -375,7 +375,7 @@ export default function SortingQuestion({
             >
               <span
                 className={cn(
-                  "grid h-[30px] w-[30px] place-items-center rounded-[8px] border font-mono text-[.75rem] font-medium",
+                  "grid h-[30px] w-[30px] place-items-center rounded-sm border font-mono text-meta font-medium",
                   isCorrect ? "border-[var(--puls-deep)] text-[var(--puls)]" : "border-[var(--line2)] text-[var(--txt2)]",
                 )}
               >
@@ -387,7 +387,7 @@ export default function SortingQuestion({
                     src={item.imageUrl}
                     alt=""
                     draggable={false}
-                    className="h-10 w-10 shrink-0 rounded-[8px] border border-[var(--line)] object-cover"
+                    className="h-10 w-10 shrink-0 rounded-sm border border-[var(--line)] object-cover"
                   />
                 )}
                 <span className="min-w-0">{text}</span>
@@ -403,7 +403,7 @@ export default function SortingQuestion({
                       onClick={() => nudge(index, -1)}
                       disabled={index === 0}
                       aria-label={`Przesuń „${text}” wyżej`}
-                      className="grid h-11 w-11 place-items-center rounded-[8px] text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
+                      className="grid h-11 w-11 place-items-center rounded-sm text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
                     >
                       <ChevronUp className="h-4 w-4" />
                     </button>
@@ -413,7 +413,7 @@ export default function SortingQuestion({
                       onClick={() => nudge(index, 1)}
                       disabled={index === items.length - 1}
                       aria-label={`Przesuń „${text}” niżej`}
-                      className="grid h-11 w-11 place-items-center rounded-[8px] text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
+                      className="grid h-11 w-11 place-items-center rounded-sm text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.92] disabled:opacity-30"
                     >
                       <ChevronDown className="h-4 w-4" />
                     </button>
@@ -421,7 +421,7 @@ export default function SortingQuestion({
                     <span
                       data-drag-handle
                       aria-hidden
-                      className="grid h-11 w-11 shrink-0 touch-none place-items-center rounded-[8px] text-[var(--label)]"
+                      className="grid h-11 w-11 shrink-0 touch-none place-items-center rounded-sm text-[var(--label)]"
                     >
                       <GripVertical className="h-4 w-4" />
                     </span>
@@ -434,7 +434,7 @@ export default function SortingQuestion({
       </ol>
 
       {!disabled && (
-        <p className="text-[.875rem] text-[var(--txt2)]">
+        <p className="text-ui text-[var(--txt2)]">
           Przeciągnij wiersz za uchwyt (albo przytrzymaj go chwilę) lub użyj strzałek, aby ułożyć elementy od pierwszego do ostatniego.
         </p>
       )}
@@ -455,8 +455,8 @@ export default function SortingQuestion({
             {result.correctAnswer.order.map((itemId: string, i: number) => {
               const item = getItemById(itemId);
               return (
-                <li key={itemId} className="grid grid-cols-[30px_minmax(0,1fr)] items-baseline gap-3.5 text-[.9375rem] text-[var(--txt)]">
-                  <span className="font-mono text-[.75rem] text-[var(--label)]">{String(i + 1).padStart(2, "0")}</span>
+                <li key={itemId} className="grid grid-cols-[30px_minmax(0,1fr)] items-baseline gap-3.5 text-sub text-[var(--txt)]">
+                  <span className="font-mono text-meta text-[var(--label)]">{String(i + 1).padStart(2, "0")}</span>
                   <span>{item ? getItemText(item) : itemId}</span>
                 </li>
               );

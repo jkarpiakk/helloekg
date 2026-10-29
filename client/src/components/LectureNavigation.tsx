@@ -323,7 +323,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
           <p className="label num shrink-0" aria-live="polite" data-testid="chapter-counter">
             {total > 1 ? `Rozdział ${safeIndex + 1}/${total}` : "Wykład"}
           </p>
-          <p className="min-w-0 flex-1 truncate text-[.875rem] text-[var(--txt2)]">{chapter.title}</p>
+          <p className="min-w-0 flex-1 truncate text-ui text-[var(--txt2)]">{chapter.title}</p>
           {total > 1 && (
             <div className="flex shrink-0 items-center">
               <Button
@@ -373,12 +373,12 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
                     type="button"
                     onClick={() => goTo(i)}
                     aria-current={current ? "step" : undefined}
-                    className={`w-full grid grid-cols-[36px_minmax(0,1fr)_20px] items-center gap-3 py-2.5 min-h-[44px] text-left text-[.9375rem] rounded-md transition-[transform,color] duration-150 active:scale-[.99] ${
+                    className={`w-full grid grid-cols-[36px_minmax(0,1fr)_20px] items-center gap-3 py-2.5 min-h-[44px] text-left text-sub rounded-md transition-[transform,color] duration-150 active:scale-[.99] ${
                       current ? "text-[var(--txt)]" : "text-[var(--txt2)] hover:text-[var(--txt)]"
                     }`}
                     data-testid={`chapter-nav-${i}`}
                   >
-                    <span className={`font-mono text-[.75rem] ${current ? "text-[var(--puls)]" : "text-[var(--label)]"}`}>
+                    <span className={`font-mono text-meta ${current ? "text-[var(--puls)]" : "text-[var(--label)]"}`}>
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="truncate">{c.title}</span>
@@ -402,7 +402,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15, ease: "easeIn" } }}
-            className="mt-6 flex items-center gap-2 border-b border-[var(--line)] pb-3 text-[.875rem] text-[var(--txt2)]"
+            className="mt-6 flex items-center gap-2 border-b border-[var(--line)] pb-3 text-ui text-[var(--txt2)]"
             role="status"
             data-testid="resume-note"
           >
@@ -538,7 +538,7 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
                 >
                   <span className="grid gap-1 min-w-0">
                     <span className="label">Następny temat{next.label ? ` · ${next.label}` : ""}</span>
-                    <span className="font-heading text-[1.125rem] leading-snug tracking-[-0.012em] text-[var(--txt)] truncate">
+                    <span className="font-heading text-item leading-snug tracking-[-0.012em] text-[var(--txt)] truncate">
                       {next.title}
                     </span>
                   </span>

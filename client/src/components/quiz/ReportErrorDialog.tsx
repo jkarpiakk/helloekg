@@ -79,7 +79,7 @@ export default function ReportErrorDialog({ questionId, open, onOpenChange }: Re
         <DialogHeader className="pr-10">
           <p className="label">Zgłoszenie</p>
           <DialogTitle className="h3">Co jest nie tak z tym pytaniem?</DialogTitle>
-          <DialogDescription className="text-[15px] text-[var(--txt2)]">
+          <DialogDescription className="text-sub text-[var(--txt2)]">
             Opisz błąd merytoryczny, literówkę albo niejasne sformułowanie. Twoje zgłoszenie trafi do autorów pytań.
           </DialogDescription>
         </DialogHeader>
@@ -102,12 +102,12 @@ export default function ReportErrorDialog({ questionId, open, onOpenChange }: Re
               data-testid="error-report-message"
             />
             {touched && empty ? (
-              <p id="error-report-hint" className="text-[14px] text-[var(--txt2)]">
+              <p id="error-report-hint" className="text-ui text-[var(--txt2)]">
                 Napisz choć jedno zdanie, żebyśmy wiedzieli, co poprawić.
               </p>
             ) : (
               !empty && (
-                <p className="text-[14px] text-[var(--txt2)]" data-testid="error-report-draft-note">
+                <p className="text-ui text-[var(--txt2)]" data-testid="error-report-draft-note">
                   Opis zostaje do wysłania. „Anuluj” go nie usuwa.
                 </p>
               )

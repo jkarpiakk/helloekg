@@ -224,7 +224,7 @@
   details[open] > summary .module-i { transform: rotate(45deg); border-color: var(--puls-deep); }
 
   /* Opcje odpowiedzi — identyczne z quizem demo na landingu */
-  .opt { width: 100%; display: grid; grid-template-columns: 30px minmax(0, 1fr) 20px; align-items: center; gap: 14px; min-height: 56px; padding: 14px 16px; text-align: left; background: transparent; border: 1px solid var(--line2); border-radius: 10px; font: 400 .9375rem/1.45 var(--font-sans); color: var(--txt); cursor: pointer; transition: transform .12s ease-out, border-color .25s, background-color .25s, color .25s; }
+  .opt { width: 100%; display: grid; grid-template-columns: 30px minmax(0, 1fr) 20px; align-items: center; gap: 14px; min-height: 56px; padding: 14px 16px; text-align: left; background: transparent; border: 1px solid var(--line2); border-radius: 12px; font: 400 .9375rem/1.45 var(--font-sans); color: var(--txt); cursor: pointer; transition: transform .12s ease-out, border-color .25s, background-color .25s, color .25s; }
   .opt:hover:not([disabled]) { border-color: var(--txt3); background: color-mix(in srgb, var(--txt) 2%, transparent); }
   .opt:active:not([disabled]) { transform: scale(.97); }
   .opt[disabled] { cursor: default; }
@@ -245,10 +245,10 @@
   .chip:active { transform: scale(.97); }
   .chip[aria-pressed=true], .chip[aria-current=page], .chip.is-on { color: var(--txt); border-color: var(--puls-deep); background: var(--tint); }
 
-  .progress { height: 4px; background: var(--puls-dark); border-radius: 2px; overflow: hidden; }
+  .progress { height: 4px; background: var(--puls-dark); border-radius: 999px; overflow: hidden; }
   /* Wypełnienie skalowane (transform), nie szerokość: style={{ "--w": 0..1 }}.
      Stare API style={{ width }} działa dalej (--w domyślnie 1 = pełna szerokość z inline), tylko bez animacji. */
-  .progress > span { display: block; width: 100%; height: 100%; background: var(--puls); border-radius: 2px; transform-origin: left center; transform: scaleX(var(--w, 1)); transition: transform .5s var(--ease); }
+  .progress > span { display: block; width: 100%; height: 100%; background: var(--puls); border-radius: 999px; transform-origin: left center; transform: scaleX(var(--w, 1)); transition: transform .5s var(--ease); }
 
   /* Materiał nawigacji: półprzezroczysty, treść przewija się pod spodem */
   .material-bar { background: var(--nav-bg); -webkit-backdrop-filter: saturate(140%) blur(18px); backdrop-filter: saturate(140%) blur(18px); }
@@ -262,14 +262,15 @@
   @media (max-width: 480px) { .prose-hk p, .prose-hk li, .prose-hk blockquote { text-align: left; } }
   .prose-hk h2 { color: var(--txt); font: 500 clamp(1.5rem, 1.2rem + 1.2vw, 2rem)/1.15 var(--font-heading); letter-spacing: -.022em; margin-top: 2.2em; }
   .prose-hk h3 { color: var(--txt); font: 500 1.25rem/1.3 var(--font-heading); letter-spacing: -.012em; margin-top: 1.8em; }
-  .prose-hk strong, .prose-hk b { color: var(--txt); font-weight: 600; }
+  /* Pogrubienie = Inter 500 (plik marki) + kolor --txt. Inter 600 nie jest ładowany — 600 byłoby syntezą przeglądarki */
+  .prose-hk strong, .prose-hk b { color: var(--txt); font-weight: 500; }
   .prose-hk a { color: var(--puls); }
   .prose-hk ul, .prose-hk ol { padding-left: 1.3em; display: grid; gap: .45em; }
   .prose-hk ul { list-style: disc; } .prose-hk ol { list-style: decimal; }
   .prose-hk li::marker { color: var(--txt3); }
-  .prose-hk blockquote { border-left: 2px solid var(--puls-deep); background: var(--tint); padding: 14px 18px; border-radius: 0 10px 10px 0; color: var(--txt); }
+  .prose-hk blockquote { border-left: 2px solid var(--puls-deep); background: var(--tint); padding: 14px 18px; border-radius: 0 12px 12px 0; color: var(--txt); }
   .prose-hk blockquote > * + * { margin-top: .6em; }
-  .prose-hk details { border: 1px solid var(--line2); border-radius: 10px; padding: 0 16px; }
+  .prose-hk details { border: 1px solid var(--line2); border-radius: 12px; padding: 0 16px; }
   .prose-hk details > summary { cursor: pointer; padding: 14px 0; color: var(--txt); font-weight: 500; list-style: none; }
   .prose-hk details > summary::-webkit-details-marker { display: none; }
   .prose-hk details > summary::after { content: "+"; float: right; font-family: var(--font-mono); color: var(--label); transition: transform .35s var(--ease); }
@@ -291,7 +292,6 @@
 }
 
 /* ===== Znak marki ===== */
-.ekg-divider { width: 100%; height: 44px; display: block; }
 @keyframes logo-pulse-dash { 0% { stroke-dashoffset: 180; } 100% { stroke-dashoffset: -360; } }
 .logo-pulse-path { animation: logo-pulse-dash 2.5s linear infinite; }
 /* Znak w belce: dwa przebiegi i stop (przy wejściu i zmianie trasy) — bez nieskończonej pętli w polu widzenia */
@@ -330,7 +330,7 @@
 .modal-overlay { background: rgba(5, 8, 11, .6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 
 /* Stary styl opcji quizu → .opt */
-.quiz-option { border-radius: 10px; transition: transform .12s ease-out, border-color .25s, background-color .25s, color .25s; }
+.quiz-option { border-radius: 12px; transition: transform .12s ease-out, border-color .25s, background-color .25s, color .25s; }
 .quiz-option:hover { transform: none; box-shadow: none; border-color: var(--txt3); }
 .quiz-option:active { transform: scale(.97); }
 .quiz-option.correct { background: var(--tint); color: var(--txt); border-color: var(--puls-deep); }
@@ -341,7 +341,7 @@
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 10px; border: 3px solid var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 999px; border: 3px solid var(--ink); }
 ::-webkit-scrollbar-thumb:hover { background: var(--txt4); }
 
 @media print { .no-print { display: none !important; } }
@@ -367,13 +367,13 @@
 
 /* ===== Wstawka interaktywna pod wyjaśnieniem pytania: „Zobacz to na żywo” (etap 2, 22.10) =====
    Telefon pierwszy: cała karta to jeden cel dotyku (≥ 44 px). Nic nie rusza się samo. */
-.hk-live { border: 1px solid var(--line2); border-radius: 14px; background: var(--panel); overflow: hidden; }
+.hk-live { border: 1px solid var(--line2); border-radius: 16px; background: var(--panel); overflow: hidden; }
 .hk-live__toggle { appearance: none; width: 100%; min-height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) 36px; align-items: center; gap: 14px;
   padding: 14px 16px; background: transparent; border: 0; color: inherit; text-align: left; cursor: pointer; font: inherit;
   transition: background-color .2s, transform .12s ease-out; -webkit-tap-highlight-color: transparent; }
 .hk-live__toggle:hover { background: var(--tint); }
 .hk-live__toggle:active { transform: scale(.995); }
-.hk-live__toggle:focus-visible { outline: 2px solid var(--puls); outline-offset: -2px; border-radius: 14px; }
+.hk-live__toggle:focus-visible { outline: 2px solid var(--puls); outline-offset: -2px; border-radius: 16px; }
 .hk-live__text { display: grid; gap: 4px; min-width: 0; }
 .hk-live__invite { color: var(--txt); font-size: .9375rem; line-height: 1.5; text-wrap: pretty; }
 .hk-live__chev { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line2); display: grid; place-items: center; transition: transform .35s var(--ease), border-color .2s; }
@@ -385,7 +385,7 @@
 .hk-live__host { padding: 0 10px 10px; }
 .hk-live__host:empty::before { content: "Wczytuję wstawkę…"; display: block; padding: 18px 8px; color: var(--txt2); font: 400 .8125rem/1.4 var(--font-mono); }
 .hk-wstawka { max-width: 100%; }
-.hk-wstawka__host:empty { min-height: 320px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
+.hk-wstawka__host:empty { min-height: 320px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
 .hk-wstawka__blad { margin: 0; padding: 14px 16px; border: 1px solid var(--line2); border-radius: 12px; color: var(--txt2); font-size: .9375rem; }
 @media (max-width: 480px) {
   .hk-live__toggle { padding: 12px 12px 12px 14px; gap: 10px; }

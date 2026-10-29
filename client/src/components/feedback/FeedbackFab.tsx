@@ -146,7 +146,7 @@ export default function FeedbackFab() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="fixed z-[45] flex w-[min(320px,calc(100vw-32px))] items-start gap-2 rounded-2xl border border-[var(--line2)] bg-[var(--panel)] py-2 pl-4 pr-1 text-[.9375rem] leading-[1.5] text-[var(--txt)]"
+            className="fixed z-[45] flex w-[min(320px,calc(100vw-32px))] items-start gap-2 rounded-2xl border border-[var(--line2)] bg-[var(--panel)] py-2 pl-4 pr-1 text-sub leading-[1.5] text-[var(--txt)]"
             style={{ right: inset.right, bottom: `calc(${inset.bottom} + 60px)` }}
             data-testid="feedback-hint"
           >
@@ -181,7 +181,7 @@ export default function FeedbackFab() {
         data-testid="feedback-fab"
         data-tour="feedback-fab"
         style={{ ...inset, borderRadius: 999, pointerEvents: tucked ? "none" : undefined }}
-        className="material-bar fixed z-[45] flex h-12 min-w-12 items-center justify-center gap-2 border border-[var(--line2)] px-[14px] text-[.9375rem] font-medium text-[var(--txt)] no-underline transition-[border-color] duration-150 hover:border-[var(--txt3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--puls)]"
+        className="material-bar fixed z-[45] flex h-12 min-w-12 items-center justify-center gap-2 border border-[var(--line2)] px-[14px] text-sub font-medium text-[var(--txt)] no-underline transition-[border-color] duration-150 hover:border-[var(--txt3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--puls)]"
       >
         <motion.span layout="position" className="grid place-items-center">
           <MessageSquareText className="h-[18px] w-[18px]" aria-hidden />

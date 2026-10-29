@@ -13,10 +13,24 @@ export default {
       '2xl': '1536px',
     },
     extend: {
+      // Zaokrąglenia: cztery wartości (docs/design-system.md). md = lg, żeby 10px nie było osobnym stopniem.
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
+        md: "var(--radius)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      // Skala pisma komponentów (docs/design-system.md). Tylko font-size, bez line-height:
+      // interlinię ustawiasz osobno (leading-*), więc zamiana z text-[NNpx] nic nie przesuwa.
+      fontSize: {
+        meta: ".75rem", // 12
+        note: ".8125rem", // 13
+        ui: ".875rem", // 14
+        sub: ".9375rem", // 15
+        body: "1rem", // 16
+        read: "1.0625rem", // 17
+        item: "1.125rem", // 18
+        heading: "1.25rem", // 20
+        figure: "1.5rem", // 24
       },
       colors: {
         background: "var(--background)",

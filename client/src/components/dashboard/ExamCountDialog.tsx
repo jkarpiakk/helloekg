@@ -50,8 +50,8 @@ export default function ExamCountDialog({
               onClick={() => setCount(n)}
               data-testid={`exam-count-${n}`}
             >
-              <span className="num text-[1.5rem] leading-none text-[var(--txt)]">{n}</span>
-              <span className="text-[12px]">{plural(n, "pytanie", "pytania", "pytań")}</span>
+              <span className="num text-figure leading-none text-[var(--txt)]">{n}</span>
+              <span className="text-meta">{plural(n, "pytanie", "pytania", "pytań")}</span>
             </button>
           ))}
         </div>

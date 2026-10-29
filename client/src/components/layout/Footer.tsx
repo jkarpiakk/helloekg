@@ -72,7 +72,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-2 border-t border-[var(--line)] pt-6 text-[.8125rem] text-[var(--label)] md:flex-row md:justify-between md:gap-6">
+        <div className="mt-12 flex flex-col gap-2 border-t border-[var(--line)] pt-6 text-note text-[var(--label)] md:flex-row md:justify-between md:gap-6">
           <p>© 2026 helloEKG · Wersja beta</p>
         </div>
       </div>
