@@ -51,6 +51,7 @@ const TYPE_LABEL: Record<QuestionType | "clinical_case", string> = {
   sorting: "Kolejność",
   hotspot: "Wskaż na zapisie",
   clinical_case: "Przypadek",
+  image_choice: "Wybierz zapis",
 };
 
 /** Etykieta trybu; quiz tematu dostaje „Moduł 01 · Temat 04” (numeracja jak na liście w Kursie) */
@@ -186,6 +187,17 @@ function withRevealedConfig(question: QuizQuestion, result: QuizResult | null): 
   if (current.type === "matching") {
     return { ...question, questionConfig: { type: "matching", config: { ...current.config, correctPairs: full.config.correctPairs } } };
   }
+  if (current.type === "image_choice") {
+    // Kolejność z podejścia zostaje; po id dochodzą poprawność, opisy i alt z rejestru
+    const byId = new Map((full.config.options ?? []).map((o: { id: string }) => [o.id, o]));
+    return {
+      ...question,
+      questionConfig: {
+        type: "image_choice",
+        config: { ...current.config, options: current.config.options.map((o: { id: string }) => ({ ...o, ...(byId.get(o.id) as object), imageUrl: (o as { imageUrl?: string }).imageUrl })) },
+      },
+    };
+  }
   return question;
 }
 
@@ -201,7 +213,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const [slow, setSlow] = useState(false);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [startTime, setStartTime] = useState(Date.now());
-  const [lightbox, setLightbox] = useState<{ url: string; origin?: HTMLElement } | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; origin?: HTMLElement; alt?: string } | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [examSessionId, setExamSessionId] = useState<string | null>(null);
@@ -534,6 +546,11 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   };
 
   const handleAnswerChange = (answerData: AnswerData) => {
+    // „Wybierz zapis” bez zaznaczonej karty = brak odpowiedzi („Sprawdź” nieaktywne)
+    if (answerData.type === "image_choice" && answerData.selectedIds.length === 0) {
+      setCurrentAnswerData(null);
+      return;
+    }
     setCurrentAnswerData(answerData);
   };
 
@@ -562,8 +579,8 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     onExit?.();
   };
 
-  const openLightbox = (imageUrl: string, origin?: HTMLElement) => {
-    setLightbox({ url: imageUrl, origin });
+  const openLightbox = (imageUrl: string, origin?: HTMLElement, alt?: string) => {
+    setLightbox({ url: imageUrl, origin, alt });
   };
 
   // Po wyniku fokus na „Dalej” — Enter od razu prowadzi dalej
@@ -677,7 +694,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         secondary={{ label: exitLabel, onClick: () => onExit?.(), testId: "exit-exam" }}
       >
         {summary.review && summary.review.length > 0 && <ExamReview items={summary.review} onImageClick={openLightbox} />}
-        {lightbox && <ImageLightbox imageUrl={lightbox.url} origin={lightbox.origin} onClose={() => setLightbox(null)} />}
+        {lightbox && <ImageLightbox imageUrl={lightbox.url} origin={lightbox.origin} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
       </Summary>
     );
   }
@@ -910,7 +927,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         </AnimatePresence>
       </div>
 
-      {lightbox && <ImageLightbox imageUrl={lightbox.url} origin={lightbox.origin} onClose={() => setLightbox(null)} />}
+      {lightbox && <ImageLightbox imageUrl={lightbox.url} origin={lightbox.origin} alt={lightbox.alt} onClose={() => setLightbox(null)} />}
 
       {question && (
         <ReportErrorDialog questionId={question.id} open={showReportDialog} onOpenChange={setShowReportDialog} />

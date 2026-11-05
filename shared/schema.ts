@@ -184,7 +184,9 @@ export type QuestionConfig =
   | { type: 'matching'; config: MatchingConfig }
   | { type: 'sorting'; config: SortingConfig }
   | { type: 'hotspot'; config: HotspotConfig }
-  | { type: 'clinical_case'; config: import('./clinicalCase').ClinicalCaseConfig };
+  | { type: 'clinical_case'; config: import('./clinicalCase').ClinicalCaseConfig }
+  // „Wybierz zapis”: kontrakt i logika w shared/wyborZapisu.ts (kopia ze studia)
+  | { type: 'image_choice'; config: import('./wyborZapisu').ImageChoiceConfig };
 
 // Questions
 export const questions = pgTable("questions", {
@@ -251,7 +253,8 @@ export type AnswerData =
   | FillBlankAnswer
   | MatchingAnswer
   | SortingAnswer
-  | HotspotAnswer;
+  | HotspotAnswer
+  | import('./wyborZapisu').ImageChoiceAnswer;
 
 // User attempts on questions
 export const attempts = pgTable("attempts", {

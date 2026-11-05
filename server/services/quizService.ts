@@ -15,6 +15,7 @@ import type {
   HotspotConfig,
   QuestionMediaAssets
 } from "@shared/schema";
+import { gradeImageChoice, kolejnoscOpcji, poprawnaOdpowiedzZapisow } from "@shared/wyborZapisu";
 import {
   gradeClinicalCase,
   buildClinicalCaseCorrectAnswer,
@@ -23,7 +24,7 @@ import {
 } from "@shared/clinicalCase";
 
 // Question types
-export type QuestionType = 'multiple_choice' | 'drag_drop' | 'fill_blank' | 'matching' | 'sorting' | 'hotspot' | 'clinical_case';
+export type QuestionType = 'multiple_choice' | 'drag_drop' | 'fill_blank' | 'matching' | 'sorting' | 'hotspot' | 'clinical_case' | 'image_choice';
 
 /**
  * Pytanie wysyłane do przeglądarki. NIE zawiera poprawnej odpowiedzi ani wyjaśnienia:
@@ -330,6 +331,13 @@ export class QuizService {
         }
         return gradeClinicalCase(config.config, answer);
       }
+
+      case 'image_choice':
+        // Ocena po id opcji (nigdy po literze ani pozycji); bez punktów częściowych
+        if (answerData.type !== 'image_choice' || !question.questionConfig || question.questionConfig.type !== 'image_choice') {
+          return { isCorrect: false, partialScore: 0, correctItems: [], incorrectItems: [] };
+        }
+        return gradeImageChoice(question.questionConfig.config, answerData.selectedIds);
         
       default:
         return { isCorrect: false, partialScore: 0, correctItems: [], incorrectItems: [] };
@@ -341,6 +349,20 @@ export class QuizService {
   private isInteractive(question: Question): boolean {
     const questionType = (question.questionType || 'multiple_choice') as QuestionType;
     return questionType !== 'multiple_choice' && !!question.questionConfig;
+  }
+
+  /**
+   * Odpowiedź do zapisu w próbach. „Wybierz zapis”: tylko znane id opcji, bez powtórzeń —
+   * z tych wierszy liczy się, który dystraktor myli najczęściej.
+   */
+  private answerDataToStore(question: Question, answerData?: AnswerData): AnswerData | undefined {
+    if (!answerData) return undefined;
+    if (answerData.type === 'image_choice' && question.questionConfig?.type === 'image_choice') {
+      const known = new Set(question.questionConfig.config.options.map(o => o.id));
+      const ids = Array.isArray(answerData.selectedIds) ? answerData.selectedIds : [];
+      return { type: 'image_choice', selectedIds: Array.from(new Set(ids.filter(id => typeof id === 'string' && known.has(id)))) };
+    }
+    return answerData;
   }
 
   /** Ocena po stronie serwera. Pytanie interaktywne bez answerData = błędna odpowiedź. */
@@ -497,7 +519,7 @@ export class QuizService {
           isCorrect: grading.isCorrect,
           timeMs: time,
           partialScore: grading.partialScore,
-          answerData: answerData || undefined,
+          answerData: this.answerDataToStore(question, answerData),
         },
       ],
     };
@@ -525,7 +547,7 @@ export class QuizService {
       isCorrect: grading.isCorrect,
       timeMs: time,
       mode: "exam",
-      answerData: answerData || undefined
+      answerData: this.answerDataToStore(question, answerData)
     });
     await this.updateUserProgress(userId, question.sectionId);
 
@@ -732,6 +754,21 @@ export class QuizService {
           type: 'hotspot',
           config: { ...c.config, hotspots: c.config.hotspots.map(h => ({ ...h, isCorrect: false })) },
         };
+      case 'image_choice':
+        // Kolejność losowana przy każdym podaniu pytania (= podejściu), stabilna w jego obrębie:
+        // klient dostaje gotowy układ, litery nadaje po nim. Przed odpowiedzią bez poprawności,
+        // opisów i alt z rejestru (nazywa rozpoznanie) — wracają w QuizResult.questionConfig.
+        return {
+          type: 'image_choice',
+          config: {
+            allowMultiple: c.config.allowMultiple === true,
+            options: kolejnoscOpcji(c.config.options ?? [], randomUUID()).map(o => ({
+              id: o.id,
+              imageUrl: o.imageUrl,
+              isCorrect: false,
+            })),
+          },
+        };
       case 'clinical_case':
         // Nauka/powtórka: kroki przypadku same pokazują wynik po każdym kroku — zostają pełne.
         // Egzamin (przypadki są z niego wyłączone, to tylko zabezpieczenie): bez odpowiedzi.
@@ -814,7 +851,7 @@ export class QuizService {
       isCorrect: grading.isCorrect,
       timeMs: time,
       mode: attemptMode,
-      answerData: answerData || undefined
+      answerData: this.answerDataToStore(question, answerData)
     });
 
     // Opanowanie sekcji zmienia każda odpowiedź (także w powtórce)
@@ -866,6 +903,8 @@ export class QuizService {
       case 'clinical_case':
         // AnswerData z schema.ts nie ma jeszcze tego wariantu — kształt z @shared/clinicalCase
         return buildClinicalCaseCorrectAnswer(config.config) as unknown as AnswerData;
+      case 'image_choice':
+        return poprawnaOdpowiedzZapisow(config.config);
       default:
         return undefined;
     }

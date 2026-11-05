@@ -1,0 +1,219 @@
+/*
+ * „Wybierz zapis” — wspólne dla studia i kursu. Kolory ustawia host przez zmienne --wz-*
+ * (studio: tokens.css, kurs: index.css). Wartości po przecinku to tylko zabezpieczenie.
+ * Telefon: karty jedna pod drugą, obraz na całą szerokość ekranu (host podaje w --wz-wciecie
+ * wewnętrzny margines swojej karty, o tyle karty wychodzą do krawędzi). Od 768 px: dwie kolumny.
+ * Litera, znak wyniku i lupa stoją na pasku NAD obrazem — nic nie zasłania zapisu.
+ */
+.wz {
+  --wz-r: 12px;
+  display: grid;
+  gap: 12px;
+}
+.wz-podpowiedz {
+  margin: 0;
+  font-size: .875rem;
+  line-height: 1.45;
+  color: var(--wz-tekst2, #46534f);
+}
+.wz-siatka {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+@media (min-width: 768px) {
+  .wz-siatka { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767.98px) {
+  .wz-siatka { margin-inline: calc(-1 * var(--wz-wciecie, 0px)); }
+  /* karta od krawędzi do krawędzi: bez bocznych linii i zaokrągleń, stan rysuje obwódka wewnętrzna */
+  .wz-karta { border-radius: 0; border-left-width: 0; border-right-width: 0; }
+  .wz-wybor, .wz-obraz, .wz-brak { border-radius: 0; }
+  /* bez wychodzenia poza ekran (przewijanie w bok) */
+  .wz-karta::after { inset: -1px 0; }
+  /* opis pod kartą trzyma linię tekstu pytania */
+  .wz-opis { padding-inline: max(14px, var(--wz-wciecie, 0px)); }
+  .wz-litera, .wz-znak { margin-left: max(0px, calc(var(--wz-wciecie, 0px) - 8px)); }
+  .wz-lupa { right: max(2px, calc(var(--wz-wciecie, 0px) - 10px)); }
+}
+
+.wz-karta {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--wz-linia, #cfd9d4);
+  border-radius: var(--wz-r);
+  background: var(--wz-panel, transparent);
+  transition: border-color .2s, box-shadow .2s, background-color .2s, opacity .2s;
+}
+/* Obwódka stanu nad obrazem (box-shadow karty schowałby się pod zapisem) */
+.wz-karta::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--wz-obwodka, transparent);
+  z-index: 3;
+  transition: box-shadow .2s;
+}
+.wz-wybor {
+  display: block;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--wz-r);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  /* pasek na literę, znak wyniku i lupę */
+  padding-top: 44px;
+  cursor: pointer;
+  /* odpowiedź na dotknięcie od razu, bez 300 ms */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease-out;
+}
+.wz-wybor:active:not([disabled]) { transform: scale(.99); }
+.wz-wybor[disabled] { cursor: default; }
+.wz-wybor:focus-visible {
+  outline: 2px solid var(--wz-marka, #0b7e54);
+  outline-offset: 2px;
+}
+.wz-karta:hover:not(.is-wybrany):not(.is-poprawny):not(.is-bledny):has(.wz-wybor:not([disabled])) {
+  border-color: var(--wz-linia-mocna, #7a8783);
+}
+
+.wz-obraz {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0 0 var(--wz-r) var(--wz-r);
+  background: var(--wz-tlo-obrazu, #fff);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.wz-brak {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: 16px;
+  border-radius: 0 0 var(--wz-r) var(--wz-r);
+  border-top: 1px dashed var(--wz-linia, #cfd9d4);
+  font-size: .875rem;
+  color: var(--wz-tekst2, #46534f);
+}
+
+.wz-litera {
+  position: absolute;
+  top: 7px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--wz-linia, #cfd9d4);
+  background: var(--wz-panel, #fff);
+  color: var(--wz-tekst, #0c1210);
+  font: 500 .8125rem/1 var(--wz-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  z-index: 1;
+}
+.wz-znak {
+  position: absolute;
+  top: 7px;
+  left: 46px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  z-index: 1;
+}
+.wz-znak:empty { display: none; }
+
+/* Lupa: osobny cel dotyku 44 × 44, nie zaznacza karty */
+.wz-lupa {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--wz-tekst, #0c1210);
+  cursor: zoom-in;
+  touch-action: manipulation;
+  z-index: 2;
+}
+.wz-lupa::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--wz-linia, #cfd9d4);
+  background: var(--wz-panel, #fff);
+  transition: transform .12s ease-out;
+}
+.wz-lupa svg { position: relative; }
+.wz-lupa:active::before { transform: scale(.92); }
+.wz-lupa:focus-visible { outline: 2px solid var(--wz-marka, #0b7e54); outline-offset: -2px; border-radius: 999px; }
+
+.wz-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Wybrany przed sprawdzeniem: obramowanie w kolorze marki (bez zieleni „dobrze”) */
+.wz-karta.is-wybrany {
+  border-color: var(--wz-marka, #0b7e54);
+  --wz-obwodka: var(--wz-marka, #0b7e54);
+}
+.wz-karta.is-wybrany .wz-litera {
+  border-color: var(--wz-marka, #0b7e54);
+  background: var(--wz-marka, #0b7e54);
+  color: var(--wz-na-marce, #fff);
+}
+
+/* Po sprawdzeniu: obwódka + 6% tinty, jak w innych typach */
+.wz-karta.is-poprawny {
+  border-color: var(--wz-ok, #0b7e54);
+  --wz-obwodka: var(--wz-ok, #0b7e54);
+  background: color-mix(in srgb, var(--wz-ok, #0b7e54) 6%, transparent);
+}
+.wz-karta.is-poprawny .wz-litera { border-color: var(--wz-ok, #0b7e54); color: var(--wz-ok, #0b7e54); }
+.wz-karta.is-poprawny .wz-znak { color: var(--wz-ok, #0b7e54); }
+.wz-karta.is-bledny {
+  border-color: var(--wz-zle, #c93b3a);
+  --wz-obwodka: var(--wz-zle, #c93b3a);
+  background: color-mix(in srgb, var(--wz-zle, #c93b3a) 6%, transparent);
+}
+.wz-karta.is-bledny .wz-litera { border-color: var(--wz-zle, #c93b3a); color: var(--wz-zle, #c93b3a); }
+.wz-karta.is-bledny .wz-znak { color: var(--wz-zle, #c93b3a); }
+.wz-karta.is-przygaszony .wz-obraz { opacity: .72; }
+
+.wz-opis {
+  padding: 10px 14px 12px;
+  font-size: .9375rem;
+  line-height: 1.5;
+  color: var(--wz-tekst, #0c1210);
+}
+.wz-opis > :first-child { margin-top: 0; }
+.wz-opis > :last-child { margin-bottom: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wz-karta, .wz-karta::after, .wz-wybor, .wz-lupa::before { transition: none; }
+  .wz-wybor:active:not([disabled]) { transform: none; }
+}

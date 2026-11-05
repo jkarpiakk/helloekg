@@ -40,7 +40,7 @@ const studioQuestions: any[] = read("questions.json");
 const manifest = read("manifest.json");
 
 /** Rozszerzenia studia, które kurs już obsługuje — reszta zostaje szkicem */
-const SUPPORTED_EXTENSIONS = new Set(["clinical_case"]);
+const SUPPORTED_EXTENSIONS = new Set(["clinical_case", "image_choice"]);
 const unsupported = new Set<string>(
   (manifest.extensionsUsed ?? [])
     .filter((e: any) => !SUPPORTED_EXTENSIONS.has(e.ext))
@@ -118,7 +118,7 @@ function splitChapters(title: string, md: string): Array<{ title: string; conten
  * pytania utrwalające osobno w każdym typie (1-5), więc temat nie zaczyna się już od pięciu
  * drag&drop pod rząd (zgłoszenie JK 21.10).
  */
-const TYPE_PRIORITY = ["multiple_choice", "matching", "sorting", "fill_blank", "drag_drop", "clinical_case", "hotspot"];
+const TYPE_PRIORITY = ["multiple_choice", "matching", "sorting", "fill_blank", "drag_drop", "clinical_case", "hotspot", "image_choice"];
 function courseOrder(qs: any[]): Map<string, number> {
   const groups = new Map<string, any[]>();
   for (const q of qs) {
@@ -167,6 +167,14 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
           const steps: any[] = Array.isArray(config.config.steps) ? config.config.steps : [];
           if (steps.some((st) => st?.kind === "hotspot") && !config.config.imageUrl) ok = false;
           if (steps.length < 2) ok = false;
+        }
+        // Wybierz zapis: każda opcja ma własny plik (eksport dokłada imageUrl = assets/…, fixDeep
+        // zamienia na /content-assets/…). Brak pliku choć w jednej opcji = pytanie zostaje szkicem.
+        if (q.questionType === "image_choice") {
+          const opts: any[] = Array.isArray(config?.config?.options) ? config.config.options : [];
+          if (opts.length < 2 || opts.some((o) => !isAsset(o?.imageUrl))) ok = false;
+          if (!opts.some((o) => o?.isCorrect === true)) ok = false;
+          imageUrl = null;
         }
         if (imageUrl && !isAsset(imageUrl)) imageUrl = null;
         const published = ok && (allPublished || q.status === "zatwierdzone");

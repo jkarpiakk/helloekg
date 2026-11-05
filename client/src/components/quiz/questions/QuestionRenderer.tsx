@@ -6,6 +6,7 @@ import MatchingQuestion from "./MatchingQuestion";
 import SortingQuestion from "./SortingQuestion";
 import HotspotQuestion from "./HotspotQuestion";
 import ClinicalCaseQuestion from "./ClinicalCaseQuestion";
+import ImageChoiceQuestion from "./ImageChoiceQuestion";
 import type { AnyQuestionConfig } from "@shared/clinicalCase";
 
 interface QuestionRendererProps {
@@ -15,7 +16,7 @@ interface QuestionRendererProps {
   showResult: boolean;
   result?: QuizResult;
   /** Obraz pytania pokazuje QuestionCard; przypadek kliniczny rysuje swój zapis sam */
-  onImageClick?: (imageUrl: string, origin?: HTMLElement) => void;
+  onImageClick?: (imageUrl: string, origin?: HTMLElement, alt?: string) => void;
 }
 
 /**
@@ -93,6 +94,19 @@ export default function QuestionRenderer({
           config={questionConfig.config}
           questionId={question.id}
           fallbackImageUrl={question.imageUrl}
+          onChange={onAnswerChange}
+          disabled={disabled}
+          showResult={showResult}
+          result={result}
+          onImageClick={onImageClick}
+        />
+      );
+    case "image_choice":
+      return (
+        <ImageChoiceQuestion
+          // Nowe pytanie (albo nowe podejście) = pusty wybór
+          key={question.id + questionConfig.config.options.map((o) => o.id).join()}
+          config={questionConfig.config}
           onChange={onAnswerChange}
           disabled={disabled}
           showResult={showResult}

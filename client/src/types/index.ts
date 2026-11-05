@@ -62,7 +62,7 @@ export type {
 };
 
 // Question type literal type
-export type QuestionType = 'multiple_choice' | 'drag_drop' | 'fill_blank' | 'matching' | 'sorting' | 'hotspot';
+export type QuestionType = 'multiple_choice' | 'drag_drop' | 'fill_blank' | 'matching' | 'sorting' | 'hotspot' | 'image_choice';
 
 // Additional frontend-specific types
 export interface AuthUser {

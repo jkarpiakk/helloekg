@@ -80,6 +80,11 @@ const QUESTION_TYPE_LABELS: Record<QuestionType, { label: string; icon: any; des
     icon: Target,
     description: "Kliknij na prawidłowy obszar na obrazku EKG"
   },
+  image_choice: {
+    label: "Wybierz zapis",
+    icon: Target,
+    description: "Tylko ze studia: wybór właściwego zapisu EKG"
+  },
 };
 
 const getDefaultConfig = (type: QuestionType): QuestionConfig | undefined => {
@@ -534,7 +539,7 @@ export default function DemoQuestionManager() {
           <div className="space-y-2">
             <Label>Typ pytania</Label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {(Object.keys(QUESTION_TYPE_LABELS) as QuestionType[]).map((type) => {
+              {(Object.keys(QUESTION_TYPE_LABELS) as QuestionType[]).filter((t) => t !== 'image_choice').map((type) => {
                 const { label, icon: Icon, description } = QUESTION_TYPE_LABELS[type];
                 const isSelected = formData.questionType === type;
                 return (

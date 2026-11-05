@@ -34,6 +34,7 @@ const TYPE_LABEL: Record<string, string> = {
   sorting: "Kolejność",
   hotspot: "Wskaż na obrazie",
   clinical_case: "Przypadek",
+  image_choice: "Wybierz zapis",
 };
 
 const STATUS_STYLE: Record<TesterStatus, string> = {

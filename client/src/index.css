@@ -329,6 +329,24 @@
 .lightbox-image { max-height: 80vh; max-width: 90vw; object-fit: contain; }
 .modal-overlay { background: rgba(5, 8, 11, .6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 
+/* „Wybierz zapis” (components/quiz/wybor-zapisu — ten sam komponent co w studiu) w barwach kursu.
+   Zmienne odwołują się do palety, więc motyw jasny i ciemny działają same. */
+.wz {
+  --wz-marka: var(--puls);
+  --wz-na-marce: var(--on-puls);
+  --wz-ok: var(--puls);
+  --wz-zle: var(--alarm);
+  --wz-linia: var(--line2);
+  --wz-linia-mocna: var(--txt3);
+  --wz-tekst: var(--txt);
+  --wz-tekst2: var(--txt2);
+  --wz-panel: var(--panel);
+  --wz-tlo-obrazu: #fff;
+  --wz-font-mono: var(--font-mono);
+  /* margines karty pytania (QuestionCard: p-[clamp(22px,3vw,40px)]) — na telefonie karty zapisów wychodzą do krawędzi */
+  --wz-wciecie: clamp(22px, 3vw, 40px);
+}
+
 /* Stary styl opcji quizu → .opt */
 .quiz-option { border-radius: 12px; transition: transform .12s ease-out, border-color .25s, background-color .25s, color .25s; }
 .quiz-option:hover { transform: none; box-shadow: none; border-color: var(--txt3); }

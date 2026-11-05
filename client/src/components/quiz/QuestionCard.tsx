@@ -36,7 +36,7 @@ interface QuestionCardProps {
   onAnswerSelect: (position: number) => void;
   onAnswerChange?: (answer: AnswerData) => void;
   /** Drugi argument: miniatura, z której wyrasta podgląd */
-  onImageClick: (imageUrl: string, origin?: HTMLElement) => void;
+  onImageClick: (imageUrl: string, origin?: HTMLElement, alt?: string) => void;
 }
 
 const letter = (i: number) => String.fromCharCode(65 + i);

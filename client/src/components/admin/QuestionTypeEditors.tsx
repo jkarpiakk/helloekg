@@ -748,6 +748,7 @@ export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   matching: "Połącz w pary",
   sorting: "Uporządkuj",
   hotspot: "Kliknij na obrazie",
+  image_choice: "Wybierz zapis",
 };
 
 export const QUESTION_TYPE_DESCRIPTIONS: Record<QuestionType, string> = {
@@ -757,6 +758,7 @@ export const QUESTION_TYPE_DESCRIPTIONS: Record<QuestionType, string> = {
   matching: "Połącz elementy z lewej strony z odpowiednikami z prawej",
   sorting: "Ułóż elementy w poprawnej kolejności",
   hotspot: "Kliknij na wskazany obszar obrazu",
+  image_choice: "Wybierz właściwy zapis EKG spośród kilku (tylko ze studia)",
 };
 
 export function getDefaultConfig(type: QuestionType): DragDropConfig | FillBlankConfig | MatchingConfig | SortingConfig | HotspotConfig | null {

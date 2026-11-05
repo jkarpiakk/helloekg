@@ -76,6 +76,7 @@ const QUESTION_TYPE_ICONS: Record<QuestionType, any> = {
   matching: ArrowLeftRight,
   sorting: ListOrdered,
   hotspot: Target,
+  image_choice: MousePointer,
 };
 
 export default function QuestionEditor({
@@ -362,7 +363,8 @@ export default function QuestionEditor({
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3 md:grid md:grid-cols-3">
-                {(Object.keys(QUESTION_TYPE_LABELS) as QuestionType[]).map((type) => {
+                {/* „Wybierz zapis” powstaje tylko w studiu (grafiki z rejestru) — tu bez edytora */}
+                {(Object.keys(QUESTION_TYPE_LABELS) as QuestionType[]).filter((t) => t !== "image_choice").map((type) => {
                   const Icon = QUESTION_TYPE_ICONS[type];
                   const isSelected = formData.questionType === type;
                   return (
