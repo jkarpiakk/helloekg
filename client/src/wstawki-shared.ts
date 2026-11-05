@@ -25,7 +25,7 @@ export const EKG_RHYTHM_LABELS: Record<EkgRhythm, string> = {
 /** Wstawki interaktywne — kod w `web/src/wstawki/`, w treści `::wstawka <nazwa> [klucz=wartość …]`. */
 export const WSTAWKI = [
   'droga-impulsu', 'kompas-osi', 'mapa-zawalu', 'wezel-av', 'petla-qrs', 'pomiary',
-  'stymulator', 'adenozyna', 'potas', 'elektrody', 'nzk', 'kardiomonitor',
+  'stymulator', 'adenozyna', 'potas', 'elektrody', 'nzk', 'kardiomonitor', 'rondo',
 ] as const;
 export type WstawkaId = (typeof WSTAWKI)[number];
 
@@ -42,6 +42,7 @@ export const WSTAWKA_LABELS: Record<WstawkaId, string> = {
   'elektrody': 'Zamienione elektrody',
   'nzk': 'Monitor zatrzymania krążenia',
   'kardiomonitor': 'Kardiomonitor',
+  'rondo': 'Fala na rondzie',
 };
 
 export function isWstawka(v: string): v is WstawkaId {
@@ -65,6 +66,7 @@ export const WSTAWKA_ZAPROSZENIA: Record<WstawkaId, string> = {
   'adenozyna': 'Zwolnij bramę AV na chwilę i zobacz, co naprawdę kryje się pod częstoskurczem.',
   'nzk': 'Stań przy monitorze i rozpoznaj rytm, zanim zrobi to alarm.',
   'kardiomonitor': 'Spójrz na ten monitor jeszcze raz, tym razem z rozpoznaniem i alarmem.',
+  'rondo': 'Puść falę po rondzie i sprawdź, czy dogoni własny ogon.',
 };
 
 /** Najdłuższe zaproszenie, jakie mieści się w jednej-dwóch liniach karty na telefonie. */

@@ -30,6 +30,7 @@ import autostrady from '../obrazy/autostrady.webp';
 import autostradaObjazd from '../obrazy/autostrada-objazd.webp';
 import autostrada1 from '../obrazy/autostrada-1-zamkniety.webp';
 import autostrada2 from '../obrazy/autostrada-2-zamkniete.webp';
+import rondo from '../obrazy/rondo.webp';
 
 export interface Obraz { url: string; w: number; h: number; opis: string }
 
@@ -59,6 +60,8 @@ export const OBRAZY = {
   autostradaObjazd: { url: autostradaObjazd, w: 900, h: 600, opis: 'Sieć autostrad z zamkniętą jezdnią' },
   autostrada1: { url: autostrada1, w: 900, h: 600, opis: 'Trzy pasy autostrady, jeden zamknięty' },
   autostrada2: { url: autostrada2, w: 900, h: 600, opis: 'Trzy pasy autostrady, dwa zamknięte' },
+  /** Rondo z góry z murowaną wyspą (NS01): środek w (419,5; 419), wloty na północy i południu. */
+  rondo: { url: rondo, w: 840, h: 838, opis: 'Rondo z murowaną wyspą widziane z góry' },
 } as const satisfies Record<string, Obraz>;
 export type ObrazId = keyof typeof OBRAZY;
 

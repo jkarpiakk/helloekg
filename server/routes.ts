@@ -893,7 +893,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!isAdmin) {
             sections = sections.filter(s => s.isVisible !== false);
           }
-          
+          // Temat bez wykładu i pytań to ślad po imporcie (np. pusta sekcja zbiorcza), nie pozycja na liście
+          sections = sections.filter(s => qBySection.has(s.id) || chBySection.has(s.id));
+
           // Add progress to each section
           const sectionsWithProgress = sections.map(section => {
             const progress = userProgress.find(p => p.sectionId === section.id);

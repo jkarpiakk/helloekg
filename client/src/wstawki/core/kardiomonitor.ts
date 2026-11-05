@@ -56,6 +56,8 @@ export interface KardiomonitorOpts {
    * żeby dźwięk nie podpowiadał rozpoznania.
    */
   pytanie?: boolean;
+  /** Mnożnik upływu czasu (domyślnie 1), np. 0,25 dla zapisu zwolnionego 4 razy. */
+  tempo?: number;
   /** Własny przełącznik dźwięku na pasku (domyślnie tak; nie, gdy monitor siedzi we wstawce z przełącznikiem w nagłówku). */
   przyciskDzwieku?: boolean;
 }
@@ -374,7 +376,7 @@ export function kardiomonitor(parent: HTMLElement, sc0: Scenariusz, o: Kardiomon
   const lp = loop(el, (_t, dt) => {
     if (isPaused || !W) return;
     const prev = now;
-    now += dt;
+    now += dt * (o.tempo ?? 1);
     gen(strip, now + 3);
     strip.prune(now - sec - 8);
     dzwiek(prev, now);

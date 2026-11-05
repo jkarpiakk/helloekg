@@ -18,6 +18,7 @@ export const LOADERS: Record<WstawkaId, () => Promise<MountFn>> = {
   'elektrody': () => import('./elektrody.js').then((m) => m.mountElektrody),
   'nzk': () => import('./nzk.js').then((m) => m.mountNzk),
   'kardiomonitor': () => import('./kardiomonitor.js').then((m) => m.mountKardiomonitor),
+  'rondo': () => import('./rondo.js').then((m) => m.mountRondo),
 };
 
 /** Podpina wstawkę do elementu. Zwraca sprzątanie (działa także, gdy ładowanie jeszcze trwa). */

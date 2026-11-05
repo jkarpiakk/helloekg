@@ -12,5 +12,6 @@ import { KARTA as potas } from './potas.karta.js';
 import { KARTA as elektrody } from './elektrody.karta.js';
 import { KARTA as nzk } from './nzk.karta.js';
 import { KARTA as km } from './kardiomonitor.karta.js';
+import { KARTA as rondo } from './rondo.karta.js';
 
-export const KARTY: Karta[] = [droga, kompas, mapa, wezel, petla, pomiary, stym, adeno, potas, elektrody, nzk, km];
+export const KARTY: Karta[] = [droga, kompas, mapa, wezel, petla, pomiary, stym, adeno, potas, elektrody, nzk, km, rondo];

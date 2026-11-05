@@ -47,6 +47,12 @@ const unsupported = new Set<string>(
     .map((e: any) => e.questionExternalId)
 );
 
+/**
+ * Pytania wstrzymane do decyzji JK: w kursie szkic także przy --all-published.
+ * Q-INT-03-HS-01 (D11): plik GFX-0408 już jest, ale strefy nie pasują do trzepotania 2:1 na obrazie.
+ */
+const WSTRZYMANE = new Set(["Q-INT-03-HS-01"]);
+
 const ASSET_RE = /(^|[("'\s])assets\/([0-9a-f]{64}\.[a-z0-9]+)/g;
 /**
  * Linia `::grafika GFX-NNNN` w treści lub wyjaśnieniu pytania → obrazek z paczki eksportu
@@ -142,6 +148,7 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
         if ((q.tags ?? []).includes("kardiomonitor")) ok = false;
         // Archiwum (bank Q-N, decyzja JK 22.10): w kursie szkic, odpowiedzi testerów zostają
         if ((q.tags ?? []).includes("ARCHIWUM")) ok = false;
+        if (WSTRZYMANE.has(q.externalId)) ok = false;
         // Hotspot: grafika pytania jest zarazem planszą do klikania
         if (q.questionType === "hotspot" && config?.config) {
           if (!isAsset(config.config.imageUrl) && isAsset(imageUrl)) {
