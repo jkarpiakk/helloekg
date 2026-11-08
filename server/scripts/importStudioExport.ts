@@ -50,8 +50,13 @@ const unsupported = new Set<string>(
 /**
  * Pytania wstrzymane do decyzji JK: w kursie szkic także przy --all-published.
  * Q-INT-03-HS-01 (D11): plik GFX-0408 już jest, ale strefy nie pasują do trzepotania 2:1 na obrazie.
+ * Q-0197…Q-0213: szkice hotspot z pakietu „braki 74 + wybierz EKG” (8.11, plansze GFX-0531…0546).
+ * Publikuje je dopiero akceptacja JK po weryfikatorze; wtedy usunąć wpis.
  */
-const WSTRZYMANE = new Set(["Q-INT-03-HS-01"]);
+const WSTRZYMANE = new Set([
+  "Q-INT-03-HS-01",
+  ...Array.from({ length: 17 }, (_, i) => `Q-${String(197 + i).padStart(4, "0")}`),
+]);
 
 const ASSET_RE = /(^|[("'\s])assets\/([0-9a-f]{64}\.[a-z0-9]+)/g;
 /**
