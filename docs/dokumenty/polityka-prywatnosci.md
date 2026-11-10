@@ -1,15 +1,13 @@
 # Polityka prywatności kursu helloEKG
 
-**Wersja:** 1.0 (projekt)
-**Data:** [DO UZUPEŁNIENIA: data publikacji]
-
-To jest projekt dokumentu do akceptacji właściciela serwisu, a nie jego obowiązująca wersja.
+**Wersja:** 1.0
+**Data:** 10 listopada 2026 r.
 
 Ta polityka wyjaśnia, jakie dane osobowe przetwarzamy w aplikacji kursu helloEKG pod adresem https://kurs.helloekg.pl, po co to robimy i jakie masz prawa. Dotyczy wersji testowej (beta). Stronę helloekg.pl i listę mailingową opisuje osobna polityka prywatności dostępna na helloekg.pl.
 
 ## 1. Kto jest administratorem danych
 
-Administratorem Twoich danych jest Jakub Karpiak, prowadzący jednoosobową działalność gospodarczą pod firmą [DO UZUPEŁNIENIA: pełna nazwa firmy z CEIDG], adres: [DO UZUPEŁNIENIA: adres wykonywania działalności], NIP: [DO UZUPEŁNIENIA], REGON: [DO UZUPEŁNIENIA] (dalej: „my”).
+Administratorem Twoich danych jest Cardiomind sp. z o.o., właściciel serwisu helloEKG (dalej: „my”).
 
 W sprawach danych osobowych napisz na kontakt@helloekg.pl. Nie wyznaczyliśmy inspektora ochrony danych, bo nie mamy takiego obowiązku.
 
@@ -57,7 +55,7 @@ Nie używamy narzędzi analitycznych firm zewnętrznych, reklam ani mechanizmów
 
 Nie sprzedajemy Twoich danych i nie udostępniamy ich innym firmom do celów marketingowych. Korzystamy z dostawców, którzy przetwarzają dane w naszym imieniu na podstawie umowy:
 
-- **OVHcloud** [DO UZUPEŁNIENIA: podmiot z umowy, np. OVH Sp. z o.o. albo OVH SAS]: serwer (VPS), na którym działa aplikacja i baza danych PostgreSQL; serwer znajduje się w Unii Europejskiej,
+- **OVHcloud** (OVH Sp. z o.o., Wrocław): serwer (VPS), na którym działa aplikacja i baza danych PostgreSQL; serwer znajduje się w Unii Europejskiej,
 - **home.pl S.A.** (Szczecin): serwer poczty w domenie helloekg.pl, przez który wysyłamy wiadomości dotyczące konta,
 - **Stripe Payments Europe Ltd.** (Dublin, Irlandia): obsługa płatności, dopiero gdy płatności zostaną włączone.
 
@@ -75,7 +73,7 @@ Aplikacja i baza danych działają na serwerze w Unii Europejskiej, a my nie prz
 | Logi techniczne serwera | 30 dni [PROPOZYCJA DO DECYZJI] |
 | Dziennik zdarzeń bezpieczeństwa | 12 miesięcy [PROPOZYCJA DO DECYZJI] |
 | Kopie zapasowe bazy (wykonywane codziennie) | 14 dni |
-| Zgłoszenia uwag | Do czasu, gdy przestaną być potrzebne do rozwoju kursu; po usunięciu konta zostają zanonimizowane [DO UZUPEŁNIENIA: ewentualny maksymalny okres] |
+| Zgłoszenia uwag | Do czasu, gdy przestaną być potrzebne do rozwoju kursu; po usunięciu konta zostają zanonimizowane; najdłużej 3 lata |
 | Korespondencja e-mail | Do 2 lat od zakończenia sprawy (jak w polityce helloekg.pl) [PROPOZYCJA DO DECYZJI] |
 | Dane rozliczeniowe (gdy będą płatności) | 5 lat od końca roku podatkowego, zgodnie z przepisami podatkowymi |
 | Data akceptacji regulaminu i polityki | Przez czas korzystania z kursu, a potem do upływu terminu przedawnienia roszczeń [PROPOZYCJA DO DECYZJI] |

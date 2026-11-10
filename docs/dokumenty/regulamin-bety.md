@@ -1,14 +1,12 @@
 # Regulamin wersji testowej (beta) kursu helloEKG
 
-**Wersja:** 1.0 (projekt)
-**Data:** [DO UZUPEŁNIENIA: data publikacji]
-
-To jest projekt dokumentu do akceptacji właściciela serwisu, a nie jego obowiązująca wersja.
+**Wersja:** 1.0
+**Data:** 10 listopada 2026 r.
 
 ## § 1. Postanowienia ogólne
 
 1. Ten regulamin określa zasady korzystania z wersji testowej (beta) kursu EKG helloEKG dostępnej pod adresem https://kurs.helloekg.pl (dalej: „kurs” albo „aplikacja”).
-2. Kurs udostępnia Jakub Karpiak, prowadzący jednoosobową działalność gospodarczą pod firmą [DO UZUPEŁNIENIA: pełna nazwa firmy z CEIDG], adres: [DO UZUPEŁNIENIA: adres wykonywania działalności], NIP: [DO UZUPEŁNIENIA], REGON: [DO UZUPEŁNIENIA] (dalej: „my”).
+2. Kurs udostępnia Cardiomind sp. z o.o., właściciel serwisu helloEKG (dalej: „my”).
 3. Kontakt z nami: kontakt@helloekg.pl.
 4. Zakładając konto, akceptujesz ten regulamin i potwierdzasz zapoznanie się z Polityką prywatności kursu helloEKG. Zapisujemy datę akceptacji i wersję dokumentów.
 
