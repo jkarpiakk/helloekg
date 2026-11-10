@@ -1,5 +1,9 @@
 import nodemailer from "nodemailer";
 
+/** Potwierdzenie zgody z ekranu płatności na trwałym nośniku (art. 21 ust. 1 i art. 38 pkt 13 ustawy o prawach konsumenta) */
+const ZGODA_W_MAILU =
+  "Przed płatnością zażądano dostępu do kursu przed upływem 14 dni na odstąpienie od umowy i przyjęto do wiadomości, że przez to prawo odstąpienia wygasa z chwilą udostępnienia kursu.";
+
 export interface EmailTemplate {
   subject: string;
   html: string;
@@ -251,11 +255,11 @@ export class EmailService {
         preheader: "Twój dostęp do kursu jest aktywny.",
         label: "Płatność · potwierdzenie",
         title: greeting(firstName, "dostęp jest aktywny."),
-        body: `<p ${P}>Dziękujemy za zakup. Możesz od razu wrócić do nauki.</p>${details([["Plan", planName], ["Aktywny do", endDate]])}`,
+        body: `<p ${P}>Dziękujemy za zakup. Możesz od razu wrócić do nauki.</p>${details([["Plan", planName], ["Aktywny do", endDate]])}<p ${P}>${ZGODA_W_MAILU}</p>`,
         cta: { href: `${appUrl()}/dashboard`, text: "Przejdź do kursu" },
         reason: "Dostajesz tę wiadomość, bo opłacono dostęp do kursu helloEKG.",
       }),
-      text: `Płatność potwierdzona. Plan: ${planName}, aktywny do: ${endDate}. ${appUrl()}/dashboard`,
+      text: `Płatność potwierdzona. Plan: ${planName}, aktywny do: ${endDate}. ${appUrl()}/dashboard\n\n${ZGODA_W_MAILU}`,
     };
   }
 

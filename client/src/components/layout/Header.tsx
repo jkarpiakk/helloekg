@@ -22,7 +22,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Menu, X, LogOut, Settings, Trash2 } from "lucide-react";
+import { Menu, X, LogOut, Settings, Trash2, CreditCard, KeyRound } from "lucide-react";
+import ZmianaHasla from "@/components/auth/ZmianaHasla";
+import { useAppConfig } from "@/lib/config";
+import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { spring } from "@/lib/motion";
@@ -102,6 +105,26 @@ export default function Header() {
   const search = useSearch();
   const { user, isAuthenticated, logout } = useAuth();
   const { toast } = useToast();
+  const { data: config } = useAppConfig();
+  const [zmianaHasla, setZmianaHasla] = useState(false);
+  // „Płatności” w menu: gdy sprzedaż działa albo gdy konto ma subskrypcję odnawianą (anulowanie zawsze możliwe)
+  const { data: subStatus } = useQuery<{ subscription: { odnawiana?: boolean } | null }>({
+    queryKey: ["/api/subscription/status"],
+    enabled: isAuthenticated && !!user?.emailVerified,
+    staleTime: 60_000,
+  });
+  const pokazPlatnosci = !!config?.platnosci || !!subStatus?.subscription?.odnawiana;
+
+  // Portal Stripe: karta, faktury, anulowanie subskrypcji
+  const openPayments = async () => {
+    try {
+      const res = await apiRequest("POST", "/api/stripe/portal", {});
+      const { url } = await res.json();
+      if (url) window.location.href = url;
+    } catch (error) {
+      toast({ title: readableError(error), variant: "destructive" });
+    }
+  };
 
   const searchParams = new URLSearchParams(search);
   const canSeeAdmin = user?.role === "owner" || user?.role === "admin" || user?.role === "reviewer";
@@ -240,6 +263,16 @@ export default function Header() {
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  {pokazPlatnosci && (
+                    <DropdownMenuItem onClick={openPayments} data-testid="menu-payments">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Płatności
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => setZmianaHasla(true)} data-testid="menu-change-password">
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    Zmień hasło
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout} data-testid="menu-logout">
                     <LogOut className="mr-2 h-4 w-4" />
                     Wyloguj się
@@ -255,6 +288,8 @@ export default function Header() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <ZmianaHasla open={zmianaHasla} onOpenChange={setZmianaHasla} />
 
               <AlertDialog open={showDeleteDialog} onOpenChange={openDeleteDialog}>
                 <AlertDialogContent>

@@ -135,7 +135,10 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
   // Walidacja przy opuszczeniu pola, potem na bieżąco przy poprawianiu
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    mode: "onTouched",
+    // błędy po „Wyślij”, potem na bieżąco: walidacja przy wyjściu z pola dodawała komunikat nad przyciskiem,
+    // przycisk zjeżdżał w dół i pierwsze kliknięcie trafiało obok (formularz się nie wysyłał)
+    mode: "onSubmit",
+    reValidateMode: "onChange",
     defaultValues: {
       email: "",
       password: "",
@@ -144,7 +147,10 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
 
   const registerForm = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    mode: "onTouched",
+    // błędy po „Wyślij”, potem na bieżąco: walidacja przy wyjściu z pola dodawała komunikat nad przyciskiem,
+    // przycisk zjeżdżał w dół i pierwsze kliknięcie trafiało obok (formularz się nie wysyłał)
+    mode: "onSubmit",
+    reValidateMode: "onChange",
     defaultValues: {
       firstName: "",
       email: "",

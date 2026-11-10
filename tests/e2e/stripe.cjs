@@ -6,6 +6,8 @@
 // drugi raz nic nie zmienia, zapis w stripe_events), jedną subskrypcję na sesję, zwrot częściowy (dostęp zostaje)
 // i całkowity (dostęp znika), błąd obsługi → 500 bez zapisu zdarzenia (Stripe ponowi), tester bety przy
 // włączonych płatnościach bez darmowego dostępu, blokadę klucza sk_live_.
+// Od 10.11.2026 także subskrypcja miesięczna: zgoda na dostęp od razu wymagana przed Checkout, sesja w trybie
+// subscription daje dostęp, invoice.paid przedłuża (nigdy nie skraca), customer.subscription.deleted kończy.
 //   BEZ=… Z=… DB=helloekg_kurs_otwarcie OUTBOX=… node tests/e2e/stripe.cjs
 const { execSync } = require("child_process");
 const crypto = require("crypto");
@@ -50,11 +52,12 @@ async function tokenZMaila(do_, poMs) {
   const email = `stripe-e2e-${start}@helloekg.test`;
   const haslo = `Stripe-${crypto.randomBytes(9).toString("base64url")}`;
   let planId = null;
+  let planMies = null;
   sql("DELETE FROM rate_limit_store");
   sql(`INSERT INTO app_settings(key,value) VALUES ('dokumenty_opublikowane','true') ON CONFLICT (key) DO UPDATE SET value='true'`);
   try {
     // ── 1. Płatności wyłączone ─────────────────────────────────────────────────────────────────
-    for (const [m, p] of [["GET", "/api/stripe/config"], ["GET", "/api/plans"], ["POST", "/api/stripe/checkout"], ["POST", "/api/stripe/guest-checkout"], ["POST", "/api/stripe/finalize-payment"], ["POST", "/api/stripe/payment-success"]]) {
+    for (const [m, p] of [["GET", "/api/stripe/config"], ["GET", "/api/plans"], ["POST", "/api/stripe/checkout"], ["POST", "/api/stripe/payment-success"]]) {
       const r = await req(BEZ, m, p, { body: m === "POST" ? {} : undefined });
       ok(`wyłączone: ${m} ${p} → 404`, r.status === 404, `status ${r.status}`);
     }
@@ -72,11 +75,12 @@ async function tokenZMaila(do_, poMs) {
     r = await req(Z, "POST", "/api/stripe/webhook/manual", { body: "{}", headers: { "stripe-signature": "t=1,v1=zly" } });
     ok("webhook: zły podpis → 400", r.status === 400, `status ${r.status}`);
 
-    // konto: rejestracja + potwierdzenie z maila
+    // konto: rejestracja + potwierdzenie z maila (ustawienia serwer trzyma w pamięci 10 s)
+    await sleep(11000);
     const przed = Date.now();
     await req(Z, "POST", "/api/auth/register", { body: { firstName: "Stripe", email, password: haslo, confirmPassword: haslo, termsAccepted: true, privacyAccepted: true } });
     const tok = await tokenZMaila(email, przed);
-    await req(Z, "GET", `/api/auth/verify-email?token=${tok}`);
+    await req(Z, "POST", "/api/auth/verify-email", { body: { token: tok } });
     r = await req(Z, "POST", "/api/auth/login", { body: { email, password: haslo } });
     const cookie = (r.headers.get("set-cookie") || "").split(";")[0];
     const userId = sql(`SELECT id FROM users WHERE email='${email}'`);
@@ -124,6 +128,39 @@ async function tokenZMaila(do_, poMs) {
     r = await wyslij(zdarzenie("customer.created", { id: "cus_x" }));
     ok("zdarzenie bez obsługi → 200", r.status === 200, `status ${r.status}`);
 
+    // ── 3. Subskrypcja miesięczna ──────────────────────────────────────────────────────────────
+    planMies = sql(`INSERT INTO plans (name, price, duration_days, currency, "interval", is_active) VALUES ('E2E miesięczny (tymczasowy)', 1.00, 30, 'PLN', 'month', true) RETURNING id`).split("\n")[0];
+    for (const p of ["/api/stripe/guest-checkout", "/api/stripe/finalize-payment"]) {
+      r = await req(Z, "POST", p, { body: { email: `gosc-${start}@helloekg.test`, planId: planMies, sessionId: "cs_test_aaaaaaaaaaaa" } });
+      ok(`zakup bez konta usunięty: ${p} → 404`, r.status === 404, `status ${r.status}`);
+    }
+    r = await req(Z, "POST", "/api/stripe/checkout", { cookie, body: { planId: planMies } });
+    ok("Checkout bez zgody na dostęp od razu → 400", r.status === 400 && /zgod/i.test((await r.json()).error || ""), `status ${r.status}`);
+    const subId = `sub_test_${crypto.randomBytes(6).toString("hex")}`;
+    const sesjaSub = { id: `cs_test_${crypto.randomBytes(8).toString("hex")}`, object: "checkout.session", mode: "subscription", payment_status: "paid", customer: "cus_test_e2e", subscription: subId, payment_intent: null, metadata: { userId, planId: planMies, durationDays: "30" } };
+    r = await wyslij(zdarzenie("checkout.session.completed", sesjaSub));
+    const koniec = () => Number(sql(`SELECT extract(epoch from end_date) FROM subscriptions WHERE stripe_subscription_id='${subId}'`));
+    const teraz = Date.now() / 1000;
+    ok("subskrypcja: sesja w trybie subscription → dostęp ~miesiąc + 2 dni", r.status === 200 && (await dostep()) === true && koniec() > teraz + 29 * 86400 && koniec() < teraz + 34 * 86400, `status ${r.status}`);
+    const st = await (await req(Z, "GET", "/api/subscription/status", { cookie })).json();
+    ok("status: odnawiana = true", st.subscription?.odnawiana === true);
+    r = await req(Z, "POST", "/api/stripe/checkout", { cookie, body: { planId: planMies, zgodaNatychmiast: true } });
+    ok("druga subskrypcja przy aktywnej → 409", r.status === 409, `status ${r.status}`);
+    r = await req(Z, "POST", "/api/stripe/checkout", { cookie, body: { planId, zgodaNatychmiast: true } });
+    ok("zakup jednorazowy przy aktywnej subskrypcji → 409", r.status === 409, `status ${r.status}`);
+    const faktura = (konieczSek) => ({ id: `in_test_${crypto.randomBytes(5).toString("hex")}`, object: "invoice", parent: { type: "subscription_details", subscription_details: { subscription: subId, metadata: {} } }, lines: { data: [{ period: { start: Math.floor(teraz), end: konieczSek } }] } });
+    const odnowienieDo = Math.floor(teraz + 62 * 86400);
+    r = await wyslij(zdarzenie("invoice.paid", faktura(odnowienieDo)));
+    ok("invoice.paid (odnowienie) → koniec = koniec okresu + 2 dni", r.status === 200 && Math.abs(koniec() - (odnowienieDo + 2 * 86400)) < 5, `status ${r.status}`);
+    r = await wyslij(zdarzenie("invoice.paid", faktura(Math.floor(teraz + 10 * 86400))));
+    ok("invoice.paid za wcześniejszy okres → koniec bez zmian", r.status === 200 && Math.abs(koniec() - (odnowienieDo + 2 * 86400)) < 5);
+    r = await wyslij(zdarzenie("invoice.paid", { ...faktura(odnowienieDo), parent: { subscription_details: { subscription: "sub_test_obcy" } } }));
+    ok("invoice.paid obcej subskrypcji → 200, nic", r.status === 200);
+    r = await wyslij(zdarzenie("customer.subscription.deleted", { id: subId, object: "subscription", ended_at: Math.floor(Date.now() / 1000) }));
+    ok("customer.subscription.deleted → status canceled, dostęp znika", r.status === 200 && sql(`SELECT status FROM subscriptions WHERE stripe_subscription_id='${subId}'`) === "canceled" && (await dostep()) === false, `status ${r.status}`);
+    r = await wyslij(zdarzenie("invoice.paid", faktura(Math.floor(teraz + 90 * 86400))));
+    ok("invoice.paid po zakończeniu → nie przywraca dostępu", r.status === 200 && (await dostep()) === false);
+
     // klucz produkcyjny zablokowany bez STRIPE_LIVE_DOZWOLONE
     const status = execSync(`npx tsx -e 'import("./server/stripeClient.ts").then(m => console.log(m.stripeStatus()))'`, {
       env: { ...process.env, STRIPE_SECRET_KEY: "sk_live_niePrawdziwy000", STRIPE_PUBLISHABLE_KEY: "pk_live_niePrawdziwy000" },
@@ -133,7 +170,7 @@ async function tokenZMaila(do_, poMs) {
     ok("wyjątek w teście", false, e.stack);
   } finally {
     sql(`DELETE FROM users WHERE email LIKE 'stripe-e2e-%@helloekg.test'`);
-    if (planId) sql(`DELETE FROM subscriptions WHERE plan_id='${planId}'; DELETE FROM plans WHERE id='${planId}'`);
+    for (const p of [planId, planMies].filter(Boolean)) sql(`DELETE FROM subscriptions WHERE plan_id='${p}'; DELETE FROM plans WHERE id='${p}'`);
     sql("DELETE FROM stripe_events WHERE event_id LIKE 'evt_test_%'");
     sql("DELETE FROM app_settings WHERE key='dokumenty_opublikowane'");
     console.log(wyn.join("\n"));

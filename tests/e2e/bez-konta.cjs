@@ -11,7 +11,6 @@ const root = path.join(__dirname, "../..");
 const PUBLICZNE = new Set(["/health", "/ready", "/robots.txt", "/.well-known/security.txt", "/api/config", "/api/dokumenty/:id"]);
 // Trasy, które bez konta mają inną odpowiedź niż 401 (opis w raporcie)
 const OCZEKIWANE = {
-  "/api/auth/verify-email": [400], // bez tokenu: 400, nic nie zdradza
   "/api/dokumenty/:id": [404, 200], // 404 przed publikacją, 200 po
   "/api/plans": [404], "/api/stripe/config": [404], // płatności wyłączone
 };

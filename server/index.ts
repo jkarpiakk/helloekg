@@ -1,6 +1,7 @@
 // Config validation must run first — exits with clear message if env vars are missing
 import "./config";
 import { config } from "./config";
+import "./logBezDanych";
 
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
@@ -134,7 +135,9 @@ console.log(stripeStatus());
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-    console.error(`[error] ${status} - ${message}`, err);
+    // 4xx (np. zły JSON) bez obiektu błędu: body-parser trzyma w nim surową treść żądania
+    if (status >= 500) console.error(`[error] ${status} - ${message}`, err);
+    else console.warn(`[error] ${status} - ${err.type || message}`);
     res.status(status).json({
       message: config.isProduction && status === 500 ? "Internal Server Error" : message,
     });

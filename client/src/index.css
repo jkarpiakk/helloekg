@@ -264,7 +264,8 @@
   .prose-hk h3 { color: var(--txt); font: 500 1.25rem/1.3 var(--font-heading); letter-spacing: -.012em; margin-top: 1.8em; }
   /* Pogrubienie = Inter 500 (plik marki) + kolor --txt. Inter 600 nie jest ładowany — 600 byłoby syntezą przeglądarki */
   .prose-hk strong, .prose-hk b { color: var(--txt); font-weight: 500; }
-  .prose-hk a { color: var(--puls); }
+  /* podkreślenie: link w tekście nie może różnić się od niego samym kolorem (WCAG 1.4.1) */
+  .prose-hk a { color: var(--puls); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
   .prose-hk ul, .prose-hk ol { padding-left: 1.3em; display: grid; gap: .45em; }
   .prose-hk ul { list-style: disc; } .prose-hk ol { list-style: decimal; }
   .prose-hk li::marker { color: var(--txt3); }

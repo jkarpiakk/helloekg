@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -68,8 +68,11 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
   const { toast } = useToast();
   const searchString = useSearch();
-  const params = new URLSearchParams(searchString);
-  const token = params.get("token");
+  // token z linku zapamiętany przy pierwszym renderze i usunięty z paska adresu (bez historii i nagłówka Referer)
+  const [token] = useState(() => new URLSearchParams(searchString).get("token"));
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("token")) window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordFormSchema),

@@ -56,6 +56,8 @@ export const plans = pgTable("plans", {
   durationDays: integer("duration_days").notNull(),
   currency: varchar("currency", { length: 3 }).notNull().default("PLN"),
   stripePriceId: varchar("stripe_price_id", { length: 100 }),
+  /** Plan odnawiany w Stripe (subskrypcja): "month" albo "year". Pusty: jednorazowa płatność za durationDays dni */
+  interval: varchar("interval", { length: 10 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -70,7 +72,8 @@ export const subscriptions = pgTable("subscriptions", {
   status: varchar("status", { length: 50 }).notNull().default("active"),
   paymentProvider: varchar("payment_provider", { length: 50 }).notNull(),
   invoiceUrl: text("invoice_url"),
-  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
+  /** Subskrypcja odnawiana w Stripe (plan z interval): jeden zapis na subskrypcję, odnowienia przesuwają endDate */
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }).unique(),
   /** Sesja Stripe Checkout, z której powstała subskrypcja: jedna sesja = jeden zapis (ponowne użycie nie daje kolejnych dni) */
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }).unique(),
   /** Płatność Stripe (payment_intent) tej subskrypcji: po niej zwrot (charge.refunded) odbiera dostęp */
@@ -816,7 +819,7 @@ export const registerSchema = z.object({
   password: nowyHaslo,
   confirmPassword: z.string().max(PASSWORD_MAX_LENGTH),
   firstName: z.string().trim().min(1, "Podaj imię").max(60, "Imię jest za długie")
-    .regex(/^[\p{L}][\p{L}\p{M} '’.-]*$/u, "Sprawdź imię: tylko litery, spacja albo łącznik"),
+    .regex(/^[\p{L}][\p{L}\p{M} '’-]*$/u, "Sprawdź imię: tylko litery, spacja albo łącznik"),
   termsAccepted: z.literal(true, { message: "Zaakceptuj regulamin bety" }),
   privacyAccepted: z.literal(true, { message: "Zaakceptuj politykę prywatności" }),
   /** Pole-pułapka (honeypot): człowiek go nie widzi i nie wypełnia */

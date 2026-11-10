@@ -3,6 +3,24 @@ import { createHmac } from "crypto";
 import { pool } from "../db";
 import { storage } from "../storage";
 import { ipWyjeteZLimitow } from "../ustawienia";
+import { isIPv6 } from "net";
+
+/**
+ * Klucz limitu dla adresu klienta. IPv6: cała sieć /64 (jedna sieć domowa czy serwer dostaje zwykle /64
+ * i może zmieniać adres w jej obrębie, więc limit na pełny adres dałoby się obejść). IPv4 bez zmian.
+ */
+export function kluczAdresu(ip: string | undefined): string {
+  if (!ip) return "brak";
+  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (v4) return v4[1];
+  if (!isIPv6(ip)) return ip;
+  // rozwinięcie „::” i pierwsze 4 grupy
+  const [glowa, ogon = ""] = ip.toLowerCase().split("::");
+  const g = glowa ? glowa.split(":") : [];
+  const o = ogon ? ogon.split(":") : [];
+  const pelne = ip.includes("::") ? [...g, ...Array(8 - g.length - o.length).fill("0"), ...o] : g;
+  return `${pelne.slice(0, 4).map((x) => x.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
 
 /** UUID-zero dla wpisów audytu bez konkretnej encji (np. nieudane logowanie na nieznany e-mail) */
 export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
@@ -29,11 +47,10 @@ async function ensureTable(): Promise<void> {
       reset_time BIGINT  NOT NULL
     )
   `);
-  // Periodically clean up expired rows (best-effort, not critical)
-  pool.query(
-    "DELETE FROM rate_limit_store WHERE reset_time < $1",
-    [Date.now()]
-  ).catch(() => {});
+  // Wygasłe wpisy: od razu i potem co 10 minut, żeby tabela nie rosła (każda nowa ścieżka to nowy klucz)
+  const sprzataj = () => pool.query("DELETE FROM rate_limit_store WHERE reset_time < $1", [Date.now()]).catch(() => {});
+  sprzataj();
+  setInterval(sprzataj, 10 * 60 * 1000).unref();
   tableReady = true;
 }
 
@@ -49,6 +66,8 @@ export function createRateLimit(options: {
   keyPrefix?: string;
   /** Przy błędzie bazy odrzucić (503) zamiast przepuścić: logowanie i tak nie działa bez bazy */
   failClosed?: boolean;
+  /** Osobny licznik dla każdej ścieżki (domyślnie). Ogólny limit API liczy wszystkie ścieżki razem. */
+  naSciezke?: boolean;
 }) {
   const {
     windowMs,
@@ -56,6 +75,7 @@ export function createRateLimit(options: {
     message = "Zbyt wiele żądań. Spróbuj ponownie później.",
     keyPrefix = "rl",
     failClosed = false,
+    naSciezke = true,
   } = options;
 
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -69,7 +89,7 @@ export function createRateLimit(options: {
       // Ścieżka bez wielkości liter i końcowego „/”: Express dopasowuje trasy bez względu na nie,
       // więc „/API/Auth/Login/” nie może dostać osobnego licznika
       const normPath = req.path.split("?")[0].toLowerCase().replace(/\/+$/, "") || "/";
-      const key = `${keyPrefix}:${req.ip}:${normPath}`;
+      const key = naSciezke ? `${keyPrefix}:${kluczAdresu(req.ip)}:${normPath}` : `${keyPrefix}:${kluczAdresu(req.ip)}`;
 
       const result = await pool.query<{ count: number; reset_time: string }>(
         `INSERT INTO rate_limit_store (key, count, reset_time)
@@ -130,11 +150,14 @@ export const authRateLimit = createRateLimit({
   failClosed: true,
 });
 
+// Wszystkie ścieżki razem, więc luźniej niż dawne 100 na ścieżkę: wspólne IP szpitala czy akademika
 export const apiRateLimit = createRateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: 300,
   message: "Zbyt wiele żądań API. Spróbuj ponownie za minutę.",
   keyPrefix: "api",
+  // jeden licznik na adres: losowe ścieżki nie zakładają nowych wierszy w rate_limit_store
+  naSciezke: false,
 });
 
 export const paymentRateLimit = createRateLimit({

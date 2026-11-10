@@ -34,6 +34,8 @@ const APP_VERSION: string = import.meta.env.VITE_APP_VERSION || "";
 /** Bezpieczny adres powrotu: tylko ścieżka w tej aplikacji */
 function safeFrom(raw: string | null): string | null {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/zgloszenie")) return null;
+  // znaki sterujące, białe i „\” przeglądarka gubi albo zamienia na „/”: „/\t/host” to inny serwis
+  if (/[\u0000-\u0020\u007f-\u009f\\]/.test(raw)) return null;
   return raw.slice(0, 500);
 }
 

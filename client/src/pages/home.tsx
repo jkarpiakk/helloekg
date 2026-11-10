@@ -133,7 +133,7 @@ export default function Home() {
       </section>
 
       <Dialog open={authMode !== null} onOpenChange={(open) => { if (!open) closeAuth(); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
           <DialogTitle className="sr-only">
             {authMode === "login" ? "Zaloguj się" : "Załóż konto"}
           </DialogTitle>

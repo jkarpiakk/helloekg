@@ -8,7 +8,7 @@ type Dokument = { id: string; wersja: string; tytul: string; tresc: string };
 
 /** Tabele szersze niż telefon przewijają się w poziomie we własnym pudełku, a nie całą stronę */
 const zTabelamiPrzewijanymi = (h: { __html: string }) => ({
-  __html: h.__html.replace(/<table/g, '<div class="overflow-x-auto"><table').replace(/<\/table>/g, "</table></div>"),
+  __html: h.__html.replace(/<table/g, '<div class="overflow-x-auto" tabindex="0" role="region" aria-label="Tabela, przewiń w poziomie"><table').replace(/<\/table>/g, "</table></div>"),
 });
 
 /** Regulamin bety i polityka prywatności (Markdown z serwera, publiczne po akceptacji JK) */

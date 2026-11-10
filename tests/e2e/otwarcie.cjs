@@ -173,7 +173,7 @@ const tokenZMaila = (m) => (m && /token=([0-9a-f]{64})/.exec(m.text)?.[1]) || nu
 
     // ── 4. Niepotwierdzone konto ─────────────────────────────────────────────────────────────────
     r = await req("POST", "/api/auth/login", { body: { email, password: dlugie } });
-    const sesja = ciastko(r);
+    let sesja = ciastko(r);
     const lj = await r.json();
     ok("logowanie hasłem dłuższym niż 72 bajty", r.status === 200 && lj.user?.emailVerified === false, `status ${r.status}`);
     r = await req("POST", "/api/auth/login", { body: { email, password: dlugie.slice(0, 72) } });
@@ -189,17 +189,23 @@ const tokenZMaila = (m) => (m && /token=([0-9a-f]{64})/.exec(m.text)?.[1]) || nu
     const przed2 = Date.now();
     r = await req("POST", "/api/auth/resend-verification", { body: { email } });
     const t2 = tokenZMaila(await czekajNaMail(email, /Potwierdź adres/, przed2));
-    r = await req("GET", `/api/auth/verify-email?token=${t1}`);
+    r = await req("POST", "/api/auth/verify-email", { body: { token: t1 } });
     ok("stary link po ponownym wysłaniu → 400", r.status === 400, `status ${r.status}`);
     sql(`UPDATE users SET email_verification_expiry = timezone('utc', now()) - interval '1 minute' WHERE email='${email}'`);
-    r = await req("GET", `/api/auth/verify-email?token=${t2}`);
+    r = await req("POST", "/api/auth/verify-email", { body: { token: t2 } });
     ok("link po 24 h → 400", r.status === 400, `status ${r.status}`);
     sql(`UPDATE users SET email_verification_expiry = timezone('utc', now()) + interval '1 hour' WHERE email='${email}'`);
-    r = await req("GET", `/api/auth/verify-email?token=${t2}`);
+    r = await req("POST", "/api/auth/verify-email", { body: { token: t2 } });
     ok("potwierdzenie ważnym linkiem → 200", r.status === 200, `status ${r.status}`);
+    r = await req("GET", "/api/auth/me", { cookie: sesja });
+    ok("potwierdzenie wylogowuje inne sesje konta (ktoś zalogowany na cudzy adres)", r.status === 401, `status ${r.status}`);
     r = await req("GET", `/api/auth/verify-email?token=${t2}`);
+    ok("GET z tokenem niczego nie potwierdza (skaner poczty) → 404", r.status === 404, `status ${r.status}`);
+    r = await req("POST", "/api/auth/verify-email", { body: { token: t2 } });
     ok("ten sam link drugi raz → 400 (jednorazowy)", r.status === 400, `status ${r.status}`);
     ok("data potwierdzenia zapisana", sql(`SELECT email_verified_at IS NOT NULL FROM users WHERE email='${email}'`) === "t");
+    r = await req("POST", "/api/auth/login", { body: { email, password: dlugie } });
+    sesja = ciastko(r);
 
     r = await req("GET", "/api/modules", { cookie: sesja });
     ok("potwierdzone: kurs otwarty", r.status === 200, `status ${r.status}`);

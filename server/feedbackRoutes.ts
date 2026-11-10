@@ -145,8 +145,37 @@ export function registerFeedbackRoutes(app: Express) {
     limit: Math.ceil(FEEDBACK_MAX_FILES * FEEDBACK_MAX_FILE_BYTES * 1.37) + 64 * 1024,
   });
 
+  /**
+   * Przed odczytem treści (do ~21 MB): dzienny limit konta i jedno zgłoszenie naraz na konto, a w całym
+   * procesie najwyżej 4 naraz. Bez tego kilkadziesiąt równoległych żądań trzyma w pamięci gigabajty JSON-a.
+   */
+  const wToku = new Set<string>();
+  const przedOdczytem = async (req: Request, res: Response, next: () => void) => {
+    const userId = req.user!.id;
+    if (wToku.has(userId) || wToku.size >= 4) {
+      res.setHeader("Retry-After", "5");
+      return fail(res, 429, "Poprzednie zgłoszenie jeszcze się wysyła. Spróbuj za chwilę.");
+    }
+    // miejsce zajęte od razu (przed zapytaniem do bazy), zwolnione po zakończeniu odpowiedzi
+    wToku.add(userId);
+    res.on("close", () => wToku.delete(userId));
+    try {
+      const [{ n }] = await db
+        .select({ n: count() })
+        .from(supportTickets)
+        .where(and(eq(supportTickets.userId, userId), eq(supportTickets.kind, "feedback"), gte(supportTickets.createdAt, sql`now() - interval '24 hours'`)));
+      if (Number(n) >= FEEDBACK_DAILY_LIMIT) {
+        return fail(res, 429, "Wysłano dziś już 20 zgłoszeń z tego konta. Kolejne możesz wysłać jutro.");
+      }
+    } catch (e) {
+      console.error("Feedback limit check failed:", e);
+      return fail(res, 500, "Nie udało się wysłać zgłoszenia. Spróbuj ponownie.");
+    }
+    next();
+  };
+
   // ── Nowe zgłoszenie ─────────────────────────────────────────────────────
-  app.post("/api/feedback", requireKonto, parseFeedbackBody, async (req: Request, res: Response) => {
+  app.post("/api/feedback", requireKonto, przedOdczytem, parseFeedbackBody, async (req: Request, res: Response) => {
     const user = req.user!;
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -167,7 +196,7 @@ export function registerFeedbackRoutes(app: Express) {
           ),
         );
       if (Number(n) >= FEEDBACK_DAILY_LIMIT) {
-        return fail(res, 429, "Wysłałeś dziś już 20 zgłoszeń. Kolejne możesz wysłać jutro.");
+        return fail(res, 429, "Wysłano dziś już 20 zgłoszeń z tego konta. Kolejne możesz wysłać jutro.");
       }
 
       // Załączniki: dekodowanie i sprawdzenie, zanim cokolwiek zapiszemy
@@ -187,7 +216,8 @@ export function registerFeedbackRoutes(app: Express) {
       }
 
       // tylko ścieżka w aplikacji: „//host” i „/\\host” przeglądarka potraktowałaby jako inny serwis
-      const pagePath = input.pagePath && /^\/(?![\/\\])/.test(input.pagePath) ? input.pagePath : null;
+      // znaki sterujące i białe (np. tabulator w „/\t/host”) przeglądarka usuwa z adresu, więc odrzucamy je wcześniej
+      const pagePath = input.pagePath && /^\/(?![\/\\])/.test(input.pagePath) && !/[\u0000-\u0020\u007f-\u009f\\]/.test(input.pagePath) ? input.pagePath : null;
       const ids = pagePath ? feedbackIdsFromPath(pagePath) : {};
       const context: FeedbackContext = {
         userAgent: (req.get("User-Agent") || "").slice(0, 400) || undefined,

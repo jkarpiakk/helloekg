@@ -7,7 +7,9 @@ const linkClass =
   "inline-flex min-h-11 w-fit items-center gap-2 text-[var(--txt2)] transition-colors duration-200 hover:text-[var(--txt)]";
 
 export default function Footer() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  // kurs otwiera się dopiero po potwierdzeniu adresu: wcześniej linki do kursu tylko by odbijały
+  const wKursie = isAuthenticated && !!user?.emailVerified;
 
   return (
     <footer className="mt-16 border-t border-[var(--line)] pb-8 pt-14 text-sm sm:mt-24" data-testid="footer">
@@ -29,7 +31,7 @@ export default function Footer() {
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
             <div className="grid content-start">
               <p className="label mb-1">Kurs</p>
-              {isAuthenticated ? (
+              {wKursie ? (
                 <>
                   <Link href="/modules" className={linkClass}>Kurs</Link>
                   <Link href="/dashboard" className={linkClass}>Postęp</Link>
@@ -43,15 +45,16 @@ export default function Footer() {
             <div className="grid content-start">
               <p className="label mb-1">Konto</p>
               {/* Postęp jest już w kolumnie „Kurs” — tu tylko to, co dotyczy konta */}
+              {/* zalogowany zmienia hasło w menu konta; „Nie pamiętasz hasła?” tylko bez konta */}
               {isAuthenticated ? (
-                <Link href="/zgloszenie?area=inne" className={linkClass}>Zgłoś uwagę</Link>
+                wKursie && <Link href="/zgloszenie?area=inne" className={linkClass}>Zgłoś uwagę</Link>
               ) : (
                 <>
                   <Link href="/?auth=login" className={linkClass}>Zaloguj się</Link>
                   <Link href="/?auth=register" className={linkClass}>Załóż konto</Link>
+                  <Link href="/forgot-password" className={linkClass}>Nie pamiętasz hasła?</Link>
                 </>
               )}
-              <Link href="/forgot-password" className={linkClass}>Nie pamiętasz hasła?</Link>
             </div>
 
             <div className="grid content-start">

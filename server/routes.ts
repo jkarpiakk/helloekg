@@ -63,7 +63,8 @@ import { users, modules, sections, questions, attempts, progress, subscriptions,
 import { eq, or, and, gte, desc, count, ilike, avg, sql, isNull, isNotNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey, stripeSource } from "./stripeClient";
 import { linkZMaila } from "./mailLinks";
-import { aktywujPlatnosc } from "./platnosci";
+import { config } from "./config";
+import { aktywujPlatnosc, anulujSubskrypcjeKonta, anulujWStripe } from "./platnosci";
 
 /** Imię i nazwisko na certyfikat: litery (także polskie), spacja, łącznik, apostrof */
 const namePart = (label: string) =>
@@ -100,6 +101,11 @@ const adminSubscriptionSchema = z.object({
 
 const deleteAccountSchema = z.object({
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+});
+
+const zmianaHaslaSchema = z.object({
+  currentPassword: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+  newPassword: z.string().min(PASSWORD_MIN_LENGTH, `Nowe hasło musi mieć co najmniej ${PASSWORD_MIN_LENGTH} znaków`).max(PASSWORD_MAX_LENGTH),
 });
 
 // Ta sama odpowiedź dla nowego i istniejącego adresu: formularz nie zdradza, czy konto już jest
@@ -180,6 +186,8 @@ function plikDokumentu(id: DokumentId): string | null {
  * (postęp, odpowiedzi, zgody, certyfikaty kasują się kaskadowo), wpis audytu bez danych osobowych.
  */
 async function usunKontoZDanymi(cel: User, kto: { actorId: string; akcja: string; ip?: string; ua?: string }) {
+  // id subskrypcji Stripe znikają razem z kontem: odczyt przed transakcją, anulowanie dopiero po udanym usunięciu
+  const anuluj = await anulujSubskrypcjeKonta(cel.id);
   await db.transaction(async (tx) => {
     await tx.update(subscriptions)
       .set({ status: "cancelled", endDate: new Date() })
@@ -203,6 +211,7 @@ async function usunKontoZDanymi(cel: User, kto: { actorId: string; akcja: string
     await tx.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${cel.id}`);
     await tx.delete(users).where(eq(users.id, cel.id));
   });
+  await anuluj();
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -392,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // wcześniej czyta je tylko właściciel i admin (podgląd projektu)
   app.get("/api/dokumenty/:id", async (req, res) => {
     const id = req.params.id as DokumentId;
-    if (!(id in DOKUMENTY)) return res.status(404).json({ error: "Nie znaleziono" });
+    if (!Object.hasOwn(DOKUMENTY, id)) return res.status(404).json({ error: "Nie znaleziono" });
     let wolno = await ustawienie("dokumenty_opublikowane");
     if (!wolno && req.session?.userId) {
       const u = await storage.getUser(req.session.userId);
@@ -486,20 +495,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Email verification endpoint
-  app.get("/api/auth/verify-email", async (req, res) => {
+  // Potwierdzenie adresu: POST z przycisku na stronie /verify-email (samo otwarcie linku przez skaner poczty
+  // niczego nie potwierdza). Po potwierdzeniu wylogowujemy inne sesje konta: ktoś, kto założył konto na cudzy
+  // adres i był zalogowany, traci je, gdy właściciel skrzynki kliknie link.
+  app.post("/api/auth/verify-email", authRateLimit, async (req, res) => {
     try {
-      const { token } = req.query;
+      const { token } = req.body ?? {};
       
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: "Brak tokenu weryfikacyjnego" });
       }
 
-      const user = await authService.verifyEmail(token);
+      const user = token.length <= 200 ? await authService.verifyEmail(token) : null;
       
       if (!user) {
-        return res.status(400).json({ error: "Nieprawidłowy lub wygasły token weryfikacyjny" });
+        return res.status(400).json({ error: "Link jest nieprawidłowy albo wygasł" });
       }
+      await db.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${user.id} AND sid <> ${req.sessionID ?? ""}`);
 
       await storage.createAuditLog({
         actorId: user.id,
@@ -532,23 +544,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ta sama odpowiedź niezależnie od tego, czy konto istnieje / jest już zweryfikowane
       const genericResponse = { message: "Jeśli konto istnieje i nie jest jeszcze zweryfikowane, wysłaliśmy nowy link weryfikacyjny" };
 
-      // najwyżej 3 maile na godzinę na adres (limit na IP da się obejść, skrzynka ofiary nie)
-      if (!(await mailDoAdresuDozwolony(email, "weryfikacja"))) return res.json(genericResponse);
-
-      const user = await storage.getUserByEmail(email);
-      if (!user || user.emailVerified) {
-        return res.json(genericResponse);
-      }
-
-      // Nowy token (24 h); poprzedni link przestaje działać
-      const newToken = await authService.newVerificationToken(user.id);
-
-      const verificationUrl = linkZMaila("/verify-email", newToken);
-
-      // odpowiedź od razu, mail w tle: czas odpowiedzi nie zdradza, czy konto istnieje
+      // odpowiedź od razu, reszta w tle: czas odpowiedzi nie zdradza, czy konto istnieje (nawet zapis tokenu)
       res.json(genericResponse);
-      emailService.sendEmailVerification(user.email, user.firstName, verificationUrl)
-        .catch((emailError) => console.error("Failed to resend verification email:", emailError));
+      (async () => {
+        // najwyżej 3 maile na godzinę na adres (limit na IP da się obejść, skrzynka ofiary nie)
+        if (!(await mailDoAdresuDozwolony(email, "weryfikacja"))) return;
+        const user = await storage.getUserByEmail(email);
+        if (!user || user.emailVerified) return;
+        // Nowy token (24 h); poprzedni link przestaje działać
+        const newToken = await authService.newVerificationToken(user.id);
+        await emailService.sendEmailVerification(user.email, user.firstName, linkZMaila("/verify-email", newToken));
+      })().catch((emailError) => console.error("Failed to resend verification email:", emailError?.message));
     } catch (error: any) {
       console.error("Resend verification error:", error);
       res.status(500).json({ error: "Błąd podczas wysyłania e-maila" });
@@ -564,28 +570,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { email } = parsed.data;
       const odpowiedz = { message: "Jeśli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła" };
-      // najwyżej 3 maile na godzinę na adres; ponad limit bez nowego tokenu (ważny link z poprzedniego maila zostaje)
-      if (!(await mailDoAdresuDozwolony(email, "reset"))) return res.json(odpowiedz);
-      const resetToken = await authService.initiatePasswordReset(email);
-
-      auditSafe({
-        actorId: null,
-        action: "password_reset_requested",
-        entityType: "auth",
-        entityId: NIL_UUID,
-        diff: { emailHash: hashEmail(email), accountExists: !!resetToken },
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      });
-
-      // odpowiedź od razu, mail w tle: czas odpowiedzi nie zdradza, czy konto istnieje
+      // odpowiedź od razu, reszta w tle: czas odpowiedzi nie zdradza, czy konto istnieje (nawet zapis tokenu)
       res.json(odpowiedz);
-      if (resetToken) {
-        const resetUrl = linkZMaila("/reset-password", resetToken);
-        storage.getUserByEmail(email)
-          .then((user) => user && emailService.sendPasswordReset(user.email, user.firstName, resetUrl))
-          .catch((emailError) => console.error("Failed to send password reset email:", emailError));
-      }
+      const ip = req.ip, ua = req.get("User-Agent");
+      (async () => {
+        // najwyżej 3 maile na godzinę na adres; ponad limit bez nowego tokenu (ważny link z poprzedniego maila zostaje)
+        if (!(await mailDoAdresuDozwolony(email, "reset"))) return;
+        const resetToken = await authService.initiatePasswordReset(email);
+        auditSafe({
+          actorId: null,
+          action: "password_reset_requested",
+          entityType: "auth",
+          entityId: NIL_UUID,
+          diff: { emailHash: hashEmail(email), accountExists: !!resetToken },
+          ipAddress: ip,
+          userAgent: ua,
+        });
+        if (!resetToken) return;
+        const user = await storage.getUserByEmail(email);
+        if (user) await emailService.sendPasswordReset(user.email, user.firstName, linkZMaila("/reset-password", resetToken));
+      })().catch((emailError) => console.error("Failed to send password reset email:", emailError?.message));
     } catch (error: any) {
       console.error("Forgot password error:", error);
       res.status(500).json({ error: "Wystąpił błąd. Spróbuj ponownie później" });
@@ -643,6 +647,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Usunięcie konta: JSON { password } — wymagane bieżące hasło
+  // Zmiana hasła z konta: obecne hasło, nowe co najmniej 10 znaków; inne sesje wylogowane, mail z powiadomieniem
+  app.post("/api/auth/change-password", accountDeleteRateLimit, requireAuth, async (req, res) => {
+    const parsed = zmianaHaslaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message || "Sprawdź hasła" });
+    }
+    try {
+      const user = req.user!;
+      if (!(await authService.verifyPassword(parsed.data.currentPassword, user.password))) {
+        auditSafe({ actorId: user.id, action: "password_change_failed", entityType: "user", entityId: user.id, ipAddress: req.ip, userAgent: req.get("User-Agent") });
+        return res.status(403).json({ error: "Obecne hasło się nie zgadza" });
+      }
+      if (parsed.data.currentPassword === parsed.data.newPassword) {
+        return res.status(400).json({ error: "Nowe hasło musi być inne niż obecne" });
+      }
+      await storage.updateUser(user.id, { password: await authService.hashPassword(parsed.data.newPassword) });
+      await db.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${user.id} AND sid <> ${req.sessionID}`);
+      auditSafe({ actorId: user.id, action: "password_changed", entityType: "user", entityId: user.id, ipAddress: req.ip, userAgent: req.get("User-Agent") });
+      res.json({ success: true });
+      emailService.sendPasswordChanged(user.email, user.firstName)
+        .catch((e) => console.error("Password changed email failed:", e?.message));
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ error: "Nie udało się zmienić hasła. Spróbuj ponownie." });
+    }
+  });
+
   app.delete("/api/auth/account", accountDeleteRateLimit, requireAuth, async (req, res) => {
     const parsed = deleteAccountSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -665,6 +696,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userAgent: req.get('User-Agent'),
         });
         return res.status(403).json({ error: "Nieprawidłowe hasło" });
+      }
+
+      // ostatni właściciel nie usuwa sam siebie: panel zostałby bez nikogo z pełnymi uprawnieniami
+      if (req.user!.role === "owner") {
+        const [{ n }] = await db.select({ n: count() }).from(users).where(eq(users.role, "owner"));
+        if (Number(n) <= 1) {
+          return res.status(409).json({ error: "To jedyne konto właściciela. Najpierw nadaj tę rolę innej osobie." });
+        }
       }
 
       await usunKontoZDanymi(req.user!, {
@@ -731,6 +770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endDate: subscription.endDate,
           status: subscription.status,
           paymentProvider: subscription.paymentProvider,
+          odnawiana: Boolean(subscription.stripeSubscriptionId),
         },
       });
     } catch (error) {
@@ -755,10 +795,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * Adres, na który Stripe wraca po płatności: APP_BASE_URL z konfiguracji serwera (za nginx req.protocol to http,
    * a nagłówek Host przychodzi od klienta), a bez niej, jak dotąd, z żądania.
    */
-  const adresPowrotu = (req: Request) => (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  const adresPowrotu = (req: Request) => {
+    // na produkcji nigdy z nagłówka Host (podaje go klient)
+    if (!process.env.APP_BASE_URL && config.isProduction) throw new Error("Brak APP_BASE_URL w konfiguracji serwera");
+    return (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  };
   /** Metody w Stripe Checkout (STRIPE_METODY, domyślnie karta, BLIK, Przelewy24); każda musi być włączona w panelu Stripe */
   const metodyPlatnosci = () =>
     (process.env.STRIPE_METODY || "card,blik,p24").split(",").map((m) => m.trim()).filter(Boolean) as any[];
+  /**
+   * Sesja Stripe Checkout dla planu. Plan z interval (miesięczny) to subskrypcja odnawiana kartą: BLIK i Przelewy24
+   * nie obsługują płatności cyklicznych w Stripe. Plan bez interval to jednorazowa płatność (karta, BLIK, Przelewy24).
+   * Metadane (plan, konto albo adres gościa, zgoda na rozpoczęcie przed upływem 14 dni) idą do sesji i do subskrypcji.
+   */
+  const sesjaCheckout = async (
+    req: Request,
+    plan: { id: string; name: string; price: string; currency: string; durationDays: number; interval: string | null },
+    klient: { customer?: string; customerEmail?: string },
+    kto: { userId?: string; guestEmail?: string },
+  ) => {
+    const stripe = await getUncachableStripeClient();
+    const odnawiany = plan.interval === "month" || plan.interval === "year";
+    const metadata: Record<string, string> = {
+      ...kto,
+      planId: plan.id,
+      durationDays: plan.durationDays.toString(),
+      zgodaNatychmiast: new Date().toISOString(),
+    };
+    return stripe.checkout.sessions.create({
+      ...(klient.customer ? { customer: klient.customer } : { customer_email: klient.customerEmail }),
+      ...(!odnawiany && !klient.customer ? { customer_creation: "always" as const } : {}),
+      payment_method_types: odnawiany ? (["card"] as any[]) : metodyPlatnosci(),
+      line_items: [{
+        price_data: {
+          currency: plan.currency.toLowerCase(),
+          product_data: {
+            name: plan.name,
+            description: odnawiany
+              ? `Dostęp do kursu helloEKG, odnawiany co ${plan.interval === "year" ? "rok" : "miesiąc"}`
+              : `Dostęp do kursu helloEKG na ${plan.durationDays} dni, bez odnawiania`,
+          },
+          unit_amount: Math.round(parseFloat(plan.price) * 100),
+          ...(odnawiany ? { recurring: { interval: plan.interval as "month" | "year" } } : {}),
+        },
+        quantity: 1,
+      }],
+      mode: odnawiany ? "subscription" : "payment",
+      locale: "pl",
+      ...(odnawiany ? { subscription_data: { metadata } } : {}),
+      success_url: `${adresPowrotu(req)}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${adresPowrotu(req)}/pricing?payment=cancelled`,
+      metadata,
+    });
+  };
+
   /** Płatności wyłączone (brak kluczy Stripe): 503 z jasnym komunikatem zamiast ogólnego błędu. */
   const bezStripe = (res: Response) => {
     if (stripeSource()) return false;
@@ -778,92 +868,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Zakup gościa: sama sesja Stripe; konto powstaje po płatności (server/platnosci.ts)
-  app.post("/api/stripe/guest-checkout", tylkoGdyPlatnosci, paymentRateLimit, async (req, res) => {
-    if (bezStripe(res)) return;
-    try {
-      const planId = req.body?.planId;
-      const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
-      if (!planId || !z.string().email().max(255).safeParse(email).success) {
-        return res.status(400).json({ error: "Email i plan są wymagane" });
-      }
-
-      const plan = await storage.getActivePlans().then(plans => 
-        plans.find(p => p.id === planId)
-      );
-      
-      if (!plan) {
-        return res.status(404).json({ error: "Plan nie znaleziony" });
-      }
-      if (!(parseFloat(plan.price) > 0)) {
-        return res.status(400).json({ error: "Ten plan nie jest dostępny do zakupu" });
-      }
-
-      const stripe = await getUncachableStripeClient();
-
-      // Konto gościa powstaje dopiero po płatności (server/platnosci.ts); tu tylko sesja Stripe z adresem.
-      const session = await stripe.checkout.sessions.create({
-        customer_email: email,
-        customer_creation: 'always',
-        payment_method_types: metodyPlatnosci(),
-        line_items: [{
-          price_data: {
-            currency: plan.currency.toLowerCase(),
-            product_data: {
-              name: plan.name,
-              description: `Dostęp na ${plan.durationDays} dni`,
-            },
-            unit_amount: Math.round(parseFloat(plan.price) * 100),
-          },
-          quantity: 1,
-        }],
-        mode: 'payment',
-        success_url: `${adresPowrotu(req)}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${adresPowrotu(req)}/?payment=cancelled`,
-        metadata: {
-          guestEmail: email,
-          planId: plan.id,
-          durationDays: plan.durationDays.toString(),
-        }
-      });
-
-      res.json({ url: session.url });
-    } catch (error: any) {
-      console.error("Guest checkout error:", error);
-      res.status(500).json({ error: "Błąd podczas tworzenia sesji płatności" });
-    }
-  });
-
-  // Strona powrotu po płatności (także gościa): aktywacja z sesji pobranej ze Stripe, idempotentna
-  app.post("/api/stripe/finalize-payment", tylkoGdyPlatnosci, paymentRateLimit, async (req, res) => {
-    if (bezStripe(res)) return;
-    try {
-      const sessionId = req.body?.sessionId;
-      if (typeof sessionId !== "string" || !/^cs_[A-Za-z0-9_]{10,250}$/.test(sessionId)) {
-        return res.status(400).json({ error: "Brak ID sesji" });
-      }
-
-      const stripe = await getUncachableStripeClient();
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
-      const wynik = await aktywujPlatnosc(session);
-      if (!wynik) {
-        return res.status(400).json({ error: "Płatność nie została zrealizowana" });
-      }
-
-      res.json({
-        success: true,
-        isNewAccount: wynik.hasloZMaila,
-        email: wynik.user.email,
-        subscription: {
-          startDate: wynik.subscription.startDate,
-          endDate: wynik.subscription.endDate
-        }
-      });
-    } catch (error: any) {
-      console.error("Finalize payment error:", error);
-      res.status(500).json({ error: "Błąd podczas finalizacji płatności" });
-    }
-  });
+  // Zakup tylko z konta (cennik i cała aplikacja wymagają zalogowania): bez zakupu gościa i bez
+  // finalize-payment, który zwracał adres e-mail dla dowolnego numeru sesji.
 
   // Create Stripe Checkout session
   app.post("/api/stripe/checkout", tylkoGdyPlatnosci, paymentRateLimit, requireAuth, async (req, res) => {
@@ -880,6 +886,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!(parseFloat(plan.price) > 0)) {
         return res.status(400).json({ error: "Ten plan nie jest dostępny do zakupu" });
+      }
+      if (req.body?.zgodaNatychmiast !== true) {
+        return res.status(400).json({ error: "Zaznacz zgodę na rozpoczęcie dostępu przed upływem 14 dni" });
+      }
+
+      // Bez podwójnych obciążeń: druga subskrypcja albo subskrypcja przy opłaconym dostępie rocznym
+      const obecna = await storage.getStoredActiveSubscription(req.user!.id);
+      if (obecna?.stripeSubscriptionId) {
+        return res.status(409).json({ error: "Masz już subskrypcję. Zarządzasz nią w menu konta: Płatności." });
+      }
+      if (obecna && plan.interval) {
+        return res.status(409).json({ error: `Masz opłacony dostęp do ${new Date(obecna.endDate).toLocaleDateString("pl-PL")}. Subskrypcję włączysz po jego końcu.` });
       }
 
       const stripe = await getUncachableStripeClient();
@@ -900,31 +918,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserStripeCustomerId(req.user!.id, customer.id);
       }
 
-      // Create checkout session with one-time payment
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: metodyPlatnosci(),
-        line_items: [{
-          price_data: {
-            currency: plan.currency.toLowerCase(),
-            product_data: {
-              name: plan.name,
-              description: `Dostęp na ${plan.durationDays} dni`,
-            },
-            unit_amount: Math.round(parseFloat(plan.price) * 100),
-          },
-          quantity: 1,
-        }],
-        mode: 'payment',
-        success_url: `${adresPowrotu(req)}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${adresPowrotu(req)}/?payment=cancelled`,
-        metadata: {
-          userId: req.user!.id,
-          planId: plan.id,
-          durationDays: plan.durationDays.toString()
-        }
-      });
-
+      const session = await sesjaCheckout(req, plan, { customer: customerId }, { userId: req.user!.id });
+      // zgoda na dostęp przed upływem 14 dni (art. 38 pkt 13 ustawy o prawach konsumenta): zapis w koncie,
+      // potwierdzenie idzie też w mailu po płatności
+      await db.insert(userConsents).values({ userId: req.user!.id, document: "dostep_przed_14_dniami", version: "1.0" });
       res.json({ url: session.url });
     } catch (error: any) {
       console.error("Checkout session error:", error);
@@ -959,6 +956,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Payment success error:", error);
       res.status(500).json({ error: "Błąd podczas przetwarzania płatności" });
+    }
+  });
+
+  // Portal klienta Stripe: zmiana karty, faktury, anulowanie subskrypcji (na koniec opłaconego okresu)
+  // także przy wyłączonej sprzedaży (PLATNOSCI_WLACZONE): kto ma subskrypcję, musi móc ją anulować
+  app.post("/api/stripe/portal", paymentRateLimit, requireKonto, async (req, res) => {
+    if (bezStripe(res)) return;
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user?.stripeCustomerId) {
+        return res.status(404).json({ error: "Nie masz jeszcze płatności w helloEKG" });
+      }
+      const stripe = await getUncachableStripeClient();
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: user.stripeCustomerId,
+        return_url: `${adresPowrotu(req)}/dashboard`,
+        locale: "pl",
+      });
+      res.json({ url: portal.url });
+    } catch (error: any) {
+      console.error("Stripe portal error:", error?.message);
+      res.status(500).json({ error: "Nie udało się otworzyć ustawień płatności" });
     }
   });
 
@@ -1266,6 +1285,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For multiple choice, selectedIndex is required
       if (answerData === undefined && typeof selectedIndex !== 'number') {
         return res.status(400).json({ error: "Nieprawidłowe dane odpowiedzi" });
+      }
+
+      // kursant ocenia tylko opublikowane pytania z widocznych sekcji i modułów (szkic zdradziłby odpowiedź)
+      if (!["owner", "admin", "reviewer"].includes(req.user!.role)) {
+        if (!/^[0-9a-f-]{36}$/i.test(questionId)) return res.status(404).json({ error: "Nie znaleziono pytania" });
+        const [dostepne] = await db.select({ id: questions.id }).from(questions)
+          .innerJoin(sections, eq(sections.id, questions.sectionId))
+          .innerJoin(modules, eq(modules.id, sections.moduleId))
+          .where(and(eq(questions.id, questionId), eq(questions.status, "published"), eq(sections.isVisible, true), eq(modules.isVisible, true)));
+        if (!dostepne) return res.status(404).json({ error: "Nie znaleziono pytania" });
       }
 
       const result = await quizService.submitAnswer(
@@ -2219,7 +2248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/ustawienia", requireKonto, requireOwner, async (req, res) => {
     const klucz = req.body?.klucz as KluczUstawienia;
-    if (typeof klucz !== "string" || !(klucz in USTAWIENIA)) {
+    if (typeof klucz !== "string" || !Object.hasOwn(USTAWIENIA, klucz)) {
       return res.status(400).json({ error: "Nieznane ustawienie" });
     }
     try {
@@ -2278,12 +2307,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           planId = manualPlan[0].id;
         }
 
-        // Deactivate any existing active subscriptions
+        // poprzedni dostęp nadany ręcznie zastępujemy; opłacone zostają (dostęp liczy się z najdłuższego)
         await db.update(subscriptions)
           .set({ status: "cancelled" })
           .where(and(
             eq(subscriptions.userId, id),
-            eq(subscriptions.status, "active")
+            eq(subscriptions.status, "active"),
+            eq(subscriptions.paymentProvider, "manual")
           ));
 
         // Create new subscription
@@ -2313,7 +2343,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({ success: true, subscription: newSubscription });
       } else if (action === "revoke") {
-        // Revoke all active subscriptions
+        // Odebranie dostępu kończy też odnawianie w Stripe, żeby karta nie była dalej obciążana
+        const odnawiane = await db.select({ s: subscriptions.stripeSubscriptionId }).from(subscriptions)
+          .where(and(eq(subscriptions.userId, id), eq(subscriptions.status, "active"), sql`${subscriptions.stripeSubscriptionId} IS NOT NULL`));
+        await anulujWStripe(odnawiane.map((o) => o.s!));
         await db.update(subscriptions)
           .set({ status: "cancelled", endDate: new Date() })
           .where(and(
@@ -2775,8 +2808,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof questionId !== "string" || typeof message !== "string" || !questionId || !message.trim()) {
         return res.status(400).json({ error: "Pytanie i wiadomość są wymagane" });
       }
-      if (questionId.length > 64 || message.length > 5000) {
+      if (!/^[0-9a-f-]{36}$/i.test(questionId) || message.length > 5000) {
         return res.status(400).json({ error: "Wiadomość może mieć najwyżej 5000 znaków" });
+      }
+      if (!(await storage.getQuestionById(questionId))) {
+        return res.status(404).json({ error: "Nie znaleziono pytania" });
+      }
+      // najwyżej 20 zgłoszeń błędów na dobę z jednego konta
+      const [{ n: dzis }] = await db.select({ n: count() }).from(supportTickets)
+        .where(and(eq(supportTickets.userId, req.user!.id), sql`${supportTickets.questionId} IS NOT NULL`, sql`${supportTickets.createdAt} > now() - interval '24 hours'`));
+      if (Number(dzis) >= 20) {
+        return res.status(429).json({ error: "Wysłano dziś już 20 zgłoszeń z tego konta. Kolejne możesz wysłać jutro." });
       }
 
       // Create support ticket

@@ -220,8 +220,8 @@ function FeedbackDetail({ report }: { report: AdminFeedbackReport }) {
     ["Typ", typeLabelOf(report)],
     ["Obszar", feedbackAreaLabel(report.area)],
   ];
-  // link tylko do ścieżki w aplikacji (stare zgłoszenia mogły mieć „//host”)
-  if (report.pagePath && /^\/(?![\/\\])/.test(report.pagePath))
+  // link tylko do czystej ścieżki w aplikacji (stare zgłoszenia mogły mieć „//host” albo „/\t/host”)
+  if (report.pagePath && /^\/(?![\/\\])/.test(report.pagePath) && !/[\u0000-\u0020\u007f-\u009f\\]/.test(report.pagePath))
     meta.push([
       "Strona",
       <a href={report.pagePath} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 break-all font-mono text-[13px] text-[var(--puls)]">

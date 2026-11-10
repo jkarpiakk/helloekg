@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -49,16 +49,22 @@ export default function VerifyEmail() {
   const [token, setToken] = useState<string | null>(null);
   const { isAuthenticated } = useAuth();
 
+  // token z linku zapamiętany w stanie i usunięty z paska adresu (nie trafi do historii ani nagłówka Referer)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setToken(params.get('token'));
+    if (params.has('token')) window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
-  const { isLoading, error, isError } = useQuery({
-    queryKey: ['/api/auth/verify-email', token],
-    queryFn: async () => {
+  const potwierdz = useMutation({
+    mutationFn: async () => {
       if (!token) throw new Error('Brak tokenu');
-      const response = await fetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+      const response = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ token }),
+      });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Błąd weryfikacji');
@@ -69,9 +75,8 @@ export default function VerifyEmail() {
       queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       return data;
     },
-    enabled: !!token,
-    retry: false,
   });
+  const { error, isError } = potwierdz;
 
   const continueAction = isAuthenticated ? (
     <Button asChild>
@@ -102,16 +107,17 @@ export default function VerifyEmail() {
     );
   }
 
-  if (isLoading) {
+  if (potwierdz.isIdle || potwierdz.isPending) {
     return (
       <Screen
-        stateKey="loading"
-        role="status"
-        label="Weryfikacja"
-        title="Sprawdzam adres e-mail…"
-        lead="To potrwa tylko chwilę."
+        stateKey="confirm"
+        label="Ostatni krok"
+        title="Potwierdź adres e-mail"
+        lead="Kliknij przycisk, żeby potwierdzić, że ten adres należy do ciebie."
       >
-        <LoadingSpinner size="lg" />
+        <Button onClick={() => potwierdz.mutate()} disabled={potwierdz.isPending} data-testid="verify-email-confirm">
+          {potwierdz.isPending ? <><LoadingSpinner size="sm" className="mr-2" />Potwierdzam…</> : "Potwierdzam adres"}
+        </Button>
       </Screen>
     );
   }

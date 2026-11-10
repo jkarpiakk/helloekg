@@ -19,6 +19,8 @@ kurs.helloekg.pl {
 					replace token REDACTED
 					replace session_id REDACTED
 				}
+				# Referer niesie adres poprzedniej strony, a ten bywał linkiem z tokenem z maila
+				request>headers>Referer delete
 				request>headers>Cookie delete
 				request>headers>Authorization delete
 				request>headers>Stripe-Signature delete
@@ -29,6 +31,15 @@ kurs.helloekg.pl {
 	}
 
 	header -Server
+
+	# TRACE i inne metody spoza aplikacji: 405 zamiast strony SPA (mniej fałszywych alarmów w skanerach)
+	@obce not method GET HEAD POST PUT PATCH DELETE OPTIONS
+	respond @obce 405
+
+	# Największe żądanie aplikacji to zgłoszenie z 3 zrzutami (ok. 21 MB w JSON); większe odcina Caddy
+	request_body {
+		max_size 22MB
+	}
 
 	reverse_proxy 127.0.0.1:3100
 }
