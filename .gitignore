@@ -18,3 +18,6 @@ data/feedback-uploads
 .env
 .env.*
 !.env.example
+# artefakty testów e2e (zrzuty, PDF z testu certyfikatu)
+/certyfikat.pdf
+/certyfikat-blad.png
