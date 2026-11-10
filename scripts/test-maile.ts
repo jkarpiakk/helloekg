@@ -2,7 +2,7 @@
  * Test dostarczalności: wysyła każdy szablon maila aplikacji na podany adres, z linkami-atrapami
  * (token TEST…, który nic nie otwiera). Uruchamiać na serwerze z konfiguracją SMTP (sekrety zostają w zmiennych
  * procesu, nic nie jest wypisywane):
- *   sudo bash -c 'set -a; . /etc/helloekg-kurs.env; set +a; cd /opt/helloekg-kurs && sudo -E -u kurs node dist/test-maile.js adres@domena.pl [szablon]'
+ *   sudo systemd-run --quiet --uid=kurs --gid=kurs -p EnvironmentFile=/etc/helloekg-kurs.env -p WorkingDirectory=/opt/helloekg-kurs --wait --pipe /usr/bin/node dist/test-maile.js adres@domena.pl [szablon]
  * Szablony: potwierdzenie, reset, haslo-zmienione, konto-istnieje, konto-usuniete, platnosc, platnosc-gosc, certyfikat
  */
 import { emailService } from "../server/services/emailService";

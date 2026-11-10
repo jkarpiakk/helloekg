@@ -21,6 +21,7 @@ import {
   requireSubscriptionManager,
   requireActiveSubscription,
   requireKonto,
+  requireRole,
   ACCOUNT_SUSPENDED_MESSAGE,
 } from "./middleware/auth";
 import {
@@ -148,6 +149,9 @@ function establishSession(req: import("express").Request, userId: string): Promi
 function auditSafe(entry: Parameters<typeof storage.createAuditLog>[0]) {
   storage.createAuditLog(entry).catch((e) => console.error("[audit] write failed:", e?.message));
 }
+
+/** Lista kont (dane osobowe): właściciel, admin (zawiesza i usuwa konta) i recenzent */
+const requireUserViewer = requireRole(["owner", "admin", "reviewer"]);
 
 /** Tylko gdy płatności są włączone (PLATNOSCI_WLACZONE): inaczej trasy zakupu nie istnieją (404) */
 function tylkoGdyPlatnosci(_req: Request, res: Response, next: import("express").NextFunction) {
@@ -1926,7 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Support endpoints
 
   // Admin endpoints for user management
-  app.get("/api/admin/users", requireKonto, requireReviewer, async (req, res) => {
+  app.get("/api/admin/users", requireKonto, requireUserViewer, async (req, res) => {
     try {
       const { search, role, status } = req.query;
       let query = db.select().from(users);
@@ -1972,7 +1976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/stats/users", requireKonto, requireReviewer, async (req, res) => {
+  app.get("/api/admin/stats/users", requireKonto, requireUserViewer, async (req, res) => {
     try {
       const totalUsers = await db.select({ count: count() }).from(users);
       const activeSubscriptions = await db.select({ count: count() })

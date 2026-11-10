@@ -11,6 +11,11 @@ if [ -d /var/lib/helloekg-kurs/assets ]; then
   mkdir -p "$DEST/assets"
   rsync -a --delete /var/lib/helloekg-kurs/assets/ "$DEST/assets/"
 fi
+# załączniki zgłoszeń (zrzuty ekranu od testerów), od 10.11.2026
+if [ -d /var/lib/helloekg-kurs/feedback ]; then
+  mkdir -p "$DEST/feedback"
+  rsync -a --delete /var/lib/helloekg-kurs/feedback/ "$DEST/feedback/"
+fi
 find "$DEST" -maxdepth 1 -name 'db-*.dump' -mtime +14 -delete
 chmod -R go-rwx "$DEST"
 echo "Kopia kursu z $STAMP gotowa."
