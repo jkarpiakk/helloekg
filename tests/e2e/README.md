@@ -1,6 +1,8 @@
 # Testy E2E kursu (Playwright)
 
-Uruchamiane na lokalnym podglądzie (`scripts/preview.sh`, port 5055, baza `helloekg_kurs_dev`, konto z `scripts/preview-seed.md`).
+Uruchamiane na lokalnym podglądzie (`scripts/preview.sh`, port z `.env.preview`, konto z `scripts/preview-seed.md`).
+Od 10.11.2026 testy domyślnie celują w kopię bazy `helloekg_kurs_otwarcie` i podgląd :5065 (zmienne `BASE`, `DB`).
+Podgląd z `MAIL_OUTBOX_DIR` w `.env.preview` zapisuje maile jako pliki JSON zamiast wysyłać (tylko poza produkcją).
 Playwright nie jest zależnością projektu, żeby nie obciążać instalacji na serwerze:
 
     mkdir -p /tmp/e2e && cd /tmp/e2e && npm i playwright@1.61.0 @axe-core/playwright@4.10.2
@@ -16,3 +18,8 @@ Dawny pełny zestaw (`ux.js`, 43/38 kroków) żył w katalogu tymczasowym sesji 
 - `certyfikat.cjs`: postęp „X z Y tematów” w Postępie, formularz imienia i nazwiska po opanowaniu wszystkich tematów (walidacja), odbiór, arkusz z nazwiskiem, druk na 1 stronie A4. Zakłada i kasuje konto tymczasowe. Po zmianie kodu serwera zrestartuj podgląd (serwer nie przeładowuje się sam).
 - `s7.cjs`: wykłady S7 po synchronizacji (każda grafika się ładuje, wstawka „Fala na rondzie”, CSP). Na `:5057`, `EKS=<rozpakowany eksport studia>`.
 - `wybor-zapisu.cjs`: „Wybierz zapis” (image_choice), telefon 375 i komputer 1280: kolejność różna w kolejnych podejściach i stała w obrębie podejścia, ocena po id (także po zmianie kolejności i z serwera: litera, śmieci, dwa wybory), lupa nie zmienia zaznaczenia, alt przed odpowiedzią tylko „Zapis X”, po sprawdzeniu kolory, opisy pod kartami przed wyjaśnieniem, w próbie zapisane wybrane id. Potrzebuje opublikowanego pytania `KOD` (domyślnie Q-0200) jedynego w swoim temacie w bazie dev.
+
+Od 10.11.2026 (otwarcie bety):
+- `otwarcie.cjs`: bez konta wszystko 401, rejestracja (zgody, pułapka, zajęty adres), potwierdzenie e-mail (24 h, jednorazowe), reset (1 h, sesje), argon2id i przeliczenie bcrypt, przełączniki w panelu, wyjątki limitów, usunięcie konta przez admina. Wymaga `OUTBOX` i `ADMIN_HASLO`.
+- `stripe.cjs` (nowy): dwa podglądy, :5065 bez płatności i :5066 `scripts/preview-stripe-test.sh` (PLATNOSCI_WLACZONE=1, fałszywe klucze testowe). Webhook: podpis, event.id, zwroty, 500 bez zapisu, blokada sk_live_.
+- `bez-konta.cjs`: tylko GET bez sesji, bezpieczny na produkcji (`BASE=https://kurs.helloekg.pl ASSETS_LIST=lista-plikow.txt`), `--md plik` zapisuje tabelę do raportu.
