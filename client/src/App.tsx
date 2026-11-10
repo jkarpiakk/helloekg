@@ -157,9 +157,9 @@ function AppContent() {
       </main>
       <Footer />
       {/* Zgłoszenia testerów (beta) — tylko dla zalogowanych */}
-      {user && <FeedbackFab />}
+      {user && user.emailVerified !== false && <FeedbackFab />}
       {/* Instrukcja przy pierwszym logowaniu — poza trasami, więc przeżywa nawigację */}
-      {user && <Tour key={user.id} userId={String(user.id)} />}
+      {user && user.emailVerified !== false && <Tour key={user.id} userId={String(user.id)} />}
     </div>
   );
 }

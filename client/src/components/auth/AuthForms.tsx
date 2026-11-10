@@ -414,7 +414,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
         <motion.p variants={rise} className="text-sub leading-relaxed text-[var(--txt2)]">
           Nie widzisz wiadomości? Zajrzyj do spamu i ofert. Po potwierdzeniu zaloguj się i zacznij kurs.
         </motion.p>
-        <motion.div variants={rise} className="flex flex-col gap-3 sm:flex-row">
+        <motion.div variants={rise} className="flex flex-col gap-3">
           <Button type="button" onClick={() => switchMode("login")} data-testid="register-done-login">Przejdź do logowania</Button>
           <Button
             type="button"
@@ -550,6 +550,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
                               field.onBlur();
                             }}
                             className="mt-0.5"
+                            aria-label={pole === "termsAccepted" ? "Akceptuję regulamin bety" : "Akceptuję politykę prywatności"}
                             data-testid={pole === "termsAccepted" ? "register-terms" : "register-privacy"}
                           />
                         </FormControl>

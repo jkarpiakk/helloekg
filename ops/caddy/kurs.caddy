@@ -1,0 +1,34 @@
+# helloEKG kurs (https://kurs.helloekg.pl). Na serwerze: /etc/caddy/kurs.caddy, import na końcu /etc/caddy/Caddyfile.
+# Od 10.11.2026 bez bramki ?beta=: treść chroni aplikacja (logowanie i potwierdzony e-mail, server/middleware/auth.ts).
+# Nagłówki bezpieczeństwa (CSP, HSTS, X-Frame-Options, Referrer-Policy) i noindex/robots.txt ustawia aplikacja
+# (server/middleware/security.ts, server/routes.ts, przełącznik INDEKSOWANIE), więc jest jedno źródło prawdy.
+kurs.helloekg.pl {
+	encode zstd gzip
+
+	# Dziennik żądań (do analizy po teście bezpieczeństwa): bez tokenów z linków w mailach i bez ciasteczek.
+	# Adres IP to dana osobowa: 30 dni (polityka prywatności).
+	log {
+		output file /var/log/caddy/kurs-access.log {
+			roll_size 20MiB
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format filter {
+			fields {
+				request>uri query {
+					replace token REDACTED
+					replace session_id REDACTED
+				}
+				request>headers>Cookie delete
+				request>headers>Authorization delete
+				request>headers>Stripe-Signature delete
+				resp_headers>Set-Cookie delete
+			}
+			wrap json
+		}
+	}
+
+	header -Server
+
+	reverse_proxy 127.0.0.1:3100
+}

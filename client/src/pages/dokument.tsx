@@ -6,6 +6,11 @@ import { rise, stagger } from "@/lib/motion";
 
 type Dokument = { id: string; wersja: string; tytul: string; tresc: string };
 
+/** Tabele szersze niż telefon przewijają się w poziomie we własnym pudełku, a nie całą stronę */
+const zTabelamiPrzewijanymi = (h: { __html: string }) => ({
+  __html: h.__html.replace(/<table/g, '<div class="overflow-x-auto"><table').replace(/<\/table>/g, "</table></div>"),
+});
+
 /** Regulamin bety i polityka prywatności (Markdown z serwera, publiczne po akceptacji JK) */
 export default function DokumentPage({ id }: { id: "regulamin_bety" | "polityka_prywatnosci" }) {
   const { data, isLoading, isError } = useQuery<Dokument>({
@@ -47,7 +52,7 @@ export default function DokumentPage({ id }: { id: "regulamin_bety" | "polityka_
         <motion.div
           variants={rise}
           className="prose-hk mt-4"
-          dangerouslySetInnerHTML={sanitizeMarkdown(data.tresc)}
+          dangerouslySetInnerHTML={zTabelamiPrzewijanymi(sanitizeMarkdown(data.tresc))}
         />
       </motion.article>
     </div>

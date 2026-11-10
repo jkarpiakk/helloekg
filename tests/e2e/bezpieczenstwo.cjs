@@ -1,11 +1,12 @@
 // Regresje bezpieczeństwa (przegląd 28.10): limity zapytań niezależne od wielkości liter i „/” na końcu,
 // CSRF także dla „/API/…”, blokada logowania na e-mail + sieć (napastnik nie zablokuje właściciela z innej sieci),
 // limit maili na adres, rozmiar odpowiedzi w quizie, zgłoszenia do supportu, uploady obiektów tylko dla recenzentów,
-// błędy bazy bez szczegółów. Konto tymczasowe w helloekg_kurs_dev, kasowane na końcu.
+// błędy bazy bez szczegółów. Konto tymczasowe (od 10.11 potwierdzane w bazie, bo rejestracja nie loguje), kasowane na końcu.
+// Od 10.11 anonimowy support i uploady obiektów (Replit) są usunięte: oczekiwane 404.
 const { execSync } = require("child_process");
 const crypto = require("crypto");
-const B = process.env.BASE || "http://localhost:5055";
-const DB = process.env.DB || "helloekg_kurs_dev";
+const B = process.env.BASE || "http://localhost:5065";
+const DB = process.env.DB || "helloekg_kurs_otwarcie";
 const wyn = []; const ok = (n, w, d = "") => wyn.push(`${w ? "OK  " : "FAIL"} ${n} ${d}`);
 const sql = (q) => execSync(`ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`, { input: q }).toString().trim();
 const H = (xff, extra = {}) => ({ "Content-Type": "application/json", Origin: B, "X-Forwarded-For": xff, ...extra });
@@ -16,9 +17,13 @@ const post = (path, body, xff = "10.9.0.1", extra = {}) => fetch(B + path, { met
   sql("DELETE FROM rate_limit_store");
   try {
     // konto tymczasowe + sesja
-    let r = await post("/api/auth/register", { email, password: haslo, confirmPassword: haslo, termsAccepted: true, privacyAccepted: true }, "10.9.0.2");
+    sql(`INSERT INTO app_settings(key,value) VALUES ('dokumenty_opublikowane','true') ON CONFLICT (key) DO UPDATE SET value='true'`);
+    await new Promise((res) => setTimeout(res, 11000)); // ustawienia w pamięci serwera do 10 s
+    let r = await post("/api/auth/register", { firstName: "Bezp", email, password: haslo, confirmPassword: haslo, termsAccepted: true, privacyAccepted: true }, "10.9.0.2");
+    sql(`UPDATE users SET email_verified=true WHERE email='${email}'`);
+    r = await post("/api/auth/login", { email, password: haslo }, "10.9.0.3");
     const cookie = (r.headers.get("set-cookie") || "").split(";")[0];
-    ok("konto tymczasowe", r.status === 201 && !!cookie, `status ${r.status}`);
+    ok("konto tymczasowe", r.status === 200 && !!cookie, `status ${r.status}`);
 
     // 1. limit zapytań: wariant ścieżki dzieli licznik
     const a = await post("/api/auth/forgot-password", { email: "nikt-1@helloekg.test" }, "10.9.1.1");
@@ -54,20 +59,20 @@ const post = (path, body, xff = "10.9.0.1", extra = {}) => fetch(B + path, { met
     ok("quiz: błąd bazy bez szczegółów", !/invalid input syntax|uuid/i.test(tx), `${r.status} ${tx.slice(0, 80)}`);
 
     // 6. support: typy i długości
-    r = await post("/api/support/tickets", { subject: "x".repeat(300), message: "test" }, "10.9.6.1");
-    ok("support: temat ponad 200 znaków → 400", r.status === 400, `status ${r.status}`);
-    r = await post("/api/support/tickets", { subject: ["a"], message: { x: 1 } }, "10.9.6.1");
-    ok("support: nie-tekst → 400", r.status === 400, `status ${r.status}`);
+    r = await post("/api/support/tickets", { subject: "x", message: "test" }, "10.9.6.1");
+    ok("anonimowy support usunięty → 404", r.status === 404, `status ${r.status}`);
+    r = await post("/api/report-error", { questionId: q, message: "x".repeat(6000) }, "10.9.6.1", { Cookie: cookie });
+    ok("zgłoszenie błędu: wiadomość ponad 5000 znaków → 400", r.status === 400, `status ${r.status}`);
 
     // 7. uploady obiektów: kursant nie może
     r = await post("/api/objects/upload", {}, "10.9.7.1", { Cookie: cookie });
-    ok("upload obiektu przez kursanta → 403", r.status === 403, `status ${r.status}`);
+    ok("upload obiektu (Replit) usunięty → 404", r.status === 404, `status ${r.status}`);
     r = await fetch(B + "/api/lecture-images", { method: "PUT", headers: H("10.9.7.1", { Cookie: cookie }), body: JSON.stringify({ imageURL: "x" }) });
-    ok("publikacja obrazu przez kursanta → 403", r.status === 403, `status ${r.status}`);
+    ok("publikacja obrazu (Replit) usunięta → 404", r.status === 404, `status ${r.status}`);
   } catch (e) {
     ok("przebieg", false, e.message.split("\n")[0]);
   } finally {
-    sql(`DELETE FROM users WHERE email='${email}'; DELETE FROM rate_limit_store`);
+    sql(`DELETE FROM users WHERE email='${email}'; DELETE FROM rate_limit_store; DELETE FROM app_settings WHERE key='dokumenty_opublikowane'`);
   }
   console.log(wyn.join("\n"));
   process.exit(wyn.some((w) => w.startsWith("FAIL")) ? 1 : 0);
