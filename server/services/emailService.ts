@@ -65,9 +65,21 @@ export class EmailService {
   }
 
   async sendEmail(to: string, template: EmailTemplate): Promise<void> {
+    // Testy (tylko poza produkcją): wiadomość ląduje jako plik JSON w MAIL_OUTBOX_DIR zamiast w SMTP
+    const outbox = process.env.NODE_ENV !== "production" ? process.env.MAIL_OUTBOX_DIR : undefined;
+    if (outbox) {
+      const fs = await import("fs");
+      const path = await import("path");
+      fs.mkdirSync(outbox, { recursive: true });
+      const plik = path.join(outbox, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`);
+      fs.writeFileSync(plik, JSON.stringify({ to, ...template }, null, 2));
+      return;
+    }
     try {
       await this.transporter.sendMail({
         from: process.env.FROM_EMAIL || "helloEKG <kurs@helloekg.pl>",
+        // odpowiedzi trafiają do skrzynki, którą ktoś czyta (nadawca bywa adresem technicznym)
+        replyTo: process.env.REPLY_TO_EMAIL || "kontakt@helloekg.pl",
         to,
         subject: template.subject,
         html: template.html,
@@ -134,6 +146,70 @@ export class EmailService {
       const template = this.getCertificateTemplate(firstName, certificateId, certificateUrl);
       await this.sendEmail(to, template);
     }
+  }
+
+  /** Rejestracja na adres, który ma już konto: formularz nie zdradza tego obcym, właściciel skrzynki dostaje tę wiadomość */
+  async sendAccountExists(to: string): Promise<void> {
+    await this.sendEmail(to, this.getAccountExistsTemplate());
+  }
+
+  getAccountExistsTemplate(): EmailTemplate {
+    const url = `${appUrl()}/?auth=login`;
+    return {
+      subject: "Masz już konto w helloEKG",
+      html: brandEmail({
+        preheader: "Ktoś próbował założyć konto na ten adres.",
+        label: "Konto",
+        title: "Masz już konto w helloEKG.",
+        body: `<p ${P}>Ktoś (pewnie Ty) próbował założyć nowe konto z tym adresem e-mail. Konto już istnieje, więc po prostu się zaloguj. Jeśli nie pamiętasz hasła, w oknie logowania wybierz „Nie pamiętasz hasła?”.</p>`,
+        cta: { href: url, text: "Zaloguj się" },
+        note: "Jeśli to nie Ty, zignoruj tę wiadomość. Twoje konto i hasło zostają bez zmian.",
+        reason: "Dostajesz tę wiadomość, bo na kurs.helloekg.pl próbowano założyć konto z tym adresem.",
+      }),
+      text: `Masz już konto w helloEKG. Zaloguj się: ${url}\nJeśli nie pamiętasz hasła, w oknie logowania wybierz „Nie pamiętasz hasła?”. Jeśli to nie Ty, zignoruj tę wiadomość.`,
+    };
+  }
+
+  /** Po ustawieniu nowego hasła: właściciel skrzynki wie, że coś się zmieniło (i co zrobić, jeśli to nie on) */
+  async sendPasswordChanged(to: string, firstName: string): Promise<void> {
+    await this.sendEmail(to, this.getPasswordChangedTemplate(firstName));
+  }
+
+  getPasswordChangedTemplate(firstName: string): EmailTemplate {
+    const url = `${appUrl()}/?auth=login`;
+    return {
+      subject: "Hasło do helloEKG zostało zmienione",
+      html: brandEmail({
+        preheader: "Hasło zmienione, wszystkie sesje wylogowane.",
+        label: "Konto · bezpieczeństwo",
+        title: greeting(firstName, "hasło zmienione."),
+        body: `<p ${P}>Hasło do Twojego konta w helloEKG zostało właśnie zmienione. Ze względów bezpieczeństwa wylogowaliśmy Cię na wszystkich urządzeniach, więc zaloguj się nowym hasłem.</p>`,
+        cta: { href: url, text: "Zaloguj się" },
+        note: "Jeśli to nie Ty zmieniasz hasło, od razu ustaw nowe przez „Nie pamiętasz hasła?” i napisz do nas: kontakt@helloekg.pl.",
+        reason: "Dostajesz tę wiadomość, bo zmieniono hasło do konta z tym adresem na kurs.helloekg.pl.",
+      }),
+      text: `Hasło do helloEKG zostało zmienione i wylogowaliśmy Cię na wszystkich urządzeniach. Zaloguj się: ${url}\nJeśli to nie Ty, ustaw nowe hasło przez „Nie pamiętasz hasła?” i napisz do nas: kontakt@helloekg.pl.`,
+    };
+  }
+
+  /** Potwierdzenie usunięcia konta (samodzielnie albo przez zespół na prośbę użytkownika) */
+  async sendAccountDeleted(to: string, firstName: string): Promise<void> {
+    await this.sendEmail(to, this.getAccountDeletedTemplate(firstName));
+  }
+
+  getAccountDeletedTemplate(firstName: string): EmailTemplate {
+    return {
+      subject: "Konto w helloEKG usunięte",
+      html: brandEmail({
+        preheader: "Twoje konto i dane zostały usunięte.",
+        label: "Konto · usunięcie",
+        title: greeting(firstName, "konto usunięte."),
+        body: `<p ${P}>Usunęliśmy Twoje konto w helloEKG razem z postępem w nauce. Twoje zgłoszenia uwag zostają, ale już bez Twoich danych. Z kopii zapasowych dane znikną najpóźniej po 14 dniach.</p>`,
+        note: "Jeśli to pomyłka albo masz pytania, napisz do nas: kontakt@helloekg.pl.",
+        reason: "Dostajesz tę wiadomość, bo konto z tym adresem na kurs.helloekg.pl zostało usunięte.",
+      }),
+      text: "Usunęliśmy Twoje konto w helloEKG razem z postępem w nauce. Z kopii zapasowych dane znikną najpóźniej po 14 dniach. Pytania: kontakt@helloekg.pl",
+    };
   }
 
   getEmailVerificationTemplate(firstName: string, verificationUrl: string): EmailTemplate {
@@ -301,7 +377,7 @@ function brandEmail(o: {
   title: string;
   subtitle?: string;
   body: string;
-  cta: { href: string; text: string };
+  cta?: { href: string; text: string };
   note?: string;
   reason: string;
 }): string {
@@ -318,13 +394,13 @@ function brandEmail(o: {
 <h1 style="margin:0 0 ${o.subtitle ? "4px" : "22px"} 0;${H}color:#F2F6F4;">${o.title}</h1>
 ${o.subtitle ? `<p style="margin:0 0 22px 0;${H}color:#8A97A0;">${esc(o.subtitle)}</p>` : ""}
 ${o.body}
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px 0;"><tr><td style="border-radius:999px;background:#3EE6A8;"><a href="${esc(o.cta.href)}" style="display:inline-block;padding:15px 28px;font-family:Inter,Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;line-height:1;color:#07130E;text-decoration:none;border-radius:999px;">${esc(o.cta.text)}</a></td></tr></table>
-<p style="margin:0 0 26px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#76838C;">Przycisk nie działa? Skopiuj ten adres do przeglądarki:<br><a href="${esc(o.cta.href)}" style="color:#8A97A0;word-break:break-all;">${esc(o.cta.href)}</a></p>
+${o.cta ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px 0;"><tr><td style="border-radius:999px;background:#3EE6A8;"><a href="${esc(o.cta.href)}" style="display:inline-block;padding:15px 28px;font-family:Inter,Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;line-height:1;color:#07130E;text-decoration:none;border-radius:999px;">${esc(o.cta.text)}</a></td></tr></table>
+<p style="margin:0 0 26px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#76838C;">Przycisk nie działa? Skopiuj ten adres do przeglądarki:<br><a href="${esc(o.cta.href)}" style="color:#8A97A0;word-break:break-all;">${esc(o.cta.href)}</a></p>` : ""}
 ${o.note ? `<p style="margin:0 0 26px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#8A97A0;">${esc(o.note)}</p>` : ""}
 <img src="${LINE_URL}" width="536" height="32" alt="" style="display:block;border:0;width:100%;max-width:536px;height:auto;margin:0 0 22px 0;">
 <p style="margin:0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#8A97A0;">Do usłyszenia,<br><b style="color:#F2F6F4;font-weight:600;">zespół helloEKG</b></p>
 </td></tr>
-<tr><td style="padding:22px 8px 0 8px;font-family:Inter,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#5C6870;text-align:center;">${esc(o.reason)}<br><a href="https://helloekg.pl/polityka-prywatnosci.html" style="color:#8A97A0;">Polityka prywatności</a> · <a href="mailto:kontakt@helloekg.pl" style="color:#8A97A0;">kontakt@helloekg.pl</a></td></tr>
+<tr><td style="padding:22px 8px 0 8px;font-family:Inter,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#5C6870;text-align:center;">${esc(o.reason)}<br><a href="${appUrl()}/polityka-prywatnosci" style="color:#8A97A0;">Polityka prywatności</a> · <a href="mailto:kontakt@helloekg.pl" style="color:#8A97A0;">kontakt@helloekg.pl</a></td></tr>
 </table></td></tr></table></body></html>`;
 }
 

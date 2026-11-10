@@ -16,7 +16,7 @@ class AuthService {
     return data.user;
   }
 
-  async register(userData: RegisterForm): Promise<{ message: string; user: AuthUser }> {
+  async register(userData: RegisterForm): Promise<{ message: string }> {
     const response = await apiRequest("POST", "/api/auth/register", userData);
     const data = await response.json();
     return data;

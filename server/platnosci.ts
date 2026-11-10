@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import bcrypt from "bcrypt";
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { db } from "./db";
 import { subscriptions, plans, type Subscription, type User } from "@shared/schema";
 import { storage } from "./storage";
 import { authService } from "./auth";
 import { emailService } from "./services/emailService";
 import { linkZMaila } from "./mailLinks";
+import { getUncachableStripeClient } from "./stripeClient";
 
 /**
  * Jedno miejsce, które zamienia opłaconą sesję Stripe Checkout w dostęp do kursu.
@@ -19,6 +20,7 @@ import { linkZMaila } from "./mailLinks";
  *   tego samego numeru sesji, także po wygaśnięciu dostępu, nie daje kolejnych dni;
  * - zakup, gdy dostęp jeszcze trwa, dodaje dni od końca obecnego dostępu;
  * - zakup gościa zakłada konto dopiero po płatności;
+ * - zwrot całej płatności (charge.refunded) odbiera dostęp z tej płatności (obsluzZwrot niżej);
  * - zakup gościa na adres istniejącego, niepotwierdzonego konta: konto dostaje nowe losowe hasło,
  *   sesje są wylogowane, a link do ustawienia hasła idzie na ten adres. Kto założył konto na cudzy
  *   e-mail, traci do niego dostęp, zanim pojawi się w nim opłacony kurs.
@@ -42,6 +44,13 @@ function bladUnikalnosci(e: any): boolean {
 async function subskrypcjaZSesji(sessionId: string): Promise<Subscription | undefined> {
   const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCheckoutSessionId, sessionId));
   return sub;
+}
+
+/** Identyfikator płatności (payment_intent) ze Stripe: napis albo obiekt z polem id */
+function idPlatnosci(pi: unknown): string | null {
+  if (typeof pi === "string") return pi;
+  if (pi && typeof pi === "object" && typeof (pi as any).id === "string") return (pi as any).id;
+  return null;
 }
 
 async function losoweHaslo(): Promise<string> {
@@ -142,6 +151,7 @@ export async function aktywujPlatnosc(session: any): Promise<WynikAktywacji | nu
       status: "active",
       paymentProvider: "stripe",
       stripeCheckoutSessionId: session.id,
+      stripePaymentIntentId: idPlatnosci(session.payment_intent),
     });
   } catch (e) {
     // ta sama sesja aktywowana równolegle innym kanałem: zapis już jest, maile wysłał tamten
@@ -177,4 +187,53 @@ export async function aktywujPlatnosc(session: any): Promise<WynikAktywacji | nu
   }
 
   return { user, subscription, hasloZMaila, juzAktywowana: false };
+}
+
+/**
+ * Zwrot pieniędzy (zdarzenie charge.refunded): przy zwrocie całej kwoty subskrypcja z tej płatności
+ * dostaje status „refunded” i kończy się teraz, więc dostęp znika. Zwrot częściowy niczego nie odbiera
+ * (decyzja przy włączaniu płatności). Subskrypcję szukamy po payment_intent, a dla starszych zapisów
+ * przez sesję Checkout tej płatności.
+ */
+export async function obsluzZwrot(charge: any): Promise<string> {
+  const pi = idPlatnosci(charge?.payment_intent);
+  if (!pi) return "zwrot bez payment_intent, pomijam";
+  if (!charge.refunded) return `zwrot częściowy (${charge.amount_refunded} z ${charge.amount}), dostęp bez zmian`;
+
+  let [sub] = await db.select().from(subscriptions).where(eq(subscriptions.stripePaymentIntentId, pi));
+  if (!sub) {
+    const stripe = await getUncachableStripeClient();
+    const sesje = await stripe.checkout.sessions.list({ payment_intent: pi, limit: 1 });
+    const sesja = sesje.data[0];
+    if (sesja) sub = (await subskrypcjaZSesji(sesja.id)) as Subscription;
+  }
+  if (!sub) return "zwrot płatności bez subskrypcji w kursie, pomijam";
+  if (sub.status === "refunded") return "subskrypcja już odebrana";
+
+  const teraz = new Date();
+  await db.update(subscriptions)
+    .set({ status: "refunded", endDate: teraz, stripePaymentIntentId: pi })
+    .where(eq(subscriptions.id, sub.id));
+  // Dostęp dokupiony później liczył dni od końca tej subskrypcji: przesuwamy go o dni, które właśnie zwrócono
+  const zwroconeMs = Math.max(0, new Date(sub.endDate).getTime() - Math.max(teraz.getTime(), new Date(sub.startDate).getTime()));
+  if (zwroconeMs > 0) {
+    const pozniejsze = await db.select().from(subscriptions).where(and(
+      eq(subscriptions.userId, sub.userId),
+      eq(subscriptions.status, "active"),
+      gt(subscriptions.endDate, new Date(sub.endDate)),
+    ));
+    for (const p of pozniejsze) {
+      await db.update(subscriptions)
+        .set({ endDate: new Date(new Date(p.endDate).getTime() - zwroconeMs) })
+        .where(eq(subscriptions.id, p.id));
+    }
+  }
+  await storage.createAuditLog({
+    actorId: sub.userId,
+    action: "subscription_refunded",
+    entityType: "subscription",
+    entityId: sub.id,
+    diff: { payment_intent: pi },
+  });
+  return "zwrot całej kwoty: dostęp z tej płatności odebrany";
 }

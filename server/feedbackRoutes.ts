@@ -19,7 +19,7 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, or, sql, count } from "
 import { db } from "./db";
 import { storage } from "./storage";
 import { emailService } from "./services/emailService";
-import { requireAuth, requireRole } from "./middleware/auth";
+import { requireKonto, requireRole } from "./middleware/auth";
 import { supportTickets, users, questions, type FeedbackAttachmentMeta, type FeedbackContext, type SupportTicket } from "@shared/schema";
 import {
   FEEDBACK_AREAS,
@@ -146,7 +146,7 @@ export function registerFeedbackRoutes(app: Express) {
   });
 
   // ── Nowe zgłoszenie ─────────────────────────────────────────────────────
-  app.post("/api/feedback", requireAuth, parseFeedbackBody, async (req: Request, res: Response) => {
+  app.post("/api/feedback", requireKonto, parseFeedbackBody, async (req: Request, res: Response) => {
     const user = req.user!;
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -265,7 +265,7 @@ export function registerFeedbackRoutes(app: Express) {
   });
 
   // ── Moje zgłoszenia + stan podpowiedzi ──────────────────────────────────
-  app.get("/api/feedback/mine", requireAuth, async (req, res) => {
+  app.get("/api/feedback/mine", requireKonto, async (req, res) => {
     try {
       const rows = await db
         .select()
@@ -280,7 +280,7 @@ export function registerFeedbackRoutes(app: Express) {
     }
   });
 
-  app.post("/api/feedback/hint-seen", requireAuth, async (req, res) => {
+  app.post("/api/feedback/hint-seen", requireKonto, async (req, res) => {
     try {
       await db
         .update(users)
@@ -294,7 +294,7 @@ export function registerFeedbackRoutes(app: Express) {
   });
 
   // ── Panel admina ────────────────────────────────────────────────────────
-  app.get("/api/admin/feedback", requireAuth, requireFeedbackAdmin, async (req, res) => {
+  app.get("/api/admin/feedback", requireKonto, requireFeedbackAdmin, async (req, res) => {
     try {
       const { status, area, type, source } = req.query as Record<string, string | undefined>;
       const rows = await db
@@ -323,7 +323,7 @@ export function registerFeedbackRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/admin/feedback/:id", requireAuth, requireFeedbackAdmin, async (req, res) => {
+  app.patch("/api/admin/feedback/:id", requireKonto, requireFeedbackAdmin, async (req, res) => {
     const { id } = req.params;
     if (!isUuid(id)) return fail(res, 404, "Nie ma takiego zgłoszenia.");
     const parsed = patchSchema.safeParse(req.body);
@@ -383,7 +383,7 @@ export function registerFeedbackRoutes(app: Express) {
     }
   });
 
-  app.get("/api/admin/feedback/:id/attachments/:n", requireAuth, requireFeedbackAdmin, async (req, res) => {
+  app.get("/api/admin/feedback/:id/attachments/:n", requireKonto, requireFeedbackAdmin, async (req, res) => {
     const { id } = req.params;
     const n = Number.parseInt(req.params.n, 10);
     if (!isUuid(id) || !Number.isInteger(n) || n < 0) return res.sendStatus(404);

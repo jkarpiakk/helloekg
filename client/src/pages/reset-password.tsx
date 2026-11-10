@@ -15,8 +15,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
 
 const resetPasswordFormSchema = z.object({
-  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
-  confirmPassword: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
+  password: z.string().min(10, "Hasło musi mieć co najmniej 10 znaków"),
+  confirmPassword: z.string().min(1, "Wpisz hasło jeszcze raz"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Hasła się różnią. Wpisz to samo hasło w obu polach",
   path: ["confirmPassword"],
@@ -152,7 +152,7 @@ export default function ResetPassword() {
       stateKey="form"
       label="Nowe hasło"
       title="Ustaw nowe hasło"
-      lead="Wybierz hasło, które ma co najmniej 8 znaków."
+      lead="Wybierz hasło, które ma co najmniej 10 znaków. Po zmianie wylogujemy cię na wszystkich urządzeniach."
     >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
@@ -167,7 +167,7 @@ export default function ResetPassword() {
                     <Input
                       type={showPassword ? "text" : "password"}
                       autoComplete="new-password"
-                      placeholder="Co najmniej 8 znaków"
+                      placeholder="Co najmniej 10 znaków"
                       className="pr-12"
                       {...field}
                     />

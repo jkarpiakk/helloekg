@@ -60,14 +60,9 @@ export default function Footer() {
                 helloekg.pl
                 <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
               </a>
-              <a
-                href="https://helloekg.pl/polityka-prywatnosci.html"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={linkClass}
-              >
-                Polityka prywatności
-              </a>
+              <Link href="/regulamin-bety" className={linkClass}>Regulamin bety</Link>
+              <Link href="/polityka-prywatnosci" className={linkClass}>Polityka prywatności</Link>
+              <a href="mailto:kontakt@helloekg.pl" className={linkClass}>kontakt@helloekg.pl</a>
             </div>
           </div>
         </div>

@@ -3,10 +3,12 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import crypto from "crypto";
-import bcrypt from "bcrypt";
+import fs from "fs";
+import path from "path";
+import express from "express";
 import { z } from "zod";
 import { storage } from "./storage";
-import { authService } from "./auth";
+import { authService, KontoIstnieje } from "./auth";
 import { emailService, esc } from "./services/emailService";
 import { quizService } from "./services/quizService";
 import { certificateService } from "./services/certificateService";
@@ -18,8 +20,19 @@ import {
   requireOwner,
   requireSubscriptionManager,
   requireActiveSubscription,
+  requireKonto,
   ACCOUNT_SUSPENDED_MESSAGE,
 } from "./middleware/auth";
+import {
+  platnosciWlaczone,
+  indeksowanieWlaczone,
+  rejestracjaPrzyjmuje,
+  ustawienie,
+  wszystkieUstawienia,
+  zapiszUstawienie,
+  USTAWIENIA,
+  type KluczUstawienia,
+} from "./ustawienia";
 import {
   authRateLimit,
   accountDeleteRateLimit,
@@ -38,16 +51,14 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   insertQuestionSchema,
-  insertBlogPostSchema,
-  insertDemoQuestionSchema,
-  insertHomePageContentSchema,
-  BlogPost,
-  InsertBlogPost,
+  PASSWORD_MIN_LENGTH,
+  DOKUMENTY,
+  type DokumentId,
   PASSWORD_MAX_LENGTH,
   type User,
 } from "@shared/schema";
 import { db } from "./db";
-import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters, blogPosts } from "@shared/schema";
+import { users, modules, sections, questions, attempts, progress, subscriptions, plans, certificates, auditLog, supportTickets, lectureChapters, userConsents } from "@shared/schema";
 import { eq, or, and, gte, desc, count, ilike, avg, sql, isNull, isNotNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey, stripeSource } from "./stripeClient";
 import { linkZMaila } from "./mailLinks";
@@ -62,19 +73,6 @@ const certificateNameSchema = z.object({
   lastName: namePart("nazwisko").optional(),
 });
 
-// Blog validation schemas
-const blogQuerySchema = z.object({
-  page: z.coerce.number().min(1).default(1),
-  pageSize: z.coerce.number().min(1).max(100).default(10),
-  tag: z.string().optional(),
-  q: z.string().optional(),
-  status: z.enum(['draft', 'published']).optional()
-});
-
-const statusUpdateSchema = z.object({
-  status: z.enum(['draft', 'published'])
-});
-
 // ── Role i zarządzanie kontami ─────────────────────────────────────────────
 const USER_ROLES = ["owner", "admin", "reviewer", "support", "student"] as const;
 // Role, które może nadawać/odbierać wyłącznie właściciel
@@ -82,7 +80,7 @@ const PRIVILEGED_ROLES: readonly string[] = ["owner", "admin"];
 
 const adminCreateUserSchema = z.object({
   email: z.string().trim().email().max(255),
-  password: z.string().min(8).max(PASSWORD_MAX_LENGTH),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   role: z.enum(USER_ROLES).default("student"),
@@ -103,7 +101,9 @@ const deleteAccountSchema = z.object({
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 });
 
-const REGISTER_MESSAGE = "Konto zostało utworzone. Sprawdź e-mail w celu weryfikacji.";
+// Ta sama odpowiedź dla nowego i istniejącego adresu: formularz nie zdradza, czy konto już jest
+const REGISTER_MESSAGE = "Sprawdź skrzynkę: wysłaliśmy link, którym potwierdzisz adres e-mail. Link działa 24 godziny.";
+const REJESTRACJA_ZAMKNIETA = "Rejestracja jest chwilowo zamknięta. Jeśli masz już konto, zaloguj się.";
 
 /** Dane użytkownika zwracane po zalogowaniu/rejestracji (bez pól wrażliwych) */
 function sessionUser(user: User) {
@@ -125,6 +125,7 @@ function adminUserView(user: User) {
     emailVerificationToken: _evt,
     passwordResetToken: _prt,
     passwordResetExpiry: _pre,
+    emailVerificationExpiry: _eve,
     stripeCustomerId: _sc,
     stripeSubscriptionId: _ss,
     ...safe
@@ -148,9 +149,80 @@ function auditSafe(entry: Parameters<typeof storage.createAuditLog>[0]) {
   storage.createAuditLog(entry).catch((e) => console.error("[audit] write failed:", e?.message));
 }
 
+/** Tylko gdy płatności są włączone (PLATNOSCI_WLACZONE): inaczej trasy zakupu nie istnieją (404) */
+function tylkoGdyPlatnosci(_req: Request, res: Response, next: import("express").NextFunction) {
+  if (platnosciWlaczone()) return next();
+  res.status(404).json({ error: "Nie znaleziono" });
+}
+
+/** Dokumenty (regulamin bety, polityka prywatności): Markdown z dist/dokumenty (produkcja) albo docs/dokumenty (podgląd) */
+function plikDokumentu(id: DokumentId): string | null {
+  const nazwa = id === "regulamin_bety" ? "regulamin-bety.md" : "polityka-prywatnosci.md";
+  const katalogi = [
+    process.env.DOKUMENTY_DIR,
+    path.resolve(import.meta.dirname, "dokumenty"),
+    path.resolve(process.cwd(), "docs/dokumenty"),
+  ].filter(Boolean) as string[];
+  for (const k of katalogi) {
+    const plik = path.join(k, nazwa);
+    if (fs.existsSync(plik)) return fs.readFileSync(plik, "utf8");
+  }
+  return null;
+}
+
+/**
+ * Usunięcie konta z danymi (RODO): samodzielnie z hasłem albo przez admina na prośbę użytkownika.
+ * Wszystko albo nic: subskrypcje anulowane, zgłoszenia zanonimizowane, sesje i konto usunięte
+ * (postęp, odpowiedzi, zgody, certyfikaty kasują się kaskadowo), wpis audytu bez danych osobowych.
+ */
+async function usunKontoZDanymi(cel: User, kto: { actorId: string; akcja: string; ip?: string; ua?: string }) {
+  await db.transaction(async (tx) => {
+    await tx.update(subscriptions)
+      .set({ status: "cancelled", endDate: new Date() })
+      .where(and(eq(subscriptions.userId, cel.id), eq(subscriptions.status, "active")));
+
+    // Zgłoszenia zostają (historia supportu), ale bez danych osobowych
+    await tx.update(supportTickets)
+      .set({ userEmail: "usuniete-konto@helloekg.invalid", userName: "Usunięte konto", userId: null })
+      .where(or(eq(supportTickets.userId, cel.id), eq(supportTickets.userEmail, cel.email)));
+
+    // actor_id zostanie wyzerowany przez ON DELETE SET NULL, gdy konto usuwa samo siebie
+    await tx.insert(auditLog).values({
+      actorId: kto.actorId,
+      action: kto.akcja,
+      entityType: "user",
+      entityId: cel.id,
+      ipAddress: kto.ip,
+      userAgent: kto.ua,
+    });
+
+    await tx.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${cel.id}`);
+    await tx.delete(users).where(eq(users.id, cel.id));
+  });
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit environment
   app.set('trust proxy', 1);
+
+  // Do dnia startu cały host poza wyszukiwarkami (INDEKSOWANIE=1 w konfiguracji serwera to zdejmuje)
+  app.use((_req, res, next) => {
+    if (!indeksowanieWlaczone()) res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    next();
+  });
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain").send(indeksowanieWlaczone() ? "User-agent: *\nAllow: /\n" : "User-agent: *\nDisallow: /\n");
+  });
+  // RFC 9116: gdzie zgłaszać podatności
+  app.get("/.well-known/security.txt", (_req, res) => {
+    res.type("text/plain").send([
+      "Contact: mailto:kontakt@helloekg.pl",
+      "Expires: 2027-11-10T00:00:00.000Z",
+      "Preferred-Languages: pl, en",
+      "Canonical: https://kurs.helloekg.pl/.well-known/security.txt",
+      "",
+    ].join("\n"));
+  });
 
   // ── Health / readiness endpoints ──────────────────────────────────────────
   // These are intentionally placed BEFORE session, auth, and rate-limit
@@ -213,41 +285,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply rate limiting to all API routes
   app.use('/api', apiRateLimit);
 
+  // Grafiki kursu zaimportowane ze studia: tylko z sesją potwierdzonego konta (to też treść kursu).
+  // Obrazy w wykładach i pytaniach to adresy z tej samej domeny, więc przeglądarka sama dołącza ciasteczko sesji.
+  if (process.env.CONTENT_ASSETS_DIR) {
+    app.use(
+      "/content-assets",
+      requireKonto,
+      express.static(process.env.CONTENT_ASSETS_DIR, {
+        fallthrough: false,
+        index: false,
+        dotfiles: "deny",
+        // prywatne: bez cache pośredników; nazwy plików to skróty treści, więc w przeglądarce mogą leżeć długo
+        setHeaders: (res) => res.setHeader("Cache-Control", "private, max-age=604800, immutable"),
+      })
+    );
+  }
+
   // Auth endpoints
   app.post("/api/auth/register", authRateLimit, async (req, res) => {
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Sprawdź dane w formularzu" });
+    }
+    const dane = parsed.data;
+    const email = dane.email.toLowerCase();
+
+    // Pole-pułapka wypełnione: to automat. Odpowiadamy jak zwykle, niczego nie zapisujemy i nie wysyłamy.
+    if (dane.website) {
+      auditSafe({
+        actorId: null,
+        action: "register_honeypot",
+        entityType: "auth",
+        entityId: NIL_UUID,
+        diff: { emailHash: hashEmail(email) },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+      return res.status(201).json({ message: REGISTER_MESSAGE });
+    }
+
+    if (!(await rejestracjaPrzyjmuje())) {
+      return res.status(403).json({ error: REJESTRACJA_ZAMKNIETA, code: "REGISTRATION_CLOSED" });
+    }
+
     try {
-      const userData = registerSchema.parse(req.body);
-      
-      // Only email + password required; fill in defaults for remaining required DB fields
-      const userDataFixed = {
-        email: userData.email,
-        password: userData.password,
-        firstName: "",
-        lastName: "",
-        marketingConsent: userData.marketingConsent ?? false,
-        termsAccepted: userData.termsAccepted ?? false,
-        privacyAccepted: userData.privacyAccepted ?? false,
-      };
-
-      let user: User;
-      let verificationToken: string;
-      try {
-        ({ user, verificationToken } = await authService.registerUser(userDataFixed));
-      } catch (err: any) {
-        if (err.message?.includes("już istnieje")) {
-          // Ten sam status i komunikat co przy nowym koncie, bez danych konta i bez sesji.
-          return res.status(201).json({ message: REGISTER_MESSAGE });
-        }
-        throw err;
-      }
-
-      const verificationUrl = linkZMaila("/verify-email", verificationToken);
-      try {
-        await emailService.sendEmailVerification(user.email, user.firstName, verificationUrl);
-      } catch (emailError) {
-        console.error("Failed to send verification email:", emailError);
-      }
-
+      const { user, verificationToken } = await authService.registerUser({
+        email,
+        password: dane.password,
+        firstName: dane.firstName,
+      });
       auditSafe({
         actorId: user.id,
         action: "user_registered",
@@ -257,19 +343,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get("User-Agent"),
       });
 
-      // Od razu zalogowany — klient może przejść prosto do /dashboard
-      try {
-        await establishSession(req, user.id);
-      } catch (sessionErr) {
-        console.error("Session after registration error:", sessionErr);
-        return res.status(201).json({ message: REGISTER_MESSAGE });
+      // odpowiedź od razu, mail w tle: czas odpowiedzi nie zdradza, czy konto było nowe
+      res.status(201).json({ message: REGISTER_MESSAGE });
+      if (await mailDoAdresuDozwolony(email, "rejestracja")) {
+        emailService.sendEmailVerification(user.email, user.firstName, linkZMaila("/verify-email", verificationToken))
+          .catch((e) => console.error("Failed to send verification email:", e?.message));
       }
-
-      res.status(201).json({ message: REGISTER_MESSAGE, user: sessionUser(user) });
     } catch (error: any) {
-      console.error("Registration error:", error.message);
-      res.status(400).json({ error: "Błąd podczas rejestracji" });
+      // Adres ma już konto (albo równoległa rejestracja zdążyła je założyć): ta sama odpowiedź,
+      // a właściciel skrzynki dostaje maila z linkiem do logowania i resetu hasła
+      const istnieje = error instanceof KontoIstnieje || error?.code === "23505" || error?.cause?.code === "23505";
+      if (istnieje) {
+        res.status(201).json({ message: REGISTER_MESSAGE });
+        auditSafe({
+          actorId: null,
+          action: "register_existing_email",
+          entityType: "auth",
+          entityId: NIL_UUID,
+          diff: { emailHash: hashEmail(email) },
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+        });
+        if (await mailDoAdresuDozwolony(email, "rejestracja")) {
+          emailService.sendAccountExists(email)
+            .catch((e) => console.error("Failed to send account-exists email:", e?.message));
+        }
+        return;
+      }
+      console.error("Registration error:", error?.message);
+      res.status(500).json({ error: "Nie udało się założyć konta. Spróbuj ponownie za chwilę." });
     }
+  });
+
+  // Ustawienia widoczne dla każdego (strona startowa, formularz rejestracji, trasy płatności)
+  app.get("/api/config", async (_req, res) => {
+    res.json({
+      rejestracjaOtwarta: await rejestracjaPrzyjmuje(),
+      dokumentyOpublikowane: await ustawienie("dokumenty_opublikowane"),
+      platnosci: platnosciWlaczone(),
+    });
+  });
+
+  // Regulamin bety i polityka prywatności: publiczne po akceptacji JK (dokumenty_opublikowane);
+  // wcześniej czyta je tylko właściciel i admin (podgląd projektu)
+  app.get("/api/dokumenty/:id", async (req, res) => {
+    const id = req.params.id as DokumentId;
+    if (!(id in DOKUMENTY)) return res.status(404).json({ error: "Nie znaleziono" });
+    let wolno = await ustawienie("dokumenty_opublikowane");
+    if (!wolno && req.session?.userId) {
+      const u = await storage.getUser(req.session.userId);
+      wolno = !!u && !u.suspendedAt && ["owner", "admin"].includes(u.role);
+    }
+    const tresc = wolno ? plikDokumentu(id) : null;
+    if (!tresc) return res.status(404).json({ error: "Nie znaleziono" });
+    res.json({ id, wersja: DOKUMENTY[id].wersja, tytul: DOKUMENTY[id].tytul, tresc });
   });
 
   app.post("/api/auth/login", authRateLimit, async (req, res) => {
@@ -381,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ 
         success: true, 
-        message: "Adres e-mail został zweryfikowany. Możesz się teraz zalogować." 
+        message: "Adres e-mail potwierdzony. Możesz zacząć kurs." 
       });
     } catch (error: any) {
       console.error("Email verification error:", error);
@@ -394,7 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email } = req.body ?? {};
       
-      if (!email || typeof email !== "string") {
+      if (!email || typeof email !== "string" || email.length > 255) {
         return res.status(400).json({ error: "Podaj adres e-mail" });
       }
 
@@ -409,9 +536,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(genericResponse);
       }
 
-      // Generate new token
-      const newToken = authService.generateToken();
-      await storage.updateUser(user.id, { emailVerificationToken: newToken });
+      // Nowy token (24 h); poprzedni link przestaje działać
+      const newToken = await authService.newVerificationToken(user.id);
 
       const verificationUrl = linkZMaila("/verify-email", newToken);
 
@@ -466,7 +592,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = resetPasswordSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: "Nieprawidłowe dane. Hasło musi mieć co najmniej 8 znaków" });
+        const pierwszy = parsed.error.issues[0];
+        return res.status(400).json({
+          error: pierwszy?.path[0] === "password" || pierwszy?.path[0] === "confirmPassword"
+            ? pierwszy.message
+            : `Nieprawidłowe dane. Hasło musi mieć co najmniej ${PASSWORD_MIN_LENGTH} znaków`,
+        });
       }
 
       const { token, password } = parsed.data;
@@ -476,17 +607,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: result.error });
       }
 
-      if (result.userId) {
+      if (result.user) {
         await storage.createAuditLog({
-          actorId: result.userId,
+          actorId: result.user.id,
           action: "password_reset",
           entityType: "user",
-          entityId: result.userId,
+          entityId: result.user.id,
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
         });
-        // Sessions are already invalidated inside authService.resetPassword
+        // sesje unieważnia już authService.resetPassword; właściciel skrzynki dostaje powiadomienie
+        emailService.sendPasswordChanged(result.user.email, result.user.firstName)
+          .catch((e) => console.error("Failed to send password-changed email:", e?.message));
       }
 
-      res.json({ message: "Hasło zostało zmienione. Możesz się teraz zalogować" });
+      res.json({ message: "Hasło zmienione. Zaloguj się nowym hasłem" });
     } catch (error: any) {
       console.error("Reset password error:", error);
       res.status(500).json({ error: "Wystąpił błąd. Spróbuj ponownie później" });
@@ -528,43 +663,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Nieprawidłowe hasło" });
       }
 
-      // Wszystko albo nic: audyt, anonimizacja zgłoszeń, sesje, konto
-      await db.transaction(async (tx) => {
-        await tx.update(subscriptions)
-          .set({ status: "cancelled", endDate: new Date() })
-          .where(and(
-            eq(subscriptions.userId, userId),
-            eq(subscriptions.status, "active")
-          ));
-
-        // Zgłoszenia zostają (historia supportu), ale bez danych osobowych
-        await tx.update(supportTickets)
-          .set({ userEmail: "usuniete-konto@helloekg.invalid", userName: "Usunięte konto", userId: null })
-          .where(or(eq(supportTickets.userId, userId), eq(supportTickets.userEmail, userEmail)));
-
-        // actor_id zostanie wyzerowany przez ON DELETE SET NULL
-        await tx.insert(auditLog).values({
-          actorId: userId,
-          action: "account_deleted",
-          entityType: "user",
-          entityId: userId,
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent'),
-        });
-
-        await tx.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${userId}`);
-        await tx.delete(users).where(eq(users.id, userId));
+      await usunKontoZDanymi(req.user!, {
+        actorId: userId,
+        akcja: "account_deleted",
+        ip: req.ip,
+        ua: req.get("User-Agent"),
       });
 
-      try {
-        await emailService.sendEmail(userEmail, {
-          subject: "Potwierdzenie usunięcia konta — helloEKG",
-          html: `<p>Cześć ${esc(userFirstName || '')},</p><p>Twoje konto w helloEKG zostało usunięte zgodnie z Twoim żądaniem. Wszystkie Twoje dane osobowe zostały trwale usunięte z naszych systemów.</p><p>Zespół helloEKG</p>`,
-          text: "Twoje konto w helloEKG zostało usunięte zgodnie z Twoim żądaniem. Wszystkie Twoje dane osobowe zostały trwale usunięte z naszych systemów."
-        });
-      } catch (emailError) {
-        console.error("Failed to send account deletion confirmation email:", emailError);
-      }
+      emailService.sendAccountDeleted(userEmail, userFirstName)
+        .catch((e) => console.error("Failed to send account deletion confirmation email:", e?.message));
 
       req.session.destroy(() => {});
       res.clearCookie("connect.sid");
@@ -574,7 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Account deletion error:", error);
       // 23503 = FK: konto zespołu z autorstwem treści (pytania, rozdziały) — nie da się usunąć samoobsługowo
       if (error?.code === "23503" || error?.cause?.code === "23503") {
-        return res.status(409).json({ error: "Tego konta nie można usunąć samodzielnie — napisz do nas: kontakt@helloekg.pl" });
+        return res.status(409).json({ error: "Tego konta nie można usunąć samodzielnie. Napisz do nas: kontakt@helloekg.pl" });
       }
       res.status(500).json({ error: "Błąd podczas usuwania konta" });
     }
@@ -588,13 +695,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: req.user!.firstName,
         lastName: req.user!.lastName,
         role: req.user!.role,
-        locale: req.user!.locale
+        locale: req.user!.locale,
+        emailVerified: req.user!.emailVerified,
       }
     });
   });
 
   // Subscription and payment endpoints
-  app.get("/api/plans", async (req, res) => {
+  app.get("/api/plans", tylkoGdyPlatnosci, async (req, res) => {
     try {
       const plans = await storage.getActivePlans();
       res.json(plans);
@@ -644,6 +752,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * a nagłówek Host przychodzi od klienta), a bez niej, jak dotąd, z żądania.
    */
   const adresPowrotu = (req: Request) => (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  /** Metody w Stripe Checkout (STRIPE_METODY, domyślnie karta, BLIK, Przelewy24); każda musi być włączona w panelu Stripe */
+  const metodyPlatnosci = () =>
+    (process.env.STRIPE_METODY || "card,blik,p24").split(",").map((m) => m.trim()).filter(Boolean) as any[];
   /** Płatności wyłączone (brak kluczy Stripe): 503 z jasnym komunikatem zamiast ogólnego błędu. */
   const bezStripe = (res: Response) => {
     if (stripeSource()) return false;
@@ -652,7 +763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Get Stripe publishable key for frontend
-  app.get("/api/stripe/config", async (req, res) => {
+  app.get("/api/stripe/config", tylkoGdyPlatnosci, async (req, res) => {
     if (bezStripe(res)) return;
     try {
       const publishableKey = await getStripePublishableKey();
@@ -664,7 +775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Zakup gościa: sama sesja Stripe; konto powstaje po płatności (server/platnosci.ts)
-  app.post("/api/stripe/guest-checkout", paymentRateLimit, async (req, res) => {
+  app.post("/api/stripe/guest-checkout", tylkoGdyPlatnosci, paymentRateLimit, async (req, res) => {
     if (bezStripe(res)) return;
     try {
       const planId = req.body?.planId;
@@ -690,7 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const session = await stripe.checkout.sessions.create({
         customer_email: email,
         customer_creation: 'always',
-        payment_method_types: ['card'],
+        payment_method_types: metodyPlatnosci(),
         line_items: [{
           price_data: {
             currency: plan.currency.toLowerCase(),
@@ -720,7 +831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Strona powrotu po płatności (także gościa): aktywacja z sesji pobranej ze Stripe, idempotentna
-  app.post("/api/stripe/finalize-payment", paymentRateLimit, async (req, res) => {
+  app.post("/api/stripe/finalize-payment", tylkoGdyPlatnosci, paymentRateLimit, async (req, res) => {
     if (bezStripe(res)) return;
     try {
       const sessionId = req.body?.sessionId;
@@ -751,7 +862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create Stripe Checkout session
-  app.post("/api/stripe/checkout", requireAuth, async (req, res) => {
+  app.post("/api/stripe/checkout", tylkoGdyPlatnosci, paymentRateLimit, requireAuth, async (req, res) => {
     if (bezStripe(res)) return;
     try {
       const { planId } = req.body;
@@ -788,7 +899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create checkout session with one-time payment
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
-        payment_method_types: ['card'],
+        payment_method_types: metodyPlatnosci(),
         line_items: [{
           price_data: {
             currency: plan.currency.toLowerCase(),
@@ -818,7 +929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Strona powrotu zalogowanego kursanta: to samo co webhook, jeśli webhook jeszcze nie dotarł
-  app.post("/api/stripe/payment-success", requireAuth, async (req, res) => {
+  app.post("/api/stripe/payment-success", tylkoGdyPlatnosci, paymentRateLimit, requireAuth, async (req, res) => {
     if (bezStripe(res)) return;
     try {
       const sessionId = req.body?.sessionId;
@@ -849,7 +960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Quiz endpoints
   // Get modules with sections and user progress
-  app.get("/api/modules", requireAuth, async (req, res) => {
+  app.get("/api/modules", requireKonto, async (req, res) => {
     try {
       let allModules = await storage.getModules();
       const userProgress = await storage.getUserProgress(req.user!.id);
@@ -941,7 +1052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }).refine((d) => d.chapterOrder <= d.chaptersTotal, { message: "chapterOrder > chaptersTotal", path: ["chapterOrder"] });
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  app.get("/api/lecture-reads", requireAuth, async (req, res) => {
+  app.get("/api/lecture-reads", requireKonto, async (req, res) => {
     try {
       const rows = await storage.getLectureReads(req.user!.id);
       res.json(rows.map((r) => ({
@@ -956,7 +1067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/lecture-reads/:sectionId", requireAuth, async (req, res) => {
+  app.put("/api/lecture-reads/:sectionId", requireKonto, async (req, res) => {
     const { sectionId } = req.params;
     if (!UUID_RE.test(sectionId)) {
       return res.status(400).json({ error: "Nieprawidłowy identyfikator sekcji" });
@@ -980,7 +1091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get sections with user progress (legacy endpoint)
-  app.get("/api/sections", requireAuth, async (req, res) => {
+  app.get("/api/sections", requireKonto, async (req, res) => {
     try {
       let allSections = await storage.getSections();
       const userProgress = await storage.getUserProgress(req.user!.id);
@@ -1021,7 +1132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/quiz/question", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.get("/api/quiz/question", requireKonto, requireActiveSubscription, async (req, res) => {
     try {
       const { sectionId, mode = "learn", exclude, ids } = req.query;
       const list = (v: unknown) => (typeof v === "string" && v ? v.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 100) : undefined);
@@ -1050,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Exam endpoints
-  app.post("/api/exam/initialize", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.post("/api/exam/initialize", requireKonto, requireActiveSubscription, async (req, res) => {
     try {
       const { count } = req.body;
       
@@ -1066,7 +1177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/exam/question", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.get("/api/exam/question", requireKonto, requireActiveSubscription, async (req, res) => {
     try {
       const { sessionId, index } = req.query;
       
@@ -1088,7 +1199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/exam/answer", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.post("/api/exam/answer", requireKonto, requireActiveSubscription, async (req, res) => {
     try {
       const { sessionId, questionId, selectedIndex, timeMs, answerData } = req.body;
 
@@ -1118,7 +1229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/exam/summary", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.get("/api/exam/summary", requireKonto, requireActiveSubscription, async (req, res) => {
     try {
       const { sessionId } = req.query;
       
@@ -1139,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quiz/answer", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.post("/api/quiz/answer", requireKonto, requireActiveSubscription, async (req, res) => {
     try {
       const { questionId, selectedIndex, timeMs, mode = "learn", answerData } = req.body;
 
@@ -1179,7 +1290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/progress", requireAuth, async (req, res) => {
+  app.get("/api/progress", requireKonto, async (req, res) => {
     try {
       const progress = await storage.getUserProgress(req.user!.id);
       const stats = await storage.getUserStatistics(req.user!.id);
@@ -1196,7 +1307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/review-queue", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.get("/api/review-queue", requireKonto, requireActiveSubscription, async (req, res) => {
     try {
       const reviewQuestions = await quizService.getReviewQueue(req.user!.id);
       res.json({ questionIds: reviewQuestions });
@@ -1207,7 +1318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Certificate endpoints
-  app.get("/api/certificates/eligibility", requireAuth, async (req, res) => {
+  app.get("/api/certificates/eligibility", requireKonto, async (req, res) => {
     try {
       const { mastered, required, isEligible } = await certificateService.getCompletion(req.user!.id);
       const user = await storage.getUser(req.user!.id);
@@ -1227,7 +1338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/certificates/my", requireAuth, async (req, res) => {
+  app.get("/api/certificates/my", requireKonto, async (req, res) => {
     try {
       const certificates = await storage.getUserCertificates(req.user!.id);
       res.json(certificates);
@@ -1237,7 +1348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/certificates/generate", requireAuth, async (req, res) => {
+  app.post("/api/certificates/generate", requireKonto, async (req, res) => {
     try {
       const parsed = certificateNameSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
@@ -1258,7 +1369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ====== GAMIFICATION ENDPOINTS ======
   
   // Pobierz statystyki użytkownika (XP, poziom, streak)
-  app.get("/api/gamification/stats", requireAuth, async (req, res) => {
+  app.get("/api/gamification/stats", requireKonto, async (req, res) => {
     try {
       const stats = await gamificationService.getUserStats(req.user!.id);
       const levelInfo = gamificationService.getXpToNextLevel(stats.xp, stats.level);
@@ -1276,7 +1387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Pobierz heatmapę aktywności
-  app.get("/api/gamification/activity-heatmap", requireAuth, async (req, res) => {
+  app.get("/api/gamification/activity-heatmap", requireKonto, async (req, res) => {
     try {
       const activities = await gamificationService.getUserActivityHeatmap(req.user!.id);
       res.json(activities);
@@ -1287,7 +1398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Pobierz osiągnięcia użytkownika
-  app.get("/api/gamification/achievements", requireAuth, async (req, res) => {
+  app.get("/api/gamification/achievements", requireKonto, async (req, res) => {
     try {
       const achievements = await gamificationService.getUserAchievements(req.user!.id);
       res.json(achievements);
@@ -1298,7 +1409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Użyj streak freeze
-  app.post("/api/gamification/use-freeze", requireAuth, async (req, res) => {
+  app.post("/api/gamification/use-freeze", requireKonto, async (req, res) => {
     try {
       const stats = await gamificationService.getUserStats(req.user!.id);
       
@@ -1315,7 +1426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoints
-  app.get("/api/admin/questions", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/questions", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { status, sectionId } = req.query;
       
@@ -1348,7 +1459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/questions", requireAuth, requireReviewer, async (req, res) => {
+  app.post("/api/admin/questions", requireKonto, requireReviewer, async (req, res) => {
     try {
       const questionData = insertQuestionSchema.parse({
         ...req.body,
@@ -1375,7 +1486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/questions/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.put("/api/admin/questions/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       // Tylko edytowalne pola treści — bez createdBy/reviewedBy/wersji (brak mass assignment)
@@ -1410,7 +1521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/questions/:id/review", requireAuth, requireReviewer, async (req, res) => {
+  app.post("/api/admin/questions/:id/review", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       const { action } = req.body; // "approve" or "reject"
@@ -1437,7 +1548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete question endpoint
-  app.delete("/api/admin/questions/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.delete("/api/admin/questions/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -1467,7 +1578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk import questions endpoint
-  app.post("/api/admin/questions/bulk", requireAuth, requireReviewer, async (req, res) => {
+  app.post("/api/admin/questions/bulk", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { items, dryRun = false } = req.body;
       
@@ -1565,7 +1676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin modules management
-  app.get("/api/admin/modules", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/modules", requireKonto, requireReviewer, async (req, res) => {
     try {
       const modules = await storage.getModulesWithSections();
       res.json(modules);
@@ -1575,7 +1686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/modules", requireAuth, requireReviewer, async (req, res) => {
+  app.post("/api/admin/modules", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { title, description, order, isLocked, prerequisiteModuleId } = req.body;
       
@@ -1605,7 +1716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/modules/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.put("/api/admin/modules/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -1635,7 +1746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/admin/modules/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.delete("/api/admin/modules/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -1665,7 +1776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin sections management
-  app.post("/api/admin/sections", requireAuth, requireReviewer, async (req, res) => {
+  app.post("/api/admin/sections", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { moduleId, title, description, order, isLocked, prerequisiteSectionId } = req.body;
       
@@ -1696,7 +1807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/sections/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.put("/api/admin/sections/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -1726,7 +1837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/admin/sections/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.delete("/api/admin/sections/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -1756,7 +1867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reorder modules
-  app.put("/api/admin/modules/reorder", requireAuth, requireReviewer, async (req, res) => {
+  app.put("/api/admin/modules/reorder", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { moduleIds } = req.body; // Array of module IDs in new order
       
@@ -1781,7 +1892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reorder sections within a module
-  app.put("/api/admin/sections/reorder", requireAuth, requireReviewer, async (req, res) => {
+  app.put("/api/admin/sections/reorder", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { sectionIds, moduleId } = req.body; // Array of section IDs in new order for specific module
       
@@ -1806,121 +1917,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Object storage endpoints for admin uploads
-  app.post("/api/admin/upload", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { ObjectStorageService } = await import("./objectStorage");
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      res.json({ uploadURL });
-    } catch (error: any) {
-      console.error("Upload URL generation error:", error);
-      res.status(500).json({ error: "Błąd podczas generowania URL uploadu" });
-    }
-  });
 
-  app.put("/api/admin/images", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { imageURL } = req.body;
-      
-      if (!imageURL) {
-        return res.status(400).json({ error: "imageURL jest wymagane" });
-      }
-
-      const { ObjectStorageService } = await import("./objectStorage");
-      const objectStorageService = new ObjectStorageService();
-      
-      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
-        imageURL,
-        {
-          owner: req.user!.id,
-          visibility: "public", // Images for questions should be public
-        }
-      );
-
-      res.status(200).json({
-        objectPath: objectPath,
-      });
-    } catch (error: any) {
-      console.error("Error setting image ACL:", error);
-      res.status(500).json({ error: "Błąd podczas zapisywania obrazu" });
-    }
-  });
 
   // Public file serving endpoint
-  app.get("/public-objects/:filePath(*)", async (req, res) => {
-    const filePath = req.params.filePath;
-    try {
-      const { ObjectStorageService } = await import("./objectStorage");
-      const objectStorageService = new ObjectStorageService();
-      const file = await objectStorageService.searchPublicObject(filePath);
-      if (!file) {
-        return res.status(404).json({ error: "File not found" });
-      }
-      objectStorageService.downloadObject(file, res);
-    } catch (error: any) {
-      console.error("Error searching for public object:", error);
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  });
 
   // Object entity serving endpoint
-  app.get("/objects/:objectPath(*)", requireAuth, async (req, res) => {
-    try {
-      const { ObjectStorageService, ObjectNotFoundError } = await import("./objectStorage");
-      const objectStorageService = new ObjectStorageService();
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-
-      const allowed = await objectStorageService.canAccessObjectEntity({
-        userId: req.user!.id,
-        objectFile,
-      });
-      if (!allowed) {
-        return res.status(403).json({ error: "Brak uprawnień do tego pliku" });
-      }
-
-      objectStorageService.downloadObject(objectFile, res);
-    } catch (error: any) {
-      console.error("Error checking object access:", error);
-      if (error.name === "ObjectNotFoundError") {
-        return res.sendStatus(404);
-      }
-      return res.sendStatus(500);
-    }
-  });
 
   // Support endpoints
-  app.post("/api/support/tickets", apiRateLimit, async (req, res) => {
-    try {
-      const { subject, message } = req.body ?? {};
-
-      if (typeof subject !== "string" || typeof message !== "string" || !subject.trim() || !message.trim()) {
-        return res.status(400).json({ error: "Temat i wiadomość są wymagane" });
-      }
-      if (subject.length > 200 || message.length > 5000) {
-        return res.status(400).json({ error: "Temat do 200 znaków, wiadomość do 5000 znaków" });
-      }
-
-      const user = req.session?.userId ? await storage.getUser(req.session.userId) : null;
-      
-      const ticket = await storage.createSupportTicket({
-        userId: req.session?.userId || undefined,
-        userEmail: user?.email || 'anonymous@unknown.com',
-        userName: user ? `${user.firstName} ${user.lastName}` : 'Anonymous User',
-        subject,
-        message,
-        status: "open",
-        priority: "medium"
-      });
-
-      res.status(201).json(ticket);
-    } catch (error) {
-      console.error("Support ticket creation error:", error);
-      res.status(500).json({ error: "Błąd podczas tworzenia zgłoszenia" });
-    }
-  });
 
   // Admin endpoints for user management
-  app.get("/api/admin/users", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/users", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { search, role, status } = req.query;
       let query = db.select().from(users);
@@ -1966,7 +1972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/stats/users", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/stats/users", requireKonto, requireReviewer, async (req, res) => {
     try {
       const totalUsers = await db.select({ count: count() }).from(users);
       const activeSubscriptions = await db.select({ count: count() })
@@ -1992,11 +1998,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Tworzenie kont przez panel — wyłącznie właściciel
-  app.post("/api/admin/users", requireAuth, requireOwner, async (req, res) => {
+  app.post("/api/admin/users", requireKonto, requireOwner, async (req, res) => {
     try {
       const parsed = adminCreateUserSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ error: "Email, hasło (8–128 znaków), imię i nazwisko są wymagane; rola musi być prawidłowa" });
+        return res.status(400).json({ error: `Email, hasło (co najmniej ${PASSWORD_MIN_LENGTH} znaków), imię i nazwisko są wymagane; rola musi być prawidłowa` });
       }
       const { email, password, firstName, lastName, role } = parsed.data;
 
@@ -2006,8 +2012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Użytkownik o tym adresie email już istnieje" });
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 12);
+      const hashedPassword = await authService.hashPassword(password);
 
       // Create user
       const [newUser] = await db
@@ -2018,7 +2023,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName,
           lastName,
           role,
-          emailVerified: true, // Admin-created users are pre-verified
+          emailVerified: true, // konto zakłada właściciel, adres uznajemy za potwierdzony
+          emailVerifiedAt: new Date(),
+          // konto kursanta (np. testowe do pentestu) ma dostęp jak tester bety
+          testerBety: role === "student",
         })
         .returning();
 
@@ -2040,7 +2048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
+  app.put("/api/admin/users/:id", requireKonto, requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const parsed = adminUpdateUserSchema.safeParse(req.body);
@@ -2145,8 +2153,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Usunięcie konta z danymi (RODO, także na prośbę użytkownika). Admin i właściciel; konta admin/owner tylko właściciel.
+  app.delete("/api/admin/users/:id", requireKonto, requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const actor = req.user!;
+      if (actor.id === id) {
+        return res.status(403).json({ error: "Własne konto usuwasz w ustawieniach konta" });
+      }
+      const target = await storage.getUser(id);
+      if (!target) return res.status(404).json({ error: "Użytkownik nie znaleziony" });
+      if (PRIVILEGED_ROLES.includes(target.role) && actor.role !== "owner") {
+        return res.status(403).json({ error: "Konta administratorów i właścicieli usuwa tylko właściciel" });
+      }
+      if (target.role === "owner") {
+        const [row] = await db.select({ n: count() }).from(users).where(eq(users.role, "owner"));
+        if (Number(row?.n ?? 0) <= 1) return res.status(409).json({ error: "Nie można usunąć ostatniego właściciela" });
+      }
+      const powiadom = req.body?.powiadom !== false;
+
+      await usunKontoZDanymi(target, {
+        actorId: actor.id,
+        akcja: "account_deleted_by_admin",
+        ip: req.ip,
+        ua: req.get("User-Agent"),
+      });
+      if (powiadom) {
+        emailService.sendAccountDeleted(target.email, target.firstName)
+          .catch((e) => console.error("Failed to send account deletion email:", e?.message));
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Admin account deletion error:", error?.message);
+      if (error?.code === "23503" || error?.cause?.code === "23503") {
+        return res.status(409).json({ error: "To konto jest autorem treści kursu (pytania, rozdziały). Najpierw przepisz autorstwo" });
+      }
+      res.status(500).json({ error: "Błąd podczas usuwania konta" });
+    }
+  });
+
+  // Zgody konta (dokument, wersja, data) do wglądu w panelu
+  app.get("/api/admin/users/:id/zgody", requireKonto, requireAdmin, async (req, res) => {
+    try {
+      const rows = await db.select().from(userConsents).where(eq(userConsents.userId, req.params.id)).orderBy(desc(userConsents.acceptedAt));
+      res.json(rows.map((r) => ({ document: r.document, version: r.version, acceptedAt: r.acceptedAt })));
+    } catch (error: any) {
+      console.error("Consents fetch error:", error?.message);
+      res.status(500).json({ error: "Błąd podczas pobierania zgód" });
+    }
+  });
+
+  // Przełączniki aplikacji (rejestracja, dokumenty, wyjątki limitów dla pentestu): tylko właściciel
+  app.get("/api/admin/ustawienia", requireKonto, requireOwner, async (_req, res) => {
+    res.json({
+      ...(await wszystkieUstawienia()),
+      // z konfiguracji serwera, w panelu tylko do odczytu
+      platnosci: platnosciWlaczone(),
+      indeksowanie: indeksowanieWlaczone(),
+    });
+  });
+
+  app.put("/api/admin/ustawienia", requireKonto, requireOwner, async (req, res) => {
+    const klucz = req.body?.klucz as KluczUstawienia;
+    if (typeof klucz !== "string" || !(klucz in USTAWIENIA)) {
+      return res.status(400).json({ error: "Nieznane ustawienie" });
+    }
+    try {
+      await zapiszUstawienie(klucz, req.body?.wartosc, req.user!.id);
+      await storage.createAuditLog({
+        actorId: req.user!.id,
+        action: "setting_changed",
+        entityType: "setting",
+        entityId: NIL_UUID,
+        diff: { klucz, wartosc: req.body?.wartosc },
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+      res.json(await wszystkieUstawienia());
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message || "Nie udało się zapisać ustawienia" });
+    }
+  });
+
   // Grant/revoke subscription for user — tylko owner/support
-  app.post("/api/admin/users/:id/subscription", requireAuth, requireSubscriptionManager, async (req, res) => {
+  app.post("/api/admin/users/:id/subscription", requireKonto, requireSubscriptionManager, async (req, res) => {
     try {
       const { id } = req.params;
       const parsed = adminSubscriptionSchema.safeParse(req.body);
@@ -2249,7 +2339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Support tickets endpoints
-  app.get("/api/admin/support/tickets", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/support/tickets", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { status, search } = req.query;
       let query = db.select().from(supportTickets);
@@ -2283,7 +2373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/stats/support", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/stats/support", requireKonto, requireReviewer, async (req, res) => {
     try {
       const totalTickets = await db.select({ count: count() }).from(supportTickets);
       const openTickets = await db.select({ count: count() })
@@ -2305,7 +2395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/support/tickets/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.put("/api/admin/support/tickets/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       const { status, adminResponse } = req.body;
@@ -2345,7 +2435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics endpoints
-  app.get("/api/admin/analytics/stats", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/analytics/stats", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { range } = req.query;
       
@@ -2419,7 +2509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/analytics/performance", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/analytics/performance", requireKonto, requireReviewer, async (req, res) => {
     try {
       // Get average quiz completion time
       const avgCompletionTime = await db.select({ 
@@ -2474,7 +2564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Lecture chapters endpoints for admins
-  app.get("/api/admin/sections/:sectionId/chapters", requireAuth, requireReviewer, async (req, res) => {
+  app.get("/api/admin/sections/:sectionId/chapters", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { sectionId } = req.params;
       const chapters = await db
@@ -2502,7 +2592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/sections/:sectionId/chapters", requireAuth, requireReviewer, async (req, res) => {
+  app.post("/api/admin/sections/:sectionId/chapters", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { sectionId } = req.params;
       const { title, contentMd, analogy, keyPoints, visual, visualContent, order } = req.body;
@@ -2540,7 +2630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/chapters/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.put("/api/admin/chapters/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
       const { title, contentMd, analogy, keyPoints, visual, visualContent, order, isPublished } = req.body;
@@ -2583,7 +2673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/admin/chapters/:id", requireAuth, requireReviewer, async (req, res) => {
+  app.delete("/api/admin/chapters/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -2614,47 +2704,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Lecture image upload endpoints
-  app.post("/api/objects/upload", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { ObjectStorageService } = await import("./objectStorage");
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      res.json({ uploadURL });
-    } catch (error: any) {
-      console.error("Error getting upload URL:", error);
-      res.status(500).json({ error: "Błąd podczas generowania URL do przesłania" });
-    }
-  });
 
-  app.put("/api/lecture-images", requireAuth, requireReviewer, async (req, res) => {
-    if (!req.body.imageURL) {
-      return res.status(400).json({ error: "imageURL jest wymagane" });
-    }
-
-    const userId = req.user!.id;
-
-    try {
-      const { ObjectStorageService } = await import("./objectStorage");
-      const objectStorageService = new ObjectStorageService();
-      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
-        req.body.imageURL,
-        {
-          owner: userId,
-          visibility: "public", // Lecture images are public
-        }
-      );
-
-      res.status(200).json({
-        objectPath: objectPath,
-      });
-    } catch (error: any) {
-      console.error("Error setting lecture image ACL:", error);
-      res.status(500).json({ error: "Błąd podczas konfiguracji obrazu" });
-    }
-  });
 
   // Public endpoints for lecture chapters
-  app.get("/api/sections/:sectionId/chapters", requireAuth, requireActiveSubscription, async (req, res) => {
+  app.get("/api/sections/:sectionId/chapters", requireKonto, requireActiveSubscription, async (req, res) => {
     try {
       const { sectionId } = req.params;
       const userRole = req.user?.role || 'student';
@@ -2707,439 +2760,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============== BLOG ROUTES ==============
-  
-  // Public Blog Routes (accessible to all)
-  app.get("/api/blog", async (req, res) => {
-    try {
-      const queryData = blogQuerySchema.parse(req.query);
-      
-      const filters = {
-        status: 'published' as const,
-        page: queryData.page,
-        pageSize: queryData.pageSize,
-        tag: queryData.tag,
-        q: queryData.q
-      };
-
-      const result = await storage.getBlogPosts(filters);
-      res.json(result);
-    } catch (error: any) {
-      console.error("Blog posts fetch error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowe parametry zapytania" });
-      }
-      res.status(500).json({ error: "Błąd podczas pobierania artykułów" });
-    }
-  });
-
-  app.get("/api/blog/:slug", async (req, res) => {
-    try {
-      const { slug } = req.params;
-      
-      if (!slug || typeof slug !== 'string') {
-        return res.status(400).json({ error: "Nieprawidłowy slug artykułu" });
-      }
-
-      const blogPost = await storage.getBlogPostBySlug(slug, 'published');
-      
-      if (!blogPost) {
-        return res.status(404).json({ error: "Artykuł nie znaleziony" });
-      }
-
-      res.json(blogPost);
-    } catch (error: any) {
-      console.error("Blog post fetch error:", error);
-      res.status(500).json({ error: "Błąd podczas pobierania artykułu" });
-    }
-  });
-
-  // Admin Blog Routes (require reviewer+ permissions)
-  app.get("/api/admin/blog-posts", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const queryData = blogQuerySchema.parse(req.query);
-      
-      const filters = {
-        status: queryData.status,
-        page: queryData.page,
-        pageSize: queryData.pageSize,
-        tag: queryData.tag,
-        q: queryData.q
-      };
-
-      const result = await storage.getBlogPosts(filters);
-      res.json(result);
-    } catch (error: any) {
-      console.error("Admin blog posts fetch error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowe parametry zapytania" });
-      }
-      res.status(500).json({ error: "Błąd podczas pobierania artykułów" });
-    }
-  });
-
-  app.post("/api/admin/blog-posts", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const blogPostData = insertBlogPostSchema.parse({
-        ...req.body,
-        authorId: req.user!.id,
-        status: req.body.status || 'draft'
-      });
-      
-      const blogPost = await storage.createBlogPost(blogPostData);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "blog_post_created",
-        entityType: "blog_post",
-        entityId: blogPost.id,
-        diff: { blogPost: blogPostData },
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.status(201).json(blogPost);
-    } catch (error: any) {
-      console.error("Blog post creation error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowe dane artykułu" });
-      }
-      res.status(500).json({ error: "Błąd podczas tworzenia artykułu" });
-    }
-  });
-
-  app.patch("/api/admin/blog-posts/:id", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: "Nieprawidłowe ID artykułu" });
-      }
-
-      // Validate partial update data
-      const updates = insertBlogPostSchema.partial().parse(req.body);
-      
-      const updatedBlogPost = await storage.updateBlogPost(id, updates);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "blog_post_updated",
-        entityType: "blog_post",
-        entityId: id,
-        diff: { updates },
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.json(updatedBlogPost);
-    } catch (error: any) {
-      console.error("Blog post update error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowe dane aktualizacji" });
-      }
-      res.status(500).json({ error: "Błąd podczas aktualizacji artykułu" });
-    }
-  });
-
-  app.patch("/api/admin/blog-posts/:id/status", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: "Nieprawidłowe ID artykułu" });
-      }
-
-      const { status } = statusUpdateSchema.parse(req.body);
-      
-      const updatedBlogPost = await storage.updateBlogPostStatus(id, status);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: `blog_post_${status === 'published' ? 'published' : 'drafted'}`,
-        entityType: "blog_post",
-        entityId: id,
-        diff: { status },
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.json(updatedBlogPost);
-    } catch (error: any) {
-      console.error("Blog post status update error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowy status artykułu" });
-      }
-      res.status(500).json({ error: "Błąd podczas zmiany statusu artykułu" });
-    }
-  });
-
-  app.delete("/api/admin/blog-posts/:id", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: "Nieprawidłowe ID artykułu" });
-      }
-
-      await storage.deleteBlogPost(id);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "blog_post_deleted",
-        entityType: "blog_post",
-        entityId: id,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.status(204).send();
-    } catch (error: any) {
-      console.error("Blog post deletion error:", error);
-      res.status(500).json({ error: "Błąd podczas usuwania artykułu" });
-    }
-  });
-
-  // Demo Question Routes
-  // Public route to get active demo question (legacy - returns single)
-  app.get("/api/demo-question", async (req, res) => {
-    try {
-      const demoQuestion = await storage.getActiveDemoQuestion();
-      res.json(demoQuestion);
-    } catch (error: any) {
-      console.error("Demo question fetch error:", error);
-      res.status(500).json({ error: "Błąd podczas pobierania pytania demo" });
-    }
-  });
-
-  // Public route to get all active demo questions
-  app.get("/api/demo-questions", async (req, res) => {
-    try {
-      const demoQuestions = await storage.getActiveDemoQuestions();
-      res.json(demoQuestions);
-    } catch (error: any) {
-      console.error("Demo questions fetch error:", error);
-      res.status(500).json({ error: "Błąd podczas pobierania pytań demo" });
-    }
-  });
-
-  // Admin routes for demo questions
-  app.get("/api/admin/demo-question", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const demoQuestions = await storage.getAllDemoQuestions();
-      res.json(demoQuestions);
-    } catch (error: any) {
-      console.error("Demo questions fetch error:", error);
-      res.status(500).json({ error: "Błąd podczas pobierania pytań demo" });
-    }
-  });
-
-  app.post("/api/admin/demo-question", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const demoQuestionData = insertDemoQuestionSchema.parse(req.body);
-      const demoQuestion = await storage.createDemoQuestion(demoQuestionData);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "demo_question_created",
-        entityType: "demo_question",
-        entityId: demoQuestion.id,
-        diff: { demoQuestion: demoQuestionData },
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.status(201).json(demoQuestion);
-    } catch (error: any) {
-      console.error("Demo question creation error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowe dane pytania demo" });
-      }
-      res.status(500).json({ error: "Błąd podczas tworzenia pytania demo" });
-    }
-  });
-
-  app.patch("/api/admin/demo-question/:id", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: "Nieprawidłowe ID pytania demo" });
-      }
-
-      const updates = insertDemoQuestionSchema.partial().parse(req.body);
-      const updatedDemoQuestion = await storage.updateDemoQuestion(id, updates);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "demo_question_updated",
-        entityType: "demo_question",
-        entityId: id,
-        diff: { updates },
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.json(updatedDemoQuestion);
-    } catch (error: any) {
-      console.error("Demo question update error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowe dane aktualizacji" });
-      }
-      res.status(500).json({ error: "Błąd podczas aktualizacji pytania demo" });
-    }
-  });
-
-  app.delete("/api/admin/demo-question/:id", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: "Nieprawidłowe ID pytania demo" });
-      }
-
-      await storage.deleteDemoQuestion(id);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "demo_question_deleted",
-        entityType: "demo_question",
-        entityId: id,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.status(204).send();
-    } catch (error: any) {
-      console.error("Demo question deletion error:", error);
-      res.status(500).json({ error: "Błąd podczas usuwania pytania demo" });
-    }
-  });
-
-  // ============================================================================
-  // HOME PAGE CONTENT ROUTES
-  // ============================================================================
-
-  // Public endpoint to get all home page content
-  app.get("/api/home-page-content", async (req, res) => {
-    try {
-      const content = await storage.getAllHomePageContent();
-      res.json(content);
-    } catch (error: any) {
-      console.error("Home page content fetch error:", error);
-      res.status(500).json({ error: "Błąd podczas pobierania treści strony głównej" });
-    }
-  });
-
-  // Admin endpoints for managing home page content
-  app.get("/api/admin/home-page-content", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const content = await storage.getAllHomePageContent();
-      res.json(content);
-    } catch (error: any) {
-      console.error("Home page content fetch error:", error);
-      res.status(500).json({ error: "Błąd podczas pobierania treści strony głównej" });
-    }
-  });
-
-  app.post("/api/admin/home-page-content", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const contentData = insertHomePageContentSchema.parse(req.body);
-      const newContent = await storage.createHomePageContent(contentData);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "home_page_content_created",
-        entityType: "home_page_content",
-        entityId: newContent.id,
-        diff: { data: contentData },
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.status(201).json(newContent);
-    } catch (error: any) {
-      console.error("Home page content creation error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowe dane treści" });
-      }
-      res.status(500).json({ error: "Błąd podczas tworzenia treści strony głównej" });
-    }
-  });
-
-  app.patch("/api/admin/home-page-content/:id", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: "Nieprawidłowe ID treści" });
-      }
-
-      const updates = insertHomePageContentSchema.partial().parse(req.body);
-      const updatedContent = await storage.updateHomePageContent(id, updates);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "home_page_content_updated",
-        entityType: "home_page_content",
-        entityId: id,
-        diff: { updates },
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.json(updatedContent);
-    } catch (error: any) {
-      console.error("Home page content update error:", error);
-      if (error.name === 'ZodError') {
-        return res.status(400).json({ error: "Nieprawidłowe dane aktualizacji" });
-      }
-      res.status(500).json({ error: "Błąd podczas aktualizacji treści strony głównej" });
-    }
-  });
-
-  app.delete("/api/admin/home-page-content/:id", requireAuth, requireReviewer, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: "Nieprawidłowe ID treści" });
-      }
-
-      await storage.deleteHomePageContent(id);
-
-      // Create audit log
-      await storage.createAuditLog({
-        actorId: req.user!.id,
-        action: "home_page_content_deleted",
-        entityType: "home_page_content",
-        entityId: id,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      res.status(204).send();
-    } catch (error: any) {
-      console.error("Home page content deletion error:", error);
-      res.status(500).json({ error: "Błąd podczas usuwania treści strony głównej" });
-    }
-  });
+  // (Blog, pytanie demo i treść strony głównej z EKGQuiz usunięte 10.11.2026: blog jest na helloekg.pl,
+  // treść kursu przychodzi ze studia.)
 
   // Report error/bug endpoint
-  app.post("/api/report-error", requireAuth, async (req, res) => {
+  app.post("/api/report-error", requireKonto, async (req, res) => {
     try {
       const { questionId, message } = req.body;
       
-      if (!questionId || !message) {
+      if (typeof questionId !== "string" || typeof message !== "string" || !questionId || !message.trim()) {
         return res.status(400).json({ error: "Pytanie i wiadomość są wymagane" });
+      }
+      if (questionId.length > 64 || message.length > 5000) {
+        return res.status(400).json({ error: "Wiadomość może mieć najwyżej 5000 znaków" });
       }
 
       // Create support ticket
@@ -3167,6 +2800,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   (await import("./feedbackRoutes")).registerFeedbackRoutes(app); // zgłoszenia testerów (beta)
   (await import("./learningAnalyticsRoutes")).registerLearningAnalyticsRoutes(app); // panel nauki (admin → Statystyki)
+
+  // Nieznany adres API: 404 w JSON (nie strona aplikacji z kodem 200)
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ error: "Nie znaleziono" });
+  });
   const httpServer = createServer(app);
   return httpServer;
 }

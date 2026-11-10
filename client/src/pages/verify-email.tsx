@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useAuth } from "@/lib/auth";
+import { authService, useAuth } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
 
@@ -58,11 +58,13 @@ export default function VerifyEmail() {
     queryKey: ['/api/auth/verify-email', token],
     queryFn: async () => {
       if (!token) throw new Error('Brak tokenu');
-      const response = await fetch(`/api/auth/verify-email?token=${token}`);
+      const response = await fetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || 'Błąd weryfikacji');
       }
+      // zapamiętany użytkownik w sesji przeglądarki: od teraz z potwierdzonym adresem (otwiera treść kursu)
+      authService.updateUser({ emailVerified: true });
       queryClient.invalidateQueries({ queryKey: ['/api/certificates/eligibility'] });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       return data;

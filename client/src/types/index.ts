@@ -72,6 +72,8 @@ export interface AuthUser {
   lastName: string;
   role: string;
   locale: string;
+  /** false: konto czeka na potwierdzenie adresu, treść kursu jest zamknięta */
+  emailVerified?: boolean;
 }
 
 export interface QuizQuestion {
@@ -197,11 +199,10 @@ export interface RegisterForm {
   password: string;
   confirmPassword: string;
   firstName: string;
-  lastName: string;
-  profession?: string;
-  marketingConsent: boolean;
   termsAccepted: boolean;
   privacyAccepted: boolean;
+  /** pole-pułapka na automaty: człowiek go nie widzi */
+  website?: string;
 }
 
 export interface ContactForm {

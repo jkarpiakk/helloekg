@@ -102,7 +102,7 @@ export class CertificateService {
     // - User name
     // - Certificate ID
     // - Date of issue
-    // - EKG Academy branding
+    // - marka helloEKG
     
     return pdfUrl;
   }

@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { createHmac } from "crypto";
 import { pool } from "../db";
 import { storage } from "../storage";
+import { ipWyjeteZLimitow } from "../ustawienia";
 
 /** UUID-zero dla wpisów audytu bez konkretnej encji (np. nieudane logowanie na nieznany e-mail) */
 export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
@@ -46,16 +47,21 @@ export function createRateLimit(options: {
   max: number;
   message?: string;
   keyPrefix?: string;
+  /** Przy błędzie bazy odrzucić (503) zamiast przepuścić: logowanie i tak nie działa bez bazy */
+  failClosed?: boolean;
 }) {
   const {
     windowMs,
     max,
     message = "Zbyt wiele żądań. Spróbuj ponownie później.",
     keyPrefix = "rl",
+    failClosed = false,
   } = options;
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // adresy firmy testującej (przełącznik w panelu admina, domyślnie wyłączony)
+      if (await ipWyjeteZLimitow(req.ip)) return next();
       await ensureTable();
 
       const now = Date.now();
@@ -107,8 +113,8 @@ export function createRateLimit(options: {
 
       next();
     } catch (err) {
-      // If the DB is unavailable, fail open to avoid blocking all traffic (logged)
-      console.error(`[rateLimit] DB error, failing open (limiter=${keyPrefix}, ip=${req.ip}, path=${req.path}):`, err);
+      console.error(`[rateLimit] DB error (limiter=${keyPrefix}, ${failClosed ? "odrzucam" : "przepuszczam"}, path=${req.path}):`, err);
+      if (failClosed) return res.status(503).json({ error: "Chwilowy problem z serwerem. Spróbuj ponownie za chwilę." });
       next();
     }
   };
@@ -119,8 +125,9 @@ export function createRateLimit(options: {
 export const authRateLimit = createRateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  message: "Zbyt wiele prób logowania. Spróbuj ponownie za 15 minut.",
+  message: "Zbyt wiele prób. Spróbuj ponownie za 15 minut.",
   keyPrefix: "auth",
+  failClosed: true,
 });
 
 export const apiRateLimit = createRateLimit({
@@ -135,6 +142,7 @@ export const paymentRateLimit = createRateLimit({
   max: 10,
   message: "Zbyt wiele prób płatności. Spróbuj ponownie za godzinę.",
   keyPrefix: "pay",
+  failClosed: true,
 });
 
 // ---------------------------------------------------------------------------
@@ -162,6 +170,7 @@ const loginFailKeys = (email: string, ip?: string) => {
 /** Zwraca liczbę sekund do odblokowania, jeśli logowanie na to konto z tej sieci jest chwilowo zablokowane; inaczej null. */
 export async function loginEmailBlockedFor(email: string, ip?: string): Promise<number | null> {
   try {
+    if (await ipWyjeteZLimitow(ip)) return null;
     await ensureTable();
     const now = Date.now();
     const k = loginFailKeys(email, ip);
@@ -242,4 +251,5 @@ export const accountDeleteRateLimit = createRateLimit({
   max: 10,
   message: "Zbyt wiele prób usunięcia konta. Spróbuj ponownie za 15 minut.",
   keyPrefix: "account-delete",
+  failClosed: true,
 });

@@ -9,7 +9,7 @@
 import type { Express } from "express";
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "./db";
-import { requireAuth, requireRole } from "./middleware/auth";
+import { requireKonto, requireRole } from "./middleware/auth";
 import {
   GRADING_FIXED_AT,
   LEARNING_RANGES,
@@ -156,7 +156,7 @@ export function summarizeLecture(r: {
 }
 
 export function registerLearningAnalyticsRoutes(app: Express) {
-  app.get("/api/admin/analytics/learning", requireAuth, requireLearningAdmin, async (req, res) => {
+  app.get("/api/admin/analytics/learning", requireKonto, requireLearningAdmin, async (req, res) => {
     try {
       const asked = Number(req.query.days);
       const days = (LEARNING_RANGES as readonly number[]).includes(asked) ? asked : 30;

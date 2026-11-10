@@ -12,10 +12,17 @@ export const users = pgTable("users", {
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
   profession: varchar("profession", { length: 100 }),
+  /** Numer prawa wykonywania zawodu: pod przyszłe punkty edukacyjne. Dziś formularz go nie zbiera. */
+  pwzNumber: varchar("pwz_number", { length: 20 }),
   role: varchar("role", { length: 50 }).notNull().default("student"),
+  /** Tester bety: pełny dostęp do kursu, dopóki płatności są wyłączone (PLATNOSCI_WLACZONE) */
+  testerBety: boolean("tester_bety").notNull().default(false),
   locale: varchar("locale", { length: 5 }).notNull().default("pl"),
   emailVerified: boolean("email_verified").notNull().default(false),
+  /** Skrót SHA-256 tokenu z linku potwierdzającego (sam token jest tylko w mailu) */
   emailVerificationToken: varchar("email_verification_token", { length: 100 }),
+  emailVerificationExpiry: timestamp("email_verification_expiry"),
+  emailVerifiedAt: timestamp("email_verified_at"),
   marketingConsent: boolean("marketing_consent").notNull().default(false),
   termsAccepted: boolean("terms_accepted").notNull().default(false),
   privacyAccepted: boolean("privacy_accepted").notNull().default(false),
@@ -66,7 +73,35 @@ export const subscriptions = pgTable("subscriptions", {
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
   /** Sesja Stripe Checkout, z której powstała subskrypcja: jedna sesja = jeden zapis (ponowne użycie nie daje kolejnych dni) */
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }).unique(),
+  /** Płatność Stripe (payment_intent) tej subskrypcji: po niej zwrot (charge.refunded) odbiera dostęp */
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+/** Zdarzenia webhooka Stripe już obsłużone: to samo zdarzenie (event.id) przetwarzamy raz */
+export const stripeEvents = pgTable("stripe_events", {
+  eventId: varchar("event_id", { length: 255 }).primaryKey(),
+  type: varchar("type", { length: 100 }).notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }).notNull().default(sql`now()`),
+});
+
+/** Zgody przy rejestracji: który dokument, w jakiej wersji i kiedy zaakceptowany */
+export const userConsents = pgTable("user_consents", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  document: varchar("document", { length: 50 }).notNull(),
+  version: varchar("version", { length: 20 }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().default(sql`now()`),
+}, (t) => [index("user_consents_user_idx").on(t.userId)]);
+
+export type UserConsent = typeof userConsents.$inferSelect;
+
+/** Ustawienia zmieniane w panelu admina (np. REJESTRACJA_OTWARTA): klucz → wartość JSON */
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
 });
 
 // Course modules
@@ -755,34 +790,50 @@ export type StreakFreezeLog = typeof streakFreezeLog.$inferSelect;
 export type InsertStreakFreezeLog = z.infer<typeof insertStreakFreezeLogSchema>;
 
 // Additional schemas for API endpoints
-// Górny limit długości hasła (bcrypt i tak czyta tylko 72 bajty; chroni przed kosztownymi żądaniami)
-export const PASSWORD_MAX_LENGTH = 128;
+// Hasło: co najmniej 10 znaków. Górny limit tylko chroni serwer przed kosztownymi żądaniami;
+// argon2id liczy skrót z całego hasła (bcrypt czytał tylko 72 bajty, stare skróty bcrypt zostają do pierwszego logowania).
+export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MAX_LENGTH = 1024;
+const nowyHaslo = z.string()
+  .min(PASSWORD_MIN_LENGTH, `Hasło musi mieć co najmniej ${PASSWORD_MIN_LENGTH} znaków`)
+  .max(PASSWORD_MAX_LENGTH, `Hasło może mieć najwyżej ${PASSWORD_MAX_LENGTH} znaków`);
 
 export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8).max(PASSWORD_MAX_LENGTH),
+  email: z.string().trim().email().max(255),
+  // przy logowaniu bez dolnego progu: konta sprzed 10.11.2026 mogą mieć hasło 8-znakowe
+  password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 });
 
+/** Wersje dokumentów, które akceptuje się przy rejestracji (zapis w user_consents) */
+export const DOKUMENTY = {
+  regulamin_bety: { wersja: "1.0", tytul: "Regulamin bety" },
+  polityka_prywatnosci: { wersja: "1.0", tytul: "Polityka prywatności" },
+} as const;
+export type DokumentId = keyof typeof DOKUMENTY;
+
 export const registerSchema = z.object({
-  email: z.string().email("Podaj prawidłowy adres e-mail"),
-  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków").max(PASSWORD_MAX_LENGTH, "Hasło może mieć najwyżej 128 znaków"),
-  confirmPassword: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków").max(PASSWORD_MAX_LENGTH, "Hasło może mieć najwyżej 128 znaków"),
-  marketingConsent: z.boolean().optional().default(false),
-  termsAccepted: z.boolean().optional().default(false),
-  privacyAccepted: z.boolean().optional().default(false),
+  email: z.string().trim().email("Podaj prawidłowy adres e-mail").max(255),
+  password: nowyHaslo,
+  confirmPassword: z.string().max(PASSWORD_MAX_LENGTH),
+  firstName: z.string().trim().min(1, "Podaj imię").max(60, "Imię jest za długie")
+    .regex(/^[\p{L}][\p{L}\p{M} '’.-]*$/u, "Sprawdź imię: tylko litery, spacja albo łącznik"),
+  termsAccepted: z.literal(true, { message: "Zaakceptuj regulamin bety" }),
+  privacyAccepted: z.literal(true, { message: "Zaakceptuj politykę prywatności" }),
+  /** Pole-pułapka (honeypot): człowiek go nie widzi i nie wypełnia */
+  website: z.string().max(500).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Hasła nie pasują do siebie",
   path: ["confirmPassword"],
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email().max(255),
 });
 
 export const resetPasswordSchema = z.object({
-  token: z.string(),
-  password: z.string().min(8).max(PASSWORD_MAX_LENGTH),
-  confirmPassword: z.string().min(8).max(PASSWORD_MAX_LENGTH),
+  token: z.string().min(1).max(200),
+  password: nowyHaslo,
+  confirmPassword: z.string().max(PASSWORD_MAX_LENGTH),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Hasła nie pasują do siebie",
   path: ["confirmPassword"],

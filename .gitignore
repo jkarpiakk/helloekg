@@ -13,3 +13,8 @@ cookies.txt
 .env.preview
 .preview-assets
 data/feedback-uploads
+
+# sekrety i lokalne konfiguracje
+.env
+.env.*
+!.env.example

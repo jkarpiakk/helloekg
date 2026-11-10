@@ -21,6 +21,9 @@ import VerifyEmail from "@/pages/verify-email";
 import ResetPassword from "@/pages/reset-password";
 import ForgotPassword from "@/pages/forgot-password";
 import NotFound from "@/pages/not-found";
+import PotwierdzEmail from "@/pages/potwierdz-email";
+import DokumentPage from "@/pages/dokument";
+import { useAppConfig } from "@/lib/config";
 
 // Ciężkie widoki poza głównym bundle (React.lazy + Suspense)
 const DynamicLecture = lazy(() => import("@/pages/dynamic-lecture"));
@@ -28,6 +31,13 @@ const Admin = lazy(() => import("@/pages/admin"));
 const CertificatePage = lazy(() => import("@/pages/certificate"));
 const CertificatePreviewPage = lazy(() => import("@/pages/certificate-preview"));
 const FeedbackPage = lazy(() => import("@/pages/feedback"));
+// Strony zakupu: tylko gdy płatności są włączone (PLATNOSCI_WLACZONE); inaczej przekierowanie do panelu
+const PricingPage = lazy(() => import("@/pages/pricing"));
+const CheckoutPage = lazy(() => import("@/pages/checkout"));
+const PaymentSuccessPage = lazy(() => import("@/pages/payment-success"));
+
+/** Trasy dostępne dla konta, które jeszcze nie potwierdziło adresu e-mail (reszta: ekran „potwierdź e-mail”) */
+const BEZ_POTWIERDZENIA = ["/verify-email", "/reset-password", "/forgot-password", "/regulamin-bety", "/polityka-prywatnosci"];
 
 // Layout
 import Header from "@/components/layout/Header";
@@ -94,6 +104,11 @@ function AppContent() {
     staleTime: Infinity,
   });
 
+  const [path] = useLocation();
+  const { data: config } = useAppConfig();
+  const platnosci = config?.platnosci === true;
+  const czekaNaPotwierdzenie = !!user && user.emailVerified === false && !BEZ_POTWIERDZENIA.includes(path);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -109,6 +124,7 @@ function AppContent() {
       {/* Dolny odstęp: pływający „Zgłoś uwagę” nie zasłania ostatnich linii treści */}
       <main className="pb-24">
         <Suspense fallback={<RouteLoader />}>
+        {czekaNaPotwierdzenie ? <PotwierdzEmail /> : (
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/quiz" component={Quiz} />
@@ -121,9 +137,12 @@ function AppContent() {
           <Route path="/simulator"><Redirect to="/modules" replace /></Route>
           <Route path="/blog" component={BlogRedirect} />
           <Route path="/blog/*" component={BlogRedirect} />
-          <Route path="/pricing"><Redirect to="/dashboard" replace /></Route>
-          <Route path="/checkout"><Redirect to="/dashboard" replace /></Route>
-          <Route path="/payment-success"><Redirect to="/dashboard" replace /></Route>
+          {platnosci ? <Route path="/pricing" component={PricingPage} /> : <Route path="/pricing"><Redirect to="/dashboard" replace /></Route>}
+          {platnosci ? <Route path="/checkout" component={CheckoutPage} /> : <Route path="/checkout"><Redirect to="/dashboard" replace /></Route>}
+          {platnosci ? <Route path="/payment-success" component={PaymentSuccessPage} /> : <Route path="/payment-success"><Redirect to="/dashboard" replace /></Route>}
+          <Route path="/regulamin-bety">{() => <DokumentPage id="regulamin_bety" />}</Route>
+          <Route path="/polityka-prywatnosci">{() => <DokumentPage id="polityka_prywatnosci" />}</Route>
+          <Route path="/potwierdz-email"><Redirect to="/dashboard" replace /></Route>
           <Route path="/admin" component={Admin} />
           <Route path="/verify-email" component={VerifyEmail} />
           <Route path="/reset-password" component={ResetPassword} />
@@ -133,6 +152,7 @@ function AppContent() {
           <Route path="/certificate/:certificateId" component={CertificatePage} />
           <Route component={NotFound} />
         </Switch>
+        )}
         </Suspense>
       </main>
       <Footer />

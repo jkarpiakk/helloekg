@@ -13,6 +13,10 @@ import {
   type Achievement, type InsertAchievement, type UserAchievement, type InsertUserAchievement
 } from "@shared/schema";
 import { db } from "./db";
+import { platnosciWlaczone } from "./ustawienia";
+
+/** Transakcja albo zwykłe połączenie (to samo API zapytań) */
+type Tx = Pick<typeof db, "insert" | "update" | "select" | "delete" | "execute">;
 import { eq, and, desc, asc, count, avg, sql, or, ilike, isNull } from "drizzle-orm";
 
 export interface IStorage {
@@ -22,7 +26,7 @@ export interface IStorage {
   getUserByVerificationToken(token: string): Promise<User | undefined>;
   getUserByPasswordResetToken(token: string): Promise<User | undefined>;
   invalidateUserSessions(userId: string): Promise<void>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: InsertUser, tx?: Tx): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   updateUserStripeInfo(id: string, stripeCustomerId: string, stripeSubscriptionId: string): Promise<User>;
   updateUserStripeCustomerId(id: string, stripeCustomerId: string): Promise<User>;
@@ -30,8 +34,8 @@ export interface IStorage {
   // Subscription management
   getActivePlans(): Promise<Plan[]>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
-  getUserActiveSubscription(userId: string): Promise<Subscription | undefined>;
-  /** Aktywna subskrypcja zapisana w bazie (opłacona), z pominięciem dostępu „beta” z BETA_OPEN_ACCESS. */
+  getUserActiveSubscription(userId: string, user?: Pick<User, "testerBety">): Promise<Subscription | undefined>;
+  /** Aktywna subskrypcja zapisana w bazie (opłacona), z pominięciem dostępu testera bety. */
   getStoredActiveSubscription(userId: string): Promise<Subscription | undefined>;
   updateSubscriptionStatus(id: string, status: string): Promise<Subscription>;
   
@@ -137,7 +141,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    // adres bez względu na wielkość liter: Jan@X.pl i jan@x.pl to ta sama skrzynka i to samo konto
+    const [user] = await db.select().from(users).where(sql`lower(${users.email}) = lower(${email.trim()})`);
     return user || undefined;
   }
 
@@ -157,8 +162,8 @@ export class DatabaseStorage implements IStorage {
     await db.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${userId}`);
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+  async createUser(insertUser: InsertUser, tx: Tx = db): Promise<User> {
+    const [user] = await tx.insert(users).values(insertUser).returning();
     return user;
   }
 
@@ -199,19 +204,22 @@ export class DatabaseStorage implements IStorage {
     return sub;
   }
 
-  async getUserActiveSubscription(userId: string): Promise<Subscription | undefined> {
-    // Beta: każde konto ma pełny dostęp bez płatności
-    if (process.env.BETA_OPEN_ACCESS === "1") {
-      const now = new Date();
-      return {
-        id: `beta-${userId}`,
-        userId,
-        planId: "beta",
-        status: "active",
-        startDate: now,
-        endDate: new Date(now.getTime() + 365 * 24 * 3600 * 1000),
-        paymentProvider: "beta",
-      } as unknown as Subscription;
+  async getUserActiveSubscription(userId: string, user?: Pick<User, "testerBety">): Promise<Subscription | undefined> {
+    // Beta: tester bety ma pełny dostęp, dopóki płatności są wyłączone (PLATNOSCI_WLACZONE)
+    if (!platnosciWlaczone()) {
+      const tester = user ?? (await this.getUser(userId));
+      if (tester?.testerBety) {
+        const now = new Date();
+        return {
+          id: `beta-${userId}`,
+          userId,
+          planId: "beta",
+          status: "active",
+          startDate: now,
+          endDate: new Date(now.getTime() + 365 * 24 * 3600 * 1000),
+          paymentProvider: "beta",
+        } as unknown as Subscription;
+      }
     }
     return this.getStoredActiveSubscription(userId);
   }

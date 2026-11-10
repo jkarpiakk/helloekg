@@ -16,7 +16,8 @@ declare module "express-session" {
   }
 }
 
-export const ACCOUNT_SUSPENDED_MESSAGE = "Konto zawieszone — napisz do nas: kontakt@helloekg.pl";
+export const ACCOUNT_SUSPENDED_MESSAGE = "Konto zawieszone. Napisz do nas: kontakt@helloekg.pl";
+export const EMAIL_NOT_VERIFIED_MESSAGE = "Potwierdź adres e-mail linkiem z wiadomości, którą wysłaliśmy po rejestracji.";
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -41,6 +42,23 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     console.error("Auth middleware error:", error);
     res.status(500).json({ error: "Błąd serwera" });
   }
+}
+
+/**
+ * Treść kursu (wykłady, pytania, postęp, grafiki) tylko dla potwierdzonego adresu e-mail.
+ * Stawiać po requireAuth. Niepotwierdzone konto może się zalogować, ale widzi tylko ekran „potwierdź e-mail”.
+ */
+export function requireVerified(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) return res.status(401).json({ error: "Wymagane uwierzytelnienie" });
+  if (!req.user.emailVerified) {
+    return res.status(403).json({ error: EMAIL_NOT_VERIFIED_MESSAGE, code: "EMAIL_NOT_VERIFIED" });
+  }
+  next();
+}
+
+/** Zalogowane konto z potwierdzonym adresem: warunek każdej treści kursu (requireAuth, potem requireVerified) */
+export function requireKonto(req: Request, res: Response, next: NextFunction) {
+  void requireAuth(req, res, (err?: unknown) => (err ? next(err) : requireVerified(req, res, next)));
 }
 
 export function requireRole(roles: string[]) {
@@ -75,7 +93,7 @@ export async function requireActiveSubscription(req: Request, res: Response, nex
   }
 
   try {
-    const subscription = await storage.getUserActiveSubscription(req.user.id);
+    const subscription = await storage.getUserActiveSubscription(req.user.id, req.user);
     if (!subscription) {
       return res.status(403).json({ 
         error: "Wymagana aktywna subskrypcja",

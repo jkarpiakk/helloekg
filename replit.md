@@ -1,8 +1,8 @@
-# EKG Academy
+# helloEKG (kurs)
 
 ## Overview
 
-EKG Academy is a comprehensive e-learning platform designed for teaching electrocardiogram (ECG/EKG) interpretation through interactive quizzes. The platform targets medical students, nursing students, paramedics, and healthcare professionals seeking to improve their ECG analysis skills.
+helloEKG is a comprehensive e-learning platform designed for teaching electrocardiogram (ECG/EKG) interpretation through interactive quizzes. The platform targets medical students, nursing students, paramedics, and healthcare professionals seeking to improve their ECG analysis skills.
 
 The application provides a quiz-based learning experience with immediate feedback, progress tracking, certification system, and multi-language support (currently Polish with internationalization architecture for English and Spanish). Users can access different learning modes including regular learning, review of incorrect answers, and exam simulations.
 

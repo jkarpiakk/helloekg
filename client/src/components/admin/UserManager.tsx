@@ -12,7 +12,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Search, Shield, Eye, Ban, CheckCircle, UserX, Mail, Edit, UserPlus, CreditCard } from "lucide-react";
+import { Search, Shield, Eye, Ban, CheckCircle, UserX, UserPlus, CreditCard, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -33,7 +34,7 @@ function parseApiError(error: unknown): { status: number | null; message: string
   return { status: Number(m[1]), message };
 }
 
-type UserAction = "status" | "role" | "subscription" | "create";
+type UserAction = "status" | "role" | "subscription" | "create" | "delete";
 
 /** Kody serwera → konkretny komunikat: co się stało i co zrobić */
 function describeUserError(error: unknown, action: UserAction): string {
@@ -41,7 +42,7 @@ function describeUserError(error: unknown, action: UserAction): string {
   switch (status) {
     case 400:
       if (action === "subscription") return "Czas subskrypcji musi wynosić od 1 do 24 miesięcy.";
-      if (action === "create") return message ?? "Sprawdź dane: e-mail, hasło (8–128 znaków), imię, nazwisko i rolę.";
+      if (action === "create") return message ?? "Sprawdź dane: e-mail, hasło (co najmniej 10 znaków), imię, nazwisko i rolę.";
       return message ?? "Nieprawidłowa rola lub status. Odśwież stronę i spróbuj ponownie.";
     case 401:
       return "Sesja wygasła. Zaloguj się ponownie.";
@@ -49,8 +50,9 @@ function describeUserError(error: unknown, action: UserAction): string {
       // Serwer mówi, czego brakuje (np. „Tylko właściciel może…”, „Nie możesz zmieniać własnej roli”)
       return `${message ?? "Nie masz uprawnień do tej operacji"}.`.replace(/\.\.$/, ".");
     case 404:
-      return "Nie znaleziono tego konta — mogło zostać usunięte. Odśwież listę.";
+      return "Nie znaleziono tego konta. Mogło zostać usunięte, odśwież listę.";
     case 409:
+      if (action === "delete") return message ?? "Tego konta nie da się teraz usunąć.";
       return `${message ?? "To ostatni właściciel"}. Najpierw nadaj rolę właściciela innemu kontu.`.replace(/\.\. /, ". ");
     default:
       return message && status !== null && status < 500
@@ -69,7 +71,7 @@ interface UserStats {
 
 const createUserSchema = z.object({
   email: z.string().email("Nieprawidłowy adres e-mail"),
-  password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków"),
+  password: z.string().min(10, "Hasło musi mieć co najmniej 10 znaków"),
   firstName: z.string().min(2, "Imię musi mieć co najmniej 2 znaki"),
   lastName: z.string().min(2, "Nazwisko musi mieć co najmniej 2 znaki"),
   role: z.enum(["student", "reviewer", "admin", "owner"]),
@@ -84,11 +86,13 @@ export default function UserManager() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [doUsuniecia, setDoUsuniecia] = useState<User | null>(null);
+  const [powiadomOUsunieciu, setPowiadomOUsunieciu] = useState(true);
   const { t } = useTranslation();
   const { toast } = useToast();
   // Przyciski tylko dla ról, którym serwer pozwala: konta tworzy właściciel,
   // subskrypcje nadaje właściciel/support, status zmienia właściciel/admin
-  const { hasRole, canManageUsers, isAdmin } = useAuth();
+  const { hasRole, canManageUsers, isAdmin, user: ja } = useAuth();
   const canCreateUsers = hasRole("owner");
   const canGrant = canManageUsers;
   const canChangeStatus = isAdmin;
@@ -198,6 +202,33 @@ export default function UserManager() {
     },
   });
 
+  // Zgody wybranego konta (dokument, wersja, data)
+  const { data: zgody } = useQuery({
+    queryKey: ["/api/admin/users", selectedUser?.id, "zgody"],
+    enabled: !!selectedUser && showUserDetails && isAdmin,
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/admin/users/${selectedUser!.id}/zgody`);
+      return response.json() as Promise<Array<{ document: string; version: string; acceptedAt: string }>>;
+    },
+  });
+
+  // Usunięcie konta z danymi (RODO)
+  const deleteUserMutation = useMutation({
+    mutationFn: async ({ userId, powiadom }: { userId: string; powiadom: boolean }) => {
+      const response = await apiRequest("DELETE", `/api/admin/users/${userId}`, { powiadom });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Konto usunięte", description: "Konto, postęp i sesje usunięte, zgłoszenia zanonimizowane." });
+      setDoUsuniecia(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats/users"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Nie udało się usunąć konta", description: describeUserError(error, "delete"), variant: "destructive" });
+    },
+  });
+
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: CreateUserForm) => {
@@ -227,6 +258,9 @@ export default function UserManager() {
     createUserMutation.mutate(data);
   };
 
+  const NAZWY_ROL: Record<string, string> = { student: "Kursant", reviewer: "Recenzent", admin: "Administrator", owner: "Właściciel", support: "Support" };
+  const NAZWY_DOKUMENTOW: Record<string, string> = { regulamin_bety: "Regulamin bety", polityka_prywatnosci: "Polityka prywatności" };
+
   const getRoleBadge = (role: string) => {
     const colors = {
       student: "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary",
@@ -237,7 +271,7 @@ export default function UserManager() {
 
     return (
       <Badge className={colors[role as keyof typeof colors] || colors.student}>
-        {role.charAt(0).toUpperCase() + role.slice(1)}
+        {NAZWY_ROL[role] ?? role}
       </Badge>
     );
   };
@@ -363,7 +397,7 @@ export default function UserManager() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="student">Student</SelectItem>
+                          <SelectItem value="student">Kursant</SelectItem>
                           <SelectItem value="reviewer">Recenzent</SelectItem>
                           <SelectItem value="admin">Administrator</SelectItem>
                           <SelectItem value="owner">Właściciel</SelectItem>
@@ -454,10 +488,10 @@ export default function UserManager() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Wszystkie role</SelectItem>
-                  <SelectItem value="student">Student</SelectItem>
-                  <SelectItem value="reviewer">Reviewer</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="student">Kursant</SelectItem>
+                  <SelectItem value="reviewer">Recenzent</SelectItem>
+                  <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="owner">Właściciel</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -494,7 +528,7 @@ export default function UserManager() {
                   <th className="text-left p-4 font-semibold text-foreground">Rola</th>
                   <th className="text-left p-4 font-semibold text-foreground">Status</th>
                   <th className="text-left p-4 font-semibold text-foreground">Data rejestracji</th>
-                  <th className="text-left p-4 font-semibold text-foreground">Ostatnia aktywność</th>
+                  <th className="text-left p-4 font-semibold text-foreground">Potwierdzenie e-mail</th>
                   <th className="text-left p-4 font-semibold text-foreground">Akcje</th>
                 </tr>
               </thead>
@@ -525,8 +559,8 @@ export default function UserManager() {
                     <td className="p-4 text-muted-foreground">
                       {new Date(user.createdAt).toLocaleDateString('pl-PL')}
                     </td>
-                    <td className="p-4 text-muted-foreground">
-                      {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('pl-PL') : 'Nigdy'}
+                    <td className="p-4 text-muted-foreground" data-testid={`user-verified-at-${user.id}`}>
+                      {user.emailVerifiedAt ? formatDate(user.emailVerifiedAt) : user.emailVerified ? "tak (data nieznana)" : "nie"}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center space-x-2">
@@ -540,13 +574,6 @@ export default function UserManager() {
                           data-testid={`view-user-${user.id}`}
                         >
                           <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          data-testid={`edit-user-${user.id}`}
-                        >
-                          <Edit className="h-4 w-4" />
                         </Button>
                         {user.role !== "owner" && (
                           <>
@@ -585,6 +612,18 @@ export default function UserManager() {
                             )}
                           </>
                         )}
+                        {canChangeStatus && user.id !== ja?.id && (user.role !== "owner" || hasRole("owner")) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => { setPowiadomOUsunieciu(true); setDoUsuniecia(user); }}
+                            title="Usuń konto z danymi"
+                            aria-label={`Usuń konto ${user.email} z danymi`}
+                            data-testid={`delete-user-${user.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -606,6 +645,41 @@ export default function UserManager() {
           </CardContent>
         </Card>
       )}
+
+      {/* Usunięcie konta: potwierdzenie z opisem skutków */}
+      <Dialog open={!!doUsuniecia} onOpenChange={(open) => { if (!open) setDoUsuniecia(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Usunąć konto {doUsuniecia?.email}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              Usuwasz konto razem z postępem, odpowiedziami, zgodami, certyfikatami i sesjami. Zgłoszenia zostają bez danych osobowych.
+              Tego nie da się cofnąć (z kopii zapasowych dane znikną po 14 dniach).
+            </p>
+            <label className="flex items-start gap-3">
+              <Checkbox
+                checked={powiadomOUsunieciu}
+                onCheckedChange={(v) => setPowiadomOUsunieciu(v === true)}
+                className="mt-0.5"
+                data-testid="delete-user-notify"
+              />
+              <span>Wyślij tej osobie potwierdzenie usunięcia mailem</span>
+            </label>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setDoUsuniecia(null)}>Anuluj</Button>
+              <Button
+                variant="destructive"
+                disabled={deleteUserMutation.isPending}
+                onClick={() => doUsuniecia && deleteUserMutation.mutate({ userId: doUsuniecia.id, powiadom: powiadomOUsunieciu })}
+                data-testid="delete-user-confirm"
+              >
+                {deleteUserMutation.isPending ? "Usuwam…" : "Usuń konto"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* User Details Dialog */}
       <Dialog open={showUserDetails} onOpenChange={setShowUserDetails}>
@@ -653,10 +727,28 @@ export default function UserManager() {
                   </p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Ostatnie logowanie</label>
+                  <label className="text-sm font-medium">Potwierdzenie e-mail</label>
                   <p className="text-sm text-muted-foreground">
-                    {selectedUser.lastLoginAt ? new Date(selectedUser.lastLoginAt).toLocaleDateString('pl-PL') : 'Nigdy'}
+                    {selectedUser.emailVerifiedAt ? formatDate(selectedUser.emailVerifiedAt) : selectedUser.emailVerified ? "tak (data nieznana)" : "nie"}
                   </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Tester bety</label>
+                  <p className="text-sm text-muted-foreground">{selectedUser.testerBety ? "tak (pełny dostęp, dopóki płatności są wyłączone)" : "nie"}</p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Zgody</label>
+                  {zgody && zgody.length > 0 ? (
+                    <ul className="text-sm text-muted-foreground" data-testid="user-consents">
+                      {zgody.map((z) => (
+                        <li key={`${z.document}-${z.version}-${z.acceptedAt}`}>
+                          {NAZWY_DOKUMENTOW[z.document] ?? z.document}, wersja {z.version}, {new Date(z.acceptedAt).toLocaleString("pl-PL")}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">brak zapisanych zgód (konto sprzed 10.11.2026 albo założone w panelu)</p>
+                  )}
                 </div>
               </div>
               
@@ -666,18 +758,6 @@ export default function UserManager() {
                   variant="outline"
                 >
                   Zamknij
-                </Button>
-                <Button
-                  onClick={() => {
-                    // TODO: Implement email functionality
-                    toast({
-                      title: "Informacja",
-                      description: "Funkcja wysyłania wiadomości będzie dostępna wkrótce",
-                    });
-                  }}
-                >
-                  <Mail className="h-4 w-4 mr-2" />
-                  Wyślij wiadomość
                 </Button>
               </div>
             </div>

@@ -15,6 +15,7 @@ import { z } from "zod";
 import type { LoginForm, RegisterForm } from "@/types";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { rise, stagger, spring } from "@/lib/motion";
+import { useAppConfig } from "@/lib/config";
 
 type AuthMode = "login" | "register";
 
@@ -26,25 +27,22 @@ interface AuthFormsProps {
 }
 
 // Komunikaty mówią, co zrobić — nie tylko, co jest źle
-const emailField = z.string().email("Wpisz adres e-mail w formacie imie@domena.pl");
-const passwordField = z.string().min(8, "Hasło musi mieć co najmniej 8 znaków");
+const emailField = z.string().trim().email("Wpisz adres e-mail w formacie imie@domena.pl");
 
 const loginSchema = z.object({
   email: emailField,
-  password: passwordField,
+  // bez dolnego progu: starsze konta mogą mieć krótsze hasło niż dzisiejsze minimum
+  password: z.string().min(1, "Wpisz hasło"),
 });
 
 const registerSchema = z.object({
+  firstName: z.string().trim().min(1, "Podaj imię").max(60, "Imię jest za długie"),
   email: emailField,
-  password: passwordField,
+  password: z.string().min(10, "Hasło musi mieć co najmniej 10 znaków").max(1024, "Hasło jest za długie"),
   confirmPassword: z.string().min(1, "Wpisz hasło jeszcze raz"),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  profession: z.string().optional(),
-  // Regulamin dojdzie przed startem płatnej wersji — w becie wymagamy tylko polityki prywatności
-  termsAccepted: z.boolean().optional(),
-  privacyAccepted: z.boolean().refine(val => val === true, "Zaznacz, aby założyć konto"),
-  marketingConsent: z.boolean().optional(),
+  termsAccepted: z.boolean().refine((v) => v === true, "Zaznacz, żeby założyć konto"),
+  privacyAccepted: z.boolean().refine((v) => v === true, "Zaznacz, żeby założyć konto"),
+  website: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Hasła się różnią. Wpisz to samo hasło w obu polach",
   path: ["confirmPassword"],
@@ -99,17 +97,20 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
-  /** Po rejestracji bez automatycznego logowania: komunikat nad formularzem logowania */
+  /** Komunikat nad formularzem logowania */
   const [loginNotice, setLoginNotice] = useState<string | null>(null);
+  /** Adres, na który poszedł link potwierdzający (ekran „sprawdź skrzynkę” po rejestracji) */
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
+  const { data: config } = useAppConfig();
   const { login, register } = useAuth();
   const { toast } = useToast();
-  const [, navigate] = useLocation();
 
   useEffect(() => setMode(modeProp), [modeProp]);
 
   const switchMode = (next: AuthMode) => {
     setShowPassword(false);
     setLoginNotice(null);
+    setRegisteredEmail(null);
     if (onSwitchMode) onSwitchMode(next);
     else setMode(next);
   };
@@ -145,24 +146,23 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
     resolver: zodResolver(registerSchema),
     mode: "onTouched",
     defaultValues: {
+      firstName: "",
       email: "",
       password: "",
       confirmPassword: "",
-      firstName: "",
-      lastName: "",
-      profession: "",
       termsAccepted: false,
       privacyAccepted: false,
-      marketingConsent: false,
+      website: "",
     },
   });
 
   const loginMutation = useMutation({
     mutationFn: login,
-    onSuccess: () => {
+    onSuccess: (user) => {
       toast({ title: "Zalogowano" });
       onSuccess?.();
-      window.location.href = "/dashboard";
+      // niepotwierdzony adres: panel pokaże ekran „potwierdź e-mail” zamiast kursu
+      window.location.href = user?.emailVerified === false ? "/potwierdz-email" : "/dashboard";
     },
     onError: (error: any) => {
       toast({
@@ -173,26 +173,13 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
     },
   });
 
+  // Rejestracja nie loguje: najpierw potwierdzenie adresu linkiem z maila (ta sama odpowiedź dla nowego i zajętego adresu)
   const registerMutation = useMutation({
     mutationFn: register,
-    onSuccess: async (data, vars) => {
-      // Nowy serwer loguje od razu i zwraca { user } jak /login. Sesję potwierdzamy przez /me —
-      // jeśli jej nie ma (starszy serwer), prowadzimy do logowania z wpisanym adresem.
-      const me = (data as { user?: unknown } | undefined)?.user ? await authService.getCurrentUser() : null;
-      if (me) {
-        queryClient.setQueryData(["/api/auth/me"], me);
-        queryClient.invalidateQueries();
-        toast({ title: "Konto gotowe. Potwierdzający e-mail jest w drodze." });
-        onSuccess?.();
-        navigate("/dashboard");
-        return;
-      }
-      loginForm.reset({ email: vars.email, password: "" });
-      setLoginNotice("Konto gotowe, zaloguj się");
+    onSuccess: (_data, vars) => {
+      setRegisteredEmail(vars.email.trim());
+      registerForm.reset();
       setShowPassword(false);
-      if (onSwitchMode) onSwitchMode("login");
-      else setMode("login");
-      setTimeout(() => loginForm.setFocus("password"), 50);
     },
     onError: (error: any) => {
       toast({
@@ -203,18 +190,19 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
     },
   });
 
+  const resendMutation = useMutation({
+    mutationFn: async (email: string) => (await apiRequest("POST", "/api/auth/resend-verification", { email })).json(),
+    onSuccess: () => toast({ title: "Wysłane", description: "Jeśli konto czeka na potwierdzenie, nowy link jest w drodze." }),
+    onError: (error: any) =>
+      toast({ title: "Nie udało się wysłać", description: readableError(error, "Spróbuj ponownie za chwilę."), variant: "destructive" }),
+  });
+
   const onLoginSubmit = (data: LoginForm) => {
     loginMutation.mutate(data);
   };
 
   const onRegisterSubmit = (data: RegisterValues) => {
-    registerMutation.mutate({
-      ...data,
-      firstName: data.firstName ?? "",
-      lastName: data.lastName ?? "",
-      termsAccepted: data.termsAccepted ?? false,
-      marketingConsent: data.marketingConsent ?? false,
-    });
+    registerMutation.mutate({ ...data, termsAccepted: true, privacyAccepted: true });
   };
 
   const header = (label: string, title: string, lead: string) => (
@@ -404,6 +392,55 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
     );
   }
 
+  const zgodaLabel = (przed: string, href: string, tekst: string) => (
+    <FormLabel className="text-sm font-normal leading-snug text-[var(--txt2)]">
+      {przed}{" "}
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[var(--txt)] underline underline-offset-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {tekst}
+      </a>
+    </FormLabel>
+  );
+
+  if (registeredEmail) {
+    return (
+      <motion.div key="registered" className="w-full space-y-6" variants={stagger(0.04)} initial="hidden" animate="show" role="status" data-testid="register-done">
+        {header("Wersja beta", "Sprawdź skrzynkę", `Wysłaliśmy link na ${registeredEmail}. Kliknij go, żeby potwierdzić adres. Link działa 24 godziny.`)}
+        <motion.p variants={rise} className="text-sub leading-relaxed text-[var(--txt2)]">
+          Nie widzisz wiadomości? Zajrzyj do spamu i ofert. Po potwierdzeniu zaloguj się i zacznij kurs.
+        </motion.p>
+        <motion.div variants={rise} className="flex flex-col gap-3 sm:flex-row">
+          <Button type="button" onClick={() => switchMode("login")} data-testid="register-done-login">Przejdź do logowania</Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={resendMutation.isPending}
+            onClick={() => resendMutation.mutate(registeredEmail)}
+            data-testid="register-done-resend"
+          >
+            {resendMutation.isPending ? "Wysyłam…" : "Wyślij link jeszcze raz"}
+          </Button>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  if (config && !config.rejestracjaOtwarta) {
+    return (
+      <motion.div key="register-closed" className="w-full space-y-6" variants={stagger(0.04)} initial="hidden" animate="show" data-testid="register-closed">
+        {header("Wersja beta", "Rejestracja chwilowo zamknięta", "Nowe konta zakładamy w kolejnych turach. Jeśli masz już konto, zaloguj się.")}
+        <motion.div variants={rise}>
+          <Button type="button" className="w-full" onClick={() => switchMode("login")}>Zaloguj się</Button>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       key="register"
@@ -412,11 +449,29 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
       initial="hidden"
       animate="show"
     >
-      {header("Wersja beta", "Załóż konto", "Konto daje dostęp do wszystkich modułów bety i zapisuje twój postęp.")}
+      {header("Wersja beta", "Załóż konto", "Konto daje dostęp do wszystkich modułów bety i zapisuje twój postęp. Kurs otworzysz po potwierdzeniu adresu e-mail.")}
 
       <motion.div variants={rise}>
         <Form {...registerForm}>
           <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4" noValidate>
+            <FormField
+              control={registerForm.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={fieldLabel}>Imię</FormLabel>
+                  <FormControl>
+                    <Input autoComplete="given-name" placeholder="Twoje imię" {...field} data-testid="register-firstName" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {/* Pole-pułapka: niewidoczne dla ludzi i czytników ekranu, automaty je wypełniają */}
+            <div aria-hidden="true" className="absolute -left-[10000px] h-px w-px overflow-hidden">
+              <label htmlFor="register-website">Strona internetowa</label>
+              <input id="register-website" type="text" tabIndex={-1} autoComplete="off" {...registerForm.register("website")} />
+            </div>
             <FormField
               control={registerForm.control}
               name="email"
@@ -446,7 +501,7 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
                   <FormControl>
                     <PasswordInput
                       autoComplete="new-password"
-                      placeholder="Co najmniej 8 znaków"
+                      placeholder="Co najmniej 10 znaków"
                       visible={showPassword}
                       onToggle={() => setShowPassword((v) => !v)}
                       toggleTestId="toggle-password"
@@ -479,59 +534,34 @@ export default function AuthForms({ mode: modeProp, onSuccess, onSwitchMode }: A
             />
 
             <div className="grid gap-3 border-t border-[var(--line)] pt-4">
-              <FormField
-                control={registerForm.control}
-                name="privacyAccepted"
-                render={({ field }) => (
-                  <FormItem className="space-y-1">
-                    <div className="flex items-start gap-3">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={(checked) => {
-                            field.onChange(checked === true);
-                            field.onBlur();
-                          }}
-                          className="mt-0.5"
-                          data-testid="register-privacy"
-                        />
-                      </FormControl>
-                      <FormLabel className="text-sm font-normal leading-snug text-[var(--txt2)]">
-                        Akceptuję{" "}
-                        <a
-                          href="https://helloekg.pl/polityka-prywatnosci.html"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[var(--txt)] underline underline-offset-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          politykę prywatności
-                        </a>
-                      </FormLabel>
-                    </div>
-                    <FormMessage className="pl-7" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={registerForm.control}
-                name="marketingConsent"
-                render={({ field }) => (
-                  <FormItem className="flex items-start gap-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(checked) => field.onChange(checked === true)}
-                        className="mt-0.5"
-                        data-testid="register-marketing"
-                      />
-                    </FormControl>
-                    <FormLabel className="text-sm font-normal leading-snug text-[var(--txt2)]">
-                      Chcę dostawać e-maile o nowościach w kursie (opcjonalnie)
-                    </FormLabel>
-                  </FormItem>
-                )}
-              />
+              {(["termsAccepted", "privacyAccepted"] as const).map((pole) => (
+                <FormField
+                  key={pole}
+                  control={registerForm.control}
+                  name={pole}
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <div className="flex items-start gap-3">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                              field.onChange(checked === true);
+                              field.onBlur();
+                            }}
+                            className="mt-0.5"
+                            data-testid={pole === "termsAccepted" ? "register-terms" : "register-privacy"}
+                          />
+                        </FormControl>
+                        {pole === "termsAccepted"
+                          ? zgodaLabel("Akceptuję", "/regulamin-bety", "regulamin bety")
+                          : zgodaLabel("Akceptuję", "/polityka-prywatnosci", "politykę prywatności")}
+                      </div>
+                      <FormMessage className="pl-7" />
+                    </FormItem>
+                  )}
+                />
+              ))}
             </div>
 
             <Button

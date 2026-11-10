@@ -5,11 +5,10 @@ import { config } from "./config";
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
 import crypto from "crypto";
-import { runMigrations } from "stripe-replit-sync";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { getStripeSync, stripeSource, stripeStatus } from "./stripeClient";
-import { WebhookHandlers } from "./webhookHandlers";
+import { serveStatic, log } from "./static";
+import { stripeStatus } from "./stripeClient";
+import { obsluzZdarzenieStripe } from "./webhookHandlers";
 import { applySecurityHeaders } from "./middleware/security";
 import { csrfOriginCheck } from "./middleware/csrf";
 
@@ -35,66 +34,46 @@ const app = express();
 // Gzip/Brotli compression for all responses
 app.use(compression());
 
-// Security headers (CSP in report-only mode; other headers enforced)
+// Security headers (CSP egzekwowana w produkcji, szczegóły w middleware/security.ts)
 applySecurityHeaders(app);
 
 // CSRF: żądania zmieniające stan do /api tylko z naszego originu (webhooki Stripe — wyjątek, podpis)
 app.use(csrfOriginCheck);
 
-// Stripe webhooks need the raw body — mount before express.json()
-// Webhook ustawiany w panelu Stripe (podpis STRIPE_WEBHOOK_SECRET). Musi stać przed trasą /:uuid,
-// bo inaczej „manual” trafia tam jako uuid zarządzanego webhooka Replita.
+// Webhook Stripe potrzebuje surowej treści (podpis): przed express.json().
+// Adres ustawiany w panelu Stripe: /api/stripe/webhook/manual, sekret podpisu w STRIPE_WEBHOOK_SECRET.
+// Działa także przy wyłączonych płatnościach (PLATNOSCI_WLACZONE), żeby dało się testować tryb testowy.
 app.post(
   "/api/stripe/webhook/manual",
-  express.raw({ type: "application/json" }),
+  express.raw({ type: "application/json", limit: "1mb" }),
   async (req, res) => {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) {
       console.error("STRIPE_WEBHOOK_SECRET is not set — manual webhook is disabled");
-      return res.status(500).json({ error: "Webhook not configured" });
+      return res.status(503).json({ error: "Webhook not configured" });
     }
     const signature = req.headers["stripe-signature"];
     if (!signature) return res.status(400).json({ error: "Missing stripe-signature header" });
 
+    let event: any;
     try {
       const { getUncachableStripeClient } = await import("./stripeClient");
       const stripe = await getUncachableStripeClient();
       const sig = Array.isArray(signature) ? signature[0] : signature;
-      const event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
-      console.log(`Manual webhook received: ${event.type}`);
-      // płatność kartą: completed od razu jako paid; metody odroczone (np. przelew): async_payment_succeeded
-      if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
-        await WebhookHandlers.handleCheckoutCompleted(event.data.object);
-      }
-      res.status(200).json({ received: true });
+      event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
     } catch (error: any) {
-      console.error("Manual webhook error:", error.message);
-      res.status(400).json({ error: "Invalid webhook signature or processing error" });
+      console.error("Stripe webhook: zły podpis albo treść:", error.message);
+      return res.status(400).json({ error: "Invalid webhook signature" });
     }
-  }
-);
-
-// Zarządzany webhook stripe-replit-sync: tylko z konektorem Replit
-app.post(
-  "/api/stripe/webhook/:uuid",
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
-    if (stripeSource() !== "replit") return res.status(404).json({ error: "Not found" });
-    const signature = req.headers["stripe-signature"];
-    if (!signature) return res.status(400).json({ error: "Missing stripe-signature" });
 
     try {
-      const sig = Array.isArray(signature) ? signature[0] : signature;
-      if (!Buffer.isBuffer(req.body)) {
-        console.error("STRIPE WEBHOOK ERROR: req.body is not a Buffer");
-        return res.status(500).json({ error: "Webhook processing error" });
-      }
-      const { uuid } = req.params;
-      await WebhookHandlers.processWebhook(req.body as Buffer, sig, uuid);
+      const wynik = await obsluzZdarzenieStripe(event);
+      console.log(`Stripe webhook ${event.type} ${event.id}: ${wynik}`);
       res.status(200).json({ received: true });
     } catch (error: any) {
-      console.error("Webhook error:", error.message);
-      res.status(400).json({ error: "Webhook processing error" });
+      // 500: Stripe ponowi wysyłkę, a zdarzenie nie jest zapisane jako obsłużone
+      console.error(`Stripe webhook ${event.type} ${event.id}: błąd obsługi:`, error?.message);
+      res.status(500).json({ error: "Webhook processing error" });
     }
   }
 );
@@ -103,13 +82,7 @@ app.use(express.json());
 // Bez express.urlencoded: aplikacja nie przyjmuje formularzy HTML (same JSON-y z fetch),
 // a urlencoded to „prosty” content-type, który obcy formularz może wysłać bez preflightu.
 
-// Grafiki kursu zaimportowane ze studia (paczka eksportu → katalog na dysku)
-if (process.env.CONTENT_ASSETS_DIR) {
-  app.use(
-    "/content-assets",
-    express.static(process.env.CONTENT_ASSETS_DIR, { maxAge: "7d", immutable: true, fallthrough: false })
-  );
-}
+// Grafiki kursu (/content-assets) serwuje server/routes.ts: dopiero za sesją, tylko dla potwierdzonych kont.
 
 // ---------------------------------------------------------------------------
 // Correlation ID — attach a unique request ID to every request/response
@@ -148,44 +121,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// ---------------------------------------------------------------------------
-// Stripe initialisation — fire-and-forget so it never blocks startup
-// ---------------------------------------------------------------------------
-function initStripe(): void {
-  if (!config.databaseUrl) return;
-  // Stan konfiguracji w logu (bez wartości kluczy). Poza Replitem klucze idą ze zmiennych serwera,
-  // a webhook ustawia się w panelu Stripe na /api/stripe/webhook/manual: bez migracji i synchronizacji.
-  console.log(stripeStatus());
-  if (stripeSource() !== "replit") return;
-
-  (async () => {
-    try {
-      console.log("Initializing Stripe schema...");
-      await runMigrations({ databaseUrl: config.databaseUrl });
-      console.log("Stripe schema ready");
-
-      const stripeSync = await getStripeSync();
-
-      // Use APP_BASE_URL instead of REPLIT_DOMAINS so this works outside Replit
-      const webhookBaseUrl = config.appBaseUrl;
-      const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
-        `${webhookBaseUrl}/api/stripe/webhook`,
-        { enabled_events: ["*"], description: "Managed webhook for Stripe sync" }
-      );
-      console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
-
-      stripeSync
-        .syncBackfill()
-        .then(() => console.log("Stripe data synced"))
-        .catch((err: any) => console.error("Error syncing Stripe data:", err));
-    } catch (error) {
-      console.error("Failed to initialize Stripe (non-fatal):", error);
-    }
-  })();
-}
-
-// Start Stripe in background — startup continues immediately regardless
-initStripe();
+// Stan konfiguracji Stripe w logu przy starcie (bez wartości kluczy)
+console.log(stripeStatus());
 
 // ---------------------------------------------------------------------------
 // Application routes + server startup
@@ -204,6 +141,8 @@ initStripe();
   });
 
   if (!config.isProduction) {
+    // vite tylko w podglądzie lokalnym: na produkcji nie jest nawet zainstalowany (npm ci --omit=dev)
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
     serveStatic(app);
