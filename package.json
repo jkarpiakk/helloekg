@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && mkdir -p dist/dokumenty && cp docs/dokumenty/*.md docs/regulamin-szkolenia.md dist/dokumenty/ && esbuild scripts/test-maile.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/test-maile.js && esbuild scripts/stripe-przygotuj.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/stripe-przygotuj.js",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && mkdir -p dist/dokumenty && cp docs/dokumenty/*.md docs/regulamin-szkolenia.md dist/dokumenty/ && esbuild scripts/test-maile.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/test-maile.js && esbuild scripts/stripe-przygotuj.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/stripe-przygotuj.js && esbuild server/scripts/importStudioExport.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/import-studio.js",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
