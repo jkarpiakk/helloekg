@@ -57,7 +57,8 @@ export function podzialProporcjonalny(n: number, wagi: number[], limity: number[
 /**
  * Losuje `n` pytań z puli testu:
  * - proporcjonalnie do udziału modułów (sekcji studia) w puli,
- * - co najmniej 1 pytanie z każdego wykładu, jeśli liczba wykładów ≤ n,
+ * - co najmniej 1 pytanie z każdego wykładu, jeśli liczba wykładów ≤ n (to najpierw, z wykluczeniami
+ *   między już wybranymi; wykłady z najmniejszym wyborem pierwsze),
  * - bez par wykluczonych regułą „wyklucza” (w obie strony),
  * - kolejność pytań potasowana.
  * Gdy wykluczenia nie pozwalają wypełnić limitu modułu, brakujące miejsca bierze reszta puli.
@@ -114,11 +115,28 @@ export function losujTest(pula: readonly PytanieWPuli[], n: number, los: Losowe 
     }
   }
 
-  // 1. Po jednym pytaniu z każdego wykładu
+  // 1. NAJPIERW po jednym pytaniu z każdego wykładu. Kolejność: zawsze wykład z najmniejszą liczbą
+  //    dozwolonych kandydatów (np. wykład z jednym pytaniem w puli). Spośród kandydatów wybieramy losowo,
+  //    ale tylko takich, które nie odbierają innemu niepokrytemu wykładowi ostatniego kandydata
+  //    (para „wyklucza” między wykładami: S3_02 ma jedno pytanie wykluczane przez pytanie z S1).
   if (minimumWykladow) {
-    for (const w of tasuj(wyklady, los)) {
-      const kandydat = tasuj(pula.filter((q) => q.sectionId === w), los).find(wolno);
-      if (kandydat) wez(kandydat);
+    const niepokryte = new Set(wyklady);
+    const dozwoleni = (w: string) => pula.filter((q) => q.sectionId === w && wolno(q));
+    while (niepokryte.size) {
+      const lista = Array.from(niepokryte).map((w) => ({ w, k: dozwoleni(w) }));
+      const bez = lista.filter((x) => x.k.length === 0);
+      bez.forEach((x) => niepokryte.delete(x.w)); // nie da się pokryć (wykluczenia): pomijamy
+      const z = lista.filter((x) => x.k.length > 0);
+      if (!z.length) break;
+      const minK = Math.min(...z.map((x) => x.k.length));
+      const nast = tasuj(z.filter((x) => x.k.length === minK), los)[0];
+      // ile innych niepokrytych wykładów straciłoby ostatniego kandydata po wybraniu q
+      const szkoda = (q: PytanieWPuli) => z.filter((x) => x.w !== nast.w
+        && x.k.every((c) => c.id === q.id || konflikty.get(q.id)?.has(c.id))).length;
+      const kandydaci = tasuj(nast.k, los);
+      const najmniej = Math.min(...kandydaci.map(szkoda));
+      wez(kandydaci.find((q) => szkoda(q) === najmniej)!);
+      niepokryte.delete(nast.w);
     }
   }
   // 2. Dopełnienie modułów do limitu
@@ -211,31 +229,74 @@ export function stanPodejsc(podejscia: readonly Podejscie[], teraz: Date, z: Zas
   return { stan: "mozna", wykorzystane, pozostale };
 }
 
+// ── Pytania testu: warunek § 3 ust. 5 rozp. MZ z 19.04.2024 ────────────────
+
+/** Pytanie testu kwalifikuje się do losowania: jednokrotny wybór, co najmniej 5 odpowiedzi, dokładnie 1 poprawna */
+export function powodOdrzuceniaPytaniaTestu(q: { questionType: string; answers: Array<{ text: string; isCorrect: boolean }> | null | undefined }): string | null {
+  if (q.questionType !== "multiple_choice") return "to nie jest pytanie jednokrotnego wyboru";
+  const odp = Array.isArray(q.answers) ? q.answers : [];
+  if (odp.length < 5) return `ma ${odp.length} odpowiedzi, potrzeba co najmniej 5`;
+  const poprawne = odp.filter((a) => a.isCorrect).length;
+  if (poprawne !== 1) return `ma ${poprawne} poprawnych odpowiedzi, potrzeba dokładnie 1`;
+  return null;
+}
+
+// ── Limit czasu testu ────────────────────────────────────────────────────────
+
+/** Zapas po terminie na opóźnienia sieci (oddanie w tym czasie jest jeszcze w terminie) */
+export const ZAPAS_PO_TERMINIE_MS = 2 * 60_000;
+
+export const terminOddania = (start: Date, limitMinut: number): Date | null =>
+  limitMinut > 0 ? new Date(start.getTime() + limitMinut * 60_000) : null;
+
+/** Po terminie i zapasie: odpowiedzi już się nie zapisują, podejście oddaje się samo */
+export const poTerminie = (termin: Date | null, teraz: Date): boolean =>
+  !!termin && teraz.getTime() > termin.getTime() + ZAPAS_PO_TERMINIE_MS;
+
 // ── Punkty wg reguły zawodu ──────────────────────────────────────────────────
 
 export interface RegulaPunktow {
   profession: string;
   active: boolean;
+  /** "godziny": liczone z godzin dydaktycznych; "decyzja": wartość z uchwały NRL / decyzji NRPiP */
+  pointsMode: "godziny" | "decyzja";
   pointsPerHour: number;
+  pointsGranted: number | null;
   maxPoints: number | null;
   minHours: number | null;
   testRequired: boolean;
   registryRequired: boolean;
   registryNumber: string | null;
+  nrlResolution: string | null;
+  formInfoAcceptedAt: string | null;
+  decisionNumber: string | null;
   inactiveReason: string | null;
 }
 
-/** Reguła działa: włączona i (gdy wymaga) z numerem wpisu do rejestru / decyzji */
-export const regulaDziala = (r: RegulaPunktow): boolean =>
-  r.active && (!r.registryRequired || !!r.registryNumber?.trim());
+/** Numer wpisu do rejestru podmiotów prowadzących kształcenie lekarzy: RR-NNNNNN-00X-ZZZZ */
+export const NUMER_WPISU_RE = /^\d{2}-\d{6}-00\d-\d{4}$/;
+
+const jest = (v: string | null | undefined) => !!v && !!v.trim();
+
+/**
+ * Reguła działa, gdy jest włączona i ma komplet danych:
+ * - lekarze (registryRequired): uchwała NRL, numer wpisu w formacie RR-NNNNNN-00X-ZZZZ i data przyjęcia informacji o formie,
+ * - punkty z decyzji: przyznana liczba punktów (i numer decyzji, gdy to nie lekarze, np. NRPiP).
+ */
+export function regulaDziala(r: RegulaPunktow): boolean {
+  if (!r.active) return false;
+  if (r.registryRequired && !(jest(r.nrlResolution) && NUMER_WPISU_RE.test(r.registryNumber?.trim() ?? "") && jest(r.formInfoAcceptedAt))) return false;
+  if (r.pointsMode === "decyzja" && !((r.pointsGranted ?? 0) > 0 && (r.registryRequired || jest(r.decisionNumber)))) return false;
+  return true;
+}
 
 export type Punkty = { punkty: number; powod: null } | { punkty: null; powod: string };
 
 export function obliczPunkty(r: RegulaPunktow | null | undefined, godziny: number, testZaliczony: boolean): Punkty {
   if (!r) return { punkty: null, powod: "Dla tego zawodu szkolenie nie daje punktów edukacyjnych." };
   if (!regulaDziala(r)) {
-    const domyslny = r.registryRequired && r.active
-      ? "Brakuje numeru wpisu organizatora do rejestru, więc zaświadczenie nie daje punktów edukacyjnych."
+    const domyslny = r.active
+      ? "Brakuje danych z uchwały, decyzji albo wpisu do rejestru, więc zaświadczenie nie daje punktów edukacyjnych."
       : "Dla tego zawodu szkolenie nie daje jeszcze punktów edukacyjnych.";
     return { punkty: null, powod: r.inactiveReason?.trim() || domyslny };
   }
@@ -243,11 +304,23 @@ export function obliczPunkty(r: RegulaPunktow | null | undefined, godziny: numbe
   if (r.minHours !== null && godziny < r.minHours) {
     return { punkty: null, powod: `Szkolenie trwa krócej niż wymagane ${r.minHours} h, więc nie daje punktów edukacyjnych.` };
   }
-  let p = godziny * r.pointsPerHour;
+  let p = r.pointsMode === "decyzja" ? (r.pointsGranted ?? 0) : godziny * r.pointsPerHour;
   if (r.maxPoints !== null) p = Math.min(p, r.maxPoints);
   p = Math.round(p * 100) / 100;
   if (p <= 0) return { punkty: null, powod: r.inactiveReason?.trim() || "Dla tego zawodu szkolenie nie daje punktów edukacyjnych." };
   return { punkty: p, powod: null };
+}
+
+// ── Przechowywanie (5 lat od końca roku wydania) ─────────────────────────────
+
+/** Ostatni rok przechowywania: zaświadczenie z 2.01.2026 → dane do 31.12.2031 (rok wydania + 5, strefa Polski) */
+export const ostatniRokPrzechowywania = (wydane: Date): number => rokWPolsce(wydane) + 5;
+
+/** Okres minął, gdy bieżący rok (PL) jest późniejszy niż ostatni rok przechowywania najpóźniejszego zaświadczenia */
+export function przechowywanieMinelo(wydania: Date[], teraz: Date): boolean {
+  if (!wydania.length) return true;
+  const ostatni = Math.max(...wydania.map(ostatniRokPrzechowywania));
+  return rokWPolsce(teraz) > ostatni;
 }
 
 // ── Numeracja zaświadczeń ────────────────────────────────────────────────────

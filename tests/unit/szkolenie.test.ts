@@ -11,6 +11,12 @@ import {
   czyNumerZaswiadczenia,
   kluczWeryfikacji,
   losujTest,
+  NUMER_WPISU_RE,
+  ostatniRokPrzechowywania,
+  poTerminie,
+  powodOdrzuceniaPytaniaTestu,
+  przechowywanieMinelo,
+  terminOddania,
   numerZaswiadczenia,
   obliczPunkty,
   ocenTest,
@@ -118,6 +124,39 @@ describe("losowanie testu", () => {
       const w = new Set(losujTest(p, 45, ziarno(s)).map((q) => q.externalId));
       expect(w.has("T-S1-1-1") && (w.has("T-S1-1-2") || w.has("T-S1-1-3"))).toBe(false);
       expect(w.has("T-S2-1-1") && w.has("T-S2-1-2")).toBe(false);
+    }
+  });
+
+  it("wykład z jedynym pytaniem wykluczanym przez pytanie innego wykładu: zawsze pokryty (kształt puli 11.11)", () => {
+    // jak w prawdziwej puli: S3_02 ma jedno pytanie (Q-TEST-S3-02), w parze „wyklucza” z Q-TEST-S1-07 (inny wykład)
+    const p = pula().filter((q) => !(q.sectionId === "S3_02" && q.externalId !== "T-S3-2-1"));
+    const s302 = p.find((q) => q.externalId === "T-S3-2-1")!;
+    s302.externalId = "Q-TEST-S3-02";
+    const s107 = p.find((q) => q.externalId === "T-S1-1-3")!;
+    s107.externalId = "Q-TEST-S1-07";
+    s107.excludes = ["Q-TEST-S3-02"];
+    expect(p.filter((q) => q.sectionId === "S3_02")).toHaveLength(1);
+    const wyklady = new Set(p.map((q) => q.sectionId));
+    for (let s = 1; s <= 1000; s++) {
+      const w = losujTest(p, 40, ziarno(s));
+      expect(w).toHaveLength(40);
+      const ext = new Set(w.map((q) => q.externalId));
+      expect(new Set(w.map((q) => q.sectionId)).size).toBe(wyklady.size);
+      expect(ext.has("Q-TEST-S3-02")).toBe(true);
+      expect(ext.has("Q-TEST-S1-07")).toBe(false);
+    }
+  });
+
+  it("wykluczenie zapisane po stronie jedynego pytania wykładu: też pokryty", () => {
+    const p = pula().filter((q) => !(q.sectionId === "S5_03" && q.externalId !== "T-S5-3-1"));
+    p.find((q) => q.externalId === "T-S5-3-1")!.excludes = ["T-S2-4-1", "T-S2-4-2"]; // oba pytania wykładu S2_04
+    for (let s = 1; s <= 500; s++) {
+      const w = losujTest(p, 40, ziarno(s));
+      const sekcje = new Set(w.map((q) => q.sectionId));
+      // S5_03 i S2_04 nie mogą być pokryte razem: wtedy wygrywa jeden z nich, ale wszystkie inne wykłady są
+      expect(sekcje.size).toBeGreaterThanOrEqual(new Set(p.map((q) => q.sectionId)).size - 1);
+      const ext = new Set(w.map((q) => q.externalId));
+      expect(ext.has("T-S5-3-1") && (ext.has("T-S2-4-1") || ext.has("T-S2-4-2"))).toBe(false);
     }
   });
 
@@ -231,15 +270,26 @@ describe("ankieta anonimowa", () => {
     expect(m![1]).not.toMatch(/user_id|participant_id|timestamptz/);
   });
 
-  it("walidacja odpowiedzi: wymagane, skala 1–5, tak/nie, tekst opcjonalny", () => {
-    const ok = { ocena_ogolna: 5, zgodnosc_z_programem: 4, przydatnosc: 5, materialy: 4, test: 3, bez_reklam: true, polecenie: true };
-    expect(sprawdzOdpowiedziAnkiety(ANKIETA_DOMYSLNA, ok)).toMatchObject({ odpowiedzi: { ...ok, uwagi: null } });
+  it("walidacja odpowiedzi: wymagane, skala od 1 do 5, tak/nie, tekst opcjonalny", () => {
+    const ok = {
+      nowa_wiedza: true, oparta_na_faktach: true, w_praktyce: true, korzysc_pacjentow: true, bez_reklamy: true,
+      ocena_ogolna: 5, organizacja: 4, materialy: 4, test: 3, polecenie: true,
+    };
+    expect(sprawdzOdpowiedziAnkiety(ANKIETA_DOMYSLNA, ok)).toMatchObject({ odpowiedzi: { ...ok, uwagi: null, najslabsze: null, najmocniejsze: null } });
     expect("blad" in sprawdzOdpowiedziAnkiety(ANKIETA_DOMYSLNA, { ...ok, ocena_ogolna: 6 })).toBe(true);
-    expect("blad" in sprawdzOdpowiedziAnkiety(ANKIETA_DOMYSLNA, { ...ok, bez_reklam: "tak" })).toBe(true);
+    expect("blad" in sprawdzOdpowiedziAnkiety(ANKIETA_DOMYSLNA, { ...ok, bez_reklamy: "tak" })).toBe(true);
     expect("blad" in sprawdzOdpowiedziAnkiety(ANKIETA_DOMYSLNA, { ...ok, polecenie: undefined })).toBe(true);
     // nadmiarowe pola (np. próba dopisania user_id) nie trafiają do zapisu
     const w = sprawdzOdpowiedziAnkiety(ANKIETA_DOMYSLNA, { ...ok, user_id: "x" });
     expect("odpowiedzi" in w && !("user_id" in w.odpowiedzi)).toBe(true);
+  });
+
+  it("ankieta startowa ma pytania z wzoru NIL, w tym o reklamę i stronniczość", () => {
+    const tresci = ANKIETA_DOMYSLNA.pytania.map((p) => p.tresc);
+    expect(tresci).toContain("Czy treści kształcenia były wolne od reklamy i stronniczości?");
+    for (const id of ["nowa_wiedza", "oparta_na_faktach", "w_praktyce", "korzysc_pacjentow", "najslabsze", "najmocniejsze", "organizacja"]) {
+      expect(ANKIETA_DOMYSLNA.pytania.some((p) => p.id === id)).toBe(true);
+    }
   });
 });
 
@@ -303,16 +353,21 @@ describe("numeracja i weryfikacja zaświadczeń", () => {
 });
 
 describe("reguły punktów", () => {
-  const ratownik: RegulaPunktow = {
-    profession: "ratownik", active: true, pointsPerHour: 1, maxPoints: 10, minHours: 4, testRequired: true,
-    registryRequired: false, registryNumber: null, inactiveReason: null,
+  const baza = {
+    pointsPerHour: 0, pointsGranted: null, maxPoints: null, minHours: null, testRequired: true, registryRequired: false,
+    registryNumber: null, nrlResolution: null, formInfoAcceptedAt: null, decisionNumber: null, inactiveReason: null,
   };
+  const ratownik: RegulaPunktow = { ...baza, profession: "ratownik", active: true, pointsMode: "godziny", pointsPerHour: 1, maxPoints: 10, minHours: 4 };
   const lekarz: RegulaPunktow = {
-    profession: "lekarz", active: false, pointsPerHour: 1, maxPoints: null, minHours: null, testRequired: true,
-    registryRequired: true, registryNumber: null, inactiveReason: "Organizator nie ma jeszcze wpisu do rejestru.",
+    ...baza, profession: "lekarz", active: false, pointsMode: "decyzja", registryRequired: true,
+    inactiveReason: "Szkolenie czeka na akceptację NRL i wpis do rejestru.",
   };
+  const lekarzKomplet: RegulaPunktow = {
+    ...lekarz, active: true, inactiveReason: null, pointsGranted: 40, nrlResolution: "TEST-NRL/1", registryNumber: "26-123456-003-0001", formInfoAcceptedAt: "2026-12-01",
+  };
+  const pielegniarka: RegulaPunktow = { ...baza, profession: "pielegniarka", active: false, pointsMode: "decyzja", inactiveReason: "Czeka na decyzję NRPiP." };
 
-  it("ratownik: 53 h daje najwyżej 10 punktów", () => {
+  it("ratownik: 1 pkt za godzinę dydaktyczną, 53 h daje najwyżej 10 punktów", () => {
     expect(obliczPunkty(ratownik, 53, true)).toEqual({ punkty: 10, powod: null });
   });
 
@@ -327,25 +382,40 @@ describe("reguły punktów", () => {
 
   it("lekarz nieaktywny bez numeru rejestru: bez punktów, z powodem", () => {
     expect(regulaDziala(lekarz)).toBe(false);
-    expect(obliczPunkty(lekarz, 53, true)).toEqual({ punkty: null, powod: "Organizator nie ma jeszcze wpisu do rejestru." });
+    expect(obliczPunkty(lekarz, 53, true)).toEqual({ punkty: null, powod: "Szkolenie czeka na akceptację NRL i wpis do rejestru." });
   });
 
-  it("lekarz włączony, ale bez numeru rejestru: dalej bez punktów", () => {
-    const r = { ...lekarz, active: true, inactiveReason: null };
-    expect(regulaDziala(r)).toBe(false);
-    expect(obliczPunkty(r, 53, true).punkty).toBeNull();
+  it("lekarz: reguła działa dopiero z uchwałą NRL, numerem wpisu i datą przyjęcia informacji o formie", () => {
+    expect(regulaDziala(lekarzKomplet)).toBe(true);
+    expect(regulaDziala({ ...lekarzKomplet, nrlResolution: null })).toBe(false);
+    expect(regulaDziala({ ...lekarzKomplet, registryNumber: null })).toBe(false);
+    expect(regulaDziala({ ...lekarzKomplet, formInfoAcceptedAt: " " })).toBe(false);
+    expect(regulaDziala({ ...lekarzKomplet, registryNumber: "26/123456/003/0001" })).toBe(false); // zły format
+    expect(regulaDziala({ ...lekarzKomplet, active: false })).toBe(false);
   });
 
-  it("lekarz włączony z numerem rejestru: 1 pkt/h bez limitu = 53", () => {
-    const r = { ...lekarz, active: true, registryNumber: "TEST/0001" };
-    expect(regulaDziala(r)).toBe(true);
-    expect(obliczPunkty(r, 53, true)).toEqual({ punkty: 53, powod: null });
+  it("lekarz: punkty z uchwały NRL (wartość przyznana), nie liczone z godzin", () => {
+    expect(obliczPunkty(lekarzKomplet, 53, true)).toEqual({ punkty: 40, powod: null });
+    expect(obliczPunkty({ ...lekarzKomplet, pointsGranted: null }, 53, true).punkty).toBeNull();
+  });
+
+  it("pielęgniarka: nieaktywna do decyzji NRPiP; z decyzją i przyznanymi punktami działa", () => {
+    expect(obliczPunkty(pielegniarka, 53, true)).toEqual({ punkty: null, powod: "Czeka na decyzję NRPiP." });
+    const zDecyzja = { ...pielegniarka, active: true, inactiveReason: null, decisionNumber: "TEST/2026/1", pointsGranted: 30 };
+    expect(obliczPunkty(zDecyzja, 53, true)).toEqual({ punkty: 30, powod: null });
+    expect(regulaDziala({ ...zDecyzja, decisionNumber: null })).toBe(false);
   });
 
   it("student / brak reguły: bez punktów", () => {
     expect(obliczPunkty(null, 53, true).punkty).toBeNull();
     const student = { ...ratownik, profession: "student", active: false, pointsPerHour: 0, maxPoints: null, minHours: null, inactiveReason: "Bez punktów." };
     expect(obliczPunkty(student, 53, true)).toEqual({ punkty: null, powod: "Bez punktów." });
+  });
+
+  it("format numeru wpisu RR-NNNNNN-00X-ZZZZ", () => {
+    expect(NUMER_WPISU_RE.test("26-123456-003-0001")).toBe(true);
+    expect(NUMER_WPISU_RE.test("26-123456-013-0001")).toBe(false);
+    expect(NUMER_WPISU_RE.test("2026-123456-003-0001")).toBe(false);
   });
 });
 
@@ -357,55 +427,82 @@ describe("walidacja PWZ", () => {
     return k === 10 ? null : `${k}${szesc}`;
   };
 
-  it("lekarz: poprawna cyfra kontrolna", () => {
+  it("lekarz: przykład NIL 5425740 poprawny, 5425741 i 0425740 błędne", () => {
+    expect(problemPwzLekarza("5425740")).toBeNull();
+    expect(problemPwzLekarza("5425741")).toMatch(/kontrolna/);
+    expect(problemPwzLekarza("0425740")).toMatch(/zera/);
     expect(zKontrolna("123456")).toBe("3123456");
     expect(problemPwzLekarza("3123456")).toBeNull();
   });
 
-  it("lekarz: zła cyfra kontrolna, zero na początku, długość, litery", () => {
-    expect(problemPwzLekarza("4123456")).toMatch(/kontrolna/);
-    expect(problemPwzLekarza("0123456")).toMatch(/zera/);
+  it("lekarz: długość, litery, wynik 10", () => {
     expect(problemPwzLekarza("312345")).toMatch(/7 cyfr/);
     expect(problemPwzLekarza("31234X6")).toMatch(/7 cyfr/);
-  });
-
-  it("lekarz: wynik 10 oznacza numer nieprawidłowy", () => {
-    // sześć cyfr, dla których suma ważona mod 11 = 10: żadna cyfra kontrolna nie pasuje
     const szesc = Array.from({ length: 1_000 }, (_, i) => String(100000 + i)).find((s) => zKontrolna(s) === null)!;
     for (let k = 1; k <= 9; k++) expect(problemPwzLekarza(`${k}${szesc}`)).not.toBeNull();
   });
 
-  it("lekarz: domyślnie ostrzeżenie, nie blokada", () => {
-    expect(sprawdzPwz("lekarz", "4123456")).toMatchObject({ blad: null, pwz: "4123456" });
-    expect(sprawdzPwz("lekarz", "4123456").ostrzezenie).toMatch(/kontrolna/);
-    expect(sprawdzPwz("lekarz", "4123456", "blokada").blad).toMatch(/kontrolna/);
-    expect(sprawdzPwz("lekarz", "4123456", "wylaczona")).toMatchObject({ blad: null, ostrzezenie: null });
-    expect(sprawdzPwz("lekarz_dentysta", "3123456")).toMatchObject({ blad: null, ostrzezenie: null });
+  it("lekarz i lekarz dentysta: walidacja twarda (błąd blokuje zapis)", () => {
+    expect(sprawdzPwz("lekarz", "4123456").blad).toMatch(/kontrolna/);
+    expect(sprawdzPwz("lekarz_dentysta", "5425740")).toEqual({ blad: null, pwz: "5425740" });
   });
 
-  it("pielęgniarka i położna: 7 cyfr albo 6 cyfr + P/A; inaczej tylko ostrzeżenie", () => {
-    expect(sprawdzPwz("pielegniarka", "1234567")).toMatchObject({ blad: null, ostrzezenie: null });
-    expect(sprawdzPwz("polozna", "123456a")).toMatchObject({ blad: null, ostrzezenie: null, pwz: "123456A" });
-    expect(sprawdzPwz("pielegniarka", "123456P")).toMatchObject({ blad: null, ostrzezenie: null });
-    expect(sprawdzPwz("pielegniarka", "12345")).toMatchObject({ blad: null });
-    expect(sprawdzPwz("pielegniarka", "12345").ostrzezenie).not.toBeNull();
+  it("pielęgniarka i położna: 7 cyfr + obowiązkowa litera P/A zgodna z zawodem", () => {
+    expect(sprawdzPwz("pielegniarka", "1234567p")).toEqual({ blad: null, pwz: "1234567P" });
+    expect(sprawdzPwz("polozna", "1234567A")).toEqual({ blad: null, pwz: "1234567A" });
+    expect(sprawdzPwz("pielegniarka", "1234567A").blad).toMatch(/nie pasuje do zawodu/);
+    expect(sprawdzPwz("polozna", "1234567P").blad).toMatch(/nie pasuje do zawodu/);
+    expect(sprawdzPwz("pielegniarka", "1234567").blad).not.toBeNull(); // bez litery
+    expect(sprawdzPwz("polozna", "123456A").blad).not.toBeNull(); // 6 cyfr
   });
 
-  it("ratownik: cyfry; litery tylko ostrzeżenie", () => {
-    expect(sprawdzPwz("ratownik", "000123")).toMatchObject({ blad: null, ostrzezenie: null });
-    expect(sprawdzPwz("ratownik", "R123").ostrzezenie).not.toBeNull();
-    expect(sprawdzPwz("ratownik", "R123").blad).toBeNull();
-  });
-
-  it("brak numeru blokuje zawody z PWZ; student i inny bez numeru", () => {
+  it("ratownik: dowolny numer bez walidacji formatu albo „nie mam jeszcze numeru”", () => {
+    expect(sprawdzPwz("ratownik", "000123")).toEqual({ blad: null, pwz: "000123" });
+    expect(sprawdzPwz("ratownik", "R/123").blad).not.toBeNull(); // tylko cyfry i litery
+    expect(sprawdzPwz("ratownik", "RM12A")).toEqual({ blad: null, pwz: "RM12A" });
+    expect(sprawdzPwz("ratownik", "", { brakNumeru: true })).toEqual({ blad: null, pwz: null });
     expect(sprawdzPwz("ratownik", "").blad).not.toBeNull();
-    expect(sprawdzPwz("student", "")).toEqual({ blad: null, ostrzezenie: null, pwz: null });
-    expect(sprawdzPwz("inny", "123")).toEqual({ blad: null, ostrzezenie: null, pwz: null });
+  });
+
+  it("student i inny bez numeru", () => {
+    expect(sprawdzPwz("student", "")).toEqual({ blad: null, pwz: null });
+    expect(sprawdzPwz("inny", "123")).toEqual({ blad: null, pwz: null });
   });
 
   it("spacje usuwane, znaki specjalne odrzucane", () => {
-    expect(sprawdzPwz("lekarz", " 312 3456 ").pwz).toBe("3123456");
+    expect(sprawdzPwz("lekarz", " 542 5740 ").pwz).toBe("5425740");
     expect(sprawdzPwz("ratownik", "12;DROP").blad).not.toBeNull();
+  });
+});
+
+describe("test: pula, limit czasu, przechowywanie", () => {
+  const odp = (n: number, poprawne: number[]) => Array.from({ length: n }, (_, i) => ({ text: `o${i}`, isCorrect: poprawne.includes(i) }));
+
+  it("do testu tylko pytania jednokrotnego wyboru z co najmniej 5 odpowiedziami i dokładnie 1 poprawną", () => {
+    expect(powodOdrzuceniaPytaniaTestu({ questionType: "multiple_choice", answers: odp(5, [2]) })).toBeNull();
+    expect(powodOdrzuceniaPytaniaTestu({ questionType: "multiple_choice", answers: odp(4, [1]) })).toMatch(/co najmniej 5/);
+    expect(powodOdrzuceniaPytaniaTestu({ questionType: "multiple_choice", answers: odp(5, [1, 2]) })).toMatch(/dokładnie 1/);
+    expect(powodOdrzuceniaPytaniaTestu({ questionType: "multiple_choice", answers: odp(5, []) })).toMatch(/dokładnie 1/);
+    expect(powodOdrzuceniaPytaniaTestu({ questionType: "matching", answers: odp(5, [0]) })).not.toBeNull();
+  });
+
+  it("limit czasu: termin = start + limit; po terminie i 2 min zapasu podejście się zamyka", () => {
+    const start = new Date("2026-11-11T10:00:00Z");
+    const t = terminOddania(start, 90)!;
+    expect(t.toISOString()).toBe("2026-11-11T11:30:00.000Z");
+    expect(poTerminie(t, new Date("2026-11-11T11:31:59Z"))).toBe(false);
+    expect(poTerminie(t, new Date("2026-11-11T11:32:01Z"))).toBe(true);
+    expect(terminOddania(start, 0)).toBeNull();
+    expect(poTerminie(null, new Date("2030-01-01"))).toBe(false);
+  });
+
+  it("przechowywanie 5 lat od końca roku wydania (2.01.2026 → do 31.12.2031)", () => {
+    const w = new Date("2026-01-02T10:00:00Z");
+    expect(ostatniRokPrzechowywania(w)).toBe(2031);
+    expect(przechowywanieMinelo([w], new Date("2031-12-31T20:00:00Z"))).toBe(false);
+    expect(przechowywanieMinelo([w], new Date("2031-12-31T23:30:00Z"))).toBe(true); // już 1.01.2032 w Polsce
+    expect(przechowywanieMinelo([w, new Date("2028-05-01T10:00:00Z")], new Date("2032-06-01"))).toBe(false); // liczy najpóźniejsze
+    expect(przechowywanieMinelo([], new Date())).toBe(true); // bez zaświadczenia: nic do przechowywania
   });
 });
 
