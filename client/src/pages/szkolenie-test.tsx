@@ -7,7 +7,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Wyjasnienie } from "@/components/quiz/Wyjasnienie";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { sanitizeHtml } from "@/lib/sanitize";
+import { sanitizeMarkdown } from "@/lib/sanitize";
 import { cn } from "@/lib/utils";
 import { plural } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
@@ -212,7 +212,7 @@ export default function SzkolenieTest() {
               <article key={b.nr} className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(18px,3vw,32px)] grid gap-4" data-testid={b.ok ? "test-dobra" : "test-bledna"}>
                 <p className={cn("label", b.ok && "label--g")}>Pytanie {b.nr}: {b.ok ? "dobrze" : "źle"}</p>
                 {b.title && <h3 className="h3">{b.title}</h3>}
-                <div className="prose-hk max-w-none" dangerouslySetInnerHTML={sanitizeHtml(b.bodyMd)} />
+                <div className="prose-hk max-w-none" dangerouslySetInnerHTML={sanitizeMarkdown(b.bodyMd)} />
                 {b.imageUrl && <img src={b.imageUrl} alt="" className="max-w-full rounded-lg" />}
                 <div className="grid gap-[10px]">
                   {b.answers.map((a, k) => {
@@ -306,7 +306,7 @@ export default function SzkolenieTest() {
       {q && (
         <article className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)] grid gap-6" aria-labelledby="test-tresc">
           {q.title && <h1 className="h3" id="test-tresc">{q.title}</h1>}
-          <div className="prose-hk max-w-none text-[var(--txt)]" id={q.title ? undefined : "test-tresc"} dangerouslySetInnerHTML={sanitizeHtml(q.bodyMd)} />
+          <div className="prose-hk max-w-none text-[var(--txt)]" id={q.title ? undefined : "test-tresc"} dangerouslySetInnerHTML={sanitizeMarkdown(q.bodyMd)} />
           {q.imageUrl && <img src={q.imageUrl} alt="" className="max-w-full rounded-lg" />}
           <div className="grid gap-[10px]" role="radiogroup" aria-label="Odpowiedzi">
             {q.answers.map((a, k) => (

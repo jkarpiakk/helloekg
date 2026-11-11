@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { sanitizeHtml, sanitizeMarkdown } from "@/lib/sanitize";
+import { sanitizeMarkdown } from "@/lib/sanitize";
 import { spring, springSnappy } from "@/lib/motion";
 import QuestionCard, { type AnswerStatus } from "./QuestionCard";
 import ImageLightbox from "./ImageLightbox";
@@ -588,15 +588,15 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     if (status === "result") nextRef.current?.focus({ preventScroll: true });
   }, [status]);
 
-  // Klawiatura: 1–4 / A–D wybiera odpowiedź, Enter = sprawdź / dalej
+  // Klawiatura: cyfra albo litera odpowiedzi (do 6 odpowiedzi) wybiera ją, Enter = sprawdź / dalej
   const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {});
   keyHandler.current = (e: KeyboardEvent) => {
     if (!question || lightbox || showReportDialog || confirmLeave || showSummary || examFinished) return;
     if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
     const target = e.target as HTMLElement | null;
     if (canAnswer && !isInteractive) {
-      let idx = "1234".indexOf(e.key);
-      if (idx < 0 && e.key.length === 1) idx = "abcd".indexOf(e.key.toLowerCase());
+      let idx = e.key.length === 1 ? "123456".indexOf(e.key) : -1;
+      if (idx < 0 && e.key.length === 1) idx = "abcdef".indexOf(e.key.toLowerCase());
       if (idx >= 0 && idx < question.answers.length) {
         e.preventDefault();
         handleAnswerSelect(idx);
@@ -915,7 +915,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                     </div>
                   ) : (
                     <p className="label hidden sm:block" aria-hidden>
-                      Klawisze 1–4 lub A–D
+                      {`Klawisze 1-${question?.answers.length ?? 4} lub A-${String.fromCharCode(64 + (question?.answers.length ?? 4))}`}
                     </p>
                   )}
                 </nav>
@@ -1124,7 +1124,7 @@ function ExamReview({ items, onImageClick }: { items: ExamReviewItem[]; onImageC
                   {item.bodyMd && (
                     <div
                       className="prose-hk max-w-[46em] text-body text-[var(--txt)]"
-                      dangerouslySetInnerHTML={sanitizeHtml(item.bodyMd)}
+                      dangerouslySetInnerHTML={sanitizeMarkdown(item.bodyMd)}
                     />
                   )}
                   {item.imageUrl && (

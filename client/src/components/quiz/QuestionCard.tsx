@@ -2,7 +2,7 @@ import { Wyjasnienie } from "./Wyjasnienie";
 import { WstawkaOtwarta, wyciagnijWstawki } from "./WstawkaOtwarta";
 import { motion } from "framer-motion";
 import { Check, Maximize2, X } from "lucide-react";
-import { sanitizeMarkdown, sanitizeHtml } from "@/lib/sanitize";
+import { sanitizeMarkdown } from "@/lib/sanitize";
 import { rise } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { QuizQuestion, QuizResult, AnswerData } from "@/types";
@@ -118,7 +118,7 @@ export default function QuestionCard({
           // Bez tytułu treść pytania JEST tytułem — w skali `.q__title` z landingu
           style={question.title ? undefined : { ...titleStyle, color: "var(--txt)", textWrap: "pretty" }}
           id={question.title ? undefined : "question-title"}
-          dangerouslySetInnerHTML={sanitizeHtml(tresc.tekst)}
+          dangerouslySetInnerHTML={sanitizeMarkdown(tresc.tekst)}
           data-testid="question-body"
         />
       )}
