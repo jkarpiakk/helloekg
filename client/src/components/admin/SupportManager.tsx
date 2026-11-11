@@ -258,6 +258,9 @@ export default function SupportManager() {
                   <tr key={ticket.id} className="hover:bg-secondary/50" data-testid={`ticket-row-${ticket.id}`}>
                     <td className="p-4">
                       <div>
+                        {ticket.kind === "prowadzacy" && (
+                          <Badge variant="secondary" className="mb-1" data-testid="ticket-prowadzacy">Do prowadzącego</Badge>
+                        )}
                         <h4 className="font-medium text-foreground">{ticket.subject}</h4>
                         <p className="text-sm text-muted-foreground">
                           {ticket.message.substring(0, 100)}...

@@ -35,9 +35,18 @@ const FeedbackPage = lazy(() => import("@/pages/feedback"));
 const PricingPage = lazy(() => import("@/pages/pricing"));
 const CheckoutPage = lazy(() => import("@/pages/checkout"));
 const PaymentSuccessPage = lazy(() => import("@/pages/payment-success"));
+// Szkolenie z punktami edukacyjnymi
+const SzkoleniePage = lazy(() => import("@/pages/szkolenie"));
+const SzkolenieTest = lazy(() => import("@/pages/szkolenie-test"));
+const SzkolenieAnkieta = lazy(() => import("@/pages/szkolenie-ankieta"));
+const ModulPage = lazy(() => import("@/pages/modul"));
+const DokumentSzkolenia = lazy(() => import("@/pages/dokument-szkolenia"));
+const ZaswiadczenieWeryfikacja = lazy(() => import("@/pages/zaswiadczenie-weryfikacja"));
 
 /** Trasy dostępne dla konta, które jeszcze nie potwierdziło adresu e-mail (reszta: ekran „potwierdź e-mail”) */
-const BEZ_POTWIERDZENIA = ["/verify-email", "/reset-password", "/forgot-password", "/regulamin-bety", "/polityka-prywatnosci"];
+const BEZ_POTWIERDZENIA = ["/verify-email", "/reset-password", "/forgot-password", "/regulamin-bety", "/polityka-prywatnosci", "/regulamin-szkolenia"];
+/** Publiczna weryfikacja zaświadczenia (link z QR): bez konta i bez potwierdzenia adresu */
+const bezPotwierdzenia = (path: string) => BEZ_POTWIERDZENIA.includes(path) || path.startsWith("/zaswiadczenie/");
 
 // Layout
 import Header from "@/components/layout/Header";
@@ -107,7 +116,7 @@ function AppContent() {
   const [path] = useLocation();
   const { data: config } = useAppConfig();
   const platnosci = config?.platnosci === true;
-  const czekaNaPotwierdzenie = !!user && user.emailVerified === false && !BEZ_POTWIERDZENIA.includes(path);
+  const czekaNaPotwierdzenie = !!user && user.emailVerified === false && !bezPotwierdzenia(path);
 
   if (isLoading) {
     return (
@@ -148,6 +157,13 @@ function AppContent() {
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/zgloszenie" component={FeedbackPage} />
+          <Route path="/szkolenie" component={SzkoleniePage} />
+          <Route path="/szkolenie/test" component={SzkolenieTest} />
+          <Route path="/szkolenie/ankieta" component={SzkolenieAnkieta} />
+          <Route path="/modul/:id" component={ModulPage} />
+          <Route path="/program-szkolenia">{() => <DokumentSzkolenia rodzaj="program" />}</Route>
+          <Route path="/regulamin-szkolenia">{() => <DokumentSzkolenia rodzaj="regulamin" />}</Route>
+          <Route path="/zaswiadczenie/:klucz" component={ZaswiadczenieWeryfikacja} />
           <Route path="/certificate/preview" component={CertificatePreviewPage} />
           <Route path="/certificate/:certificateId" component={CertificatePage} />
           <Route component={NotFound} />

@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { rise, stagger } from "@/lib/motion";
 import { plural, pytania } from "@/lib/i18n";
+import { czyStan, useSzkolenie } from "@/lib/szkolenie";
 
 interface ModuleSection {
   id: string;
@@ -33,6 +34,10 @@ interface CourseModule {
   order: number;
   isLocked?: boolean;
   completionPercentage: number;
+  /** Moduł wchodzi do szkolenia z punktami (S8 „EKG na LEK” nie) */
+  cme?: boolean;
+  hasSummary?: boolean;
+  hasBibliography?: boolean;
   sections: ModuleSection[];
 }
 
@@ -91,6 +96,9 @@ export default function Modules() {
     // Postęp zmienia się po każdym quizie — przy wejściu na ekran zawsze dociągnij świeży
     refetchOnMount: "always",
   });
+  // Szkolenie z punktami: link na górze, gdy zapisy działają (albo podgląd zespołu)
+  const { data: szkolenie } = useSzkolenie(isAuthenticated);
+  const pokazSzkolenie = czyStan(szkolenie);
   // Miękka kolejność kursu: ten sam „Następny krok” co na Postępie
   const nextId = nextStep(courseItems(modules as unknown as OrderModule[] | undefined))?.section.id;
 
@@ -139,6 +147,14 @@ export default function Modules() {
         <p className="lead">
           Otwórz moduł, przeczytaj wykład i od razu sprawdź się w pytaniach. Postęp liczymy z twoich odpowiedzi.
         </p>
+        {pokazSzkolenie && (
+          <p>
+            <Link href="/szkolenie" className="inline-flex items-center gap-1 min-h-[44px] text-[var(--txt)] underline" data-testid="link-szkolenie">
+              Szkolenie z punktami edukacyjnymi
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </p>
+        )}
       </header>
 
       {isError && (
@@ -203,12 +219,23 @@ export default function Modules() {
                 </summary>
 
                 <div className="pb-8 grid gap-8 sm:gap-10 sm:pl-[60px]">
+                  {module.cme === false && (
+                    <p className="label" data-testid="modul-poza-szkoleniem">Moduł dodatkowy, poza szkoleniem z punktami</p>
+                  )}
                   {module.description && (
                     <p className="text-body sm:text-read leading-[1.7] text-[var(--txt2)] max-w-[42em]">
                       {module.description}
                     </p>
                   )}
 
+                  {!module.isLocked && (
+                    <p className="flex flex-wrap gap-x-5 gap-y-1 text-ui">
+                      <Link href={`/modul/${module.id}`} className="underline" data-testid={`modul-strona-${module.id}`}>
+                        {module.hasSummary || module.hasBibliography ? "Podsumowanie i bibliografia" : "Strona modułu"}
+                      </Link>
+                      <Link href={`/modul/${module.id}#do-prowadzacego`} className="underline">Napisz do prowadzącego</Link>
+                    </p>
+                  )}
                   {module.isLocked ? (
                     <p className="muted pb-2">Ten moduł nie jest jeszcze dostępny w becie.</p>
                   ) : count === 0 ? (
