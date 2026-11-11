@@ -17,7 +17,8 @@
  *
  * Szkolenie z punktami (kontrakt docs/kontrakt-eksportu-cme.md, studio-v0.2): pytania niosą `pula`
  * (cwiczenia | test), `bezTasowania`, `wyklucza`; sekcje `podsumowanieMd`, `bibliografiaMd`, `szkolenie`;
- * opcjonalny program.json → course_documents("program"). Starsze paczki: wartości domyślne
+ * opcjonalny program.json → course_documents("program"). Wersje `podsumowanieMdApp`, `bibliografiaMdApp`,
+ * `programMdApp` (po toAppMarkdown studia, jak contentMdApp wykładów) mają pierwszeństwo przed surowymi. Starsze paczki: wartości domyślne
  * (pula ćwiczeń, tasowanie, bez wykluczeń; podsumowania i program bez zmian; szkolenie: wszystko poza S8).
  *
  * UWAGA (tylko --replace): zastępuje CAŁĄ treść kursu razem z postępami.
@@ -43,18 +44,24 @@ const studioSections: Array<{
   code: string; title: string; order: number;
   /** studio-v0.2: null = puste albo niezatwierdzone; brak pola = starsza paczka (bez zmian w kursie) */
   podsumowanieMd?: string | null; bibliografiaMd?: string | null; szkolenie?: boolean;
+  /** Ta sama treść po toAppMarkdown studia (dyrektywy jak w contentMdApp wykładów); pierwszeństwo przed surową */
+  podsumowanieMdApp?: string | null; bibliografiaMdApp?: string | null;
 }> = read("sections.json");
 /** Program szkolenia (studio-v0.2, plik opcjonalny) */
-const program: { programMd: string | null; wersja: number } | null =
+const program: { programMd: string | null; programMdApp?: string | null; wersja: number } | null =
   fs.existsSync(path.join(dir, "program.json")) ? read("program.json") : null;
+
+/** Wersja *App (po toAppMarkdown studia), gdy jest w paczce; inaczej surowy Markdown */
+const appAlboSurowe = (app: string | null | undefined, surowe: string | null | undefined) =>
+  app !== undefined && app !== null ? app : surowe;
 
 /** Pola modułu ze szkolenia; undefined = pole nieobecne w paczce (nie nadpisujemy) */
 function moduleCme(s: (typeof studioSections)[number]) {
   const md = (v: string | null | undefined) => (v === undefined ? undefined : v && v.trim() ? fixLecture(v) : null);
   return {
     cme: typeof s.szkolenie === "boolean" ? s.szkolenie : s.code !== "S8",
-    ...(s.podsumowanieMd !== undefined ? { summaryMd: md(s.podsumowanieMd) } : {}),
-    ...(s.bibliografiaMd !== undefined ? { bibliographyMd: md(s.bibliografiaMd) } : {}),
+    ...(s.podsumowanieMd !== undefined || s.podsumowanieMdApp !== undefined ? { summaryMd: md(appAlboSurowe(s.podsumowanieMdApp, s.podsumowanieMd)) } : {}),
+    ...(s.bibliografiaMd !== undefined || s.bibliografiaMdApp !== undefined ? { bibliographyMd: md(appAlboSurowe(s.bibliografiaMdApp, s.bibliografiaMd)) } : {}),
   };
 }
 
@@ -233,7 +240,8 @@ const LOOSE = (code: string) => `${code}:utrwalajace`;
 
 /** Program szkolenia z program.json → course_documents("program") */
 async function zapiszProgram(tx: any) {
-  const tresc = program?.programMd?.trim() ? fixLecture(program.programMd) : null;
+  const zrodlo = appAlboSurowe(program?.programMdApp, program?.programMd);
+  const tresc = zrodlo?.trim() ? fixLecture(zrodlo) : null;
   await tx.insert(courseDocuments).values({ key: "program", contentMd: tresc, version: Number(program?.wersja) || 0 })
     .onConflictDoUpdate({ target: courseDocuments.key, set: { contentMd: tresc, version: Number(program?.wersja) || 0, updatedAt: new Date() } });
   console.log(`  program szkolenia: ${tresc ? `wersja ${program?.wersja}` : "pusty"}`);
