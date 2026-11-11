@@ -54,7 +54,7 @@ export interface IStorage {
   updateSection(id: string, updates: Partial<InsertSection>): Promise<Section>;
   deleteSection(id: string): Promise<void>;
   reorderSections(sectionIds: string[], moduleId: string): Promise<void>;
-  getQuestionsBySection(sectionId: string, status?: string): Promise<Question[]>;
+  getQuestionsBySection(sectionId: string, status?: string, opts?: { pula?: "wszystkie" }): Promise<Question[]>;
   getQuestionById(id: string): Promise<Question | undefined>;
   createQuestion(question: InsertQuestion): Promise<Question>;
   createQuestionsBulk(questions: InsertQuestion[]): Promise<{ summary: { total: number; created: number; failed: number }; results: Array<{ index: number; status: 'created' | 'failed'; id?: string; errors?: string[] }> }>;
@@ -345,27 +345,28 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getQuestionsBySection(sectionId: string, status?: string): Promise<Question[]> {
-    if (status) {
-      return db.select().from(questions)
-        .where(and(eq(questions.sectionId, sectionId), eq(questions.status, status)))
-        .orderBy(asc(questions.order), asc(questions.createdAt));
-    }
-    
+  /**
+   * Pytania tematu. Z `status` = "published" domyślnie tylko pula ćwiczeń: pytania testu szkolenia
+   * (pool = "test") nigdy nie trafiają do nauki, powtórki, egzaminu próbnego ani opanowania.
+   * Panel admina przekazuje `pula: "wszystkie"`.
+   */
+  async getQuestionsBySection(sectionId: string, status?: string, opts: { pula?: "wszystkie" } = {}): Promise<Question[]> {
+    const warunki = [eq(questions.sectionId, sectionId)];
+    if (status) warunki.push(eq(questions.status, status));
+    if (status === "published" && opts.pula !== "wszystkie") warunki.push(eq(questions.pool, "practice"));
     // Kolejność z importu (przeplatane typy, ABCD na początku), potem data utworzenia
     return db.select().from(questions)
-      .where(eq(questions.sectionId, sectionId))
+      .where(and(...warunki))
       .orderBy(asc(questions.order), asc(questions.createdAt));
   }
 
-  async getAllQuestions(status?: string): Promise<Question[]> {
-    if (status) {
-      return db.select().from(questions)
-        .where(eq(questions.status, status))
-        .orderBy(asc(questions.createdAt));
-    }
-    
+  /** Wszystkie pytania; z `status` = "published" tylko pula ćwiczeń (jak getQuestionsBySection) */
+  async getAllQuestions(status?: string, opts: { pula?: "wszystkie" } = {}): Promise<Question[]> {
+    const warunki = [];
+    if (status) warunki.push(eq(questions.status, status));
+    if (status === "published" && opts.pula !== "wszystkie") warunki.push(eq(questions.pool, "practice"));
     return db.select().from(questions)
+      .where(warunki.length ? and(...warunki) : undefined)
       .orderBy(asc(questions.createdAt));
   }
 

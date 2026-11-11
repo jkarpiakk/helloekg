@@ -15,6 +15,11 @@
  * pytania bez wykładu → sekcja „Pytania utrwalające" na końcu modułu.
  * Grafiki: assets/<hash>.<ext> → /content-assets/<hash>.<ext> (katalog CONTENT_ASSETS_DIR).
  *
+ * Szkolenie z punktami (kontrakt docs/kontrakt-eksportu-cme.md, studio-v0.2): pytania niosą `pula`
+ * (cwiczenia | test), `bezTasowania`, `wyklucza`; sekcje `podsumowanieMd`, `bibliografiaMd`, `szkolenie`;
+ * opcjonalny program.json → course_documents("program"). Starsze paczki: wartości domyślne
+ * (pula ćwiczeń, tasowanie, bez wykluczeń; podsumowania i program bez zmian; szkolenie: wszystko poza S8).
+ *
  * UWAGA (tylko --replace): zastępuje CAŁĄ treść kursu razem z postępami.
  */
 import fs from "node:fs";
@@ -22,7 +27,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, pool } from "../db";
-import { users, modules, sections, lectureChapters, questions } from "@shared/schema";
+import { users, modules, sections, lectureChapters, questions, courseDocuments } from "@shared/schema";
 
 const dir = process.argv[2];
 const allPublished = process.argv.includes("--all-published");
@@ -34,7 +39,27 @@ if (!dir) {
 }
 
 const read = (f: string) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
-const studioSections: Array<{ code: string; title: string; order: number }> = read("sections.json");
+const studioSections: Array<{
+  code: string; title: string; order: number;
+  /** studio-v0.2: null = puste albo niezatwierdzone; brak pola = starsza paczka (bez zmian w kursie) */
+  podsumowanieMd?: string | null; bibliografiaMd?: string | null; szkolenie?: boolean;
+}> = read("sections.json");
+/** Program szkolenia (studio-v0.2, plik opcjonalny) */
+const program: { programMd: string | null; wersja: number } | null =
+  fs.existsSync(path.join(dir, "program.json")) ? read("program.json") : null;
+
+/** Pola modułu ze szkolenia; undefined = pole nieobecne w paczce (nie nadpisujemy) */
+function moduleCme(s: (typeof studioSections)[number]) {
+  const md = (v: string | null | undefined) => (v === undefined ? undefined : v && v.trim() ? fixLecture(v) : null);
+  return {
+    cme: typeof s.szkolenie === "boolean" ? s.szkolenie : s.code !== "S8",
+    ...(s.podsumowanieMd !== undefined ? { summaryMd: md(s.podsumowanieMd) } : {}),
+    ...(s.bibliografiaMd !== undefined ? { bibliographyMd: md(s.bibliografiaMd) } : {}),
+  };
+}
+
+/** Pula pytania ze studia: "test" tylko dla testu zaliczeniowego, wszystko inne to ćwiczenia */
+const pulaPytania = (q: any): "practice" | "test" => (q.pula === "test" ? "test" : "practice");
 const studioLectures: any[] = read("lectures.json");
 const studioQuestions: any[] = read("questions.json");
 const manifest = read("manifest.json");
@@ -198,10 +223,21 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
           createdBy: authorId,
           questionType: q.questionType,
           questionConfig: config,
+          pool: pulaPytania(q),
+          noShuffle: q.bezTasowania === true,
+          excludes: Array.isArray(q.wyklucza) ? q.wyklucza.filter((x: unknown) => typeof x === "string").slice(0, 200) : [],
         };
       }
 
 const LOOSE = (code: string) => `${code}:utrwalajace`;
+
+/** Program szkolenia z program.json → course_documents("program") */
+async function zapiszProgram(tx: any) {
+  const tresc = program?.programMd?.trim() ? fixLecture(program.programMd) : null;
+  await tx.insert(courseDocuments).values({ key: "program", contentMd: tresc, version: Number(program?.wersja) || 0 })
+    .onConflictDoUpdate({ target: courseDocuments.key, set: { contentMd: tresc, version: Number(program?.wersja) || 0, updatedAt: new Date() } });
+  console.log(`  program szkolenia: ${tresc ? `wersja ${program?.wersja}` : "pusty"}`);
+}
 
 async function sync(authorId: string) {
   const st = { modules: { added: 0, updated: 0 }, sections: { added: 0, updated: 0 }, chapters: 0, questions: { added: 0, updated: 0, retired: 0 }, published: 0, draft: 0 };
@@ -216,10 +252,10 @@ async function sync(authorId: string) {
         // moduł: po kodzie studia, a przy pierwszej synchronizacji po tytule
         let mod = allMods.find((m) => m.externalId === s.code) ?? allMods.find((m) => !m.externalId && m.title === s.title);
         if (mod) {
-          await tx.update(modules).set({ externalId: s.code, title: s.title, order: s.order, updatedAt: new Date() }).where(eq(modules.id, mod.id));
+          await tx.update(modules).set({ externalId: s.code, title: s.title, order: s.order, ...moduleCme(s), updatedAt: new Date() }).where(eq(modules.id, mod.id));
           st.modules.updated++;
         } else {
-          [mod] = await tx.insert(modules).values({ externalId: s.code, title: s.title, order: s.order }).returning();
+          [mod] = await tx.insert(modules).values({ externalId: s.code, title: s.title, order: s.order, ...moduleCme(s) }).returning();
           st.modules.added++;
         }
         const modSecs = allSecs.filter((x) => x.moduleId === mod!.id);
@@ -294,6 +330,7 @@ async function sync(authorId: string) {
       if (retire.length) await tx.update(questions).set({ status: "draft", updatedAt: new Date() }).where(inArray(questions.id, retire));
       st.questions.retired = retire.length;
 
+      if (program) await zapiszProgram(tx);
       if (dryRun) throw DryRun;
     });
   } catch (e) {
@@ -332,7 +369,7 @@ async function main() {
     await tx.delete(modules); // kaskada: sekcje, rozdziały, pytania
 
     for (const s of [...studioSections].sort((a, b) => a.order - b.order)) {
-      const [mod] = await tx.insert(modules).values({ title: s.title, order: s.order }).returning();
+      const [mod] = await tx.insert(modules).values({ externalId: s.code, title: s.title, order: s.order, ...moduleCme(s) }).returning();
       stats.modules++;
 
       const lecs = studioLectures
@@ -383,6 +420,7 @@ async function main() {
     }
   });
 
+  if (program) await db.transaction(async (tx) => zapiszProgram(tx));
   console.log("Import zakończony:", stats);
   await pool.end();
 }

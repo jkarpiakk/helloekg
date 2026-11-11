@@ -251,7 +251,7 @@ export function registerLearningAnalyticsRoutes(app: Express) {
           join sections s on s.id = q.section_id
           join modules m on m.id = s.module_id
           left join rep on rep.question_id = q.id
-        where exists(select 1 from f where f.question_id = q.id) or rep.n is not null
+        where q.pool = 'practice' and (exists(select 1 from f where f.question_id = q.id) or rep.n is not null)
       `);
 
       const lectureRows = await rows<Parameters<typeof summarizeLecture>[0]>(sql`

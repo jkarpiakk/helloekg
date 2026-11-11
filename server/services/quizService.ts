@@ -405,7 +405,7 @@ export class QuizService {
     let allQuestions = await db
       .select({ id: questions.id, questionType: questions.questionType })
       .from(questions)
-      .where(eq(questions.status, "published"));
+      .where(and(eq(questions.status, "published"), eq(questions.pool, "practice")));
 
     // Przypadki kliniczne pokazują wynik krok po kroku (to ich sens dydaktyczny),
     // więc nie dałoby się ich zadać na egzaminie bez zdradzania odpowiedzi
@@ -687,7 +687,7 @@ export class QuizService {
 
       for (const id of candidateIds.filter(id => !exclude.has(id))) {
         const question = await storage.getQuestionById(id);
-        if (question && question.status === "published") {
+        if (question && question.status === "published" && question.pool !== "test") {
           return this.formatQuestionForQuiz(question, mode);
         }
       }
@@ -796,9 +796,9 @@ export class QuizService {
       index
     }));
 
-    // Only shuffle answers for multiple choice questions
+    // Tasujemy tylko odpowiedzi pytań zamkniętych, i to bez „nie tasuj” (studio: bezTasowania, np. „wszystkie powyższe”)
     const questionType = (question.questionType || 'multiple_choice') as QuestionType;
-    if (questionType === 'multiple_choice') {
+    if (questionType === 'multiple_choice' && !question.noShuffle) {
       for (let i = answers.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [answers[i], answers[j]] = [answers[j], answers[i]];
