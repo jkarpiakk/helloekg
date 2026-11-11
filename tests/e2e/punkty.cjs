@@ -53,11 +53,13 @@ const N_PYTAN = 14;
     for (const [sekcja] of wyklady) {
       for (let k = 0; k < 2 && n < N_PYTAN; k++) {
         n++;
+        // test: co najmniej 5 odpowiedzi, dokładnie 1 poprawna
         const odp = JSON.stringify([
           { text: `Błędna odpowiedź ${n}a`, isCorrect: false },
           { text: `Właściwa odpowiedź ${n}`, isCorrect: true },
           { text: `Błędna odpowiedź ${n}b`, isCorrect: false },
           { text: `Błędna odpowiedź ${n}c`, isCorrect: false },
+          { text: `Błędna odpowiedź ${n}d`, isCorrect: false },
         ]);
         const wyklucza = n === 1 ? `'["E2E-CME-2"]'` : "'[]'";
         sql(`INSERT INTO questions (section_id, title, body_md, answers, explanation_md, tags, status, created_by, question_type, pool, no_shuffle, excludes)
@@ -66,6 +68,10 @@ const N_PYTAN = 14;
           'multiple_choice', 'test', ${n === 3 ? "true" : "false"}, ${wyklucza})`);
       }
     }
+    // pytanie puli testu z 4 odpowiedziami: nie kwalifikuje się (pominięte w losowaniu, widoczne w panelu)
+    sql(`INSERT INTO questions (section_id, title, body_md, answers, explanation_md, tags, status, created_by, question_type, pool)
+      VALUES ('${wyklady[0][0]}', 'E2E pytanie ABCD', 'Pytanie E2E z czterema odpowiedziami (fałszywe).', '[{"text":"a","isCorrect":true},{"text":"b","isCorrect":false},{"text":"c","isCorrect":false},{"text":"d","isCorrect":false}]',
+      'x', '["e2e-cme","studio:E2E-CME-ABCD"]', 'published', '${autor}', 'multiple_choice', 'test')`);
     // podsumowanie modułu (oznaczone [E2E]); przywracane na końcu
     modulZPodsumowaniem = wyklady[0][1];
     podsumowaniePrzed = sql(`SELECT coalesce(summary_md, '<<NULL>>') FROM modules WHERE id = '${modulZPodsumowaniem}'`);
@@ -73,6 +79,14 @@ const N_PYTAN = 14;
     await czekaj(11000); // ustawienia w pamięci serwera do 10 s
 
     // pytania testu nigdy w ćwiczeniach: liczniki /api/modules bez puli testu
+    // konto admina (sprawdzenie PWZ, raporty): jeden kontekst na cały test
+    const admCtx = await br.newContext({ viewport: { width: 1280, height: 900 } }); const adm = await admCtx.newPage();
+    await adm.goto(B + "/");
+    const admLogin = await adm.evaluate(async (a) => (await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(a) })).status, ADMIN);
+    ok("admin: logowanie", admLogin === 200, String(admLogin));
+    const pulaRaport = await adm.evaluate(async () => (await fetch("/api/admin/szkolenie/pula-testu")).json());
+    ok("admin: pula testu: pytanie z 4 odpowiedziami pominięte z powodem", pulaRaport.odrzucone.some((o) => o.externalId === "E2E-CME-ABCD" && /co najmniej 5/.test(o.powod)) && pulaRaport.kwalifikuje >= N_PYTAN, JSON.stringify(pulaRaport).slice(0, 160));
+
     const praktyka = Number(sql(`SELECT count(*) FROM questions q JOIN sections s ON s.id=q.section_id WHERE s.id='${wyklady[0][0]}' AND q.status='published' AND q.pool='practice'`));
 
     for (const [nazwa, opt] of [["telefon", { ...devices["iPhone 13"], viewport: { width: 375, height: 812 } }], ["komputer", { viewport: { width: 1280, height: 900 } }]]) {
@@ -113,21 +127,28 @@ const N_PYTAN = 14;
       await pg.click('[data-testid="chce-zaswiadczenie"]');
       await pg.check('[data-testid="zawod-ratownik"]'); await pg.check('[data-testid="zawod-lekarz"]');
       await pg.fill('[data-testid="pwz-lekarz"]', "4123456"); // fikcyjny, zła cyfra kontrolna
-      await pg.fill('[data-testid="pwz-ratownik"]', "1234567"); // fikcyjny
+      if (nazwa === "telefon") await pg.check('[data-testid="pwz-ratownik-brak"]'); // „nie mam jeszcze numeru”
+      else await pg.fill('[data-testid="pwz-ratownik"]', "RM1234"); // fikcyjny, bez formatu urzędowego
       await pg.fill('[data-testid="spec-lekarz"]', "choroby wewnętrzne");
+      await pg.selectOption('[data-testid="izba-lekarz"]', "Łódzka");
       const uwaga = await pg.locator('[data-testid="pwz-lekarz-uwaga"]').innerText().catch(() => "");
-      ok(`${nazwa}: PWZ lekarza z błędną cyfrą kontrolną: ostrzeżenie`, /kontrolna/.test(uwaga), uwaga);
+      ok(`${nazwa}: PWZ lekarza z błędną cyfrą kontrolną: komunikat od razu`, /kontrolna/.test(uwaga), uwaga);
       await pg.fill('[data-testid="cme-imie"]', "Testowa"); await pg.fill('[data-testid="cme-nazwisko"]', "Uczestniczka-Próbna");
       await pg.click('[data-testid="cme-zapisz"]');
       ok(`${nazwa}: bez oświadczenia zapis odrzucony`, /oświadczenie/i.test(await pg.locator('[data-testid="cme-blad"]').innerText().catch(() => "")));
       await pg.check('[data-testid="cme-oswiadczenie"]');
+      await pg.click('[data-testid="cme-zapisz"]');
+      await pg.waitForTimeout(800);
+      ok(`${nazwa}: zła cyfra kontrolna PWZ lekarza blokuje zapis (walidacja twarda)`, /kontrolna/.test(await pg.locator('[data-testid="cme-blad"]').innerText().catch(() => "")));
+      await pg.fill('[data-testid="pwz-lekarz"]', "3123456"); // fikcyjny z poprawną cyfrą kontrolną
       await pg.screenshot({ path: path.join(SHOTS, `punkty-${nazwa}-2-zapis.png`), fullPage: true });
       await pg.click('[data-testid="cme-zapisz"]');
       await pg.waitForSelector('[data-testid="zapis-ratownik"]', { timeout: 10000 }).catch(() => {});
-      ok(`${nazwa}: zapis na dwa zawody (ostrzeżenie nie blokuje)`, (await pg.locator('[data-testid="zapis-ratownik"]').isVisible()) && (await pg.locator('[data-testid="zapis-lekarz"]').isVisible()));
+      ok(`${nazwa}: zapis na dwa zawody`, (await pg.locator('[data-testid="zapis-ratownik"]').isVisible()) && (await pg.locator('[data-testid="zapis-lekarz"]').isVisible()));
       const zapisRat = await pg.locator('[data-testid="zapis-ratownik"]').innerText();
       ok(`${nazwa}: ratownik: 10 punktów`, /Punkty edukacyjne: 10/.test(zapisRat), zapisRat.replace(/\n/g, " "));
-      ok(`${nazwa}: lekarz: bez punktów (brak wpisu do rejestru)`, /Bez punktów/.test(await pg.locator('[data-testid="zapis-lekarz"]').innerText()));
+      ok(`${nazwa}: lekarz: bez punktów (brak uchwały NRL i wpisu)`, /Bez punktów/.test(await pg.locator('[data-testid="zapis-lekarz"]').innerText()));
+      if (nazwa === "telefon") ok(`${nazwa}: ratownik bez numeru PWZ`, /Bez numeru PWZ/.test(zapisRat), zapisRat.replace(/\n/g, " "));
       ok(`${nazwa}: test zablokowany przed ukończeniem modułów`, await pg.locator('[data-testid="test-zablokowany"]').isVisible());
       const zly = await pg.evaluate(async () => (await fetch("/api/szkolenie/test/start", { method: "POST" })).status);
       ok(`${nazwa}: serwer nie otwiera testu przed modułami`, zly === 403, String(zly));
@@ -157,7 +178,7 @@ const N_PYTAN = 14;
         && Number(sql(`SELECT count(*) FROM cme_log WHERE participant_id='${uid}' AND type='wyklad_ukonczony'`)) > 0);
 
       // ── Test ──
-      const podejscie = async (zaliczyc) => {
+      const podejscie = async (zaliczyc, przerwijPo = null) => {
         await pg.goto(`${B}/szkolenie`, { waitUntil: "networkidle" });
         await pg.click('[data-testid="do-testu"]');
         await pg.click('[data-testid="test-rozpocznij"]');
@@ -166,6 +187,8 @@ const N_PYTAN = 14;
         const pyt = surowe.otwarte?.pytania ?? [];
         ok(`${nazwa}: test: ${pyt.length} pytań, przeglądarka nie dostaje poprawnych odpowiedzi ani uzasadnień`,
           pyt.length === 10 && !/isCorrect|explanation|Uzasadnienie/.test(JSON.stringify(surowe)), String(pyt.length));
+        ok(`${nazwa}: test: pytanie z 4 odpowiedziami nie wylosowane, każde ma 5 odpowiedzi`, pyt.every((p) => p.answers.length === 5) && !pyt.some((p) => /ABCD/.test(p.title)));
+        ok(`${nazwa}: test: odliczanie czasu widoczne`, /\d+:\d{2}/.test(await pg.locator('[data-testid="test-czas"]').innerText().catch(() => "")));
         const ids = pyt.map((p) => p.id);
         const ext = sql(`SELECT string_agg(t, ',') FROM questions, json_array_elements_text(tags) t WHERE id IN (${ids.map((i) => `'${i}'`).join(",")}) AND t LIKE 'studio:%'`);
         const wylosowane = new Set(ext.split(",").map((t) => t.replace(/^studio:/, "")));
@@ -179,6 +202,7 @@ const N_PYTAN = 14;
             ok(`${nazwa}: bez informacji zwrotnej w trakcie`, (await pg.locator(".opt.is-right, .opt.is-wrong").count()) === 0);
             if (zaliczyc) await pg.screenshot({ path: path.join(SHOTS, `punkty-${nazwa}-4-test.png`), fullPage: true });
           }
+          if (przerwijPo !== null && i + 1 >= przerwijPo) return null;
           if (i < pyt.length - 1) await pg.click('[data-testid="test-nastepne"]');
         }
         await pg.waitForTimeout(500);
@@ -187,15 +211,24 @@ const N_PYTAN = 14;
         return pg.locator('[data-testid="test-wynik-procent"]').innerText();
       };
       if (nazwa === "telefon") {
-        const p1 = await podejscie(false);
-        ok(`${nazwa}: podejście 1 niezaliczone (0%)`, p1.trim() === "0%", p1);
+        // podejście 1: trzy złe odpowiedzi, potem koniec czasu (termin przesunięty w bazie): serwer oddaje sam
+        await podejscie(false, 3);
+        sql(`UPDATE cme_test_attempts SET deadline_at = now() - interval '10 minutes' WHERE participant_id = '${uid}' AND submitted_at IS NULL`);
+        const poCzasie = await pg.evaluate(async () => {
+          const t = await (await fetch("/api/szkolenie/test")).json();
+          return t.podejscia.map((p) => [p.automatycznie, p.procent]);
+        });
+        ok(`${nazwa}: po limicie czasu podejście oddane automatycznie (serwer)`, JSON.stringify(poCzasie) === "[[true,0]]", JSON.stringify(poCzasie));
+        await pg.goto(`${B}/szkolenie`, { waitUntil: "networkidle" });
+        await pg.locator('[data-testid="test-wglad-linki"] a').first().click();
+        await pg.waitForSelector('[data-testid="test-wynik"]', { timeout: 10000 });
         const bledne = await pg.locator('[data-testid="test-bledna"]').count();
         const uzas = await pg.locator('[data-testid="test-bledna"]').first().innerText();
-        ok(`${nazwa}: po oddaniu uzasadnienia błędnych odpowiedzi`, bledne === 10 && /Uzasadnienie E2E/.test(uzas), String(bledne));
+        ok(`${nazwa}: wgląd w całe ocenione podejście (pytania, klucz, uzasadnienia)`, bledne === 10 && /Uzasadnienie E2E/.test(uzas) && /oddane po czasie|Czas minął/.test(await pg.locator('[data-testid="test-wynik"]').innerText()), String(bledne));
         await pg.screenshot({ path: path.join(SHOTS, `punkty-${nazwa}-5-wynik-niezaliczony.png`), fullPage: true });
         const p2 = await podejscie(true);
         ok(`${nazwa}: podejście 2 (nowe losowanie) zaliczone 100%`, p2.trim() === "100%", p2);
-        ok(`${nazwa}: zaliczony: brak listy błędnych`, (await pg.locator('[data-testid="test-bledna"]').count()) === 0);
+        ok(`${nazwa}: zaliczony: wgląd w całe podejście (10 dobrych, 0 błędnych)`, (await pg.locator('[data-testid="test-bledna"]').count()) === 0 && (await pg.locator('[data-testid="test-dobra"]').count()) === 10);
         const trzecie = await pg.evaluate(async () => (await fetch("/api/szkolenie/test/start", { method: "POST" })).status);
         ok(`${nazwa}: po zaliczeniu nie ma kolejnego podejścia`, trzecie === 409, String(trzecie));
       } else {
@@ -212,8 +245,9 @@ const N_PYTAN = 14;
       ok(`${nazwa}: zaświadczenie dopiero po ankiecie`, odbiorPrzedAnkieta === 403, String(odbiorPrzedAnkieta));
       await pg.click('[data-testid="po-tescie-ankieta"]');
       await pg.waitForSelector('[data-testid="ankieta"]');
-      for (const id of ["ocena_ogolna", "zgodnosc_z_programem", "przydatnosc", "materialy", "test"]) await pg.click(`[data-testid="ankieta-${id}-5"]`);
-      await pg.click('[data-testid="ankieta-bez_reklam-tak"]'); await pg.click('[data-testid="ankieta-polecenie-tak"]');
+      for (const id of ["nowa_wiedza", "oparta_na_faktach", "w_praktyce", "korzysc_pacjentow", "bez_reklamy", "polecenie"]) await pg.click(`[data-testid="ankieta-${id}-tak"]`);
+      for (const id of ["ocena_ogolna", "organizacja", "materialy", "test"]) await pg.click(`[data-testid="ankieta-${id}-5"]`);
+      ok(`${nazwa}: ankieta: pytanie NIL o reklamę i stronniczość`, /wolne od reklamy i stronniczości/.test(await pg.locator('[data-testid="ankieta"]').innerText()));
       await pg.fill('[data-testid="ankieta-uwagi-tekst"]', "Uwaga testowa E2E.");
       await pg.screenshot({ path: path.join(SHOTS, `punkty-${nazwa}-7-ankieta.png`), fullPage: true });
       await pg.click('[data-testid="ankieta-wyslij"]');
@@ -224,31 +258,50 @@ const N_PYTAN = 14;
         && sql(`SELECT count(*) FROM cme_log WHERE participant_id='${uid}' AND type='ankieta_wypelniona'`) === "1"
         && !/Uwaga testowa/.test(sql(`SELECT coalesce(string_agg(details::text, ' '), '') FROM cme_log WHERE participant_id='${uid}'`)), kolumny);
 
-      // ── Zaświadczenia ──
+      // ── Zaświadczenia: ratownik czeka na sprawdzenie PWZ (do tego czasu ukończenie bez punktów), lekarz bez punktów ──
       await pg.goto(`${B}/szkolenie`, { waitUntil: "networkidle" });
+      const czeka = await pg.locator('[data-testid="czeka-ratownik"]').innerText().catch(() => "");
+      ok(`${nazwa}: ratownik: „czeka na weryfikację danych”`, /czeka na weryfikację danych \(zwykle do \d+ dni roboczych\)/.test(czeka), czeka.replace(/\n/g, " "));
+      const zaWczesnie = await pg.evaluate(async () => {
+        const s = await (await fetch("/api/szkolenie")).json();
+        const z = s.zapisy.find((x) => x.zawod === "ratownik");
+        return (await fetch("/api/szkolenie/zaswiadczenia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ zapisId: z.id, rodzaj: "punkty" }) })).status;
+      });
+      ok(`${nazwa}: serwer nie wydaje zaświadczenia z punktami przed sprawdzeniem PWZ`, zaWczesnie === 409, String(zaWczesnie));
       for (const z of ["ratownik", "lekarz"]) {
-        await pg.click(`[data-testid="odbierz-${z}"]`);
-        await pg.waitForSelector(`[data-testid="pdf-${z}"]`, { timeout: 10000 }).catch(() => {});
+        await pg.click(`[data-testid="odbierz-${z}-ukonczenie"]`);
+        await pg.waitForSelector(`[data-testid="pdf-${z}-ukonczenie"]`, { timeout: 10000 }).catch(() => {});
       }
-      const certy = sql(`SELECT profession || '|' || number || '|' || coalesce(points::text,'-') || '|' || verification_token FROM cme_certificates WHERE participant_id='${uid}' ORDER BY profession`).split("\n").map((l) => l.split("|"));
-      const rat = certy.find((c) => c[0] === "ratownik"); const lek = certy.find((c) => c[0] === "lekarz");
-      ok(`${nazwa}: zaświadczenia: numery HE-RRRR-NNNNNN, ratownik 10 pkt, lekarz bez punktów`,
-        !!rat && !!lek && /^HE-\d{4}-\d{6}$/.test(rat[1]) && Number(rat[2]) === 10 && lek[2] === "-", JSON.stringify(certy.map((c) => c.slice(0, 3))));
-      const [pobranie] = await Promise.all([pg.waitForEvent("download"), pg.click('[data-testid="pdf-ratownik"]')]);
+      // admin: „PWZ sprawdzony w publicznym rejestrze” (dziennik), potem zaświadczenie z punktami
+      const zapisRatId = sql(`SELECT id FROM cme_enrollments WHERE participant_id='${uid}' AND profession='ratownik'`);
+      const spr = await adm.evaluate(async (id) => (await fetch(`/api/admin/szkolenie/zapisy/${id}/pwz-sprawdzony`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sprawdzony: true }) })).status, zapisRatId);
+      ok(`${nazwa}: admin oznacza PWZ jako sprawdzony (kto i kiedy w dzienniku)`, spr === 200 && sql(`SELECT count(*) FROM cme_log WHERE participant_id='${uid}' AND type='pwz_sprawdzony' AND actor_id IS NOT NULL`) === "1", String(spr));
+      await pg.goto(`${B}/szkolenie`, { waitUntil: "networkidle" });
+      await pg.click('[data-testid="odbierz-ratownik-punkty"]');
+      await pg.waitForSelector('[data-testid="pdf-ratownik-punkty"]', { timeout: 10000 }).catch(() => {});
+      const certy = sql(`SELECT profession || '|' || kind || '|' || number || '|' || coalesce(points::text,'-') || '|' || verification_token FROM cme_certificates WHERE participant_id='${uid}' ORDER BY profession, kind`).split("\n").map((l) => l.split("|"));
+      const rat = certy.find((c) => c[0] === "ratownik" && c[1] === "punkty").filter((_, i) => i !== 1);
+      const ratUk = certy.find((c) => c[0] === "ratownik" && c[1] === "ukonczenie");
+      const lek = certy.find((c) => c[0] === "lekarz" && c[1] === "ukonczenie");
+      ok(`${nazwa}: zaświadczenia: ratownik z punktami (10) i ukończenie bez punktów, lekarz bez punktów, numery HE-RRRR-NNNNNN`,
+        !!rat && !!ratUk && !!lek && /^HE-\d{4}-\d{6}$/.test(rat[1]) && Number(rat[2]) === 10 && ratUk[3] === "-" && lek[3] === "-" && certy.length === 3, JSON.stringify(certy.map((c) => c.slice(0, 4))));
+      const [pobranie] = await Promise.all([pg.waitForEvent("download"), pg.click('[data-testid="pdf-ratownik-punkty"]')]);
       const plik = path.join(SHOTS, `punkty-${nazwa}-zaswiadczenie.pdf`);
       await pobranie.saveAs(plik);
       const pdf = fs.readFileSync(plik);
       ok(`${nazwa}: PDF pobrany`, pdf.slice(0, 5).toString() === "%PDF-" && pdf.length > 15000, `${pdf.length} B`);
+      const [pobranie2] = await Promise.all([pg.waitForEvent("download"), pg.click('[data-testid="pdf-lekarz-ukonczenie"]')]);
+      await pobranie2.saveAs(path.join(SHOTS, `punkty-${nazwa}-zaswiadczenie-lekarz-bez-punktow.pdf`));
       ok(`${nazwa}: dane zablokowane po zaświadczeniu`, (await pg.locator('[data-testid="zapis-ratownik"]').innerText()).includes("Dane są na zaświadczeniu"));
       const zmiana = await pg.evaluate(async () => (await fetch("/api/szkolenie/zapis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imie: "Inna", nazwisko: "Osoba", oswiadczenie: true, zawody: [{ zawod: "ratownik", pwz: "1234567" }] }) })).status);
       ok(`${nazwa}: zmiana nazwiska po zaświadczeniu odrzucona`, zmiana === 409, String(zmiana));
       await pg.screenshot({ path: path.join(SHOTS, `punkty-${nazwa}-8-zaswiadczenia.png`), fullPage: true });
 
       // ── Weryfikacja: po kluczu tak, po numerze nie ──
-      await pg.click('[data-testid="weryfikacja-link-ratownik"]');
+      await pg.click('[data-testid="weryfikacja-link-ratownik-punkty"]');
       await pg.waitForSelector('[data-testid="weryfikacja-stan"]', { timeout: 8000 }).catch(() => {});
       const wer = await pg.locator('[data-testid="weryfikacja"]').innerText().catch(() => "");
-      ok(`${nazwa}: weryfikacja: ważne, inicjały, bez PWZ i nazwiska`, /Zaświadczenie ważne/.test(wer) && wer.includes("T. U.-P.") && !wer.includes("1234567") && !wer.includes("Uczestniczka"), wer.replace(/\n/g, " ").slice(0, 160));
+      ok(`${nazwa}: weryfikacja: ważne, inicjały, bez PWZ i nazwiska`, /Zaświadczenie ważne/.test(wer) && wer.includes("T. U.-P.") && !wer.includes("RM1234") && !wer.includes("Uczestniczka"), wer.replace(/\n/g, " ").slice(0, 160));
       ok(`${nazwa}: adres weryfikacji to losowy klucz, nie numer`, pg.url().endsWith(`/zaswiadczenie/${rat[3]}`) && !pg.url().includes("HE-"), pg.url());
       await pg.screenshot({ path: path.join(SHOTS, `punkty-${nazwa}-9-weryfikacja.png`), fullPage: true });
       const anon = await br.newContext(opt); const ap = await anon.newPage();
@@ -274,26 +327,46 @@ const N_PYTAN = 14;
 
       // ── Komputer: panel admina i usunięcie konta ──
       if (nazwa === "komputer") {
-        const adm = await br.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true }); const ad = await adm.newPage();
-        await ad.goto(B + "/");
-        await ad.evaluate(async (a) => { await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(a) }); localStorage.setItem("hk:feedback-hint-seen", "1"); }, ADMIN);
+        const ad = adm;
         const csv = await ad.evaluate(async () => { const r = await fetch("/api/admin/szkolenie/lista-obecnosci.csv"); return [r.status, await r.text()]; });
-        ok("admin: lista obecności CSV z uczestnikiem, PWZ i numerem zaświadczenia", csv[0] === 200 && csv[1].includes("Uczestniczka-Próbna") && csv[1].includes("1234567") && csv[1].includes(rat[1]), String(csv[0]));
+        ok("admin: lista obecności CSV z uczestnikiem, PWZ i numerem zaświadczenia", csv[0] === 200 && csv[1].includes("Uczestniczka-Próbna") && csv[1].includes("RM1234") && csv[1].includes(rat[1]), String(csv[0]));
+        const orl = await ad.evaluate(async () => { const r = await fetch(`/api/admin/szkolenie/raport-orl.csv?izba=${encodeURIComponent("Łódzka")}`); return [r.status, await r.text()]; });
+        ok("admin: raport dla izby lekarskiej (filtr Łódzka): lekarz, PWZ, numer zaświadczenia", orl[0] === 200 && orl[1].includes("3123456") && orl[1].includes(lek[2]) && orl[1].includes("Łódzka"), String(orl[0]));
         await ad.goto(`${B}/admin?tab=szkolenie`, { waitUntil: "networkidle" });
         await ad.waitForSelector('[data-testid="admin-szkolenie"]', { timeout: 10000 }).catch(() => {});
         ok("admin: zakładka Szkolenie z uczestnikiem", (await ad.locator('[data-testid="admin-szkolenie"]').innerText().catch(() => "")).includes("Uczestniczka-Próbna"));
         await ad.screenshot({ path: path.join(SHOTS, "punkty-komputer-10-admin.png"), fullPage: false });
         const zapisId = sql(`SELECT id FROM cme_enrollments WHERE participant_id='${uid}' AND profession='ratownik'`);
-        const edycja = await ad.evaluate(async (id) => (await fetch(`/api/admin/szkolenie/zapisy/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ specjalizacja: null, pwz: "7654321", powod: "Test E2E: poprawka numeru" }) })).status, zapisId);
-        ok("admin: edycja danych z wpisem w dzienniku", edycja === 200 && sql(`SELECT count(*) FROM cme_log WHERE participant_id='${uid}' AND type='dane_zmienione_admin'`) === "1", String(edycja));
-        await adm.close();
+        const zapisLekId = sql(`SELECT id FROM cme_enrollments WHERE participant_id='${uid}' AND profession='lekarz'`);
+        const bezWyjatku = await ad.evaluate(async (id) => (await fetch(`/api/admin/szkolenie/zapisy/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pwz: "1234567", powod: "Test E2E" }) })).status, zapisLekId);
+        ok("admin: zły PWZ lekarza bez wyjątku odrzucony", bezWyjatku === 400, String(bezWyjatku));
+        const edycja = await ad.evaluate(async (id) => (await fetch(`/api/admin/szkolenie/zapisy/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pwz: "1234567", pominWalidacje: true, powod: "Test E2E: PWZ warunkowe" }) })).status, zapisLekId);
+        ok("admin: wyjątek od walidacji PWZ z wpisem w dzienniku", edycja === 200 && sql(`SELECT count(*) FROM cme_log WHERE participant_id='${uid}' AND type='dane_zmienione_admin' AND details->>'pominWalidacje' = 'true'`) === "1", String(edycja));
         // usunięcie konta: rejestr szkolenia zostaje (5 lat), user_id = NULL
         const usun = await pg.evaluate(async (password) => (await fetch("/api/auth/account", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) })).status, haslo);
-        ok("konto usunięte, zapis, dziennik i zaświadczenia zostają (user_id NULL)", usun === 200
+        ok("konto z zaświadczeniem usunięte: zapis, dziennik i zaświadczenia zostają (user_id NULL), treść odpowiedzi testu nie", usun === 200
           && sql(`SELECT count(*) FROM users WHERE id='${uid}'`) === "0"
           && sql(`SELECT count(*) FROM cme_enrollments WHERE participant_id='${uid}' AND user_id IS NULL`) === "2"
-          && sql(`SELECT count(*) FROM cme_certificates WHERE participant_id='${uid}' AND user_id IS NULL`) === "2"
+          && sql(`SELECT count(*) FROM cme_certificates WHERE participant_id='${uid}' AND user_id IS NULL`) === "3"
+          && sql(`SELECT count(*) FROM cme_test_attempts WHERE participant_id='${uid}' AND (answers <> '{}'::jsonb OR grading IS NOT NULL)`) === "0"
+          && sql(`SELECT count(*) FROM cme_test_attempts WHERE participant_id='${uid}' AND passed`) === "1"
           && Number(sql(`SELECT count(*) FROM cme_log WHERE participant_id='${uid}'`)) > 10, String(usun));
+        const retencja = await ad.evaluate(async () => (await fetch("/api/admin/szkolenie/retencja", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json());
+        ok("retencja (próba): konto usunięte w tym roku nie jest jeszcze do usunięcia", retencja.sprawdzone >= 1 && retencja.doUsuniecia === 0 && retencja.usunieto === 0, JSON.stringify(retencja));
+        // konto bez zaświadczenia: dane szkolenia znikają razem z kontem
+        const email3 = `punkty-e2e-bez-zasw-${stamp}@helloekg.test`; konta.push(email3);
+        const h3 = crypto.randomBytes(12).toString("base64url");
+        const c3 = await br.newContext(); const p3 = await c3.newPage(); await p3.goto(B + "/");
+        await p3.evaluate(async ({ e, h }) => fetch("/api/auth/register", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ firstName: "Testowa", email: e, password: h, confirmPassword: h, termsAccepted: true, privacyAccepted: true }) }), { e: email3, h: h3 });
+        sql(`UPDATE users SET email_verified = true, tester_bety = true WHERE email = '${email3}'`);
+        const uid3 = await p3.evaluate(async ({ e, h }) => {
+          const j = await (await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: e, password: h }) })).json();
+          await fetch("/api/szkolenie/zapis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imie: "Testowa", nazwisko: "Bezzaswiadczenia", oswiadczenie: true, zawody: [{ zawod: "student" }] }) });
+          await fetch("/api/auth/account", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: h }) });
+          return j.user.id;
+        }, { e: email3, h: h3 });
+        ok("konto bez zaświadczenia usunięte: zapis i dziennik szkolenia znikają", sql(`SELECT count(*) FROM cme_enrollments WHERE participant_id='${uid3}'`) === "0" && sql(`SELECT count(*) FROM cme_log WHERE participant_id='${uid3}'`) === "0");
+        await c3.close();
         const poUsunieciu = await pg.evaluate(async (k) => (await fetch(`/api/zaswiadczenia/${k}`)).status, rat[3]);
         ok("weryfikacja działa po usunięciu konta", poUsunieciu === 200, String(poUsunieciu));
       }
