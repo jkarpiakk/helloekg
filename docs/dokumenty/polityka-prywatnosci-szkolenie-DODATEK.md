@@ -1,0 +1,16 @@
+# Dodatek do Polityki prywatności: szkolenie z punktami edukacyjnymi
+
+> **SZKIC do akceptacji JK (11.11.2026).** Nie zmienia opublikowanej Polityki prywatności 1.0.
+> Po akceptacji: wstawić jako nowy punkt polityki, podnieść wersję w `DOKUMENTY` (`shared/schema.ts`) i opublikować.
+> Pola w nawiasach kwadratowych `[…]` do uzupełnienia.
+
+## Szkolenie z punktami edukacyjnymi
+
+1. **Jakie dane.** Jeśli zapiszesz się na szkolenie z punktami edukacyjnymi, przetwarzamy: imię i nazwisko, zawód, numer prawa wykonywania zawodu, specjalizację (jeśli ją podasz), datę i godzinę oświadczenia o prawdziwości danych, daty otwarcia i ukończenia wykładów, otwarcia podsumowań i ukończenia modułów, daty i wyniki podejść do testu końcowego, informację o wypełnieniu ankiety oraz dane wydanych zaświadczeń (numer, data, liczba godzin i punktów).
+2. **Po co.** Żeby wystawić zaświadczenie o ukończeniu szkolenia, potwierdzić jego ważność i prowadzić dokumentację szkolenia (lista obecności, dziennik), której mogą wymagać przepisy o doskonaleniu zawodowym i organy samorządu zawodowego.
+3. **Podstawa prawna.** Art. 6 ust. 1 lit. b RODO (wykonanie umowy: udział w szkoleniu i wydanie zaświadczenia) oraz art. 6 ust. 1 lit. c RODO (obowiązek prawny organizatora kształcenia ustawicznego) [do potwierdzenia: konkretne przepisy dla lekarzy, ratowników medycznych, pielęgniarek i położnych], a po usunięciu konta także art. 6 ust. 1 lit. f RODO (nasz prawnie uzasadniony interes: obrona przed roszczeniami i potwierdzanie ważności zaświadczeń).
+4. **Jak długo.** Dane szkolenia przechowujemy przez **5 lat** od końca roku kalendarzowego, w którym wydaliśmy zaświadczenie (albo, gdy zaświadczenia nie wydano, od ostatniego zdarzenia w szkoleniu). **Dotyczy to także sytuacji, w której usuniesz konto w serwisie**: konto i postęp w nauce znikają, ale zapis na szkolenie, dziennik szkolenia, wyniki testu i zaświadczenia zostają do końca tego okresu. Bez zapisu na szkolenie usunięcie konta usuwa także ślady czytania wykładów.
+5. **Ankieta.** Ankieta po teście jest anonimowa. Odpowiedzi zapisujemy bez powiązania z kontem i bez dokładnej daty (tylko miesiąc). W dzienniku szkolenia zostaje wyłącznie informacja, że ankieta została wypełniona.
+6. **Weryfikacja zaświadczenia.** Każde zaświadczenie ma link i kod QR z losowym kluczem. Kto zna ten link, zobaczy numer zaświadczenia, jego ważność, tytuł szkolenia, datę wydania i inicjały uczestnika. Nie pokazujemy numeru prawa wykonywania zawodu ani pełnego imienia i nazwiska.
+7. **Komu przekazujemy.** Danych szkolenia nie przekazujemy nikomu poza dostawcami usług technicznych (hosting, poczta) [lista jak w polityce]. Na żądanie uprawnionego organu (np. okręgowej izby lekarskiej) możemy udostępnić listę obecności w zakresie wymaganym przepisami [do potwierdzenia].
+8. **Twoje prawa.** Masz prawo dostępu do danych szkolenia, ich sprostowania (zmianę danych po wydaniu zaświadczenia wprowadzamy na prośbę wysłaną na [adres e-mail]) i ograniczenia przetwarzania. Prawo do usunięcia danych szkolenia przed upływem okresu z punktu 4 może być ograniczone, gdy przechowanie jest potrzebne do wypełnienia obowiązku prawnego albo obrony przed roszczeniami (art. 17 ust. 3 lit. b i e RODO).
