@@ -65,7 +65,7 @@ import { getUncachableStripeClient, getStripePublishableKey, stripeSource } from
 import { linkZMaila } from "./mailLinks";
 import { config } from "./config";
 import { aktywujPlatnosc, anulujSubskrypcjeKonta, anulujWStripe } from "./platnosci";
-import { usunSladyBezZapisu, zapiszCzytanie, poOdpowiedzi } from "./szkolenie/serwis";
+import { przyUsunieciuKonta, zapiszCzytanie, poOdpowiedzi } from "./szkolenie/serwis";
 
 /** Imię i nazwisko na certyfikat: litery (także polskie), spacja, łącznik, apostrof */
 const namePart = (label: string) =>
@@ -185,7 +185,8 @@ function plikDokumentu(id: DokumentId): string | null {
  * Usunięcie konta z danymi (RODO): samodzielnie z hasłem albo przez admina na prośbę użytkownika.
  * Wszystko albo nic: subskrypcje anulowane, zgłoszenia zanonimizowane, sesje i konto usunięte
  * (postęp, odpowiedzi, zgody, certyfikaty kasują się kaskadowo), wpis audytu bez danych osobowych.
- * Wyjątek: zapis na szkolenie z punktami, dziennik szkolenia i zaświadczenia CME zostają 5 lat (bez kaskady).
+ * Wyjątek: osoba z zaświadczeniem szkolenia z punktami zostaje w rejestrze (zapis, dziennik, wynik testu,
+ * zaświadczenia) 5 lat od końca roku wydania; patrz przyUsunieciuKonta i czyscPrzeterminowane.
  */
 async function usunKontoZDanymi(cel: User, kto: { actorId: string; akcja: string; ip?: string; ua?: string }) {
   // id subskrypcji Stripe znikają razem z kontem: odczyt przed transakcją, anulowanie dopiero po udanym usunięciu
@@ -210,8 +211,9 @@ async function usunKontoZDanymi(cel: User, kto: { actorId: string; akcja: string
       userAgent: kto.ua,
     });
 
-    // Szkolenie z punktami: uczestnik zostaje w rejestrze 5 lat (user_id = NULL), reszta kont bez śladu
-    await usunSladyBezZapisu(tx, cel.id);
+    // Szkolenie z punktami: osoba z zaświadczeniem zostaje w rejestrze 5 lat od końca roku wydania
+    // (user_id = NULL, bez treści odpowiedzi testu); bez zaświadczenia dane szkolenia znikają z kontem
+    await przyUsunieciuKonta(tx, cel.id);
 
     await tx.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${cel.id}`);
     await tx.delete(users).where(eq(users.id, cel.id));

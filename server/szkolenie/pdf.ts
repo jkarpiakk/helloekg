@@ -32,6 +32,12 @@ type Snapshot = {
   punkty: number | null; powodBezPunktow: string | null;
   organizator: { nazwa: string; adres: string; krs: string; nip: string; email: string; reklamacje: string };
   kierownikNaukowy: string;
+  kierownikNaukowyTytul?: string;
+  podpisujacy?: string;
+  miejsce?: string;
+  rodzaj?: "punkty" | "ukonczenie";
+  podpisOrganizatora?: string | null;
+  podpisKierownika?: string | null;
 };
 
 const liczba = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(".", ","));
@@ -85,39 +91,44 @@ export async function pdfZaswiadczenia(c: CmeCertificate): Promise<Buffer> {
 
   // Dane w dwóch kolumnach: etykieta, wartość
   const wiersze: Array<[string, string]> = [];
+  const pole = (k: string) => (r[k] === null || r[k] === undefined || String(r[k]).trim() === "" ? null : String(r[k]));
   wiersze.push(["Zawód", s.zawodNazwa]);
   if (s.pwz) wiersze.push(["Numer prawa wykonywania zawodu", s.pwz]);
+  else if (s.zawod === "ratownik") wiersze.push(["Numer prawa wykonywania zawodu", "nie podano"]);
   if (s.specjalizacja) wiersze.push(["Specjalizacja", s.specjalizacja]);
   wiersze.push(["Tytuł szkolenia", s.tytul]);
-  wiersze.push(["Forma szkolenia", s.forma]);
+  wiersze.push(["Forma kształcenia", s.forma]);
+  wiersze.push(["Miejsce", s.miejsce || "online"]);
   wiersze.push(["Termin", `od ${dataPL(new Date(s.dataRozpoczecia))} do ${dataPL(new Date(s.dataZakonczenia))}`]);
-  wiersze.push(["Liczba godzin", `${liczba(Number(s.godziny))} h`]);
+  wiersze.push(["Liczba godzin dydaktycznych (45 min)", liczba(Number(s.godziny))]);
   if (s.wynikTestu?.procent !== null && s.wynikTestu?.procent !== undefined) {
     wiersze.push(["Test końcowy", `zaliczony, ${liczba(s.wynikTestu.procent)}% (${s.wynikTestu.wynik} z ${s.wynikTestu.maks})`]);
   }
   if (s.punkty !== null) {
     wiersze.push(["Punkty edukacyjne", liczba(s.punkty)]);
-    if (r.points_formula ?? r.pointsFormula) wiersze.push(["Sposób liczenia punktów", String(r.points_formula ?? r.pointsFormula)]);
-    if (r.legal_basis ?? r.legalBasis) wiersze.push(["Podstawa prawna", String(r.legal_basis ?? r.legalBasis)]);
-    if (r.registry_number ?? r.registryNumber) wiersze.push(["Numer wpisu do rejestru / decyzji", String(r.registry_number ?? r.registryNumber)]);
+    if (pole("pointsFormula")) wiersze.push(["Sposób liczenia punktów", pole("pointsFormula")!]);
+    if (pole("legalBasis")) wiersze.push(["Podstawa prawna", pole("legalBasis")!]);
+    if (pole("nrlResolution")) wiersze.push(["Uchwała Naczelnej Rady Lekarskiej", pole("nrlResolution")!]);
+    if (pole("registryNumber")) wiersze.push(["Numer wpisu do rejestru", pole("registryNumber")!]);
+    if (pole("decisionNumber")) wiersze.push(["Decyzja o przyznaniu punktów", pole("decisionNumber")!]);
   }
   const org = s.organizator;
   const orgTekst = [org?.nazwa, org?.adres, org?.krs ? `KRS ${org.krs}` : "", org?.nip ? `NIP ${org.nip}` : ""].filter(Boolean).join(", ");
   wiersze.push(["Organizator", orgTekst || "helloEKG"]);
-  if (s.kierownikNaukowy) wiersze.push(["Kierownik naukowy", s.kierownikNaukowy]);
+  if (s.kierownikNaukowy) wiersze.push(["Kierownik naukowy", [s.kierownikNaukowy, s.kierownikNaukowyTytul].filter(Boolean).join(", ")]);
 
   const kolEt = 190;
   let y = doc.y;
   for (const [et, wart] of wiersze) {
-    doc.font("Sans").fontSize(9).fillColor(MUTED);
+    doc.font("Sans").fontSize(8.5).fillColor(MUTED);
     const hEt = doc.heightOfString(et, { width: kolEt - 12 });
-    doc.font("Sans").fontSize(10.5).fillColor(INK);
+    doc.font("Sans").fontSize(9.5).fillColor(INK);
     const hW = doc.heightOfString(wart, { width: P - kolEt });
     const h = Math.max(hEt, hW);
     doc.moveTo(L, y).lineTo(L + P, y).lineWidth(0.5).strokeColor(LINE).stroke();
-    doc.font("Sans").fontSize(9).fillColor(MUTED).text(et, L, y + 6, { width: kolEt - 12 });
-    doc.font("Sans").fontSize(10.5).fillColor(INK).text(wart, L + kolEt, y + 5, { width: P - kolEt });
-    y += h + 12;
+    doc.font("Sans").fontSize(8.5).fillColor(MUTED).text(et, L, y + 5, { width: kolEt - 12 });
+    doc.font("Sans").fontSize(9.5).fillColor(INK).text(wart, L + kolEt, y + 4, { width: P - kolEt });
+    y += h + 9;
   }
   doc.moveTo(L, y).lineTo(L + P, y).lineWidth(0.5).strokeColor(LINE).stroke();
   y += 12;
@@ -132,9 +143,31 @@ export async function pdfZaswiadczenia(c: CmeCertificate): Promise<Buffer> {
     y += h + 32;
   }
 
+  // Podpisy: organizator i kierownik naukowy (skan podpisu z panelu, gdy jest, i podpis drukowany)
+  const podpisy: Array<{ et: string; kto: string; obraz?: string | null }> = [
+    { et: "Za organizatora", kto: s.podpisujacy || org?.nazwa || "", obraz: s.podpisOrganizatora },
+    { et: "Kierownik naukowy", kto: [s.kierownikNaukowy, s.kierownikNaukowyTytul].filter(Boolean).join(", "), obraz: s.podpisKierownika },
+  ];
+  const qrSize = 84;
+  const wysPodpisu = 66;
+  const yStopka = doc.page.height - doc.page.margins.bottom - qrSize - 4;
+  const yPodpisy = Math.max(y + 6, yStopka - wysPodpisu - 14);
+  const kol = (P - 24) / 2;
+  podpisy.forEach((p, i) => {
+    const x = L + i * (kol + 24);
+    if (p.obraz) {
+      try {
+        doc.image(Buffer.from(p.obraz, "base64"), x, yPodpisy, { fit: [kol, 36], align: "center" });
+      } catch {
+        /* uszkodzony obraz: zostaje podpis drukowany */
+      }
+    }
+    doc.moveTo(x, yPodpisy + 40).lineTo(x + kol, yPodpisy + 40).lineWidth(0.5).strokeColor(MUTED).stroke();
+    doc.font("Sans").fontSize(8.5).fillColor(INK).text(p.kto || " ", x, yPodpisy + 44, { width: kol, align: "center" });
+    doc.font("Sans").fontSize(7.5).fillColor(MUTED).text(p.et, x, doc.y, { width: kol, align: "center" });
+  });
+
   // Stopka: QR, weryfikacja, data wydania, reklamacje
-  const qrSize = 92;
-  const yStopka = Math.max(y + 8, doc.page.height - doc.page.margins.bottom - qrSize - 8);
   doc.image(qr, L, yStopka, { width: qrSize, height: qrSize });
   const tx = L + qrSize + 16;
   const tw = P - qrSize - 16;

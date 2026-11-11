@@ -25,15 +25,10 @@ export const ZAWODY_ZE_SPECJALIZACJA: readonly Zawod[] = ["lekarz", "lekarz_dent
 
 export const czyZawod = (v: unknown): v is Zawod => typeof v === "string" && (ZAWODY as readonly string[]).includes(v);
 
-/** Tryb sprawdzania cyfry kontrolnej PWZ lekarza (ustawienie pwz_kontrola_lekarz) */
-export const TRYBY_PWZ_LEKARZ = ["ostrzezenie", "blokada", "wylaczona"] as const;
-export type TrybPwzLekarz = (typeof TRYBY_PWZ_LEKARZ)[number];
-
 /**
- * Numer PWZ lekarza i lekarza dentysty: 7 cyfr, pierwsza to cyfra kontrolna
- * = (suma i × cyfra[i+1] dla i = 1…6) mod 11. Wynik 10 albo zero na początku: numer nieprawidłowy.
- * Zwraca opis problemu albo null. Algorytm do potwierdzenia przez JK na prawdziwych numerach,
- * dlatego domyślnie to tylko ostrzeżenie (pwz_kontrola_lekarz = "ostrzezenie").
+ * Numer PWZ lekarza i lekarza dentysty (NIL, „Zasady weryfikowania nr PWZ”): 7 cyfr KABCDEF, bez zera
+ * na początku, K = (A·1 + B·2 + C·3 + D·4 + E·5 + F·6) mod 11. Reszta 0 i 10 nie daje numeru.
+ * Przykład NIL: 5425740. Walidacja twarda; wyjątek (np. PWZ warunkowe) wpisuje zespół w panelu, z wpisem w dzienniku.
  */
 export function problemPwzLekarza(pwz: string): string | null {
   if (!/^\d{7}$/.test(pwz)) return "Numer PWZ lekarza ma 7 cyfr.";
@@ -46,36 +41,42 @@ export function problemPwzLekarza(pwz: string): string | null {
   return null;
 }
 
-/** Pielęgniarka, położna: 7 znaków, cyfry i opcjonalnie litera P albo A na końcu (tylko ostrzeżenie) */
-export function problemPwzPielegniarki(pwz: string): string | null {
-  return /^(\d{7}|\d{6}[PA])$/i.test(pwz) ? null : "Numer prawa wykonywania zawodu pielęgniarki i położnej ma zwykle 7 znaków: cyfry i czasem litera P albo A na końcu. Sprawdź numer.";
+/**
+ * Pielęgniarka i położna (NIPiP): 7 cyfr i obowiązkowa litera: P dla pielęgniarki, A dla położnej.
+ * Osoba z oboma zawodami ma dwa numery (osobne pole dla każdego zawodu).
+ */
+export function problemPwzPielegniarki(zawod: "pielegniarka" | "polozna", pwz: string): string | null {
+  const litera = zawod === "pielegniarka" ? "P" : "A";
+  if (!/^\d{7}[PA]$/.test(pwz)) return `Numer prawa wykonywania zawodu ${zawod === "pielegniarka" ? "pielęgniarki" : "położnej"} to 7 cyfr i litera ${litera} na końcu.`;
+  if (pwz[7] !== litera) return `Litera na końcu numeru nie pasuje do zawodu: dla ${zawod === "pielegniarka" ? "pielęgniarki" : "położnej"} to ${litera}.`;
+  return null;
 }
 
-/** Ratownik medyczny: same cyfry (tylko ostrzeżenie) */
-export function problemPwzRatownika(pwz: string): string | null {
-  return /^\d{1,12}$/.test(pwz) ? null : "Numer prawa wykonywania zawodu ratownika medycznego składa się z cyfr. Sprawdź numer.";
-}
-
-export type WynikPwz = { blad: string | null; ostrzezenie: string | null; pwz: string | null };
+export type WynikPwz = { blad: string | null; pwz: string | null };
 
 /**
- * Walidacja numeru PWZ dla zawodu. `blad` blokuje zapis, `ostrzezenie` tylko informuje.
- * Format wszędzie poza cyfrą kontrolną lekarza w trybie „blokada” jest ostrzeżeniem.
+ * Walidacja numeru PWZ dla zawodu (twarda). Ratownik medyczny: rejestr dopiero rusza i nie ma urzędowego
+ * formatu, więc dowolne cyfry i litery (do 20 znaków) albo „nie mam jeszcze numeru” (`brakNumeru`).
  */
-export function sprawdzPwz(zawod: Zawod, surowy: string | null | undefined, trybLekarz: TrybPwzLekarz = "ostrzezenie"): WynikPwz {
+export function sprawdzPwz(zawod: Zawod, surowy: string | null | undefined, opts: { brakNumeru?: boolean } = {}): WynikPwz {
   const pwz = (surowy ?? "").replace(/\s+/g, "").toUpperCase();
-  if (!ZAWODY_Z_PWZ.includes(zawod)) return { blad: null, ostrzezenie: null, pwz: null };
-  if (!pwz) return { blad: "Podaj numer prawa wykonywania zawodu.", ostrzezenie: null, pwz: null };
-  if (pwz.length > 20) return { blad: "Numer prawa wykonywania zawodu jest za długi.", ostrzezenie: null, pwz: null };
-  if (!/^[0-9A-Z]+$/.test(pwz)) return { blad: "Numer prawa wykonywania zawodu może mieć tylko cyfry i litery.", ostrzezenie: null, pwz: null };
-  if (zawod === "lekarz" || zawod === "lekarz_dentysta") {
-    if (trybLekarz === "wylaczona") return { blad: null, ostrzezenie: null, pwz };
-    const p = problemPwzLekarza(pwz);
-    return trybLekarz === "blokada" ? { blad: p, ostrzezenie: null, pwz } : { blad: null, ostrzezenie: p, pwz };
-  }
-  if (zawod === "pielegniarka" || zawod === "polozna") return { blad: null, ostrzezenie: problemPwzPielegniarki(pwz), pwz };
-  return { blad: null, ostrzezenie: problemPwzRatownika(pwz), pwz };
+  if (!ZAWODY_Z_PWZ.includes(zawod)) return { blad: null, pwz: null };
+  if (zawod === "ratownik" && opts.brakNumeru) return { blad: null, pwz: null };
+  if (!pwz) return { blad: "Podaj numer prawa wykonywania zawodu.", pwz: null };
+  if (pwz.length > 20) return { blad: "Numer prawa wykonywania zawodu jest za długi.", pwz: null };
+  if (!/^[0-9A-Z]+$/.test(pwz)) return { blad: "Numer prawa wykonywania zawodu może mieć tylko cyfry i litery.", pwz: null };
+  if (zawod === "lekarz" || zawod === "lekarz_dentysta") return { blad: problemPwzLekarza(pwz), pwz };
+  if (zawod === "pielegniarka" || zawod === "polozna") return { blad: problemPwzPielegniarki(zawod, pwz), pwz };
+  return { blad: null, pwz };
 }
+
+/** Okręgowe izby lekarskie (raport do izby; pole opcjonalne dla lekarzy) */
+export const IZBY_LEKARSKIE = [
+  "Beskidzka (Bielsko-Biała)", "Białostocka", "Bydgoska", "Częstochowska", "Dolnośląska (Wrocław)", "Gdańska",
+  "Gorzowska", "Kielecka", "Koszalińska", "Krakowska", "Lubelska", "Lubuska (Zielona Góra)", "Łódzka", "Opolska",
+  "Płocka", "Rzeszowska", "Szczecińska", "Śląska (Katowice)", "Tarnowska", "Toruńska", "Warmińsko-Mazurska (Olsztyn)",
+  "Warszawska", "Wielkopolska (Poznań)", "Wojskowa",
+] as const;
 
 /** Oświadczenie o prawdziwości danych (treść zapisywana przy zapisie; zmiana = nowa wersja tekstu) */
 export const OSWIADCZENIE =
@@ -94,7 +95,11 @@ export const zapisSchema = z.object({
   zawody: z.array(z.object({
     zawod: z.enum(ZAWODY, { message: "Wybierz zawód" }),
     pwz: z.string().max(40).optional().nullable(),
+    /** Ratownik medyczny: „nie mam jeszcze numeru PWZ” */
+    brakPwz: z.boolean().optional(),
     specjalizacja: z.string().trim().max(200).optional().nullable(),
+    /** Lekarze (opcjonalnie): okręgowa izba lekarska, do raportu dla izby */
+    izba: z.string().trim().max(100).optional().nullable(),
   })).min(1, "Wybierz co najmniej jeden zawód").max(ZAWODY.length),
 });
 export type ZapisInput = z.infer<typeof zapisSchema>;
@@ -123,15 +128,24 @@ export const ankietaSchema = z.object({
 export type Ankieta = z.infer<typeof ankietaSchema>;
 export type PytanieAnkiety = z.infer<typeof pytanieAnkietySchema>;
 
+/**
+ * Pytania startowe: wzór obowiązkowej ankiety anonimowej NIL (audyt prawny 11.11, p. 2.5), w tym
+ * „Czy treści kształcenia były wolne od reklamy i stronniczości?”, oraz pytania o organizację.
+ */
 export const ANKIETA_DOMYSLNA: Ankieta = {
-  wersja: "1",
+  wersja: "2",
   pytania: [
+    { id: "nowa_wiedza", typ: "tak_nie", tresc: "Czy szkolenie dało ci nową wiedzę?", wymagane: true },
+    { id: "oparta_na_faktach", typ: "tak_nie", tresc: "Czy przekazywana wiedza była oparta na faktach naukowych?", wymagane: true },
+    { id: "w_praktyce", typ: "tak_nie", tresc: "Czy wykorzystasz zdobytą wiedzę w praktyce?", wymagane: true },
+    { id: "korzysc_pacjentow", typ: "tak_nie", tresc: "Czy twoi pacjenci odniosą korzyść z tego szkolenia?", wymagane: true },
+    { id: "bez_reklamy", typ: "tak_nie", tresc: "Czy treści kształcenia były wolne od reklamy i stronniczości?", wymagane: true },
+    { id: "najslabsze", typ: "tekst", tresc: "Co było najsłabszą stroną szkolenia?", wymagane: false },
+    { id: "najmocniejsze", typ: "tekst", tresc: "Co było najmocniejszą stroną szkolenia?", wymagane: false },
     { id: "ocena_ogolna", typ: "skala", tresc: "Jak oceniasz szkolenie jako całość?", wymagane: true },
-    { id: "zgodnosc_z_programem", typ: "skala", tresc: "Na ile treść szkolenia była zgodna z programem?", wymagane: true },
-    { id: "przydatnosc", typ: "skala", tresc: "Na ile zdobyta wiedza przyda ci się w pracy?", wymagane: true },
+    { id: "organizacja", typ: "skala", tresc: "Jak oceniasz organizację szkolenia: platformę, dostęp do materiałów i kontakt z prowadzącym?", wymagane: true },
     { id: "materialy", typ: "skala", tresc: "Jak oceniasz jakość materiałów: wykładów, zapisów EKG i pytań?", wymagane: true },
     { id: "test", typ: "skala", tresc: "Na ile test końcowy sprawdzał to, czego uczyło szkolenie?", wymagane: true },
-    { id: "bez_reklam", typ: "tak_nie", tresc: "Czy szkolenie było wolne od treści reklamowych?", wymagane: true },
     { id: "polecenie", typ: "tak_nie", tresc: "Czy polecisz to szkolenie innym?", wymagane: true },
     { id: "uwagi", typ: "tekst", tresc: "Co warto poprawić albo dodać?", wymagane: false },
   ],

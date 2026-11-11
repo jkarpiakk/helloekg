@@ -17,6 +17,7 @@ import { quizService } from "../services/quizService";
 import { ustawienie } from "../ustawienia";
 import * as s from "./serwis";
 import { pdfZaswiadczenia } from "./pdf";
+import { NUMER_WPISU_RE } from "./logika";
 
 const ZESPOL = ["owner", "admin", "reviewer"];
 const czyZespol = (req: Request) => !!req.user && ZESPOL.includes(req.user.role);
@@ -54,6 +55,9 @@ const edycjaZapisuSchema = z.object({
   nazwisko: czescNazwiska("nazwisko").optional(),
   pwz: z.string().max(40).nullable().optional(),
   specjalizacja: z.string().max(200).nullable().optional(),
+  izba: z.string().max(100).nullable().optional(),
+  /** Wyjątek od walidacji formatu PWZ (np. PWZ warunkowe): zapis w dzienniku */
+  pominWalidacje: z.boolean().optional(),
   powod: z.string().trim().min(3, "Podaj powód zmiany (trafia do dziennika).").max(500),
 });
 const liczbaLubNull = z.number().min(0).max(1000).nullable();
@@ -62,11 +66,18 @@ const regulaSchema = z.object({
   legalBasis: z.string().max(1000).nullable().optional(),
   pointsFormula: z.string().max(500).nullable().optional(),
   pointsPerHour: z.number().min(0).max(100).optional(),
+  pointsMode: z.enum(["godziny", "decyzja"]).optional(),
+  pointsGranted: liczbaLubNull.optional(),
+  nrlResolution: z.string().max(200).nullable().optional(),
+  formInfoAcceptedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data w formacie RRRR-MM-DD").nullable().optional(),
+  decisionNumber: z.string().max(200).nullable().optional(),
+  formText: z.string().max(500).nullable().optional(),
   maxPoints: liczbaLubNull.optional(),
   minHours: liczbaLubNull.optional(),
   testRequired: z.boolean().optional(),
   registryRequired: z.boolean().optional(),
-  registryNumber: z.string().max(200).nullable().optional(),
+  registryNumber: z.string().trim().max(200).nullable().optional()
+    .refine((v) => !v || NUMER_WPISU_RE.test(v), "Numer wpisu do rejestru: format RR-NNNNNN-00X-ZZZZ"),
   inactiveReason: z.string().max(1000).nullable().optional(),
 });
 
@@ -233,8 +244,10 @@ export function registerSzkolenieRoutes(app: Express) {
   app.post("/api/szkolenie/zaswiadczenia", requireKonto, szkolenieDostepne, async (req, res) => {
     const id = req.body?.zapisId;
     if (typeof id !== "string" || !UUID_RE.test(id)) return res.status(400).json({ error: "Wybierz zawód" });
+    const rodzaj = req.body?.rodzaj;
+    if (rodzaj !== undefined && rodzaj !== "punkty" && rodzaj !== "ukonczenie") return res.status(400).json({ error: "Nieznany rodzaj zaświadczenia" });
     try {
-      const c = await s.wydajZaswiadczenie(req.user!, id);
+      const c = await s.wydajZaswiadczenie(req.user!, id, rodzaj);
       res.status(201).json(s.widokZaswiadczenia(c));
     } catch (e) {
       blad(res, e, "Nie udało się wydać zaświadczenia");
@@ -288,6 +301,54 @@ export function registerSzkolenieRoutes(app: Express) {
       res.json(await s.edytujZapis(req.user!.id, req.params.id, d, powod));
     } catch (e) {
       blad(res, e, "Nie udało się zmienić danych");
+    }
+  });
+
+  // PWZ sprawdzony ręcznie w publicznym rejestrze NIL / NIPiP (warunek zaświadczenia z punktami)
+  app.post("/api/admin/szkolenie/zapisy/:id/pwz-sprawdzony", requireKonto, requireAdmin, async (req, res) => {
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Nie znaleziono" });
+    const sprawdzony = req.body?.sprawdzony !== false;
+    const uwaga = typeof req.body?.uwaga === "string" ? req.body.uwaga.trim().slice(0, 500) : undefined;
+    try {
+      res.json(await s.oznaczPwzSprawdzony(req.user!.id, req.params.id, sprawdzony, uwaga));
+    } catch (e) {
+      blad(res, e, "Nie udało się zapisać sprawdzenia PWZ");
+    }
+  });
+
+  // Raport dla okręgowej izby lekarskiej (lekarze z zaświadczeniem), opcjonalnie ?izba=
+  app.get("/api/admin/szkolenie/raport-orl.csv", requireKonto, requireAdmin, async (req, res) => {
+    try {
+      const izba = typeof req.query.izba === "string" ? req.query.izba.slice(0, 100) : undefined;
+      const csv = await s.raportOrlCsv(izba);
+      const dzien = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw" }).format(new Date());
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="raport-izba-lekarska-${dzien}.csv"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.send(csv);
+    } catch (e) {
+      blad(res, e, "Nie udało się przygotować raportu dla izby");
+    }
+  });
+
+  // Pula testu: ile pytań się kwalifikuje (≥ 5 odpowiedzi, dokładnie 1 poprawna), które są pominięte
+  app.get("/api/admin/szkolenie/pula-testu", requireKonto, requireAdmin, async (_req, res) => {
+    try {
+      res.json(await s.raportPuliTestu());
+    } catch (e) {
+      blad(res, e, "Nie udało się sprawdzić puli testu");
+    }
+  });
+
+  // Przechowywanie: przegląd (proba) i usunięcie rejestru po 5 latach od końca roku wydania (tylko właściciel)
+  app.post("/api/admin/szkolenie/retencja", requireKonto, requireOwner, async (req, res) => {
+    try {
+      const proba = req.body?.usun !== true;
+      const w = await s.czyscPrzeterminowane({ proba });
+      if (!proba) console.log("[szkolenie] retencja: usunięto", w.usunieto, "uczestników po okresie przechowywania");
+      res.json(w);
+    } catch (e) {
+      blad(res, e, "Nie udało się sprawdzić okresu przechowywania");
     }
   });
 

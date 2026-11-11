@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS cme_rules (
   test_required boolean NOT NULL DEFAULT true,
   registry_required boolean NOT NULL DEFAULT false,
   registry_number varchar(200),
+  nrl_resolution varchar(200),
+  form_info_accepted_at varchar(10),
+  decision_number varchar(200),
+  points_mode varchar(12) NOT NULL DEFAULT 'godziny',
+  points_granted numeric(6,2),
+  form_text text,
   inactive_reason text,
   updated_at timestamptz NOT NULL DEFAULT now(),
   updated_by uuid REFERENCES users(id) ON DELETE SET NULL
@@ -56,6 +62,10 @@ CREATE TABLE IF NOT EXISTS cme_enrollments (
   pwz varchar(20),
   pwz_warning text,
   specialization varchar(200),
+  chamber varchar(100),
+  pwz_override boolean NOT NULL DEFAULT false,
+  pwz_verified_at timestamptz,
+  pwz_verified_by uuid REFERENCES users(id) ON DELETE SET NULL,
   first_name varchar(100) NOT NULL,
   last_name varchar(100) NOT NULL,
   declaration_text text NOT NULL,
@@ -110,6 +120,8 @@ CREATE TABLE IF NOT EXISTS cme_test_attempts (
   user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   started_at timestamptz NOT NULL DEFAULT now(),
   submitted_at timestamptz,
+  deadline_at timestamptz,
+  auto_submitted boolean NOT NULL DEFAULT false,
   question_ids jsonb NOT NULL,
   answer_orders jsonb NOT NULL DEFAULT '{}'::jsonb,
   answers jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -141,6 +153,7 @@ CREATE TABLE IF NOT EXISTS cme_certificates (
   user_id uuid REFERENCES users(id) ON DELETE SET NULL,
   enrollment_id uuid NOT NULL REFERENCES cme_enrollments(id),
   profession varchar(30) NOT NULL,
+  kind varchar(12) NOT NULL DEFAULT 'punkty',
   snapshot jsonb NOT NULL,
   rule_snapshot jsonb NOT NULL,
   points numeric(6,2),
@@ -157,39 +170,60 @@ CREATE INDEX IF NOT EXISTS cme_certificates_participant_idx ON cme_certificates 
 ALTER TABLE cme_certificates ADD COLUMN IF NOT EXISTS verification_token varchar(64);
 ALTER TABLE cme_certificates ALTER COLUMN verification_token SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS cme_certificates_verification_token_key ON cme_certificates (verification_token);
--- najwyżej jedno ważne zaświadczenie na osobę i zawód
-CREATE UNIQUE INDEX IF NOT EXISTS cme_certificates_valid_uq ON cme_certificates (participant_id, profession) WHERE valid;
+
+-- Uzupełnienia po audycie prawnym 11.11 (kopia testowa miała już tabele z pierwszej wersji tej migracji)
+ALTER TABLE cme_rules ADD COLUMN IF NOT EXISTS nrl_resolution varchar(200);
+ALTER TABLE cme_rules ADD COLUMN IF NOT EXISTS form_info_accepted_at varchar(10);
+ALTER TABLE cme_rules ADD COLUMN IF NOT EXISTS decision_number varchar(200);
+ALTER TABLE cme_rules ADD COLUMN IF NOT EXISTS points_mode varchar(12) NOT NULL DEFAULT 'godziny';
+ALTER TABLE cme_rules ADD COLUMN IF NOT EXISTS points_granted numeric(6,2);
+ALTER TABLE cme_rules ADD COLUMN IF NOT EXISTS form_text text;
+ALTER TABLE cme_enrollments ADD COLUMN IF NOT EXISTS chamber varchar(100);
+ALTER TABLE cme_enrollments ADD COLUMN IF NOT EXISTS pwz_override boolean NOT NULL DEFAULT false;
+ALTER TABLE cme_enrollments ADD COLUMN IF NOT EXISTS pwz_verified_at timestamptz;
+ALTER TABLE cme_enrollments ADD COLUMN IF NOT EXISTS pwz_verified_by uuid REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE cme_test_attempts ADD COLUMN IF NOT EXISTS deadline_at timestamptz;
+ALTER TABLE cme_test_attempts ADD COLUMN IF NOT EXISTS auto_submitted boolean NOT NULL DEFAULT false;
+ALTER TABLE cme_certificates ADD COLUMN IF NOT EXISTS kind varchar(12) NOT NULL DEFAULT 'punkty';
+-- najwyżej jedno ważne zaświadczenie każdego rodzaju (z punktami / ukończenie bez punktów) na osobę i zawód
+DROP INDEX IF EXISTS cme_certificates_valid_uq;
+CREATE UNIQUE INDEX IF NOT EXISTS cme_certificates_valid_kind_uq ON cme_certificates (participant_id, profession, kind) WHERE valid;
 
 CREATE TABLE IF NOT EXISTS cme_certificate_counters (
   year integer PRIMARY KEY,
   last integer NOT NULL DEFAULT 0
 );
 
--- Reguły startowe (plan, sekcja 2.B.7). Istniejących wierszy nie nadpisujemy (zmiany z panelu zostają).
-INSERT INTO cme_rules (profession, active, legal_basis, points_formula, points_per_hour, max_points, min_hours, test_required, registry_required, registry_number, inactive_reason) VALUES
+-- Reguły startowe (plan 2.B.7 po audycie prawnym 11.11). Istniejących wierszy nie nadpisujemy (zmiany z panelu zostają).
+-- Lekarze: punkty z uchwały NRL; reguła działa dopiero z uchwałą NRL, numerem wpisu i datą przyjęcia informacji o formie.
+-- Pielęgniarki i położne: punkty z decyzji NRPiP. Ratownicy: 1 pkt za godzinę dydaktyczną (45 min), maks. 10, min. 4 h.
+INSERT INTO cme_rules (profession, active, legal_basis, points_formula, points_mode, points_per_hour, max_points, min_hours, test_required, registry_required, form_text, inactive_reason) VALUES
   ('lekarz', false,
-   'Rozporządzenie Ministra Zdrowia z dnia 21 lutego 2022 r. w sprawie sposobów dopełnienia obowiązku doskonalenia zawodowego lekarzy i lekarzy dentystów (Dz.U. 2022 poz. 464)',
-   '1 punkt edukacyjny za 1 godzinę szkolenia, bez limitu', 1, NULL, NULL, true, true, NULL,
-   'Organizator nie ma jeszcze wpisu do rejestru podmiotów prowadzących kształcenie ustawiczne lekarzy i lekarzy dentystów, więc to zaświadczenie nie daje punktów edukacyjnych.'),
+   'rozp. MZ z 21.02.2022 (Dz.U. 2022 poz. 464) oraz rozp. MZ z 19.04.2024 (Dz.U. 2024 poz. 637)',
+   'liczba punktów według uchwały Naczelnej Rady Lekarskiej', 'decyzja', 0, NULL, NULL, true, true,
+   'kurs medyczny prowadzony za pośrednictwem sieci internetowej z ograniczonym dostępem (§ 1 pkt 2 lit. a rozp. MZ z 21.02.2022)',
+   'Szkolenie czeka na akceptację Naczelnej Rady Lekarskiej i wpis do rejestru okręgowej izby lekarskiej, więc to zaświadczenie nie daje jeszcze punktów edukacyjnych.'),
   ('lekarz_dentysta', false,
-   'Rozporządzenie Ministra Zdrowia z dnia 21 lutego 2022 r. w sprawie sposobów dopełnienia obowiązku doskonalenia zawodowego lekarzy i lekarzy dentystów (Dz.U. 2022 poz. 464)',
-   '1 punkt edukacyjny za 1 godzinę szkolenia, bez limitu', 1, NULL, NULL, true, true, NULL,
-   'Organizator nie ma jeszcze wpisu do rejestru podmiotów prowadzących kształcenie ustawiczne lekarzy i lekarzy dentystów, więc to zaświadczenie nie daje punktów edukacyjnych.'),
+   'rozp. MZ z 21.02.2022 (Dz.U. 2022 poz. 464) oraz rozp. MZ z 19.04.2024 (Dz.U. 2024 poz. 637)',
+   'liczba punktów według uchwały Naczelnej Rady Lekarskiej', 'decyzja', 0, NULL, NULL, true, true,
+   'kurs medyczny prowadzony za pośrednictwem sieci internetowej z ograniczonym dostępem (§ 1 pkt 2 lit. a rozp. MZ z 21.02.2022)',
+   'Szkolenie czeka na akceptację Naczelnej Rady Lekarskiej i wpis do rejestru okręgowej izby lekarskiej, więc to zaświadczenie nie daje jeszcze punktów edukacyjnych.'),
   ('ratownik', true,
-   'Rozporządzenie Ministra Zdrowia z dnia 18 sierpnia 2023 r. w sprawie doskonalenia zawodowego ratowników medycznych (Dz.U. 2023 poz. 1800)',
-   '1 punkt edukacyjny za 1 godzinę szkolenia, najwyżej 10 punktów za jedno szkolenie, szkolenie co najmniej 4 godziny', 1, 10, 4, true, false, NULL,
+   'rozp. MZ z 18.08.2023 w sprawie ustawicznego rozwoju zawodowego ratowników medycznych (Dz.U. 2023 poz. 1800)',
+   '1 punkt za każdą godzinę dydaktyczną (45 min), najwyżej 10 punktów za kurs, kurs co najmniej 4 godziny dydaktyczne', 'godziny', 1, 10, 4, true, false,
+   'kurs realizowany za pośrednictwem sieci internetowej z ograniczonym dostępem, zakończony testem',
    NULL),
   ('pielegniarka', false,
-   'Uchwała Naczelnej Rady Pielęgniarek i Położnych nr 166/VIII/2025 (ze zmianami)',
-   'Według decyzji Naczelnej Rady Pielęgniarek i Położnych', 0, NULL, NULL, true, false, NULL,
+   'uchwała NRPiP nr 166/VIII/2025 z 3.12.2025 ze zm. (uchwała nr 195/VIII/2026 z 17.06.2026)',
+   'liczba punktów według decyzji Naczelnej Rady Pielęgniarek i Położnych', 'decyzja', 0, NULL, NULL, true, false, NULL,
    'Szkolenie czeka na decyzję Naczelnej Rady Pielęgniarek i Położnych, więc to zaświadczenie nie daje jeszcze punktów edukacyjnych.'),
   ('polozna', false,
-   'Uchwała Naczelnej Rady Pielęgniarek i Położnych nr 166/VIII/2025 (ze zmianami)',
-   'Według decyzji Naczelnej Rady Pielęgniarek i Położnych', 0, NULL, NULL, true, false, NULL,
+   'uchwała NRPiP nr 166/VIII/2025 z 3.12.2025 ze zm. (uchwała nr 195/VIII/2026 z 17.06.2026)',
+   'liczba punktów według decyzji Naczelnej Rady Pielęgniarek i Położnych', 'decyzja', 0, NULL, NULL, true, false, NULL,
    'Szkolenie czeka na decyzję Naczelnej Rady Pielęgniarek i Położnych, więc to zaświadczenie nie daje jeszcze punktów edukacyjnych.'),
-  ('student', false, NULL, 'Bez punktów edukacyjnych', 0, NULL, NULL, true, false, NULL,
+  ('student', false, NULL, 'Bez punktów edukacyjnych', 'godziny', 0, NULL, NULL, true, false, NULL,
    'Punkty edukacyjne przysługują osobom wykonującym zawód medyczny. To zaświadczenie potwierdza ukończenie szkolenia.'),
-  ('inny', false, NULL, 'Bez punktów edukacyjnych', 0, NULL, NULL, true, false, NULL,
+  ('inny', false, NULL, 'Bez punktów edukacyjnych', 'godziny', 0, NULL, NULL, true, false, NULL,
    'Dla tego zawodu szkolenie nie daje punktów edukacyjnych. To zaświadczenie potwierdza ukończenie szkolenia.')
 ON CONFLICT (profession) DO NOTHING;
 

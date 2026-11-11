@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ANKIETA_DOMYSLNA, ankietaSchema, TRYBY_PWZ_LEKARZ, type Ankieta, type TrybPwzLekarz } from "@shared/szkolenie";
+import { ANKIETA_DOMYSLNA, ankietaSchema, type Ankieta } from "@shared/szkolenie";
 
 /**
  * Przełączniki aplikacji.
@@ -12,6 +12,15 @@ import { ANKIETA_DOMYSLNA, ankietaSchema, TRYBY_PWZ_LEKARZ, type Ankieta, type T
  */
 export const platnosciWlaczone = (): boolean => /^(1|true|tak)$/i.test(process.env.PLATNOSCI_WLACZONE ?? "");
 export const indeksowanieWlaczone = (): boolean => /^(1|true|tak)$/i.test(process.env.INDEKSOWANIE ?? "");
+
+/** Obraz podpisu w base64: pusty albo PNG/JPEG (po sygnaturze pliku), najwyżej 200 KB */
+const obrazPodpisu = z.string().max(280_000, "Obraz podpisu może mieć najwyżej 200 KB").refine((v) => {
+  if (!v) return true;
+  const b = Buffer.from(v, "base64");
+  const png = b.length > 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const jpg = b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  return png || jpg;
+}, "Podpis: plik PNG albo JPEG");
 
 const IP_RE = /^(?:\d{1,3}(?:\.\d{1,3}){3}|[0-9a-f:]{2,39})$/i;
 
@@ -29,8 +38,10 @@ export const USTAWIENIA = {
   szkolenie_wlaczone: { domyslnie: false as boolean, schemat: z.boolean() },
   /** Moduł ukończony wymaga też opanowania wszystkich tematów z ćwiczeniami (wariant B) */
   cwiczenia_wymagane: { domyslnie: true as boolean, schemat: z.boolean() },
-  /** Cyfra kontrolna PWZ lekarza: ostrzeżenie (domyślnie, do potwierdzenia algorytmu), blokada albo bez sprawdzania */
-  pwz_kontrola_lekarz: { domyslnie: "ostrzezenie" as TrybPwzLekarz, schemat: z.enum(TRYBY_PWZ_LEKARZ) },
+  /** Zaświadczenie z punktami dopiero po ręcznym sprawdzeniu PWZ w publicznym rejestrze (NIL, NIPiP) przez zespół */
+  weryfikacja_pwz_reczna: { domyslnie: true as boolean, schemat: z.boolean() },
+  /** Ile dni roboczych zwykle trwa sprawdzenie (komunikat dla uczestnika) */
+  weryfikacja_pwz_dni: { domyslnie: 3 as number, schemat: z.number().int().min(1).max(30) },
   /** Regulamin szkolenia opublikowany (po akceptacji JK): wtedy zapis wymaga jego akceptacji */
   regulamin_szkolenia_opublikowany: { domyslnie: false as boolean, schemat: z.boolean() },
   /** Liczba godzin szkolenia (zaświadczenie, punkty, opis). Obowiązuje wartość z panelu (app_settings); 53 to tylko wartość startowa wariantu B, zmiana programu nie wymaga zmiany kodu */
@@ -41,7 +52,12 @@ export const USTAWIENIA = {
   /** Po którym niezaliczonym podejściu (i każdym kolejnym) obowiązuje przerwa */
   cme_test_przerwa_po: { domyslnie: 2 as number, schemat: z.number().int().min(1).max(20) },
   cme_test_przerwa_godziny: { domyslnie: 24 as number, schemat: z.number().min(0).max(24 * 30) },
-  cme_tytul: { domyslnie: "Interpretacja EKG: kurs helloEKG" as string, schemat: z.string().trim().min(3).max(200) },
+  /** Maksymalny czas na test (minuty, wymóg programu e-learningu); 0 = bez limitu. Pilnuje serwer. */
+  test_limit_minut: { domyslnie: 90 as number, schemat: z.number().int().min(0).max(600) },
+  /** Wgląd w oceniony test: całe podejście (pytania, odpowiedzi, klucz, uzasadnienia) albo tylko błędne */
+  test_wglad: { domyslnie: "pelny" as "pelny" | "bledne", schemat: z.enum(["pelny", "bledne"]) },
+  /** Tytuł z programu szkolenia */
+  cme_tytul: { domyslnie: "Elektrokardiografia w praktyce klinicznej: od podstaw do stanów zagrożenia życia" as string, schemat: z.string().trim().min(3).max(200) },
   cme_forma: { domyslnie: "szkolenie online (e-learning) zakończone testem" as string, schemat: z.string().trim().min(3).max(200) },
   cme_organizator: {
     domyslnie: { nazwa: "Cardiomind sp. z o.o.", adres: "", krs: "", nip: "", email: "kontakt@helloekg.pl", reklamacje: "kontakt@helloekg.pl" } as Organizator,
@@ -54,7 +70,15 @@ export const USTAWIENIA = {
       reklamacje: z.string().trim().max(300),
     }),
   },
+  /** Kierownik naukowy (musi być lekarzem): imię i nazwisko oraz tytuł / specjalizacja */
   cme_kierownik_naukowy: { domyslnie: "" as string, schemat: z.string().trim().max(200) },
+  cme_kierownik_naukowy_tytul: { domyslnie: "" as string, schemat: z.string().trim().max(200) },
+  /** Kto podpisuje za organizatora: imię, nazwisko i funkcja (np. prezes zarządu) */
+  cme_organizator_podpisujacy: { domyslnie: "" as string, schemat: z.string().trim().max(200) },
+  /** Skan podpisu (PNG albo JPEG w base64, do 200 KB); pusty = sam podpis drukowany */
+  cme_podpis_organizator: { domyslnie: "" as string, schemat: obrazPodpisu },
+  cme_podpis_kierownik: { domyslnie: "" as string, schemat: obrazPodpisu },
+  cme_miejsce: { domyslnie: "online" as string, schemat: z.string().trim().min(1).max(100) },
   cme_ankieta: { domyslnie: ANKIETA_DOMYSLNA as Ankieta, schemat: ankietaSchema },
 } as const;
 

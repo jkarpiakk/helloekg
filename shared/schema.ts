@@ -883,9 +883,22 @@ export const cmeRules = pgTable("cme_rules", {
   maxPoints: decimal("max_points", { precision: 6, scale: 2 }),
   minHours: decimal("min_hours", { precision: 6, scale: 2 }),
   testRequired: boolean("test_required").notNull().default(true),
-  /** Reguła działa dopiero z numerem wpisu do rejestru / decyzji (np. lekarze: rejestr OIL) */
+  /**
+   * Lekarze: reguła działa dopiero z kompletem: uchwała NRL, numer wpisu do rejestru ORL
+   * (RR-NNNNNN-00X-ZZZZ) i data przyjęcia „Informacji o formie kształcenia”
+   */
   registryRequired: boolean("registry_required").notNull().default(false),
+  /** Numer wpisu do rejestru podmiotów prowadzących kształcenie (format RR-NNNNNN-00X-ZZZZ) */
   registryNumber: varchar("registry_number", { length: 200 }),
+  nrlResolution: varchar("nrl_resolution", { length: 200 }),
+  formInfoAcceptedAt: varchar("form_info_accepted_at", { length: 10 }),
+  /** Pielęgniarki i położne: numer decyzji NRPiP */
+  decisionNumber: varchar("decision_number", { length: 200 }),
+  /** "godziny" = liczone z godzin (ratownik), "decyzja" = punkty przyznane w uchwale / decyzji (lekarz, pielęgniarka) */
+  pointsMode: varchar("points_mode", { length: 12 }).notNull().default("godziny"),
+  pointsGranted: decimal("points_granted", { precision: 6, scale: 2 }),
+  /** Forma kształcenia słowami przepisu (na zaświadczeniu); pusta = ustawienie cme_forma */
+  formText: text("form_text"),
   /** Komunikat na zaświadczeniu bez punktów: dlaczego reguła nie działa */
   inactiveReason: text("inactive_reason"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
@@ -902,6 +915,13 @@ export const cmeEnrollments = pgTable("cme_enrollments", {
   /** Ostrzeżenie walidacji PWZ w chwili zapisu (null = numer wygląda poprawnie albo nie jest wymagany) */
   pwzWarning: text("pwz_warning"),
   specialization: varchar("specialization", { length: 200 }),
+  /** Lekarze (opcjonalnie): okręgowa izba lekarska, do raportu dla izby */
+  chamber: varchar("chamber", { length: 100 }),
+  /** Zespół wpisał PWZ z pominięciem walidacji formatu (np. PWZ warunkowe), wpis w dzienniku */
+  pwzOverride: boolean("pwz_override").notNull().default(false),
+  /** PWZ sprawdzony ręcznie w publicznym rejestrze NIL / NIPiP (kto i kiedy): warunek zaświadczenia z punktami */
+  pwzVerifiedAt: timestamp("pwz_verified_at", { withTimezone: true }),
+  pwzVerifiedBy: uuid("pwz_verified_by").references(() => users.id, { onDelete: "set null" }),
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
   /** Treść oświadczenia o prawdziwości danych w brzmieniu z chwili zapisu */
@@ -959,6 +979,10 @@ export const cmeTestAttempts = pgTable("cme_test_attempts", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().default(sql`now()`),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  /** Termin oddania (start + test_limit_minut); po nim i krótkim zapasie podejście oddaje się samo */
+  deadlineAt: timestamp("deadline_at", { withTimezone: true }),
+  /** Oddane automatycznie po czasie (ocenione odpowiedzi zapisane przed terminem) */
+  autoSubmitted: boolean("auto_submitted").notNull().default(false),
   /** Pytania w kolejności pokazanej kursantowi */
   questionIds: jsonb("question_ids").$type<string[]>().notNull(),
   /** Kolejność odpowiedzi per pytanie (indeksy z bazy w kolejności na ekranie) */
@@ -997,6 +1021,8 @@ export const cmeCertificates = pgTable("cme_certificates", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   enrollmentId: uuid("enrollment_id").notNull().references(() => cmeEnrollments.id),
   profession: varchar("profession", { length: 30 }).notNull(),
+  /** "punkty" = z punktami edukacyjnymi, "ukonczenie" = ukończenie bez punktów (najwyżej jedno ważne każdego rodzaju na zawód) */
+  kind: varchar("kind", { length: 12 }).notNull().default("punkty"),
   /** Dane uczestnika, szkolenia i organizatora z chwili wydania */
   snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
   /** Reguła punktów z chwili wydania */
