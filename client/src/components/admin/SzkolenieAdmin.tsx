@@ -58,7 +58,13 @@ interface Regula {
   pointsGranted: string | null;
   formText: string | null;
   dziala: boolean;
+  /** Czego brakuje aktywnej regule, żeby dawała punkty */
+  braki: string[];
   inactiveReason: string | null;
+  nrlResolutionAt: string | null;
+  obowiazujeOd: string | null;
+  obowiazujeDo: string | null;
+  obowiazujeOdPodpowiedz: string | null;
   updatedAt: string;
 }
 
@@ -72,6 +78,7 @@ export default function SzkolenieAdmin() {
         <h2 className="text-2xl font-bold">Szkolenie z punktami</h2>
         <p className="text-muted-foreground">Zapisy, dziennik i lista obecności zostają 5 lat, także po usunięciu konta. Czas w strefie Polski.</p>
       </div>
+      <BrakiOrganizatora />
       <Tabs defaultValue="uczestnicy" className="space-y-6">
         <TabsList>
           <TabsTrigger value="uczestnicy">Uczestnicy</TabsTrigger>
@@ -88,6 +95,24 @@ export default function SzkolenieAdmin() {
   );
 }
 
+/** Zaświadczenia z punktami są wstrzymane, dopóki dane organizatora nie są kompletne (uczestnik dostaje ukończenie) */
+function BrakiOrganizatora() {
+  const { data } = useQuery<{ organizator: string[] }>({
+    queryKey: ["/api/admin/szkolenie/braki"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/szkolenie/braki")).json(),
+    staleTime: 0,
+  });
+  if (!data?.organizator.length) return null;
+  return (
+    <Card className="border-destructive" data-testid="braki-organizatora">
+      <CardContent className="pt-6 text-sm">
+        <p className="font-medium">Zaświadczenia z punktami są wstrzymane: brakuje danych organizatora.</p>
+        <p className="text-muted-foreground">Uzupełnij w Ustawieniach szkolenia: {data.organizator.join(", ")}. Do tego czasu uczestnicy widzą „zaświadczenie z punktami czeka na uzupełnienie danych organizatora” i mogą pobrać zaświadczenie ukończenia bez punktów.</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function Uczestnicy() {
   const { data, isLoading } = useQuery<{ modulyWszystkie: number; uczestnicy: Uczestnik[] }>({
     queryKey: ["/api/admin/szkolenie/uczestnicy"],
@@ -98,14 +123,21 @@ function Uczestnicy() {
   const [dziennik, setDziennik] = useState<Uczestnik | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  // wysyłamy dane, które admin widzi na liście: serwer zatwierdzi je tylko, jeśli się nie zmieniły
   const sprawdz = useMutation({
-    mutationFn: async ({ id, sprawdzony }: { id: string; sprawdzony: boolean }) =>
-      (await apiRequest("POST", `/api/admin/szkolenie/zapisy/${id}/pwz-sprawdzony`, { sprawdzony })).json(),
+    mutationFn: async ({ u, sprawdzony }: { u: Uczestnik; sprawdzony: boolean }) =>
+      (await apiRequest("POST", `/api/admin/szkolenie/zapisy/${u.id}/pwz-sprawdzony`, sprawdzony
+        ? { sprawdzony, pwz: u.pwz, imie: u.imie, nazwisko: u.nazwisko }
+        : { sprawdzony })).json(),
     onSuccess: () => {
       toast({ title: "Zapisane w dzienniku" });
       qc.invalidateQueries({ queryKey: ["/api/admin/szkolenie/uczestnicy"] });
     },
-    onError: (e) => toast({ title: "Nie udało się", description: bladSerwera(e), variant: "destructive" }),
+    onError: (e) => {
+      toast({ title: "Nie udało się", description: bladSerwera(e), variant: "destructive" });
+      qc.invalidateQueries({ queryKey: ["/api/admin/szkolenie/uczestnicy"] });
+    },
   });
   if (isLoading || !data) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
   return (
@@ -156,9 +188,9 @@ function Uczestnicy() {
                     )) : "brak"}
                   </td>
                   <td className="py-2 space-x-2 space-y-1 whitespace-nowrap">
-                    <Button size="sm" variant={u.pwzSprawdzonyAt ? "ghost" : "default"} disabled={sprawdz.isPending}
-                      onClick={() => sprawdz.mutate({ id: u.id, sprawdzony: !u.pwzSprawdzonyAt })} data-testid={`pwz-sprawdzony-${u.id}`}
-                      title="Porównaj imię, nazwisko i numer z publicznym rejestrem NIL albo NIPiP">
+                    <Button size="sm" variant={u.pwzSprawdzonyAt ? "ghost" : "default"} disabled={sprawdz.isPending || (!u.pwzSprawdzonyAt && u.participantId === user?.id)}
+                      onClick={() => sprawdz.mutate({ u, sprawdzony: !u.pwzSprawdzonyAt })} data-testid={`pwz-sprawdzony-${u.id}`}
+                      title={u.participantId === user?.id ? "Własnego PWZ nie sprawdzasz: poproś inną osobę z zespołu" : "Porównaj imię, nazwisko i numer z publicznym rejestrem NIL albo NIPiP"}>
                       {u.pwzSprawdzonyAt ? "Cofnij sprawdzenie PWZ" : "PWZ sprawdzony w publicznym rejestrze"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setEdytowany(u)} data-testid={`edytuj-${u.id}`}>Edytuj dane</Button>
@@ -222,7 +254,7 @@ function EdycjaZapisu({ u, onClose }: { u: Uczestnik; onClose: () => void }) {
 }
 
 function Dziennik({ u, onClose }: { u: Uczestnik; onClose: () => void }) {
-  const { data } = useQuery<Array<{ typ: string; nazwa: string; atPL: string; details: Record<string, unknown> }>>({
+  const { data } = useQuery<Array<{ typ: string; nazwa: string; atPL: string; details: Record<string, unknown>; wykonawca: { email: string; imie: string | null; rola: string } | null }>>({
     queryKey: ["/api/admin/szkolenie/dziennik", u.participantId],
     queryFn: async () => (await apiRequest("GET", `/api/admin/szkolenie/dziennik/${u.participantId}`)).json(),
     staleTime: 0,
@@ -240,6 +272,8 @@ function Dziennik({ u, onClose }: { u: Uczestnik; onClose: () => void }) {
                 {typeof w.details?.procent === "number" && <span> · {liczbaPL(w.details.procent)}%</span>}
                 {typeof w.details?.numer === "string" && <span> · {w.details.numer}</span>}
                 {typeof w.details?.powod === "string" && <span> · powód: {w.details.powod}</span>}
+                {typeof w.details?.rozdzial === "number" && <span> · rozdział {w.details.rozdzial}</span>}
+                {w.wykonawca && <span className="text-muted-foreground"> · wykonał: {w.wykonawca.imie ? `${w.wykonawca.imie}, ` : ""}{w.wykonawca.email} ({w.wykonawca.rola})</span>}
               </li>
             ))}
           </ol>
@@ -258,7 +292,9 @@ function Reguly({ edycja }: { edycja: boolean }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Zaświadczenie zapisuje kopię reguły z chwili wydania. Reguła lekarzy działa dopiero z numerem wpisu do rejestru.
+        Zaświadczenie zapisuje kopię reguły z chwili wydania, razem z okresem obowiązywania. Punkty tylko wtedy, gdy całe szkolenie uczestnika
+        (zapis i zaliczenie testu) mieści się w okresie „obowiązuje od/do”: bez daty „od” reguła nie daje punktów. Reguła lekarzy działa
+        dopiero z uchwałą NRL, numerem wpisu i datą przyjęcia informacji o formie; „od” to domyślnie późniejsza z dat uchwały i informacji.
         {!edycja && " Zmienia je tylko właściciel."}
       </p>
       {data.map((r) => <RegulaKarta key={r.profession} r={r} edycja={edycja} />)}
@@ -278,6 +314,7 @@ function RegulaKarta({ r, edycja }: { r: Regula; edycja: boolean }) {
       pointsPerHour: Number(d.pointsPerHour) || 0, maxPoints: num(d.maxPoints), minHours: num(d.minHours),
       pointsMode: d.pointsMode, pointsGranted: num(d.pointsGranted), nrlResolution: d.nrlResolution || null,
       formInfoAcceptedAt: d.formInfoAcceptedAt || null, decisionNumber: d.decisionNumber || null, formText: d.formText || null,
+      nrlResolutionAt: d.nrlResolutionAt || null, obowiazujeOd: d.obowiazujeOd || null, obowiazujeDo: d.obowiazujeDo || null,
       testRequired: d.testRequired, registryRequired: d.registryRequired, registryNumber: d.registryNumber || null, inactiveReason: d.inactiveReason || null,
     })).json(),
     onSuccess: () => {
@@ -286,7 +323,7 @@ function RegulaKarta({ r, edycja }: { r: Regula; edycja: boolean }) {
     },
     onError: (e) => toast({ title: "Nie udało się", description: bladSerwera(e), variant: "destructive" }),
   });
-  const pole = (k: keyof Regula, label: string, typ: "text" | "number" = "text") => (
+  const pole = (k: keyof Regula, label: string, typ: "text" | "number" | "date" = "text") => (
     <label className="grid gap-1 text-sm">{label}
       <Input type={typ} value={(d[k] as string | null) ?? ""} disabled={!edycja} onChange={(e) => setD({ ...d, [k]: e.target.value })} />
     </label>
@@ -307,10 +344,16 @@ function RegulaKarta({ r, edycja }: { r: Regula; edycja: boolean }) {
             <option value="decyzja">z uchwały / decyzji (przyznana liczba)</option>
           </select>
         </label>
-        {d.pointsMode === "decyzja" ? pole("pointsGranted", "Punkty przyznane w uchwale / decyzji", "number") : pole("pointsPerHour", "Punkty za godzinę dydaktyczną (45 min)", "number")}
+        {r.active && r.braki.length > 0 && (
+          <p className="sm:col-span-2 text-sm text-destructive" data-testid={`regula-braki-${r.profession}`}>Reguła nie daje punktów, brakuje: {r.braki.join(", ")}.</p>
+        )}
+        {d.pointsMode === "decyzja" ? pole("pointsGranted", "Punkty przyznane w uchwale / decyzji", "number") : pole("pointsPerHour", r.profession === "ratownik" ? "Punkty za godzinę dydaktyczną (45 min)" : "Punkty za godzinę programu", "number")}
         {pole("maxPoints", "Maks. punktów (puste = bez limitu)", "number")}
+        {pole("obowiazujeOd", r.obowiazujeOdPodpowiedz && !d.obowiazujeOd ? `Obowiązuje od (podpowiedź: ${r.obowiazujeOdPodpowiedz})` : "Obowiązuje od (punkty nie działają wstecz)", "date")}
+        {pole("obowiazujeDo", "Obowiązuje do (puste = bez końca)", "date")}
         {pole("minHours", "Min. godzin (puste = bez minimum)", "number")}
         {d.registryRequired && pole("nrlResolution", "Uchwała Naczelnej Rady Lekarskiej (numer)")}
+        {d.registryRequired && pole("nrlResolutionAt", "Data uchwały NRL", "date")}
         {d.registryRequired && pole("registryNumber", "Numer wpisu do rejestru (RR-NNNNNN-00X-ZZZZ)")}
         {d.registryRequired && pole("formInfoAcceptedAt", "Data przyjęcia informacji o formie (RRRR-MM-DD)")}
         {!d.registryRequired && d.pointsMode === "decyzja" && pole("decisionNumber", "Numer decyzji (np. NRPiP)")}
@@ -327,25 +370,43 @@ function RegulaKarta({ r, edycja }: { r: Regula; edycja: boolean }) {
 }
 
 function RaportAnkiety() {
-  const { data, isLoading } = useQuery<{ odpowiedzi: number; pytania: Array<{ id: string; typ: string; tresc: string; n: number; srednia?: number | null; rozklad?: number[]; tak?: number; nie?: number; teksty?: string[] }> }>({
-    queryKey: ["/api/admin/szkolenie/ankieta"],
-    queryFn: async () => (await apiRequest("GET", "/api/admin/szkolenie/ankieta")).json(),
+  const [od, setOd] = useState("");
+  const [doM, setDoM] = useState("");
+  const parametry = new URLSearchParams({ ...(od ? { od } : {}), ...(doM ? { do: doM } : {}) }).toString();
+  const { data, isLoading } = useQuery<{ odpowiedzi: number; tekstyWidoczne: boolean; minOdpowiedzi: number; pytania: Array<{ id: string; typ: string; tresc: string; n: number; srednia?: number | null; rozklad?: number[]; tak?: number; nie?: number; teksty?: string[]; tekstyUkryte?: boolean }> }>({
+    queryKey: ["/api/admin/szkolenie/ankieta", parametry],
+    queryFn: async () => (await apiRequest("GET", `/api/admin/szkolenie/ankieta${parametry ? `?${parametry}` : ""}`)).json(),
     staleTime: 0,
   });
-  if (isLoading || !data) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
   return (
-    <Card>
-      <CardHeader><CardTitle>Raport ankiety ({data.odpowiedzi} {data.odpowiedzi === 1 ? "odpowiedź" : "odpowiedzi"})</CardTitle></CardHeader>
+    <Card data-testid="raport-ankiety">
+      <CardHeader><CardTitle>Raport ankiety{data ? ` (${data.odpowiedzi} ${data.odpowiedzi === 1 ? "odpowiedź" : "odpowiedzi"})` : ""}</CardTitle></CardHeader>
       <CardContent className="space-y-5">
         <p className="text-sm text-muted-foreground">Ankieta jest anonimowa: odpowiedzi nie mają powiązania z kontem ani dokładnej daty (tylko miesiąc).</p>
-        {data.pytania.map((p) => (
-          <div key={p.id} className="border-t border-border pt-3 text-sm">
-            <p className="font-medium">{p.tresc}</p>
-            {p.typ === "skala" && <p>Średnia: {p.srednia ?? "brak"} (n = {p.n}) · rozkład od 1 do 5: {p.rozklad?.join(" / ")}</p>}
-            {p.typ === "tak_nie" && <p>Tak: {p.tak} · Nie: {p.nie}</p>}
-            {p.typ === "tekst" && (p.teksty?.length ? <ul className="list-disc pl-5">{p.teksty.map((t, i) => <li key={i}>{t}</li>)}</ul> : <p className="text-muted-foreground">Brak uwag.</p>)}
-          </div>
-        ))}
+        <div className="flex flex-wrap items-end gap-3 text-sm">
+          <label className="grid gap-1">Od miesiąca<Input type="month" value={od} onChange={(e) => setOd(e.target.value)} /></label>
+          <label className="grid gap-1">Do miesiąca<Input type="month" value={doM} onChange={(e) => setDoM(e.target.value)} /></label>
+          {(od || doM) && <Button variant="ghost" size="sm" onClick={() => { setOd(""); setDoM(""); }}>Cały okres</Button>}
+        </div>
+        {isLoading || !data ? <div className="flex justify-center py-6"><LoadingSpinner /></div> : (
+          <>
+            {!data.tekstyWidoczne && (
+              <p className="text-sm text-muted-foreground" data-testid="ankieta-teksty-ukryte">
+                Odpowiedzi tekstowe pokażemy, gdy w wybranym okresie będzie co najmniej {data.minOdpowiedzi} ankiet (teraz: {data.odpowiedzi}). Przy mniejszej liczbie łatwo rozpoznać autora.
+              </p>
+            )}
+            {data.pytania.map((p) => (
+              <div key={p.id} className="border-t border-border pt-3 text-sm">
+                <p className="font-medium">{p.tresc}</p>
+                {p.typ === "skala" && <p>Średnia: {p.srednia ?? "brak"} (n = {p.n}) · rozkład od 1 do 5: {p.rozklad?.join(" / ")}</p>}
+                {p.typ === "tak_nie" && <p>Tak: {p.tak} · Nie: {p.nie}</p>}
+                {p.typ === "tekst" && (p.teksty?.length
+                  ? <ul className="list-disc pl-5">{p.teksty.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                  : <p className="text-muted-foreground">{p.tekstyUkryte ? `Uwagi ukryte (${p.n}), za mało ankiet w okresie.` : "Brak uwag."}</p>)}
+              </div>
+            ))}
+          </>
+        )}
       </CardContent>
     </Card>
   );
@@ -442,7 +503,7 @@ function UstawieniaSzkolenia() {
           {przelacznik("regulamin_szkolenia_opublikowany", "Regulamin szkolenia opublikowany", "Po publikacji zapis wymaga akceptacji regulaminu.")}
           {przelacznik("weryfikacja_pwz_reczna", "Ręczne sprawdzenie PWZ przed zaświadczeniem z punktami", "Zespół porównuje dane z publicznym rejestrem NIL albo NIPiP (Uczestnicy → „PWZ sprawdzony”). Do tego czasu uczestnik może pobrać zaświadczenie ukończenia bez punktów.")}
           <div className="flex items-start justify-between gap-6 py-3">
-            <div><p className="font-medium">Wgląd w oceniony test</p><p className="text-sm text-muted-foreground">Całe podejście (pytania, odpowiedzi, klucz, uzasadnienia) albo tylko błędne odpowiedzi.</p></div>
+            <div><p className="font-medium">Wgląd w oceniony test</p><p className="text-sm text-muted-foreground">Po zaliczeniu albo po ostatnim podejściu: całe podejście (pytania, odpowiedzi, klucz, uzasadnienia) albo tylko błędne. Wcześniej uczestnik widzi tylko wynik i odsetek poprawnych w modułach.</p></div>
             <select className="rounded-md border border-border bg-background px-2 py-1 text-sm" value={data.test_wglad} onChange={(e) => ustaw("test_wglad", e.target.value)}>
               <option value="pelny">całe podejście</option><option value="bledne">tylko błędne</option>
             </select>
@@ -545,7 +606,7 @@ function RaportIzby() {
 
 /** Pula testu: pytania, które nie spełniają warunku (≥ 5 odpowiedzi, dokładnie 1 poprawna), są pomijane */
 function PulaTestu() {
-  const { data } = useQuery<{ kwalifikuje: number; odrzucone: Array<{ id: string; externalId: string | null; tytul: string | null; powod: string }> }>({
+  const { data } = useQuery<{ kwalifikuje: number; liczbaPytan: number; zaMala: boolean; odrzucone: Array<{ id: string; externalId: string | null; tytul: string | null; powod: string }> }>({
     queryKey: ["/api/admin/szkolenie/pula-testu"],
     queryFn: async () => (await apiRequest("GET", "/api/admin/szkolenie/pula-testu")).json(),
     staleTime: 0,
@@ -554,7 +615,12 @@ function PulaTestu() {
   return (
     <Card data-testid="pula-testu">
       <CardHeader><CardTitle>Pula testu: {data.kwalifikuje} pytań w losowaniu</CardTitle></CardHeader>
-      <CardContent className="text-sm">
+      <CardContent className="text-sm space-y-2">
+        {data.zaMala && (
+          <p className="text-destructive" data-testid="pula-za-mala">
+            Pula jest mała: {data.kwalifikuje} pytań przy {data.liczbaPytan} w teście. Zalecane co najmniej {2 * data.liczbaPytan}, inaczej kolejne podejścia mają prawie ten sam zestaw pytań. Test działa, to tylko ostrzeżenie.
+          </p>
+        )}
         {data.odrzucone.length === 0 ? (
           <p className="text-muted-foreground">Wszystkie opublikowane pytania puli testu spełniają warunek: co najmniej 5 odpowiedzi i dokładnie 1 poprawna.</p>
         ) : (

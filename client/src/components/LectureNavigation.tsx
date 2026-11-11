@@ -138,9 +138,17 @@ export function LectureNavigation({ sectionId, sectionTitle, hasLecture, check, 
     [sectionId, queryClient],
   );
 
+  // Każdy rozdział wysyłamy przy pierwszym wyświetleniu od razu (bez czekania 1 s): serwer zapisuje otwarcie
+  // każdego rozdziału, a wykład w szkoleniu z punktami jest ukończony dopiero, gdy otwarto wszystkie
+  const wyslane = useRef<{ sectionId: string; nr: Set<number> }>({ sectionId, nr: new Set() });
   useEffect(() => {
     if (resumed === null || !total) return;
     const p = { chapter: safeIndex + 1, total };
+    if (wyslane.current.sectionId !== sectionId) wyslane.current = { sectionId, nr: new Set() };
+    if (!wyslane.current.nr.has(p.chapter)) {
+      wyslane.current.nr.add(p.chapter);
+      saveRead(sectionId, p.chapter, p.total).catch(() => {});
+    }
     pending.current = p;
     // Pamięć podręczna od razu: powrót do wykładu w tej samej sesji trafia we właściwe miejsce
     queryClient.setQueryData<LectureRead[]>(READS_KEY, (prev) => [

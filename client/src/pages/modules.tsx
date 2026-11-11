@@ -219,7 +219,7 @@ export default function Modules() {
                 </summary>
 
                 <div className="pb-8 grid gap-8 sm:gap-10 sm:pl-[60px]">
-                  {module.cme === false && (
+                  {pokazSzkolenie && module.cme === false && (
                     <p className="label" data-testid="modul-poza-szkoleniem">Moduł dodatkowy, poza szkoleniem z punktami</p>
                   )}
                   {module.description && (
@@ -228,7 +228,8 @@ export default function Modules() {
                     </p>
                   )}
 
-                  {!module.isLocked && (
+                  {/* strona modułu i „Napisz do prowadzącego” należą do szkolenia: tylko gdy jest włączone (albo podgląd zespołu) */}
+                  {pokazSzkolenie && !module.isLocked && (
                     <p className="flex flex-wrap gap-x-5 gap-y-1 text-ui">
                       <Link href={`/modul/${module.id}`} className="underline" data-testid={`modul-strona-${module.id}`}>
                         {module.hasSummary || module.hasBibliography ? "Podsumowanie i bibliografia" : "Strona modułu"}

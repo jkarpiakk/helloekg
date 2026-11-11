@@ -11,7 +11,7 @@ import { sanitizeHtml } from "@/lib/sanitize";
 import { cn } from "@/lib/utils";
 import { plural } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
-import { bladSerwera, dataGodzinaPL, liczbaPL, SZKOLENIE_KEY, type StanPodejsc, type ZasadyTestu } from "@/lib/szkolenie";
+import { bladSerwera, dataGodzinaPL, liczbaPL, opisWgladu, SZKOLENIE_KEY, type StanPodejsc, type ZasadyTestu } from "@/lib/szkolenie";
 
 interface PytanieTestu {
   id: string;
@@ -33,6 +33,7 @@ interface Podejscie {
 interface StanTestu {
   zapisany: boolean;
   odblokowany: boolean;
+  zespol: boolean;
   brakujaceModuly: string[];
   pulaPusta: boolean;
   stan: StanPodejsc;
@@ -48,6 +49,10 @@ interface Wynik {
   prog: number;
   automatycznie: boolean;
   wglad: "pelny" | "bledne";
+  /** "podsumowanie": niezaliczone, zostały podejścia (bez pytań, klucza i uzasadnień) */
+  zakres: "pelny" | "bledne" | "podsumowanie";
+  pozostale: number;
+  moduly: Array<{ modul: string | null; tytul: string; dobrze: number; wszystkie: number }>;
   pytania: Array<{ nr: number; ok: boolean; title: string; bodyMd: string; imageUrl: string | null; answers: Array<{ index: number; text: string }>; wybrana: number | null; poprawne: number[]; wyjasnienie: string }>;
 }
 
@@ -171,7 +176,11 @@ export default function SzkolenieTest() {
           <p className="lead">
             {wynik.wynik} z {wynik.maks} poprawnych odpowiedzi, próg {liczbaPL(wynik.prog)}%.{" "}
             {wynik.automatycznie && "Czas minął: liczą się odpowiedzi zapisane przed końcem czasu. "}
-            {wynik.zaliczony ? "Teraz krótka anonimowa ankieta, a po niej zaświadczenie." : "Przejrzyj uzasadnienia poniżej. Kolejne podejście to nowy zestaw pytań."}
+            {wynik.zaliczony
+              ? "Teraz krótka anonimowa ankieta, a po niej zaświadczenie."
+              : wynik.zakres === "podsumowanie"
+                ? "Kolejne podejście to nowy zestaw pytań. Pytania, klucz i uzasadnienia zobaczysz po zaliczeniu testu albo po wykorzystaniu wszystkich podejść."
+                : "Przejrzyj uzasadnienia poniżej."}
           </p>
           <div className="flex flex-wrap gap-3">
             {wynik.zaliczony ? (
@@ -181,6 +190,19 @@ export default function SzkolenieTest() {
             )}
           </div>
         </header>
+        {wynik.moduly.length > 0 && (
+          <section className="grid gap-3" aria-labelledby="moduly-wynik" data-testid="test-moduly">
+            <h2 id="moduly-wynik" className="h3">Poprawne odpowiedzi w modułach</h2>
+            <ul className="rows [&>li:last-child]:border-b-0">
+              {wynik.moduly.map((m, k) => (
+                <li key={k} className="row py-3 grid-cols-[minmax(0,1fr)_auto] gap-3">
+                  <span className="text-body">{m.tytul.replace(/^\s*moduł\s*\d+\s*[:.-]\s*/i, "")}</span>
+                  <span className="text-ui tabular-nums">{m.dobrze} z {m.wszystkie} ({m.wszystkie ? liczbaPL(Math.round((m.dobrze / m.wszystkie) * 100)) : 0}%)</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {wynik.pytania.length > 0 && (
           <section className="grid gap-6" aria-labelledby="bledne">
             <h2 id="bledne" className="h3">
@@ -235,10 +257,12 @@ export default function SzkolenieTest() {
           {z.limitMinut > 0 && <li>Na rozwiązanie masz {z.limitMinut} min. Po tym czasie test odda się sam z zapisanymi odpowiedziami.</li>}
           <li>Najwyżej {z.limit} {plural(z.limit, "podejście", "podejścia", "podejść")}; po {z.przerwaPo}. niezaliczonym {liczbaPL(z.przerwaGodziny)} h przerwy.</li>
           <li>W trakcie nie zobaczysz, czy odpowiedź jest dobra. Odpowiedzi zapisują się od razu, możesz wrócić do testu później.</li>
-          <li>{z.wglad === "pelny" ? "Po oddaniu zobaczysz wynik i całe ocenione podejście: pytania, swoje odpowiedzi, klucz i uzasadnienia." : "Wynik i uzasadnienia błędnych odpowiedzi zobaczysz po oddaniu testu."}</li>
+          <li>{opisWgladu(z.wglad)}</li>
         </ul>
         {!stan.zapisany ? (
           <p className="text-body">Najpierw <Link href="/szkolenie" className="underline">zapisz się na szkolenie</Link>.</p>
+        ) : stan.zespol ? (
+          <p className="text-body" data-testid="test-zespol">Podgląd zespołu: konta zespołu nie zdają testu (mają dostęp do klucza).</p>
         ) : !stan.odblokowany ? (
           <p className="text-body" data-testid="test-zablokowany">
             {stan.pulaPusta ? "Test jest w przygotowaniu." : `Test otworzy się po ukończeniu wszystkich modułów. Zostało: ${stan.brakujaceModuly.join(", ")}.`}
@@ -250,7 +274,7 @@ export default function SzkolenieTest() {
         ) : s.stan === "wyczerpane" ? (
           <p className="text-body">Wykorzystano wszystkie podejścia. Napisz do nas: kontakt@helloekg.pl.</p>
         ) : null}
-        {mozna && (
+        {mozna && !stan.zespol && (
           <div>
             <Button onClick={() => start.mutate()} disabled={start.isPending} data-testid="test-rozpocznij">
               {s.stan === "w_toku" ? "Wróć do testu" : `Rozpocznij podejście ${s.wykorzystane + 1} z ${z.limit}`}

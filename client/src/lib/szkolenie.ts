@@ -19,6 +19,8 @@ export interface ZapisSzkolenia {
   powodBezPunktow: string | null;
   /** Reguła daje punkty, ale zespół jeszcze nie sprawdził PWZ w publicznym rejestrze */
   czekaNaWeryfikacje: boolean;
+  /** Reguła daje punkty, ale dane organizatora (adres, kierownik naukowy, podpisujący) są niekompletne */
+  czekaNaOrganizatora: boolean;
 }
 
 export interface StanModuluSzkolenia {
@@ -83,7 +85,7 @@ export interface StanSzkolenia {
   weryfikacjaDni: number;
   zapisy: ZapisSzkolenia[];
   moduly: StanModuluSzkolenia[];
-  test: { odblokowany: boolean; stan: StanPodejsc; zasady: ZasadyTestu; pulaPusta: boolean; podejscia: PodejscieTestu[] };
+  test: { odblokowany: boolean; zespol: boolean; stan: StanPodejsc; zasady: ZasadyTestu; pulaPusta: boolean; podejscia: PodejscieTestu[] };
   ankieta: { wypelniona: boolean; dostepna: boolean };
   zaswiadczenia: ZaswiadczenieSzkolenia[];
 }
@@ -122,3 +124,11 @@ export const dataGodzinaPL = (d: string | Date) =>
   fmt({ day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(d));
 
 export const liczbaPL = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(".", ","));
+
+/** Opis wglądu w test (regulamin § 4 pkt 5: warunki udostępniania do wglądu) */
+export const opisWgladu = (wglad: "pelny" | "bledne") =>
+  `Po niezaliczonym podejściu, gdy zostały kolejne, zobaczysz wynik i odsetek poprawnych odpowiedzi w każdym module. ${
+    wglad === "pelny"
+      ? "Pełny wgląd (pytania, twoje odpowiedzi, klucz i uzasadnienia) otworzy się po zaliczeniu testu albo po wykorzystaniu wszystkich podejść."
+      : "Uzasadnienia błędnych odpowiedzi zobaczysz po zaliczeniu testu albo po wykorzystaniu wszystkich podejść."
+  }`;

@@ -15,6 +15,7 @@ import {
   dataGodzinaPL,
   dataPL,
   liczbaPL,
+  opisWgladu,
   SZKOLENIE_KEY,
   useSzkolenie,
   type StanModuluSzkolenia,
@@ -181,7 +182,7 @@ function WierszModulu({ m, nr }: { m: StanModuluSzkolenia; nr: number }) {
 function OpisTestu({ stan, zapisany }: { stan: StanSzkolenia; zapisany: boolean }) {
   const t = stan.test;
   const z = t.zasady;
-  const zasady = `${z.liczbaPytan} ${plural(z.liczbaPytan, "pytanie", "pytania", "pytań")} jednokrotnego wyboru${z.limitMinut ? `, ${z.limitMinut} min na rozwiązanie` : ""}, próg ${liczbaPL(z.prog)}%, najwyżej ${z.limit} ${plural(z.limit, "podejście", "podejścia", "podejść")}. Po ${z.przerwaPo}. niezaliczonym podejściu ${liczbaPL(z.przerwaGodziny)} h przerwy. Każde podejście to nowy zestaw pytań. Po oddaniu zobaczysz ${z.wglad === "pelny" ? "całe ocenione podejście z kluczem i uzasadnieniami" : "uzasadnienia błędnych odpowiedzi"}.`;
+  const zasady = `${z.liczbaPytan} ${plural(z.liczbaPytan, "pytanie", "pytania", "pytań")} jednokrotnego wyboru${z.limitMinut ? `, ${z.limitMinut} min na rozwiązanie` : ""}, próg ${liczbaPL(z.prog)}%, najwyżej ${z.limit} ${plural(z.limit, "podejście", "podejścia", "podejść")}. Po ${z.przerwaPo}. niezaliczonym podejściu ${liczbaPL(z.przerwaGodziny)} h przerwy. Każde podejście to nowy zestaw pytań. ${opisWgladu(z.wglad)}`;
   const oddane = t.podejscia.filter((p) => p.submittedAt);
   const ostatnie = t.podejscia.filter((p) => p.submittedAt).at(-1);
   return (
@@ -203,6 +204,8 @@ function OpisTestu({ stan, zapisany }: { stan: StanSzkolenia; zapisany: boolean 
       )}
       {!zapisany ? (
         <p className="text-body text-[var(--txt2)]">Najpierw zapisz się na szkolenie.</p>
+      ) : t.zespol ? (
+        <p className="text-body text-[var(--txt2)]" data-testid="test-zespol">Podgląd zespołu: konta zespołu nie zdają testu i nie dostają zaświadczeń z punktami (mają dostęp do klucza).</p>
       ) : t.stan.stan === "zaliczony" ? (
         <p className="text-body inline-flex items-center gap-2" data-testid="test-zaliczony"><Check className="h-4 w-4 text-[var(--puls)]" aria-hidden />Test zaliczony.</p>
       ) : t.pulaPusta ? (
@@ -249,7 +252,13 @@ function Zaswiadczenia({ stan }: { stan: StanSzkolenia }) {
               <b className="first-letter:uppercase">{z.zawodNazwa}</b>
               {!gotowe && <span className="!text-ui">Po teście i ankiecie.</span>}
               {gotowe && !dajePunkty && !ukonczenie && <span className="!text-ui">Bez punktów: {z.powodBezPunktow}</span>}
-              {gotowe && dajePunkty && !zPunktami && z.czekaNaWeryfikacje && (
+              {gotowe && dajePunkty && !zPunktami && z.czekaNaOrganizatora && (
+                <span className="!text-ui" data-testid={`czeka-organizator-${z.zawod}`}>
+                  Zaświadczenie z punktami czeka na uzupełnienie danych organizatora.
+                  {!ukonczenie && " Już teraz możesz pobrać zaświadczenie ukończenia bez punktów."}
+                </span>
+              )}
+              {gotowe && dajePunkty && !zPunktami && !z.czekaNaOrganizatora && z.czekaNaWeryfikacje && (
                 <span className="!text-ui" data-testid={`czeka-${z.zawod}`}>
                   Zaświadczenie z punktami ({liczbaPL(z.punkty!)} pkt) czeka na weryfikację danych (zwykle do {stan.weryfikacjaDni} dni roboczych).
                   {!ukonczenie && " Już teraz możesz pobrać zaświadczenie ukończenia bez punktów."}
@@ -270,12 +279,12 @@ function Zaswiadczenia({ stan }: { stan: StanSzkolenia }) {
               ))}
               {gotowe && (
                 <span className="flex flex-wrap gap-3">
-                  {dajePunkty && !zPunktami && !z.czekaNaWeryfikacje && (
+                  {dajePunkty && !zPunktami && !z.czekaNaWeryfikacje && !z.czekaNaOrganizatora && (
                     <Button size="sm" disabled={wydaj.isPending} onClick={() => wydaj.mutate({ zapisId: z.id, rodzaj: "punkty" })} data-testid={`odbierz-${z.zawod}-punkty`}>
                       Odbierz zaświadczenie z punktami
                     </Button>
                   )}
-                  {!ukonczenie && (!dajePunkty || (z.czekaNaWeryfikacje && !zPunktami)) && (
+                  {!ukonczenie && (!dajePunkty || ((z.czekaNaWeryfikacje || z.czekaNaOrganizatora) && !zPunktami)) && (
                     <Button size="sm" variant={dajePunkty ? "outline" : "default"} disabled={wydaj.isPending} onClick={() => wydaj.mutate({ zapisId: z.id, rodzaj: "ukonczenie" })} data-testid={`odbierz-${z.zawod}-ukonczenie`}>
                       {dajePunkty ? "Pobierz zaświadczenie ukończenia bez punktów" : "Odbierz zaświadczenie ukończenia"}
                     </Button>
