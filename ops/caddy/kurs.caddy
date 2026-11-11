@@ -15,10 +15,11 @@ kurs.helloekg.pl {
 		}
 		format filter {
 			fields {
-				request>uri query {
-					replace token REDACTED
-					replace session_id REDACTED
-				}
+				# Jeden filtr na pole (standardowy Caddy nie ma „multiple”), więc jedno wyrażenie robi oba zastąpienia:
+				# - klucz weryfikacji zaświadczenia w ścieżce: /zaswiadczenie/<klucz> (strona) i /api/zaswiadczenia/<klucz> (API),
+				# - token i session_id w zapytaniu (linki z maili), jak dawny filtr `query`.
+				# Niedopasowana grupa w Go regexp daje pusty tekst, więc ${1}${2} działa dla obu gałęzi.
+				request>uri regexp "^(/(?:api/)?zaswiadczeni[ae]/)[^/?]+|([?&](?:token|session_id)=)[^&]*" "${1}${2}REDACTED"
 				# Referer niesie adres poprzedniej strony, a ten bywał linkiem z tokenem z maila
 				request>headers>Referer delete
 				request>headers>Cookie delete

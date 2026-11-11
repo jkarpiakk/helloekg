@@ -21,7 +21,12 @@
  * `programMdApp` (po toAppMarkdown studia, jak contentMdApp wykładów) mają pierwszeństwo przed surowymi. Starsze paczki: wartości domyślne
  * (pula ćwiczeń, tasowanie, bez wykluczeń; podsumowania i program bez zmian; szkolenie: wszystko poza S8).
  *
- * UWAGA (tylko --replace): zastępuje CAŁĄ treść kursu razem z postępami.
+ * UWAGA (tylko --replace): zastępuje CAŁĄ treść kursu razem z postępami nauki. Rejestr szkolenia z punktami
+ * (cme_*) nie ma kluczy obcych z kaskadą do treści: zostaje, a postęp wykładów i modułów dopasowuje się
+ * po identyfikatorach studia (kopie w cme_lecture_progress i cme_module_progress).
+ *
+ * Pula: pytanie, które ma odpowiedzi w ćwiczeniach (attempts), nie przechodzi z ćwiczeń do testu (klucz
+ * jest znany z nauki). Zostaje w ćwiczeniach i trafia na listę KONFLIKTY w raporcie synchronizacji.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -248,7 +253,7 @@ async function zapiszProgram(tx: any) {
 }
 
 async function sync(authorId: string) {
-  const st = { modules: { added: 0, updated: 0 }, sections: { added: 0, updated: 0 }, chapters: 0, questions: { added: 0, updated: 0, retired: 0 }, published: 0, draft: 0 };
+  const st = { modules: { added: 0, updated: 0 }, sections: { added: 0, updated: 0 }, chapters: 0, questions: { added: 0, updated: 0, retired: 0 }, published: 0, draft: 0, konflikty: [] as string[] };
   const DryRun = new Error("dry-run");
   try {
     await db.transaction(async (tx) => {
@@ -318,10 +323,19 @@ async function sync(authorId: string) {
           seenQ.add(q.externalId);
           const row = questionRow(q, pos.get(q.externalId) ?? i, (q.lectureExternalId && sectionByLecture.get(q.lectureExternalId)) || looseId, authorId, st);
           if (!row.sectionId) throw new Error(`Pytanie bez tematu: ${q.externalId}`);
-          const [existing] = await tx.select({ id: questions.id }).from(questions)
+          const [existing] = await tx.select({ id: questions.id, pool: questions.pool }).from(questions)
             .where(sql`${questions.tags}::jsonb ? ${"studio:" + q.externalId}`).limit(1);
           if (existing) {
             const { createdBy: _c, ...upd } = row as any;
+            // Pytanie z odpowiedziami w ćwiczeniach nie przechodzi do puli testu: klucz zna każdy, kto je ćwiczył.
+            // Zostaje w ćwiczeniach; konflikt w raporcie importu (decyzja w studiu: nowe pytanie do testu).
+            if (existing.pool === "practice" && upd.pool === "test") {
+              const { rows: [{ n }] } = await tx.execute(sql`SELECT count(*)::int AS n FROM attempts WHERE question_id = ${existing.id}`) as unknown as { rows: Array<{ n: number }> };
+              if (n > 0) {
+                upd.pool = "practice";
+                st.konflikty.push(`${q.externalId}: ćwiczenia → test zablokowane (${n} odpowiedzi w ćwiczeniach), zostaje w ćwiczeniach`);
+              }
+            }
             await tx.update(questions).set({ ...upd, updatedAt: new Date() }).where(eq(questions.id, existing.id));
             st.questions.updated++;
           } else {
@@ -345,7 +359,12 @@ async function sync(authorId: string) {
     if (e !== DryRun) throw e;
     console.log("PRÓBA (nic nie zapisano):");
   }
-  console.log("Synchronizacja:", JSON.stringify(st));
+  const { konflikty, ...liczby } = st;
+  console.log("Synchronizacja:", JSON.stringify(liczby));
+  if (konflikty.length) {
+    console.log(`KONFLIKTY puli (${konflikty.length}): pytanie z odpowiedziami w ćwiczeniach nie przechodzi do testu`);
+    for (const k of konflikty) console.log(`  ${k}`);
+  }
 }
 
 async function main() {
@@ -387,7 +406,7 @@ async function main() {
       let order = 1;
 
       for (const l of lecs) {
-        const [sec] = await tx.insert(sections).values({ moduleId: mod.id, title: l.title, order: order++ }).returning();
+        const [sec] = await tx.insert(sections).values({ moduleId: mod.id, externalId: l.externalId, title: l.title, order: order++ }).returning();
         sectionByLecture.set(l.externalId, sec.id);
         stats.sections++;
         const chapters = splitChapters(l.title, fixLecture(l.contentMdApp)).map(withWidgets);

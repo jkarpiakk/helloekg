@@ -8,6 +8,20 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { getTableColumns } from "drizzle-orm";
 import {
+  brakiOrganizatora,
+  brakiReguly,
+  brakujaceRozdzialy,
+  czyRolaZespolu,
+  daneZgodne,
+  etykietaGodzin,
+  poczatekObowiazywania,
+  pozaObowiazywaniem,
+  pulaZaMala,
+  pytaniaDoOceny,
+  raportAnkietyZ,
+  udzialModulow,
+  zakresWgladu,
+  type KopiaPytan,
   czyNumerZaswiadczenia,
   kluczWeryfikacji,
   losujTest,
@@ -30,8 +44,11 @@ import {
   type RegulaPunktow,
 } from "../../server/szkolenie/logika";
 import { komorkaCsv } from "../../server/szkolenie/csv";
-import { cmeSurveyResponses } from "../../shared/schema";
+import { pdfZaswiadczenia, wierszeZaswiadczenia } from "../../server/szkolenie/pdf";
+import { cmeChapterProgress, cmeLectureProgress, cmeModuleProgress, cmeSurveyResponses, type CmeCertificate } from "../../shared/schema";
 import {
+  oczyscTekst,
+  zapisSchema,
   ANKIETA_DOMYSLNA,
   inicjaly,
   problemPwzLekarza,
@@ -313,15 +330,31 @@ describe("numeracja i weryfikacja zaświadczeń", () => {
     expect(rokWPolsce(new Date("2026-12-31T22:30:00Z"))).toBe(2026);
   });
 
-  it("publiczna weryfikacja: tylko inicjały, bez PWZ, zawodu i pełnego nazwiska", () => {
+  it("publiczna weryfikacja: rodzaj, punkty, zawód i godziny; inicjały, bez PWZ i pełnego nazwiska", () => {
     const v = widokWeryfikacji({
       number: "HE-2026-000007",
       valid: true,
       issuedAt: new Date("2026-11-11T12:00:00Z"),
-      snapshot: { imie: "Testowa Anna", nazwisko: "Przykładowa-Nowak", pwz: "3123456", zawod: "ratownik", tytul: "Kurs EKG" },
+      kind: "punkty", points: "10.00", hours: "53.00", profession: "ratownik",
+      snapshot: { imie: "Testowa Anna", nazwisko: "Przykładowa-Nowak", pwz: "3123456", zawod: "ratownik", zawodNazwa: "ratownik medyczny", tytul: "Kurs EKG" },
     }, inicjaly);
-    expect(v).toEqual({ numer: "HE-2026-000007", wazne: true, tytul: "Kurs EKG", dataWydania: "11.11.2026", inicjaly: "T. A. P.-N." });
-    expect(JSON.stringify(v)).not.toMatch(/3123456|ratownik|Przykładowa/);
+    expect(v).toEqual({
+      numer: "HE-2026-000007", wazne: true, uniewaznione: null, rodzaj: "punkty", rodzajNazwa: "z punktami edukacyjnymi", punkty: 10,
+      zawod: "ratownik medyczny", zawodDeklarowany: false, godziny: 53, etykietaGodzin: "Liczba godzin dydaktycznych (45 min)",
+      tytul: "Kurs EKG", dataWydania: "11.11.2026", inicjaly: "T. A. P.-N.",
+    });
+    expect(JSON.stringify(v)).not.toMatch(/3123456|Przykładowa/);
+  });
+
+  it("weryfikacja zaświadczenia ukończenia: bez punktów, zawód deklarowany, gdy PWZ niesprawdzony (dopisanie punktów w PDF nie przejdzie)", () => {
+    const baza = { number: "HE-2026-000009", valid: true, issuedAt: new Date("2026-11-11T12:00:00Z"), kind: "ukonczenie", points: null, hours: 53, profession: "lekarz" };
+    const v = widokWeryfikacji({ ...baza, snapshot: { imie: "A", nazwisko: "B", zawod: "lekarz", zawodNazwa: "lekarz", pwz: "3123456", pwzSprawdzonyAt: null } }, inicjaly);
+    expect(v).toMatchObject({ rodzaj: "ukonczenie", punkty: null, zawod: "lekarz", zawodDeklarowany: true, etykietaGodzin: "Liczba godzin programu" });
+    expect(v.rodzajNazwa).toMatch(/bez punktów/);
+    const sprawdzony = widokWeryfikacji({ ...baza, snapshot: { imie: "A", nazwisko: "B", zawod: "lekarz", pwzSprawdzonyAt: "2026-11-11T10:00:00Z" } }, inicjaly);
+    expect(sprawdzony.zawodDeklarowany).toBe(false);
+    // „punkty” bez wartości punktów w bazie to nadal zaświadczenie bez punktów
+    expect(widokWeryfikacji({ ...baza, kind: "punkty", snapshot: {} }, inicjaly).rodzaj).toBe("ukonczenie");
   });
 
   it("klucz weryfikacji: 128 losowych bitów (base64url), za każdym razem inny", () => {
@@ -345,9 +378,10 @@ describe("numeracja i weryfikacja zaświadczeń", () => {
     expect(kluczWeryfikacji(k)).toBe(k);
   });
 
-  it("unieważnione zaświadczenie: ważne = false", () => {
-    const v = widokWeryfikacji({ number: "HE-2026-000008", valid: false, issuedAt: new Date(), snapshot: { imie: "Ła", nazwisko: "Żó" } }, inicjaly);
+  it("unieważnione zaświadczenie: ważne = false, z datą unieważnienia", () => {
+    const v = widokWeryfikacji({ number: "HE-2026-000008", valid: false, issuedAt: new Date(), invalidatedAt: new Date("2026-12-02T10:00:00Z"), snapshot: { imie: "Ła", nazwisko: "Żó" } }, inicjaly);
     expect(v.wazne).toBe(false);
+    expect(v.uniewaznione).toBe("02.12.2026");
     expect(v.inicjaly).toBe("Ł. Ż.");
   });
 });
@@ -356,6 +390,7 @@ describe("reguły punktów", () => {
   const baza = {
     pointsPerHour: 0, pointsGranted: null, maxPoints: null, minHours: null, testRequired: true, registryRequired: false,
     registryNumber: null, nrlResolution: null, formInfoAcceptedAt: null, decisionNumber: null, inactiveReason: null,
+    obowiazujeOd: "2026-01-01", obowiazujeDo: null,
   };
   const ratownik: RegulaPunktow = { ...baza, profession: "ratownik", active: true, pointsMode: "godziny", pointsPerHour: 1, maxPoints: 10, minHours: 4 };
   const lekarz: RegulaPunktow = {
@@ -392,6 +427,13 @@ describe("reguły punktów", () => {
     expect(regulaDziala({ ...lekarzKomplet, formInfoAcceptedAt: " " })).toBe(false);
     expect(regulaDziala({ ...lekarzKomplet, registryNumber: "26/123456/003/0001" })).toBe(false); // zły format
     expect(regulaDziala({ ...lekarzKomplet, active: false })).toBe(false);
+    expect(regulaDziala({ ...lekarzKomplet, obowiazujeOd: null })).toBe(false);
+    expect(brakiReguly({ ...lekarzKomplet, nrlResolution: null, obowiazujeOd: null })).toEqual(["uchwała Naczelnej Rady Lekarskiej", "data, od której reguła obowiązuje"]);
+  });
+
+  it("każda reguła z punktami wymaga daty „obowiązuje od” (ratownik bez daty nie daje punktów)", () => {
+    expect(regulaDziala({ ...ratownik, obowiazujeOd: null })).toBe(false);
+    expect(obliczPunkty({ ...ratownik, obowiazujeOd: null }, 53, true).punkty).toBeNull();
   });
 
   it("lekarz: punkty z uchwały NRL (wartość przyznana), nie liczone z godzin", () => {
@@ -512,5 +554,243 @@ describe("lista obecności CSV", () => {
     expect(komorkaCsv("Nowak; Anna")).toBe('"Nowak; Anna"');
     expect(komorkaCsv('a"b')).toBe('"a""b"');
     expect(komorkaCsv(null)).toBe("");
+  });
+});
+
+// ── Poprawki po przeglądzie 11.11 ────────────────────────────────────────────
+
+describe("wgląd w test (H1)", () => {
+  const z = { limit: 3, przerwaPo: 2, przerwaGodziny: 24 };
+  const t = (h: number) => new Date(Date.UTC(2026, 10, 11, h));
+
+  it("po niezaliczonym podejściu, gdy zostały kolejne: tylko podsumowanie (bez klucza)", () => {
+    const stan = stanPodejsc([{ submittedAt: t(8), passed: false }], t(9), z).stan;
+    expect(stan).toBe("mozna");
+    expect(zakresWgladu("pelny", stan)).toBe("podsumowanie");
+    expect(zakresWgladu("bledne", stan)).toBe("podsumowanie");
+    // także w przerwie i w trakcie kolejnego podejścia
+    expect(zakresWgladu("pelny", stanPodejsc([{ submittedAt: t(8), passed: false }, { submittedAt: t(9), passed: false }], t(10), z).stan)).toBe("podsumowanie");
+    expect(zakresWgladu("pelny", stanPodejsc([{ submittedAt: t(8), passed: false }, { submittedAt: null, passed: null }], t(10), z).stan)).toBe("podsumowanie");
+  });
+
+  it("po zaliczeniu albo po ostatnim podejściu: pełny wgląd (albo błędne przy „bledne”)", () => {
+    const zaliczony = stanPodejsc([{ submittedAt: t(8), passed: false }, { submittedAt: t(9), passed: true }], t(10), z).stan;
+    expect(zakresWgladu("pelny", zaliczony)).toBe("pelny");
+    const wyczerpane = stanPodejsc([1, 2, 3].map((h) => ({ submittedAt: t(h), passed: false })), t(40), z).stan;
+    expect(wyczerpane).toBe("wyczerpane");
+    expect(zakresWgladu("pelny", wyczerpane)).toBe("pelny");
+    expect(zakresWgladu("bledne", wyczerpane)).toBe("bledne");
+  });
+
+  it("udział poprawnych w modułach, w kolejności modułów, bez treści pytań", () => {
+    const kopia: KopiaPytan = Object.fromEntries([["a", "S2", 2], ["b", "S1", 1], ["c", "S1", 1]].map(([id, m, k]) => [id as string, {
+      externalId: null, sectionId: null, moduleId: `mod-${m}`, modul: m as string, modulTytul: `Moduł ${m}`, modulKolejnosc: k as number,
+      title: "x", bodyMd: "tajne", imageUrl: null, answers: [], explanationMd: "tajne",
+    }]));
+    const u = udzialModulow([{ questionId: "a", ok: true }, { questionId: "b", ok: false }, { questionId: "c", ok: true }], kopia);
+    expect(u).toEqual([{ modul: "S1", tytul: "Moduł S1", dobrze: 1, wszystkie: 2 }, { modul: "S2", tytul: "Moduł S2", dobrze: 1, wszystkie: 1 }]);
+    expect(JSON.stringify(u)).not.toMatch(/tajne/);
+  });
+
+  it("ostrzeżenie o małej puli: mniej niż 2 × liczba pytań", () => {
+    expect(pulaZaMala(50, 40)).toBe(true);
+    expect(pulaZaMala(79, 40)).toBe(true);
+    expect(pulaZaMala(80, 40)).toBe(false);
+  });
+});
+
+describe("okres obowiązywania reguły (H2)", () => {
+  const r = { obowiazujeOd: "2027-03-01", obowiazujeDo: "2027-12-31" };
+
+  it("szkolenie w całości w okresie: punkty", () => {
+    expect(pozaObowiazywaniem(r, new Date("2027-03-01T08:00:00Z"), new Date("2027-12-31T20:00:00Z"))).toBeNull();
+  });
+
+  it("zapis przed datą „od” (np. przed uchwałą NRL): bez punktów, z powodem", () => {
+    const p = pozaObowiazywaniem(r, new Date("2026-12-10T10:00:00Z"), new Date("2027-03-20T10:00:00Z"));
+    expect(p).toMatch(/10\.12\.2026.*01\.03\.2027.*nie działają wstecz/);
+  });
+
+  it("zaliczenie po dacie „do”: bez punktów", () => {
+    expect(pozaObowiazywaniem(r, new Date("2027-05-01T10:00:00Z"), new Date("2028-01-02T10:00:00Z"))).toMatch(/po dniu/);
+  });
+
+  it("granice dni w strefie Polski (28.02 23:30 UTC to już 1.03 w Polsce)", () => {
+    expect(pozaObowiazywaniem(r, new Date("2027-02-28T23:30:00Z"), new Date("2027-04-01T10:00:00Z"))).toBeNull();
+    expect(pozaObowiazywaniem(r, new Date("2027-02-28T22:30:00Z"), new Date("2027-04-01T10:00:00Z"))).not.toBeNull();
+    expect(pozaObowiazywaniem({ obowiazujeOd: "2027-03-01", obowiazujeDo: null }, new Date("2027-03-01T10:00:00Z"), new Date("2040-01-01T10:00:00Z"))).toBeNull();
+  });
+
+  it("bez daty „od”: bez punktów", () => {
+    expect(pozaObowiazywaniem({ obowiazujeOd: null }, new Date(), new Date())).toMatch(/nie ma jeszcze daty/);
+  });
+
+  it("lekarze: domyślne „od” = późniejsza z dat uchwały NRL i przyjęcia informacji o formie", () => {
+    expect(poczatekObowiazywania("2027-02-10", "2027-03-01")).toBe("2027-03-01");
+    expect(poczatekObowiazywania("2027-04-10", "2027-03-01")).toBe("2027-04-10");
+    expect(poczatekObowiazywania(null, "2027-03-01")).toBeNull();
+    expect(poczatekObowiazywania("10.02.2027", "2027-03-01")).toBeNull();
+  });
+});
+
+describe("zaświadczenie: dane organizatora, zawód, godziny, PDF (H3, M6, niskie)", () => {
+  const komplet = { organizator: { nazwa: "Testowy Organizator sp. z o.o.", adres: "ul. Przykładowa 1, 00-001 Warszawa" }, kierownikNaukowy: "Testowy Kierownik", kierownikNaukowyTytul: "dr n. med.", podpisujacy: "Testowa Osoba, prezes" };
+
+  it("zaświadczenie z punktami wymaga nazwy i adresu organizatora, kierownika naukowego z tytułem i podpisującego", () => {
+    expect(brakiOrganizatora(komplet)).toEqual([]);
+    expect(brakiOrganizatora({ ...komplet, organizator: { nazwa: "X", adres: " " }, kierownikNaukowyTytul: "", podpisujacy: "" }))
+      .toEqual(["adres organizatora", "tytuł kierownika naukowego", "osoba podpisująca za organizatora"]);
+  });
+
+  it("godzina dydaktyczna (45 min) tylko dla ratowników, innym „godziny programu”", () => {
+    expect(etykietaGodzin("ratownik")).toMatch(/45 min/);
+    for (const z of ["lekarz", "pielegniarka", "student"]) expect(etykietaGodzin(z)).toBe("Liczba godzin programu");
+  });
+
+  const cert = (kind: string, snap: Record<string, unknown>, rule: Record<string, unknown> = {}, valid = true): CmeCertificate => ({
+    id: "00000000-0000-0000-0000-000000000001", number: "HE-2026-000042", verificationToken: "A".repeat(22), participantId: "p", userId: null, enrollmentId: "e",
+    profession: String(snap.zawod), kind, points: kind === "punkty" ? "10.00" : null, hours: "53.00", testAttemptId: null,
+    issuedAt: new Date("2026-11-11T12:00:00Z"), valid, invalidatedAt: valid ? null : new Date("2026-11-12T12:00:00Z"), invalidatedReason: valid ? null : "Test",
+    snapshot: {
+      imie: "Testowa", nazwisko: "Uczestniczka", zawodNazwa: String(snap.zawod), tytul: "Kurs EKG", forma: "online", godziny: 53,
+      dataRozpoczecia: "2026-11-01T10:00:00Z", dataZakonczenia: "2026-11-10T10:00:00Z", punkty: kind === "punkty" ? 10 : null, powodBezPunktow: kind === "punkty" ? null : "Powód.",
+      organizator: { nazwa: "Org", adres: "Adres", krs: "", nip: "", email: "a@b.test", reklamacje: "a@b.test" }, kierownikNaukowy: "K", kierownikNaukowyTytul: "dr", podpisujacy: "P",
+      ...snap,
+    },
+    ruleSnapshot: rule,
+  });
+
+  it("ukończenie bez sprawdzonego PWZ: bez numeru PWZ, „Deklarowany zawód”", () => {
+    const w = wierszeZaswiadczenia(cert("ukonczenie", { zawod: "lekarz", pwz: "3123456", pwzSprawdzonyAt: null, specjalizacja: "kardiologia" }));
+    expect(w.map((x) => x[0])).toContain("Deklarowany zawód");
+    expect(JSON.stringify(w)).not.toMatch(/3123456|Numer prawa/);
+    const zPunktami = wierszeZaswiadczenia(cert("punkty", { zawod: "ratownik", pwz: "RM1", pwzSprawdzonyAt: "2026-11-10T00:00:00Z" }));
+    expect(zPunktami).toContainEqual(["Numer prawa wykonywania zawodu", "RM1"]);
+    expect(zPunktami).toContainEqual(["Liczba godzin dydaktycznych (45 min)", "53"]);
+    expect(wierszeZaswiadczenia(cert("ukonczenie", { zawod: "lekarz", pwz: "3123456", pwzSprawdzonyAt: "2026-11-10T00:00:00Z" })))
+      .toContainEqual(["Liczba godzin programu", "53"]);
+  });
+
+  const strony = (pdf: Buffer) => (pdf.toString("latin1").match(/\/Type \/Page\b(?!s)/g) ?? []).length;
+
+  it("PDF: długie pola reguły i nazwisko nie przepełniają strony (zawsze 1 strona A4)", async () => {
+    const dlugi = "Podstawa prawna bardzo długa ".repeat(40);
+    const c = cert("punkty", {
+      zawod: "ratownik", pwz: "RM1", imie: "Bardzozdługimimieniem Anna-Maria Katarzyna", nazwisko: "Przykładowa-Testowa-Nowakowska-Kowalska",
+      organizator: { nazwa: "Org ".repeat(40), adres: "Adres ".repeat(60), krs: "1", nip: "2", email: "a@b.test", reklamacje: "r ".repeat(150) },
+      specjalizacja: "s ".repeat(100),
+    }, { legalBasis: dlugi, pointsFormula: "f ".repeat(250), nrlResolution: "n ".repeat(100), registryNumber: "26-123456-003-0001", decisionNumber: "d ".repeat(100) });
+    const pdf = await pdfZaswiadczenia(c);
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(strony(pdf)).toBe(1);
+  });
+
+  it("PDF unieważnionego: znak UNIEWAŻNIONE (tytuł dokumentu) i nadal 1 strona", async () => {
+    const pdf = await pdfZaswiadczenia(cert("punkty", { zawod: "ratownik", pwz: "RM1" }, {}, false));
+    // tytuł w metadanych PDF: UTF-16BE w nawiasach
+    const utf16 = Buffer.from("UNIEWAŻNIONE", "utf16le").swap16();
+    expect(pdf.includes(utf16)).toBe(true);
+    expect(strony(pdf)).toBe(1);
+    const wazny = await pdfZaswiadczenia(cert("punkty", { zawod: "ratownik", pwz: "RM1" }));
+    expect(wazny.includes(utf16)).toBe(false);
+  });
+
+  it("dane wejściowe: znaki sterujące i kierunku pisma znikają ze specjalizacji; imię tylko w alfabecie łacińskim", () => {
+    expect(oczyscTekst("kardio\u202Elogia\u200B\u0007 \n dziecięca")).toBe("kardio logia dziecięca");
+    const baza = { oswiadczenie: true as const, zawody: [{ zawod: "lekarz" as const, pwz: "3123456", specjalizacja: "choroby\u202E wewnętrzne\u200D" }] };
+    const ok = zapisSchema.safeParse({ ...baza, imie: "Zoë Łucja", nazwisko: "O’Brien-Żak" });
+    expect(ok.success).toBe(true);
+    expect(ok.success && ok.data.zawody[0].specjalizacja).toBe("choroby wewnętrzne");
+    for (const imie of ["Анна", "李", "Ann\u202Ea", "Ann\u200Ba", "Ae\u0301\u0301\u0301\u0301"]) {
+      expect(zapisSchema.safeParse({ ...baza, imie, nazwisko: "Test" }).success).toBe(false);
+    }
+  });
+});
+
+describe("sprawdzenie PWZ (M4)", () => {
+  const z = { pwz: "3123456", firstName: "Testowa", lastName: "Osoba" };
+  it("zatwierdzamy tylko dane, które admin widział", () => {
+    expect(daneZgodne(z, { pwz: "3123456", imie: "Testowa", nazwisko: "Osoba" })).toBe(true);
+    expect(daneZgodne(z, { pwz: "3123457", imie: "Testowa", nazwisko: "Osoba" })).toBe(false);
+    expect(daneZgodne(z, { pwz: "3123456", imie: "Testowa", nazwisko: "Inna" })).toBe(false);
+    expect(daneZgodne({ ...z, pwz: null }, { pwz: null, imie: "Testowa", nazwisko: "Osoba" })).toBe(true);
+    expect(daneZgodne({ ...z, pwz: null }, { pwz: "3123456", imie: "Testowa", nazwisko: "Osoba" })).toBe(false);
+  });
+});
+
+describe("wykład ukończony = każdy rozdział otwarty (M7)", () => {
+  it("jedno żądanie z ostatnim rozdziałem nie ukończy wykładu", () => {
+    expect(brakujaceRozdzialy([5], 5)).toEqual([1, 2, 3, 4]);
+    expect(brakujaceRozdzialy([1, 2, 4, 5], 5)).toEqual([3]);
+    expect(brakujaceRozdzialy([3, 1, 2, 5, 4], 5)).toEqual([]);
+    expect(brakujaceRozdzialy([1, 2, 3, 99], 3)).toEqual([]);
+  });
+
+  it("tabela rozdziałów ma pierwsze otwarcie z godziną, bez pomiaru czasu", () => {
+    const kol = Object.keys(getTableColumns(cmeChapterProgress));
+    expect(kol).toEqual(expect.arrayContaining(["participantId", "sectionId", "chapterOrder", "firstOpenedAt"]));
+    expect(kol.some((k) => /czas|duration|seconds|time_?ms/i.test(k))).toBe(false);
+  });
+});
+
+describe("trwałość rejestru i kopia pytań (M8)", () => {
+  it("ocena z kopii z chwili losowania, także po edycji albo usunięciu pytania", () => {
+    const kopia: KopiaPytan = {
+      q1: { externalId: "T1", sectionId: null, moduleId: null, modul: null, modulTytul: null, modulKolejnosc: null, title: null, bodyMd: "", imageUrl: null, explanationMd: "",
+        answers: [{ text: "A", isCorrect: false }, { text: "B", isCorrect: true }, { text: "C", isCorrect: false }, { text: "D", isCorrect: false }, { text: "E", isCorrect: false }] },
+      q2: { externalId: "T2", sectionId: null, moduleId: null, modul: null, modulTytul: null, modulKolejnosc: null, title: null, bodyMd: "", imageUrl: null, explanationMd: "",
+        answers: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: false }, { text: "C", isCorrect: false }, { text: "D", isCorrect: false }, { text: "E", isCorrect: false }] },
+    };
+    // po imporcie: q1 ma inny klucz (poprawna przesunięta na 0), q2 usunięte z bazy
+    const zywe = new Map([["q1", { externalId: "T1", answers: [{ text: "B", isCorrect: true }, { text: "A", isCorrect: false }, { text: "C", isCorrect: false }, { text: "D", isCorrect: false }, { text: "E", isCorrect: false }] }]]);
+    const w = ocenTest(pytaniaDoOceny(["q1", "q2"], kopia, zywe), { q1: 1, q2: 0 }, 70);
+    expect(w.wynik).toBe(2);
+    expect(w.zaliczony).toBe(true);
+    // stare podejście bez kopii: bieżąca treść (q2 usunięte = błędne)
+    const bezKopii = ocenTest(pytaniaDoOceny(["q1", "q2"], null, zywe), { q1: 1, q2: 0 }, 70);
+    expect(bezKopii.wynik).toBe(0);
+  });
+
+  it("postęp wykładów i modułów bez klucza obcego do treści, z kopią identyfikatora i tytułu", () => {
+    const migr = fs.readFileSync(path.resolve(__dirname, "../../migrations/2026-11-11-punkty-2.sql"), "utf8");
+    expect(migr).toMatch(/DROP CONSTRAINT IF EXISTS cme_lecture_progress_section_id_fkey/);
+    expect(migr).toMatch(/DROP CONSTRAINT IF EXISTS cme_module_progress_module_id_fkey/);
+    expect(Object.keys(getTableColumns(cmeLectureProgress))).toEqual(expect.arrayContaining(["lectureExternalId", "lectureTitle", "moduleExternalId"]));
+    expect(Object.keys(getTableColumns(cmeModuleProgress))).toEqual(expect.arrayContaining(["moduleExternalId", "moduleTitle"]));
+    const schemat = fs.readFileSync(path.resolve(__dirname, "../../shared/schema.ts"), "utf8");
+    const blok = (nazwa: string) => schemat.slice(schemat.indexOf(`pgTable("${nazwa}"`), schemat.indexOf("});", schemat.indexOf(`pgTable("${nazwa}"`)));
+    for (const t of ["cme_lecture_progress", "cme_chapter_progress", "cme_module_progress"]) expect(blok(t)).not.toMatch(/sections\.id|modules\.id/);
+  });
+});
+
+describe("zespół (niskie)", () => {
+  it("owner, admin, reviewer i support nie zdają testu i nie dostają punktów; kursant tak", () => {
+    for (const r of ["owner", "admin", "reviewer", "support"]) expect(czyRolaZespolu(r)).toBe(true);
+    for (const r of ["student", "", null, undefined]) expect(czyRolaZespolu(r)).toBe(false);
+  });
+});
+
+describe("raport ankiety (M5)", () => {
+  const ankieta = { pytania: [{ id: "uwagi", typ: "tekst" as const, tresc: "Uwagi", wymagane: false }, { id: "ocena", typ: "skala" as const, tresc: "Ocena", wymagane: true }] };
+  const wiersz = (t: string | null) => ({ surveyVersion: "2", answers: { uwagi: t, ocena: 5 } });
+
+  it("odpowiedzi tekstowe ukryte poniżej 5 ankiet w okresie, liczby widoczne", () => {
+    const r = raportAnkietyZ(ankieta, [wiersz("uwaga 1"), wiersz(null), wiersz("uwaga 2"), wiersz("x")]);
+    expect(r.tekstyWidoczne).toBe(false);
+    expect(r.pytania[0]).toMatchObject({ teksty: [], tekstyUkryte: true, n: 3 });
+    expect(r.pytania[1]).toMatchObject({ n: 4, srednia: 5 });
+    const pelny = raportAnkietyZ(ankieta, [1, 2, 3, 4, 5].map((i) => wiersz(`uwaga ${i}`)));
+    expect(pelny.tekstyWidoczne).toBe(true);
+    expect(pelny.pytania[0].teksty).toHaveLength(5);
+  });
+
+  it("dziennik i odpowiedź zapisywane w osobnych transakcjach (bez wspólnego xmin)", () => {
+    const kod = fs.readFileSync(path.resolve(__dirname, "../../server/szkolenie/serwis.ts"), "utf8");
+    const f = kod.slice(kod.indexOf("export async function zapiszAnkiete"), kod.indexOf("// ── Reguły punktów"));
+    const tx = f.split("db.transaction(");
+    expect(tx).toHaveLength(3);
+    expect(tx[1]).toMatch(/ankieta_wypelniona/);
+    expect(tx[1]).not.toMatch(/cmeSurveyResponses/);
+    expect(tx[2]).toMatch(/cmeSurveyResponses/);
   });
 });

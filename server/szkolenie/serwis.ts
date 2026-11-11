@@ -10,6 +10,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, pool } from "../db";
 import {
   cmeCertificates,
+  cmeChapterProgress,
   cmeEnrollments,
   cmeLectureProgress,
   cmeLog,
@@ -25,6 +26,7 @@ import {
   type CmeEnrollment,
   type CmeRule,
   type CmeTestAttempt,
+  type KopiaWykonawcy,
   type User,
 } from "@shared/schema";
 import {
@@ -41,24 +43,41 @@ import {
 import { ustawienie, type Organizator } from "../ustawienia";
 import { komorkaCsv } from "./csv";
 import {
+  brakiOrganizatora,
+  brakiReguly,
+  brakujaceRozdzialy,
   czyNumerZaswiadczenia,
+  czyRolaZespolu,
+  daneZgodne,
   dataGodzinaPL,
   dataPL,
+  DATA_RE,
+  etykietaGodzin,
   kluczWeryfikacji,
   losujTest,
   numerZaswiadczenia,
   obliczPunkty,
   ocenTest,
+  poczatekObowiazywania,
   poTerminie,
   powodOdrzuceniaPytaniaTestu,
+  pozaObowiazywaniem,
   przechowywanieMinelo,
+  pulaZaMala,
+  pytaniaDoOceny,
+  raportAnkietyZ,
   regulaDziala,
   rokWPolsce,
   stanPodejsc,
   tasuj,
   terminOddania,
   tokenWeryfikacji,
+  udzialModulow,
   widokWeryfikacji,
+  zakresWgladu,
+  zawodZweryfikowany,
+  type KopiaPytan,
+  type Punkty,
   type RegulaPunktow,
   type StanPodejsc,
 } from "./logika";
@@ -76,6 +95,7 @@ export const TYPY_ZDARZEN = {
   zapis: "Zapis na szkolenie",
   zapis_zmiana: "Zmiana danych zapisu",
   wyklad_otwarty: "Wykład otwarty",
+  rozdzial_otwarty: "Rozdział wykładu otwarty",
   wyklad_ukonczony: "Wykład ukończony",
   podsumowanie_otwarte: "Podsumowanie modułu otwarte",
   modul_ukonczony: "Moduł ukończony",
@@ -127,16 +147,21 @@ export const WERSJA_REGULAMINU_SZKOLENIA = "szkic-2026-11-11";
 
 // ── Dziennik ──────────────────────────────────────────────────────────────────
 
+/** Kopia danych osoby z zespołu (do dziennika): zostaje, gdy jej konto zniknie */
+export const kopiaWykonawcy = (u: Pick<User, "id" | "email" | "firstName" | "role">): KopiaWykonawcy =>
+  ({ id: u.id, email: u.email, imie: u.firstName ?? null, rola: u.role });
+
 export async function wpis(
   ex: Wykonawca,
-  w: { type: TypZdarzenia; participantId: string; userId?: string | null; enrollmentId?: string | null; actorId?: string | null; details?: Record<string, unknown>; at?: Date },
+  w: { type: TypZdarzenia; participantId: string; userId?: string | null; enrollmentId?: string | null; actor?: KopiaWykonawcy | null; details?: Record<string, unknown>; at?: Date },
 ) {
   await ex.insert(cmeLog).values({
     type: w.type,
     participantId: w.participantId,
     userId: w.userId ?? null,
     enrollmentId: w.enrollmentId ?? null,
-    actorId: w.actorId ?? null,
+    actorId: w.actor?.id ?? null,
+    actorSnapshot: w.actor ?? null,
     details: w.details ?? {},
     ...(w.at ? { at: w.at } : {}),
   });
@@ -255,22 +280,34 @@ export async function zapisz(user: User, input: ZapisInput) {
   return { zapisy: zapisy.map(widokZapisu), pierwszy };
 }
 
-/** Zdarzenia sprzed zapisu (wykłady, podsumowania) do dziennika, z datami z chwili zdarzenia */
+/** Zdarzenia sprzed zapisu (wykłady, rozdziały, podsumowania) do dziennika, z datami z chwili zdarzenia */
 async function uzupelnijDziennikPoZapisie(tx: Tx, participantId: string, userId: string) {
   const wyklady = await tx.select({
     sectionId: cmeLectureProgress.sectionId, first: cmeLectureProgress.firstOpenedAt, done: cmeLectureProgress.completedAt,
-    title: sections.title, externalId: sections.externalId, moduleId: sections.moduleId, cme: modules.cme,
+    title: sql<string | null>`coalesce(${sections.title}, ${cmeLectureProgress.lectureTitle})`,
+    externalId: sql<string | null>`coalesce(${sections.externalId}, ${cmeLectureProgress.lectureExternalId})`,
+    moduleId: sql<string | null>`coalesce(${sections.moduleId}, ${cmeLectureProgress.moduleId})`,
+    cme: sql<boolean>`coalesce(${modules.cme}, true)`,
   }).from(cmeLectureProgress)
-    .innerJoin(sections, eq(sections.id, cmeLectureProgress.sectionId))
-    .innerJoin(modules, eq(modules.id, sections.moduleId))
+    .leftJoin(sections, eq(sections.id, cmeLectureProgress.sectionId))
+    .leftJoin(modules, eq(modules.id, sections.moduleId))
     .where(eq(cmeLectureProgress.participantId, participantId));
+  const rozdzialy = await tx.select().from(cmeChapterProgress).where(eq(cmeChapterProgress.participantId, participantId))
+    .orderBy(asc(cmeChapterProgress.firstOpenedAt));
   for (const w of wyklady.filter((x) => x.cme)) {
     const details = { sectionId: w.sectionId, wyklad: w.externalId, tytul: w.title, moduleId: w.moduleId, przedZapisem: true };
     await wpis(tx, { type: "wyklad_otwarty", participantId, userId, details, at: w.first });
+    for (const r of rozdzialy.filter((x) => x.sectionId === w.sectionId)) {
+      await wpis(tx, { type: "rozdzial_otwarty", participantId, userId, details: { ...details, rozdzial: r.chapterOrder }, at: r.firstOpenedAt });
+    }
     if (w.done) await wpis(tx, { type: "wyklad_ukonczony", participantId, userId, details, at: w.done });
   }
-  const pods = await tx.select({ moduleId: cmeModuleProgress.moduleId, at: cmeModuleProgress.summaryOpenedAt, title: modules.title, externalId: modules.externalId, cme: modules.cme })
-    .from(cmeModuleProgress).innerJoin(modules, eq(modules.id, cmeModuleProgress.moduleId))
+  const pods = await tx.select({
+    moduleId: cmeModuleProgress.moduleId, at: cmeModuleProgress.summaryOpenedAt,
+    title: sql<string | null>`coalesce(${modules.title}, ${cmeModuleProgress.moduleTitle})`,
+    externalId: sql<string | null>`coalesce(${modules.externalId}, ${cmeModuleProgress.moduleExternalId})`,
+    cme: sql<boolean>`coalesce(${modules.cme}, true)`,
+  }).from(cmeModuleProgress).leftJoin(modules, eq(modules.id, cmeModuleProgress.moduleId))
     .where(eq(cmeModuleProgress.participantId, participantId));
   for (const p of pods.filter((x) => x.cme && x.at)) {
     await wpis(tx, { type: "podsumowanie_otwarte", participantId, userId, details: { moduleId: p.moduleId, modul: p.externalId, tytul: p.title, przedZapisem: true }, at: p.at! });
@@ -280,33 +317,52 @@ async function uzupelnijDziennikPoZapisie(tx: Tx, participantId: string, userId:
 // ── Wykłady ───────────────────────────────────────────────────────────────────
 
 /**
- * Wywoływane przy zapisie miejsca w wykładzie (PUT /api/lecture-reads): pierwsze otwarcie
- * i ukończenie (dojście do ostatniego opublikowanego rozdziału; liczba rozdziałów z bazy, nie od klienta).
- * Ślad zapisujemy każdemu (zapis na szkolenie później liczy wcześniejsze czytanie), dziennik tylko uczestnikom.
+ * Wywoływane przy zapisie miejsca w wykładzie (PUT /api/lecture-reads): pierwsze otwarcie wykładu i każdego
+ * rozdziału (z godziną, bez pomiaru czasu). Wykład jest ukończony dopiero, gdy otwarto każdy opublikowany
+ * rozdział 1…N (liczba z bazy, nie od klienta); ukończenie zapisuje się po ostatnim brakującym rozdziale.
+ * Jedno żądanie z ostatnim rozdziałem nie ukończy wykładu. Ślad zapisujemy każdemu (zapis na szkolenie
+ * później przenosi wcześniejsze czytanie do dziennika), dziennik od razu tylko uczestnikom.
  */
 export async function zapiszCzytanie(userId: string, sectionId: string, chapterOrder: number): Promise<void> {
-  const [sec] = await db.select({ id: sections.id, title: sections.title, externalId: sections.externalId, moduleId: sections.moduleId, cme: modules.cme })
-    .from(sections).innerJoin(modules, eq(modules.id, sections.moduleId)).where(eq(sections.id, sectionId));
-  if (!sec) return;
+  const [sec] = await db.select({
+    id: sections.id, title: sections.title, externalId: sections.externalId, moduleId: sections.moduleId, cme: modules.cme,
+    moduleExternalId: modules.externalId, widoczna: sections.isVisible, modulWidoczny: modules.isVisible,
+  }).from(sections).innerJoin(modules, eq(modules.id, sections.moduleId)).where(eq(sections.id, sectionId));
+  if (!sec || !sec.widoczna || !sec.modulWidoczny) return;
   const { rows: [{ n }] } = await pool.query<{ n: number }>(
     "SELECT count(*)::int AS n FROM lecture_chapters WHERE section_id = $1 AND is_published", [sectionId]);
-  if (!n) return;
+  if (!n || !Number.isInteger(chapterOrder) || chapterOrder < 1 || chapterOrder > n) return;
   const participantId = userId;
-  const otwarty = await db.insert(cmeLectureProgress).values({ participantId, userId, sectionId })
-    .onConflictDoNothing().returning({ at: cmeLectureProgress.firstOpenedAt });
-  let ukonczony: { at: Date | null }[] = [];
-  if (chapterOrder >= n) {
-    ukonczony = await db.update(cmeLectureProgress).set({ completedAt: new Date() })
-      .where(and(eq(cmeLectureProgress.participantId, participantId), eq(cmeLectureProgress.sectionId, sectionId), isNull(cmeLectureProgress.completedAt)))
-      .returning({ at: cmeLectureProgress.completedAt });
-  }
-  if (!sec.cme || (!otwarty.length && !ukonczony.length) || !(await czyUczestnik(participantId))) return;
-  const details = { sectionId, wyklad: sec.externalId, tytul: sec.title, moduleId: sec.moduleId };
-  if (otwarty.length) await wpis(db, { type: "wyklad_otwarty", participantId, userId, details, at: otwarty[0].at ?? undefined });
-  if (ukonczony.length) {
-    await wpis(db, { type: "wyklad_ukonczony", participantId, userId, details, at: ukonczony[0].at ?? undefined });
-    await sprawdzModuly(participantId, userId);
-  }
+  const wynik = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"cme:" + participantId}))`);
+    const otwarty = await tx.insert(cmeLectureProgress).values({
+      participantId, userId, sectionId, lectureExternalId: sec.externalId, lectureTitle: sec.title, moduleId: sec.moduleId, moduleExternalId: sec.moduleExternalId,
+    }).onConflictDoNothing().returning({ at: cmeLectureProgress.firstOpenedAt });
+    const rozdzial = await tx.insert(cmeChapterProgress).values({ participantId, userId, sectionId, lectureExternalId: sec.externalId, chapterOrder })
+      .onConflictDoNothing().returning({ at: cmeChapterProgress.firstOpenedAt });
+    let ukonczony: { at: Date | null }[] = [];
+    if (rozdzial.length) {
+      // rozdziały tego wykładu, także zapisane pod starym id sekcji (ponowny import z tym samym id studia)
+      const otwarte = await tx.select({ nr: cmeChapterProgress.chapterOrder }).from(cmeChapterProgress).where(and(
+        eq(cmeChapterProgress.participantId, participantId),
+        sec.externalId
+          ? sql`(${cmeChapterProgress.sectionId} = ${sectionId} OR ${cmeChapterProgress.lectureExternalId} = ${sec.externalId})`
+          : eq(cmeChapterProgress.sectionId, sectionId)));
+      if (brakujaceRozdzialy(otwarte.map((r) => r.nr), n).length === 0) {
+        // clock_timestamp(): ukończenie ma czas późniejszy niż otwarcie ostatniego rozdziału w tej transakcji
+        ukonczony = await tx.update(cmeLectureProgress).set({ completedAt: sql`clock_timestamp()` })
+          .where(and(eq(cmeLectureProgress.participantId, participantId), eq(cmeLectureProgress.sectionId, sectionId), isNull(cmeLectureProgress.completedAt)))
+          .returning({ at: cmeLectureProgress.completedAt });
+      }
+    }
+    if (!sec.cme || (!otwarty.length && !rozdzial.length && !ukonczony.length) || !(await czyUczestnik(participantId, tx))) return false;
+    const details = { sectionId, wyklad: sec.externalId, tytul: sec.title, moduleId: sec.moduleId };
+    if (otwarty.length) await wpis(tx, { type: "wyklad_otwarty", participantId, userId, details, at: otwarty[0].at ?? undefined });
+    if (rozdzial.length) await wpis(tx, { type: "rozdzial_otwarty", participantId, userId, details: { ...details, rozdzial: chapterOrder, rozdzialow: n }, at: rozdzial[0].at ?? undefined });
+    if (ukonczony.length) await wpis(tx, { type: "wyklad_ukonczony", participantId, userId, details: { ...details, rozdzialow: n }, at: ukonczony[0].at ?? undefined });
+    return ukonczony.length > 0;
+  });
+  if (wynik) await sprawdzModuly(participantId, userId);
 }
 
 // ── Moduły ────────────────────────────────────────────────────────────────────
@@ -321,7 +377,7 @@ export async function otworzPodsumowanie(userId: string, moduleId: string): Prom
   const m = await modulDoPodsumowania(moduleId);
   if (!m || !m.summaryMd?.trim()) return false;
   const participantId = userId;
-  await db.insert(cmeModuleProgress).values({ participantId, userId, moduleId }).onConflictDoNothing();
+  await db.insert(cmeModuleProgress).values({ participantId, userId, moduleId, moduleExternalId: m.externalId, moduleTitle: m.title }).onConflictDoNothing();
   const nowe = await db.update(cmeModuleProgress).set({ summaryOpenedAt: new Date() })
     .where(and(eq(cmeModuleProgress.participantId, participantId), eq(cmeModuleProgress.moduleId, moduleId), isNull(cmeModuleProgress.summaryOpenedAt)))
     .returning({ at: cmeModuleProgress.summaryOpenedAt });
@@ -348,7 +404,8 @@ export interface StanModulu {
  * Stan modułów szkolenia (cme = true, widoczne). Moduł ukończony = wszystkie wykłady ukończone
  * + podsumowanie otwarte (gdy moduł je ma) + (gdy cwiczenia_wymagane) każdy temat z ćwiczeniami
  * opanowany: ostatnia odpowiedź na każde opublikowane pytanie puli ćwiczeń poprawna.
- * Ukończenie jest zapisywane raz (cme_module_progress.completed_at) i potem już nie znika.
+ * Ukończenie jest zapisywane raz (cme_module_progress.completed_at) i potem już nie znika, także
+ * po ponownym imporcie treści (postęp dopasowany po id albo po identyfikatorze studia).
  */
 export async function sprawdzModuly(participantId: string, userId: string | null): Promise<StanModulu[]> {
   const cwiczeniaWymagane = await ustawienie("cwiczenia_wymagane");
@@ -356,8 +413,8 @@ export async function sprawdzModuly(participantId: string, userId: string | null
     .from(modules).where(and(eq(modules.cme, true), eq(modules.isVisible, true))).orderBy(asc(modules.order));
   if (!mods.length) return [];
   const ids = mods.map((m) => m.id);
-  const { rows: wyklady } = await pool.query<{ id: string; module_id: string }>(
-    `SELECT s.id, s.module_id FROM sections s
+  const { rows: wyklady } = await pool.query<{ id: string; module_id: string; external_id: string | null }>(
+    `SELECT s.id, s.module_id, s.external_id FROM sections s
       WHERE s.is_visible AND s.module_id = ANY($1::uuid[])
         AND EXISTS (SELECT 1 FROM lecture_chapters c WHERE c.section_id = s.id AND c.is_published)`, [ids]);
   const { rows: cwiczenia } = await pool.query<{ section_id: string; module_id: string; question_id: string }>(
@@ -369,9 +426,21 @@ export async function sprawdzModuly(participantId: string, userId: string | null
       `SELECT DISTINCT ON (question_id) question_id, is_correct FROM attempts WHERE user_id = $1 ORDER BY question_id, created_at DESC`, [userId]);
     for (const r of rows) ostatnie.set(r.question_id, r.is_correct);
   }
-  const przeczytane = new Set((await db.select({ s: cmeLectureProgress.sectionId }).from(cmeLectureProgress)
-    .where(and(eq(cmeLectureProgress.participantId, participantId), sql`${cmeLectureProgress.completedAt} IS NOT NULL`))).map((r) => r.s));
-  const postep = new Map((await db.select().from(cmeModuleProgress).where(eq(cmeModuleProgress.participantId, participantId))).map((r) => [r.moduleId, r]));
+  const przeczytane = new Set<string>();
+  for (const r of await db.select({ s: cmeLectureProgress.sectionId, ext: cmeLectureProgress.lectureExternalId }).from(cmeLectureProgress)
+    .where(and(eq(cmeLectureProgress.participantId, participantId), sql`${cmeLectureProgress.completedAt} IS NOT NULL`))) {
+    przeczytane.add(r.s);
+    if (r.ext) przeczytane.add(`ext:${r.ext}`);
+  }
+  const postepRows = await db.select().from(cmeModuleProgress).where(eq(cmeModuleProgress.participantId, participantId));
+  const postepPo = (m: { id: string; externalId: string | null }) => {
+    const wlasny = postepRows.find((r) => r.moduleId === m.id);
+    const poExt = m.externalId ? postepRows.filter((r) => r.moduleId !== m.id && r.moduleExternalId === m.externalId) : [];
+    return {
+      summaryOpenedAt: wlasny?.summaryOpenedAt ?? poExt.find((r) => r.summaryOpenedAt)?.summaryOpenedAt ?? null,
+      completedAt: wlasny?.completedAt ?? poExt.find((r) => r.completedAt)?.completedAt ?? null,
+    };
+  };
   const uczestnik = await czyUczestnik(participantId);
 
   const wynik: StanModulu[] = [];
@@ -380,22 +449,22 @@ export async function sprawdzModuly(participantId: string, userId: string | null
     const tematy = new Map<string, string[]>();
     for (const c of cwiczenia.filter((x) => x.module_id === m.id)) tematy.set(c.section_id, [...(tematy.get(c.section_id) ?? []), c.question_id]);
     const opanowane = Array.from(tematy.values()).filter((qs) => qs.every((q) => ostatnie.get(q) === true)).length;
-    const p = postep.get(m.id);
+    const p = postepPo(m);
     const jestPodsumowanie = !!m.summaryMd?.trim();
     const stan: StanModulu = {
       id: m.id, externalId: m.externalId, tytul: m.title, kolejnosc: m.order,
-      wyklady: { ukonczone: w.filter((x) => przeczytane.has(x.id)).length, wszystkie: w.length },
-      podsumowanie: { jest: jestPodsumowanie, otwarte: !!p?.summaryOpenedAt },
+      wyklady: { ukonczone: w.filter((x) => przeczytane.has(x.id) || (x.external_id && przeczytane.has(`ext:${x.external_id}`))).length, wszystkie: w.length },
+      podsumowanie: { jest: jestPodsumowanie, otwarte: !!p.summaryOpenedAt },
       cwiczenia: { opanowane, wszystkie: tematy.size, wymagane: cwiczeniaWymagane },
-      ukonczony: !!p?.completedAt,
-      ukonczonyAt: p?.completedAt ? p.completedAt.toISOString() : null,
+      ukonczony: !!p.completedAt,
+      ukonczonyAt: p.completedAt ? p.completedAt.toISOString() : null,
     };
     const spelnia = (w.length + tematy.size > 0)
       && stan.wyklady.ukonczone === stan.wyklady.wszystkie
       && (!jestPodsumowanie || stan.podsumowanie.otwarte)
       && (!cwiczeniaWymagane || opanowane === tematy.size);
     if (!stan.ukonczony && spelnia) {
-      await db.insert(cmeModuleProgress).values({ participantId, userId, moduleId: m.id }).onConflictDoNothing();
+      await db.insert(cmeModuleProgress).values({ participantId, userId, moduleId: m.id, moduleExternalId: m.externalId, moduleTitle: m.title }).onConflictDoNothing();
       const zapisane = await db.update(cmeModuleProgress).set({ completedAt: new Date() })
         .where(and(eq(cmeModuleProgress.participantId, participantId), eq(cmeModuleProgress.moduleId, m.id), isNull(cmeModuleProgress.completedAt)))
         .returning({ at: cmeModuleProgress.completedAt });
@@ -424,6 +493,7 @@ export async function poOdpowiedzi(userId: string): Promise<void> {
 type PytanieTestu = {
   id: string; tags: string[] | null; excludes: string[] | null; section_id: string; module_id: string; title: string | null;
   question_type: string; answers: Array<{ text: string; isCorrect: boolean }>;
+  body_md: string; image_url: string | null; explanation_md: string; modul: string | null; modul_tytul: string; modul_kolejnosc: number;
 };
 
 const externalIdZ = (tags: string[] | null | undefined) => (tags ?? []).find((t) => t.startsWith("studio:"))?.slice(7) ?? null;
@@ -431,7 +501,8 @@ const externalIdZ = (tags: string[] | null | undefined) => (tags ?? []).find((t)
 /** Opublikowane pytania puli testu w modułach szkolenia, podzielone na kwalifikujące się i odrzucone (z powodem) */
 async function pulaTestuZRaportem() {
   const { rows } = await pool.query<PytanieTestu>(
-    `SELECT q.id, q.tags, q.excludes, q.section_id, s.module_id, q.title, q.question_type, q.answers
+    `SELECT q.id, q.tags, q.excludes, q.section_id, s.module_id, q.title, q.question_type, q.answers,
+            q.body_md, q.image_url, q.explanation_md, m.external_id AS modul, m.title AS modul_tytul, m."order" AS modul_kolejnosc
        FROM questions q JOIN sections s ON s.id = q.section_id JOIN modules m ON m.id = s.module_id
       WHERE q.pool = 'test' AND q.status = 'published' AND m.cme AND m.is_visible AND s.is_visible`);
   const dobre: PytanieTestu[] = [];
@@ -448,10 +519,14 @@ async function pulaTestu(): Promise<PytanieTestu[]> {
   return (await pulaTestuZRaportem()).dobre;
 }
 
-/** Panel: ile pytań puli testu się kwalifikuje i które są pominięte (mniej niż 5 odpowiedzi, nie 1 poprawna) */
+/**
+ * Panel: ile pytań puli testu się kwalifikuje i które są pominięte (mniej niż 5 odpowiedzi, nie 1 poprawna).
+ * Ostrzeżenie (bez blokady), gdy pula jest mniejsza niż 2 × liczba pytań w teście.
+ */
 export async function raportPuliTestu() {
   const { dobre, odrzucone } = await pulaTestuZRaportem();
-  return { kwalifikuje: dobre.length, odrzucone };
+  const liczbaPytan = await ustawienie("cme_test_liczba_pytan");
+  return { kwalifikuje: dobre.length, liczbaPytan, zaMala: pulaZaMala(dobre.length, liczbaPytan), odrzucone };
 }
 
 async function podejsciaUczestnika(participantId: string, ex: Wykonawca = db): Promise<CmeTestAttempt[]> {
@@ -462,14 +537,33 @@ function zasadyZ(k: Konfiguracja) {
   return { limit: k.test.limit, przerwaPo: k.test.przerwaPo, przerwaGodziny: k.test.przerwaGodziny };
 }
 
-/** Ocena i zapis podejścia (w transakcji z blokadą uczestnika) */
+/** Bieżąca treść pytań (tylko dla podejść sprzed kopii pytań i pytań spoza kopii) */
+async function pytaniaZBazy(ex: Wykonawca, ids: string[]) {
+  if (!ids.length) return new Map<string, { id: string; tags: string[] | null; title: string | null; bodyMd: string; imageUrl: string | null; answers: Array<{ text: string; isCorrect: boolean }>; explanationMd: string }>();
+  const qs = await ex.select({ id: questions.id, tags: questions.tags, title: questions.title, bodyMd: questions.bodyMd, imageUrl: questions.imageUrl, answers: questions.answers, explanationMd: questions.explanationMd })
+    .from(questions).where(inArray(questions.id, ids));
+  return new Map(qs.map((q) => [q.id, q]));
+}
+
+/** Pytania podejścia z kopii (od 11.11) albo, dla starszych podejść, z bazy */
+async function trescPodejscia(ex: Wykonawca, a: CmeTestAttempt) {
+  const kopia = (a.questionSnapshot ?? null) as KopiaPytan | null;
+  const brakujace = a.questionIds.filter((id) => !kopia?.[id]);
+  const zywe = await pytaniaZBazy(ex, brakujace);
+  const pytanie = (id: string) => {
+    const k = kopia?.[id];
+    if (k) return { title: k.title, bodyMd: k.bodyMd, imageUrl: k.imageUrl, answers: k.answers, explanationMd: k.explanationMd };
+    const z = zywe.get(id);
+    return z ? { title: z.title, bodyMd: z.bodyMd, imageUrl: z.imageUrl, answers: z.answers, explanationMd: z.explanationMd } : null;
+  };
+  return { kopia, zywe, pytanie };
+}
+
+/** Ocena i zapis podejścia (w transakcji z blokadą uczestnika); pytania z kopii z chwili losowania */
 async function ocenIZapisz(tx: Tx, a: CmeTestAttempt, user: { id: string } | null, odpowiedzi: Record<string, number>, automatycznie: boolean) {
-  const qs = a.questionIds.length
-    ? await tx.select({ id: questions.id, tags: questions.tags, answers: questions.answers }).from(questions).where(inArray(questions.id, a.questionIds))
-    : [];
-  const poId = new Map(qs.map((q) => [q.id, q]));
-  // pytanie usunięte w międzyczasie liczy się jako błędne (nie zmniejsza maksimum)
-  const doOceny = a.questionIds.map((id) => ({ id, externalId: externalIdZ(poId.get(id)?.tags), answers: poId.get(id)?.answers ?? [] }));
+  const { kopia, zywe } = await trescPodejscia(tx, a);
+  const zyweOcena = new Map(Array.from(zywe.values()).map((q) => [q.id, { externalId: externalIdZ(q.tags), answers: q.answers }]));
+  const doOceny = pytaniaDoOceny(a.questionIds, kopia, zyweOcena);
   const prog = Number((a.rules as { prog?: number }).prog ?? 70);
   const w = ocenTest(doOceny, odpowiedzi, prog);
   await tx.update(cmeTestAttempts).set({
@@ -506,6 +600,8 @@ export async function stanTestu(user: User) {
   return {
     zapisany: zapisy.length > 0,
     odblokowany,
+    /** Konto zespołu: podgląd bez testu (zna klucz) */
+    zespol: czyRolaZespolu(user.role),
     brakujaceModuly: brakujace,
     pulaPusta: pula.length === 0,
     stan,
@@ -519,11 +615,7 @@ export async function stanTestu(user: User) {
 
 /** Pytania podejścia dla przeglądarki: bez poprawnych odpowiedzi i wyjaśnień, odpowiedzi w zapisanej kolejności */
 async function widokPodejscia(a: CmeTestAttempt) {
-  const qs = a.questionIds.length
-    ? await db.select({ id: questions.id, title: questions.title, bodyMd: questions.bodyMd, imageUrl: questions.imageUrl, answers: questions.answers })
-      .from(questions).where(inArray(questions.id, a.questionIds))
-    : [];
-  const poId = new Map(qs.map((q) => [q.id, q]));
+  const { pytanie } = await trescPodejscia(db, a);
   return {
     id: a.id,
     startedAt: a.startedAt,
@@ -531,7 +623,7 @@ async function widokPodejscia(a: CmeTestAttempt) {
     termin: a.deadlineAt,
     teraz: new Date(),
     pytania: a.questionIds.map((id, i) => {
-      const q = poId.get(id);
+      const q = pytanie(id);
       const kolejnosc = a.answerOrders[id] ?? (q ? q.answers.map((_, j) => j) : []);
       return {
         id, nr: i + 1, title: q?.title ?? "", bodyMd: q?.bodyMd ?? "Pytanie niedostępne", imageUrl: q?.imageUrl ?? null,
@@ -543,6 +635,9 @@ async function widokPodejscia(a: CmeTestAttempt) {
 }
 
 export async function rozpocznijTest(user: User) {
+  if (czyRolaZespolu(user.role)) {
+    throw new BladSzkolenia(403, "Konta zespołu helloEKG nie zdają testu zaliczeniowego (mają dostęp do pytań i klucza). Do sprawdzenia użyj konta kursanta.");
+  }
   const k = await konfiguracja();
   const t = await stanTestu(user);
   if (!t.zapisany) throw new BladSzkolenia(403, "Najpierw zapisz się na szkolenie.");
@@ -566,13 +661,19 @@ export async function rozpocznijTest(user: User) {
     const { rows: noShuffle } = await pool.query<{ id: string }>("SELECT id FROM questions WHERE id = ANY($1::uuid[]) AND no_shuffle", [ids]);
     const stale = new Set(noShuffle.map((r) => r.id));
     const answerOrders: Record<string, number[]> = {};
+    const kopia: KopiaPytan = {};
     for (const id of ids) {
-      const kolejnosc = poId.get(id)!.answers.map((_, j) => j);
+      const q = poId.get(id)!;
+      const kolejnosc = q.answers.map((_, j) => j);
       answerOrders[id] = stale.has(id) ? kolejnosc : tasuj(kolejnosc);
+      kopia[id] = {
+        externalId: externalIdZ(q.tags), sectionId: q.section_id, moduleId: q.module_id, modul: q.modul, modulTytul: q.modul_tytul, modulKolejnosc: q.modul_kolejnosc,
+        title: q.title, bodyMd: q.body_md, imageUrl: q.image_url, answers: q.answers.map((x) => ({ text: x.text, isCorrect: !!x.isCorrect })), explanationMd: q.explanation_md ?? "",
+      };
     }
     const start = new Date();
     const [a] = await tx.insert(cmeTestAttempts).values({
-      participantId, userId: user.id, questionIds: ids, answerOrders, startedAt: start,
+      participantId, userId: user.id, questionIds: ids, answerOrders, startedAt: start, questionSnapshot: kopia,
       deadlineAt: terminOddania(start, k.test.limitMinut),
       rules: { ...k.test, losowanie: ids.length, pula: pula.length },
     }).returning();
@@ -630,19 +731,21 @@ export async function oddajTest(user: User, attemptId: string, odpowiedzi?: Reco
 }
 
 /**
- * Wgląd w ocenione podejście (§ 3 ust. 4 pkt 3 lit. f rozp. MZ z 19.04.2024): przy test_wglad = "pelny"
- * całe podejście (pytania, własne odpowiedzi, klucz, uzasadnienia), przy "bledne" tylko błędne odpowiedzi.
+ * Wgląd w ocenione podejście (§ 3 ust. 4 pkt 3 lit. f rozp. MZ z 19.04.2024, warunki w regulaminie § 4 pkt 5):
+ * - po niezaliczonym podejściu, gdy zostały kolejne: tylko wynik, zaliczenie i udział poprawnych odpowiedzi
+ *   w każdym module, bez pytań, klucza i uzasadnień (kolejne podejście losuje z tej samej puli),
+ * - po zaliczeniu albo po wykorzystaniu wszystkich podejść: przy test_wglad = "pelny" całe podejście
+ *   (pytania, własne odpowiedzi, klucz, uzasadnienia), przy "bledne" tylko błędne odpowiedzi.
+ * Treść z kopii pytań z chwili losowania.
  */
 export async function wynikPodejscia(user: User, attemptId: string) {
   const a = await podejscieUzytkownika(user, attemptId);
   if (!a.submittedAt) throw new BladSzkolenia(409, "Podejście nie jest jeszcze oddane.");
-  const wglad = await ustawienie("test_wglad");
-  const oceny = (a.grading ?? []).filter((o) => wglad === "pelny" || !o.ok);
-  const qs = oceny.length
-    ? await db.select({ id: questions.id, title: questions.title, bodyMd: questions.bodyMd, imageUrl: questions.imageUrl, answers: questions.answers, explanationMd: questions.explanationMd })
-      .from(questions).where(inArray(questions.id, oceny.map((b) => b.questionId)))
-    : [];
-  const poId = new Map(qs.map((q) => [q.id, q]));
+  const k = await konfiguracja();
+  const stan = stanPodejsc(await podejsciaUczestnika(user.id), new Date(), zasadyZ(k));
+  const zakres = zakresWgladu(k.test.wglad, stan.stan);
+  const { kopia, pytanie } = await trescPodejscia(db, a);
+  const oceny = zakres === "podsumowanie" ? [] : (a.grading ?? []).filter((o) => zakres === "pelny" || !o.ok);
   return {
     id: a.id,
     wynik: a.score ?? 0,
@@ -652,9 +755,13 @@ export async function wynikPodejscia(user: User, attemptId: string) {
     prog: Number((a.rules as { prog?: number }).prog ?? 0),
     submittedAt: a.submittedAt,
     automatycznie: a.autoSubmitted,
-    wglad,
+    wglad: k.test.wglad,
+    /** "podsumowanie": bez pytań i klucza (niezaliczone, zostały podejścia) */
+    zakres,
+    pozostale: stan.pozostale,
+    moduly: udzialModulow(a.grading ?? [], kopia),
     pytania: oceny.map((b) => {
-      const q = poId.get(b.questionId);
+      const q = pytanie(b.questionId);
       const kolejnosc = a.answerOrders[b.questionId] ?? [];
       return {
         nr: a.questionIds.indexOf(b.questionId) + 1,
@@ -696,21 +803,29 @@ export async function stanAnkiety(user: User) {
 
 /**
  * Odpowiedzi trafiają do tabeli bez user_id i bez godziny (tylko miesiąc); w dzienniku zostaje
- * wyłącznie fakt „ankieta wypełniona”. Jedna ankieta na osobę.
+ * wyłącznie fakt „ankieta wypełniona”. Jedna ankieta na osobę. Wpis w dzienniku i odpowiedzi zapisujemy
+ * w DWÓCH osobnych transakcjach (najpierw dziennik), żeby wiersze nie miały wspólnego identyfikatora
+ * transakcji (xmin), po którym dałoby się je połączyć.
  */
 export async function zapiszAnkiete(user: User, surowe: unknown) {
   const k = await konfiguracja();
   if (!(await zaliczonePodejscie(user.id))) throw new BladSzkolenia(403, "Ankieta otworzy się po zaliczeniu testu.");
   const s = sprawdzOdpowiedziAnkiety(k.ankieta, surowe);
   if ("blad" in s) throw new BladSzkolenia(400, s.blad);
+  const miesiac = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit" }).format(new Date());
   await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"cme:" + user.id}))`);
     if (await ankietaWypelniona(user.id, tx)) throw new BladSzkolenia(409, "Ankieta jest już wypełniona. Dziękujemy!");
-    const teraz = new Date();
-    const miesiac = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit" }).format(teraz);
-    await tx.insert(cmeSurveyResponses).values({ month: miesiac, surveyVersion: k.ankieta.wersja, answers: s.odpowiedzi });
     await wpis(tx, { type: "ankieta_wypelniona", participantId: user.id, userId: user.id, details: { wersja: k.ankieta.wersja } });
   });
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(cmeSurveyResponses).values({ month: miesiac, surveyVersion: k.ankieta.wersja, answers: s.odpowiedzi });
+    });
+  } catch (e) {
+    // dziennik już mówi „wypełniona”; zgubiona odpowiedź anonimowa nie blokuje zaświadczenia
+    console.error("[szkolenie] zapis odpowiedzi ankiety:", (e as Error)?.message);
+  }
 }
 
 // ── Reguły punktów ────────────────────────────────────────────────────────────
@@ -732,28 +847,52 @@ export const regulaZWiersza = (r: CmeRule): RegulaPunktow => ({
   formInfoAcceptedAt: r.formInfoAcceptedAt,
   decisionNumber: r.decisionNumber,
   inactiveReason: r.inactiveReason,
+  obowiazujeOd: r.obowiazujeOd,
+  obowiazujeDo: r.obowiazujeDo,
 });
 
 export async function reguly() {
   const rows = await db.select().from(cmeRules).orderBy(asc(cmeRules.profession));
-  return rows.map((r) => ({ ...r, dziala: regulaDziala(regulaZWiersza(r)) }));
+  return rows.map((r) => {
+    const regula = regulaZWiersza(r);
+    return {
+      ...r, dziala: regulaDziala(regula), braki: r.active ? brakiReguly(regula) : [],
+      /** Podpowiedź początku obowiązywania (lekarze): późniejsza z dat uchwały NRL i informacji o formie */
+      obowiazujeOdPodpowiedz: poczatekObowiazywania(r.nrlResolutionAt, r.formInfoAcceptedAt),
+    };
+  });
 }
 
-export async function zapiszRegule(adminId: string, profession: string, d: Partial<{
+export type ZmianaReguly = Partial<{
   active: boolean; legalBasis: string | null; pointsFormula: string | null; pointsMode: "godziny" | "decyzja"; pointsPerHour: number;
   pointsGranted: number | null; maxPoints: number | null; minHours: number | null; testRequired: boolean; registryRequired: boolean;
-  registryNumber: string | null; nrlResolution: string | null; formInfoAcceptedAt: string | null; decisionNumber: string | null;
-  formText: string | null; inactiveReason: string | null;
-}>) {
+  registryNumber: string | null; nrlResolution: string | null; nrlResolutionAt: string | null; formInfoAcceptedAt: string | null; decisionNumber: string | null;
+  formText: string | null; inactiveReason: string | null; obowiazujeOd: string | null; obowiazujeDo: string | null;
+}>;
+
+/**
+ * Zapis reguły. Okres obowiązywania: gdy „od” jest puste, a reguła ma datę uchwały NRL i przyjęcia
+ * informacji o formie, „od” = późniejsza z nich (można zmienić ręcznie).
+ */
+export async function zapiszRegule(admin: User, profession: string, d: ZmianaReguly) {
   if (!czyZawod(profession)) throw new BladSzkolenia(404, "Nieznany zawód.");
-  const set: Record<string, unknown> = { updatedAt: new Date(), updatedBy: adminId };
+  const [obecna] = await db.select().from(cmeRules).where(eq(cmeRules.profession, profession));
+  const set: Record<string, unknown> = { updatedAt: new Date(), updatedBy: admin.id };
   for (const [k, v] of Object.entries(d)) {
     if (v === undefined) continue;
     set[k] = ["pointsPerHour", "maxPoints", "minHours", "pointsGranted"].includes(k) && v !== null ? String(v) : v;
   }
+  const po = <K extends keyof CmeRule>(k: K) => (k in set ? set[k] : obecna?.[k] ?? null) as CmeRule[K] | null;
+  if (!po("obowiazujeOd")) {
+    const podp = poczatekObowiazywania(po("nrlResolutionAt") as string | null, po("formInfoAcceptedAt") as string | null);
+    if (podp) set.obowiazujeOd = podp;
+  }
+  const od = (set.obowiazujeOd ?? obecna?.obowiazujeOd ?? null) as string | null;
+  const doDnia = (set.obowiazujeDo ?? obecna?.obowiazujeDo ?? null) as string | null;
+  if (od && doDnia && doDnia < od) throw new BladSzkolenia(400, "Data „obowiązuje do” jest wcześniejsza niż „obowiązuje od”.");
   const [r] = await db.insert(cmeRules).values({ profession, ...(set as object) } as any)
     .onConflictDoUpdate({ target: cmeRules.profession, set: set as any }).returning();
-  return { ...r, dziala: regulaDziala(regulaZWiersza(r)) };
+  return { ...r, dziala: regulaDziala(regulaZWiersza(r)), braki: r.active ? brakiReguly(regulaZWiersza(r)) : [], obowiazujeOdPodpowiedz: poczatekObowiazywania(r.nrlResolutionAt, r.formInfoAcceptedAt) };
 }
 
 // ── Zaświadczenia ─────────────────────────────────────────────────────────────
@@ -781,20 +920,48 @@ export async function zaswiadczeniaUczestnika(participantId: string) {
   return db.select().from(cmeCertificates).where(eq(cmeCertificates.participantId, participantId)).orderBy(desc(cmeCertificates.issuedAt));
 }
 
-/** Punkty dla zapisu i czy czeka na ręczne sprawdzenie PWZ (zaświadczenie z punktami dopiero po nim) */
-async function punktyZapisu(zapis: CmeEnrollment, k: Konfiguracja) {
-  const [wiersz] = await db.select().from(cmeRules).where(eq(cmeRules.profession, zapis.profession));
-  const regula = wiersz ? regulaZWiersza(wiersz) : null;
-  const punkty = obliczPunkty(regula, k.godziny, true);
-  const czekaNaWeryfikacje = punkty.punkty !== null && k.weryfikacjaReczna && !zapis.pwzVerifiedAt;
-  return { wiersz, regula, punkty, czekaNaWeryfikacje };
+/**
+ * Okres szkolenia z dziennika: początek = pierwszy zapis na szkolenie, koniec = zaliczenie testu
+ * (null, gdy jeszcze niezaliczony). Rezerwowo: data zapisu i data oddania podejścia.
+ */
+async function okresSzkolenia(participantId: string, zapisy: CmeEnrollment[]) {
+  const { rows: [r] } = await pool.query<{ start: Date | null; koniec: Date | null }>(
+    `SELECT (SELECT min(at) FROM cme_log WHERE participant_id = $1 AND type = 'zapis') AS start,
+            (SELECT min(at) FROM cme_log WHERE participant_id = $1 AND type = 'test_oddany' AND details->>'zaliczony' = 'true') AS koniec`, [participantId]);
+  const zapisStart = zapisy.reduce<Date | null>((min, z) => (!min || z.createdAt < min ? z.createdAt : min), null);
+  const test = r?.koniec ? null : await zaliczonePodejscie(participantId);
+  return { start: r?.start ?? zapisStart ?? new Date(), koniec: r?.koniec ?? test?.submittedAt ?? null };
 }
 
 /**
+ * Punkty dla zapisu (po regule, okresie obowiązywania i roli konta) i na co czeka zaświadczenie z punktami:
+ * ręczne sprawdzenie PWZ albo dane organizatora (nazwa, adres, kierownik naukowy z tytułem, podpisujący).
+ */
+async function punktyZapisu(zapis: CmeEnrollment, k: Konfiguracja, kto: { role: string }, okres: { start: Date; koniec: Date | null }) {
+  const [wiersz] = await db.select().from(cmeRules).where(eq(cmeRules.profession, zapis.profession));
+  const regula = wiersz ? regulaZWiersza(wiersz) : null;
+  let punkty: Punkty = obliczPunkty(regula, k.godziny, true);
+  if (punkty.punkty !== null && czyRolaZespolu(kto.role)) {
+    punkty = { punkty: null, powod: "Konta zespołu helloEKG nie dostają zaświadczeń z punktami edukacyjnymi." };
+  }
+  if (punkty.punkty !== null && regula) {
+    const poza = pozaObowiazywaniem(regula, okres.start, okres.koniec ?? new Date());
+    if (poza) punkty = { punkty: null, powod: poza };
+  }
+  const braki = brakiOrganizatora(k);
+  const czekaNaOrganizatora = punkty.punkty !== null && braki.length > 0;
+  const czekaNaWeryfikacje = punkty.punkty !== null && k.weryfikacjaReczna && !zapis.pwzVerifiedAt;
+  return { wiersz, regula, punkty, czekaNaWeryfikacje, czekaNaOrganizatora, brakiOrganizatora: braki };
+}
+
+export const KOMUNIKAT_ORGANIZATOR = "Zaświadczenie z punktami czeka na uzupełnienie danych organizatora.";
+
+/**
  * Wydanie zaświadczenia dla zapisu (zawodu). Rodzaj:
- * - "punkty": reguła zawodu daje punkty i (gdy weryfikacja_pwz_reczna) zespół sprawdził PWZ w rejestrze,
+ * - "punkty": reguła zawodu daje punkty, całe szkolenie mieści się w okresie obowiązywania reguły,
+ *   dane organizatora są kompletne i (gdy weryfikacja_pwz_reczna) zespół sprawdził PWZ w rejestrze,
  * - "ukonczenie": bez punktów; jedyne dla zawodów bez punktów, a dla pozostałych do pobrania od razu,
- *   zanim zespół sprawdzi dane.
+ *   zanim zespół sprawdzi dane albo uzupełni dane organizatora.
  * Najwyżej jedno ważne zaświadczenie każdego rodzaju na zawód.
  */
 export async function wydajZaswiadczenie(user: User, enrollmentId: string, chciany?: RodzajZaswiadczenia) {
@@ -806,15 +973,19 @@ export async function wydajZaswiadczenie(user: User, enrollmentId: string, chcia
   const test = await zaliczonePodejscie(participantId);
   if (!test) throw new BladSzkolenia(403, "Zaświadczenie będzie dostępne po zaliczeniu testu.");
   if (!(await ankietaWypelniona(participantId))) throw new BladSzkolenia(403, "Przed zaświadczeniem wypełnij krótką anonimową ankietę.");
-  const { wiersz, regula, punkty, czekaNaWeryfikacje } = await punktyZapisu(zapis, k);
+  const zapisy = await zapisyUczestnika(participantId);
+  const okres = await okresSzkolenia(participantId, zapisy);
+  const koniec = okres.koniec ?? test.submittedAt ?? new Date();
+  const { wiersz, regula, punkty, czekaNaWeryfikacje, czekaNaOrganizatora } = await punktyZapisu(zapis, k, user, { start: okres.start, koniec });
   const rodzaj: RodzajZaswiadczenia = punkty.punkty === null ? "ukonczenie" : (chciany ?? "punkty");
+  if (rodzaj === "punkty" && czekaNaOrganizatora) {
+    throw new BladSzkolenia(409, `${KOMUNIKAT_ORGANIZATOR} Możesz już pobrać zaświadczenie ukończenia bez punktów.`);
+  }
   if (rodzaj === "punkty" && czekaNaWeryfikacje) {
     throw new BladSzkolenia(409, `Zaświadczenie z punktami czeka na weryfikację danych (zwykle do ${k.weryfikacjaDni} dni roboczych). Możesz już pobrać zaświadczenie ukończenia bez punktów.`);
   }
   const zPunktami = rodzaj === "punkty";
   const powodBezPunktow = zPunktami ? null : (punkty.powod ?? "Zaświadczenie ukończenia bez punktów edukacyjnych: dane uczestnika czekają na weryfikację.");
-  const zapisy = await zapisyUczestnika(participantId);
-  const start = zapisy.reduce((min, z) => (z.createdAt < min ? z.createdAt : min), zapis.createdAt);
   const [podpisOrg, podpisKier] = [await ustawienie("cme_podpis_organizator"), await ustawienie("cme_podpis_kierownik")];
 
   return db.transaction(async (tx) => {
@@ -839,13 +1010,16 @@ export async function wydajZaswiadczenie(user: User, enrollmentId: string, chcia
       zawodNazwa: czyZawod(zapis.profession) ? NAZWA_ZAWODU[zapis.profession] : zapis.profession,
       pwz: zapis.pwz,
       pwzSprawdzonyAt: zapis.pwzVerifiedAt?.toISOString() ?? null,
+      /** Zawód sprawdzony (z punktami albo PWZ sprawdzony); inaczej na zaświadczeniu „deklarowany zawód” bez PWZ */
+      zawodZweryfikowany: zawodZweryfikowany(rodzaj, { pwzSprawdzonyAt: zapis.pwzVerifiedAt }),
       specjalizacja: zapis.specialization,
       tytul: k.tytul,
       forma: zPunktami && wiersz?.formText?.trim() ? wiersz.formText : k.forma,
       miejsce: k.miejsce,
       godziny: k.godziny,
-      dataRozpoczecia: start.toISOString(),
-      dataZakonczenia: (test.submittedAt ?? teraz).toISOString(),
+      etykietaGodzin: etykietaGodzin(zapis.profession),
+      dataRozpoczecia: okres.start.toISOString(),
+      dataZakonczenia: koniec.toISOString(),
       wynikTestu: { wynik: test.score, maks: test.maxScore, procent: test.percent === null ? null : Number(test.percent) },
       punkty: zPunktami ? punkty.punkty : null,
       powodBezPunktow,
@@ -856,7 +1030,8 @@ export async function wydajZaswiadczenie(user: User, enrollmentId: string, chcia
       podpisOrganizatora: podpisOrg || null,
       podpisKierownika: podpisKier || null,
     };
-    const ruleSnapshot = wiersz ? { ...wiersz, dziala: regulaDziala(regula!) } : { profession: zapis.profession, brak: true };
+    // kopia reguły z chwili wydania, razem z okresem obowiązywania (obowiazujeOd/obowiazujeDo)
+    const ruleSnapshot = wiersz ? { ...wiersz, dziala: regulaDziala(regula!), braki: brakiReguly(regula!) } : { profession: zapis.profession, brak: true };
     const [c] = await tx.insert(cmeCertificates).values({
       number: numer, verificationToken: tokenWeryfikacji(), participantId, userId: user.id, enrollmentId: zapis.id,
       profession: zapis.profession, kind: rodzaj, snapshot, ruleSnapshot: ruleSnapshot as Record<string, unknown>,
@@ -881,6 +1056,11 @@ export async function weryfikacja(token: string) {
   return c ? widokWeryfikacji(c, inicjaly) : null;
 }
 
+/** Braki blokujące zaświadczenia z punktami (panel): dane organizatora */
+export async function brakiSzkolenia() {
+  return { organizator: brakiOrganizatora(await konfiguracja()) };
+}
+
 // ── Stan dla strony szkolenia ─────────────────────────────────────────────────
 
 export async function stanSzkolenia(user: User) {
@@ -890,10 +1070,14 @@ export async function stanSzkolenia(user: User) {
   const test = await stanTestu(user);
   const ankieta = { wypelniona: await ankietaWypelniona(user.id), dostepna: !!(await zaliczonePodejscie(user.id)) };
   const certyfikaty = await zaswiadczeniaUczestnika(user.id);
+  const okres = zapisy.length ? await okresSzkolenia(user.id, zapisy) : { start: new Date(), koniec: null };
   const widokiZapisow = [];
   for (const z of zapisy) {
-    const p = await punktyZapisu(z, k);
-    widokiZapisow.push({ ...widokZapisu(z), punkty: p.punkty.punkty, powodBezPunktow: p.punkty.powod, czekaNaWeryfikacje: p.czekaNaWeryfikacje });
+    const p = await punktyZapisu(z, k, user, okres);
+    widokiZapisow.push({
+      ...widokZapisu(z), punkty: p.punkty.punkty, powodBezPunktow: p.punkty.powod,
+      czekaNaWeryfikacje: p.czekaNaWeryfikacje, czekaNaOrganizatora: p.czekaNaOrganizatora,
+    });
   }
   return {
     wlaczone: k.wlaczone,
@@ -904,7 +1088,7 @@ export async function stanSzkolenia(user: User) {
     weryfikacjaDni: k.weryfikacjaDni,
     zapisy: widokiZapisow,
     moduly,
-    test: { odblokowany: test.odblokowany, stan: test.stan, zasady: test.zasady, pulaPusta: test.pulaPusta, podejscia: test.podejscia },
+    test: { odblokowany: test.odblokowany, zespol: test.zespol, stan: test.stan, zasady: test.zasady, pulaPusta: test.pulaPusta, podejscia: test.podejscia },
     ankieta,
     zaswiadczenia: certyfikaty.map(widokZaswiadczenia),
   };
@@ -923,6 +1107,7 @@ async function usunUczestnika(ex: Wykonawca, participantIds: string[]) {
   await ex.delete(cmeLog).where(inArray(cmeLog.participantId, participantIds));
   await ex.delete(cmeTestAttempts).where(inArray(cmeTestAttempts.participantId, participantIds));
   await ex.delete(cmeLectureProgress).where(inArray(cmeLectureProgress.participantId, participantIds));
+  await ex.delete(cmeChapterProgress).where(inArray(cmeChapterProgress.participantId, participantIds));
   await ex.delete(cmeModuleProgress).where(inArray(cmeModuleProgress.participantId, participantIds));
   await ex.delete(cmeEnrollments).where(inArray(cmeEnrollments.participantId, participantIds));
 }
@@ -937,8 +1122,9 @@ async function usunUczestnika(ex: Wykonawca, participantIds: string[]) {
 export async function przyUsunieciuKonta(tx: Tx, userId: string) {
   const [c] = await tx.select({ id: cmeCertificates.id }).from(cmeCertificates).where(eq(cmeCertificates.participantId, userId)).limit(1);
   if (!c) return usunUczestnika(tx, [userId]);
-  await tx.update(cmeTestAttempts).set({ answers: {}, answerOrders: {}, grading: null, questionIds: [] }).where(eq(cmeTestAttempts.participantId, userId));
+  await tx.update(cmeTestAttempts).set({ answers: {}, answerOrders: {}, grading: null, questionIds: [], questionSnapshot: null }).where(eq(cmeTestAttempts.participantId, userId));
   await tx.delete(cmeLectureProgress).where(eq(cmeLectureProgress.participantId, userId));
+  await tx.delete(cmeChapterProgress).where(eq(cmeChapterProgress.participantId, userId));
   await tx.delete(cmeModuleProgress).where(eq(cmeModuleProgress.participantId, userId));
   await wpis(tx, { type: "konto_usuniete", participantId: userId, userId, details: {} });
 }
@@ -964,7 +1150,7 @@ export async function czyscPrzeterminowane(opts: { proba: boolean; teraz?: Date 
 
 export async function listaUczestnikow() {
   const { rows } = await pool.query(`
-    SELECT e.*, u.email, v.email AS verified_by_email,
+    SELECT e.*, u.email, coalesce(v.email, e.pwz_verified_by_snapshot->>'email') AS verified_by_email,
       (SELECT count(*) FROM cme_module_progress mp JOIN modules m ON m.id = mp.module_id WHERE mp.participant_id = e.participant_id AND mp.completed_at IS NOT NULL AND m.cme)::int AS moduly_ukonczone,
       (SELECT count(*) FROM cme_log l WHERE l.participant_id = e.participant_id AND l.type = 'modul_ukonczony')::int AS moduly_w_dzienniku,
       (SELECT json_build_object('procent', t.percent, 'zaliczony', t.passed, 'at', t.submitted_at) FROM cme_test_attempts t
@@ -988,7 +1174,7 @@ export async function listaUczestnikow() {
 }
 
 /** Zespół: zmiana danych zapisu z powodem w dzienniku; `pominWalidacje` = wyjątek od formatu PWZ (np. PWZ warunkowe) */
-export async function edytujZapis(adminId: string, enrollmentId: string, d: { imie?: string; nazwisko?: string; pwz?: string | null; specjalizacja?: string | null; izba?: string | null; pominWalidacje?: boolean }, powod: string) {
+export async function edytujZapis(admin: User, enrollmentId: string, d: { imie?: string; nazwisko?: string; pwz?: string | null; specjalizacja?: string | null; izba?: string | null; pominWalidacje?: boolean }, powod: string) {
   const [z] = await db.select().from(cmeEnrollments).where(eq(cmeEnrollments.id, enrollmentId));
   if (!z) throw new BladSzkolenia(404, "Nie znaleziono zapisu.");
   const zawod = z.profession as Zawod;
@@ -1024,46 +1210,62 @@ export async function edytujZapis(adminId: string, enrollmentId: string, d: { im
   }
   if (!Object.keys(zmiany).length) return widokZapisu(z);
   // zmiana danych osobowych: sprawdzenie w rejestrze trzeba zrobić od nowa
-  if (zmiany.imie || zmiany.nazwisko || zmiany.pwz) { set.pwzVerifiedAt = null; set.pwzVerifiedBy = null; }
+  if (zmiany.imie || zmiany.nazwisko || zmiany.pwz) { set.pwzVerifiedAt = null; set.pwzVerifiedBy = null; set.pwzVerifiedBySnapshot = null; }
   const [nowy] = await db.transaction(async (tx) => {
     const r = await tx.update(cmeEnrollments).set(set).where(eq(cmeEnrollments.id, z.id)).returning();
-    await wpis(tx, { type: "dane_zmienione_admin", participantId: z.participantId, userId: z.userId, enrollmentId: z.id, actorId: adminId, details: { zmiany, powod, pominWalidacje: !!d.pominWalidacje } });
+    await wpis(tx, { type: "dane_zmienione_admin", participantId: z.participantId, userId: z.userId, enrollmentId: z.id, actor: kopiaWykonawcy(admin), details: { zmiany, powod, pominWalidacje: !!d.pominWalidacje } });
     return r;
   });
   return widokZapisu(nowy);
 }
 
-/** „PWZ sprawdzony w publicznym rejestrze” (NIL / NIPiP): kto i kiedy, wpis w dzienniku; cofnięcie też */
-export async function oznaczPwzSprawdzony(adminId: string, enrollmentId: string, sprawdzony: boolean, uwaga?: string) {
+/**
+ * „PWZ sprawdzony w publicznym rejestrze” (NIL / NIPiP): kto i kiedy, wpis w dzienniku; cofnięcie też.
+ * Zatwierdzamy tylko dane, które admin widział (PWZ, imię, nazwisko z listy): gdy uczestnik zmienił je
+ * w międzyczasie, UPDATE nic nie zmienia i jest 409. Nikt nie sprawdza własnego PWZ.
+ */
+export async function oznaczPwzSprawdzony(admin: User, enrollmentId: string, sprawdzony: boolean, oczekiwane: { pwz: string | null; imie: string; nazwisko: string } | null, uwaga?: string) {
   const [z] = await db.select().from(cmeEnrollments).where(eq(cmeEnrollments.id, enrollmentId));
   if (!z) throw new BladSzkolenia(404, "Nie znaleziono zapisu.");
+  if (sprawdzony && (z.participantId === admin.id || z.userId === admin.id)) throw new BladSzkolenia(403, "Nie możesz sprawdzić własnego numeru PWZ. Poproś inną osobę z zespołu.");
+  const zmienione = new BladSzkolenia(409, "Dane uczestnika zmieniły się po wczytaniu listy. Odśwież listę i porównaj je z rejestrem jeszcze raz.");
+  if (sprawdzony && (!oczekiwane || !daneZgodne(z, oczekiwane))) throw zmienione;
   const teraz = new Date();
+  const kto = kopiaWykonawcy(admin);
   const [r] = await db.transaction(async (tx) => {
-    const u = await tx.update(cmeEnrollments).set(sprawdzony ? { pwzVerifiedAt: teraz, pwzVerifiedBy: adminId } : { pwzVerifiedAt: null, pwzVerifiedBy: null })
-      .where(eq(cmeEnrollments.id, z.id)).returning();
+    const warunek = sprawdzony && oczekiwane
+      ? and(eq(cmeEnrollments.id, z.id), sql`${cmeEnrollments.pwz} IS NOT DISTINCT FROM ${z.pwz}`, eq(cmeEnrollments.firstName, z.firstName), eq(cmeEnrollments.lastName, z.lastName))
+      : eq(cmeEnrollments.id, z.id);
+    const u = await tx.update(cmeEnrollments)
+      .set(sprawdzony ? { pwzVerifiedAt: teraz, pwzVerifiedBy: admin.id, pwzVerifiedBySnapshot: kto } : { pwzVerifiedAt: null, pwzVerifiedBy: null, pwzVerifiedBySnapshot: null })
+      .where(warunek).returning();
+    if (!u.length) throw zmienione;
     await wpis(tx, {
-      type: sprawdzony ? "pwz_sprawdzony" : "pwz_sprawdzenie_cofniete", participantId: z.participantId, userId: z.userId, enrollmentId: z.id, actorId: adminId,
-      details: { zawod: z.profession, pwz: z.pwz, imie: z.firstName, nazwisko: z.lastName, uwaga: uwaga ?? null },
+      type: sprawdzony ? "pwz_sprawdzony" : "pwz_sprawdzenie_cofniete", participantId: z.participantId, userId: z.userId, enrollmentId: z.id, actor: kto,
+      details: { zawod: z.profession, pwz: u[0].pwz, imie: u[0].firstName, nazwisko: u[0].lastName, uwaga: uwaga ?? null },
     });
     return u;
   });
   return widokZapisu(r);
 }
 
-export async function uniewaznijZaswiadczenie(adminId: string, numer: string, powod: string) {
+export async function uniewaznijZaswiadczenie(admin: User, numer: string, powod: string) {
   const c = await zaswiadczeniePoNumerze(numer);
   if (!c) throw new BladSzkolenia(404, "Nie znaleziono zaświadczenia.");
   if (!c.valid) return c;
   return db.transaction(async (tx) => {
     const [r] = await tx.update(cmeCertificates).set({ valid: false, invalidatedAt: new Date(), invalidatedReason: powod }).where(eq(cmeCertificates.id, c.id)).returning();
-    await wpis(tx, { type: "zaswiadczenie_uniewaznione", participantId: c.participantId, userId: c.userId, enrollmentId: c.enrollmentId, actorId: adminId, details: { numer, powod } });
+    await wpis(tx, { type: "zaswiadczenie_uniewaznione", participantId: c.participantId, userId: c.userId, enrollmentId: c.enrollmentId, actor: kopiaWykonawcy(admin), details: { numer, powod } });
     return r;
   });
 }
 
 export async function dziennikUczestnika(participantId: string) {
   const rows = await db.select().from(cmeLog).where(eq(cmeLog.participantId, participantId)).orderBy(asc(cmeLog.at));
-  return rows.map((r) => ({ typ: r.type, nazwa: TYPY_ZDARZEN[r.type as TypZdarzenia] ?? r.type, at: r.at, atPL: dataGodzinaPL(r.at), details: r.details, actorId: r.actorId }));
+  return rows.map((r) => ({
+    typ: r.type, nazwa: TYPY_ZDARZEN[r.type as TypZdarzenia] ?? r.type, at: r.at, atPL: dataGodzinaPL(r.at), details: r.details,
+    actorId: r.actorId, wykonawca: r.actorSnapshot ?? null,
+  }));
 }
 
 /** Lista obecności: wiersz na zapis (osoba × zawód), daty w strefie Polski */
@@ -1121,24 +1323,18 @@ export async function raportOrlCsv(izba?: string): Promise<string> {
   return "﻿" + linie.join("\r\n") + "\r\n";
 }
 
-/** Raport zbiorczy ankiety: średnie i rozkład skal, odsetek „tak”, lista uwag (bez dat) */
-export async function raportAnkiety() {
+/**
+ * Raport zbiorczy ankiety (opcjonalnie miesiące od–do, RRRR-MM): średnie i rozkład skal, tak/nie.
+ * Odpowiedzi tekstowe dopiero od 5 ankiet w wybranym okresie (mniej = łatwo rozpoznać autora).
+ */
+export async function raportAnkiety(okres: { od?: string; do?: string } = {}) {
   const k = await konfiguracja();
-  const rows = await db.select().from(cmeSurveyResponses);
-  const pytania = k.ankieta.pytania.map((p) => {
-    const odp = rows.map((r) => r.answers[p.id]).filter((v) => v !== null && v !== undefined);
-    if (p.typ === "skala") {
-      const liczby = odp.filter((v): v is number => typeof v === "number");
-      const rozklad = [1, 2, 3, 4, 5].map((o) => liczby.filter((v) => v === o).length);
-      return { ...p, n: liczby.length, srednia: liczby.length ? Math.round((liczby.reduce((a, b) => a + b, 0) / liczby.length) * 100) / 100 : null, rozklad };
-    }
-    if (p.typ === "tak_nie") {
-      const b = odp.filter((v): v is boolean => typeof v === "boolean");
-      return { ...p, n: b.length, tak: b.filter(Boolean).length, nie: b.filter((v) => !v).length };
-    }
-    return { ...p, n: odp.length, teksty: tasuj(odp.map(String).filter((t) => t.trim())) };
-  });
-  return { odpowiedzi: rows.length, wersje: Array.from(new Set(rows.map((r) => r.surveyVersion))), pytania };
+  const warunki = [
+    okres.od ? sql`${cmeSurveyResponses.month} >= ${okres.od}` : undefined,
+    okres.do ? sql`${cmeSurveyResponses.month} <= ${okres.do}` : undefined,
+  ].filter(Boolean);
+  const rows = await db.select().from(cmeSurveyResponses).where(warunki.length ? and(...warunki) : undefined);
+  return { ...raportAnkietyZ(k.ankieta, rows), okres: { od: okres.od ?? null, do: okres.do ?? null } };
 }
 
 export { dataPL };

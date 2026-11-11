@@ -271,6 +271,10 @@ export interface RegulaPunktow {
   formInfoAcceptedAt: string | null;
   decisionNumber: string | null;
   inactiveReason: string | null;
+  /** Reguła obowiązuje od (RRRR-MM-DD, włącznie); bez tej daty reguła nie daje punktów */
+  obowiazujeOd?: string | null;
+  /** Reguła obowiązuje do (RRRR-MM-DD, włącznie); puste = bez końca */
+  obowiazujeDo?: string | null;
 }
 
 /** Numer wpisu do rejestru podmiotów prowadzących kształcenie lekarzy: RR-NNNNNN-00X-ZZZZ */
@@ -279,15 +283,66 @@ export const NUMER_WPISU_RE = /^\d{2}-\d{6}-00\d-\d{4}$/;
 const jest = (v: string | null | undefined) => !!v && !!v.trim();
 
 /**
- * Reguła działa, gdy jest włączona i ma komplet danych:
+ * Czego brakuje, żeby reguła dawała punkty (pusta lista = reguła kompletna):
  * - lekarze (registryRequired): uchwała NRL, numer wpisu w formacie RR-NNNNNN-00X-ZZZZ i data przyjęcia informacji o formie,
- * - punkty z decyzji: przyznana liczba punktów (i numer decyzji, gdy to nie lekarze, np. NRPiP).
+ * - punkty z decyzji: przyznana liczba punktów (i numer decyzji, gdy to nie lekarze, np. NRPiP),
+ * - każda reguła: data, od której obowiązuje (punkty nie działają wstecz).
  */
+export function brakiReguly(r: RegulaPunktow): string[] {
+  const braki: string[] = [];
+  if (r.registryRequired) {
+    if (!jest(r.nrlResolution)) braki.push("uchwała Naczelnej Rady Lekarskiej");
+    if (!NUMER_WPISU_RE.test(r.registryNumber?.trim() ?? "")) braki.push("numer wpisu do rejestru (RR-NNNNNN-00X-ZZZZ)");
+    if (!jest(r.formInfoAcceptedAt)) braki.push("data przyjęcia informacji o formie kształcenia");
+  }
+  if (r.pointsMode === "decyzja") {
+    if (!((r.pointsGranted ?? 0) > 0)) braki.push("liczba punktów przyznana w uchwale albo decyzji");
+    if (!r.registryRequired && !jest(r.decisionNumber)) braki.push("numer decyzji");
+  }
+  if (!DATA_RE.test(r.obowiazujeOd ?? "")) braki.push("data, od której reguła obowiązuje");
+  return braki;
+}
+
+/** Reguła działa, gdy jest włączona i ma komplet danych (brakiReguly) */
 export function regulaDziala(r: RegulaPunktow): boolean {
-  if (!r.active) return false;
-  if (r.registryRequired && !(jest(r.nrlResolution) && NUMER_WPISU_RE.test(r.registryNumber?.trim() ?? "") && jest(r.formInfoAcceptedAt))) return false;
-  if (r.pointsMode === "decyzja" && !((r.pointsGranted ?? 0) > 0 && (r.registryRequired || jest(r.decisionNumber)))) return false;
-  return true;
+  return r.active && brakiReguly(r).length === 0;
+}
+
+// ── Okres obowiązywania reguły (punkty nie działają wstecz) ──────────────────
+
+export const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Dzień w strefie Polski jako RRRR-MM-DD (do porównań z datami obowiązywania) */
+export const dzienPL = (d: Date): string =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+
+/** RRRR-MM-DD → DD.MM.RRRR */
+export const dataZDnia = (d: string): string => d.split("-").reverse().join(".");
+
+/**
+ * Domyślny początek obowiązywania reguły lekarzy: późniejsza z dat uchwały NRL i przyjęcia informacji
+ * o formie kształcenia (obie RRRR-MM-DD). Brak którejś: null (datę wpisuje się ręcznie).
+ */
+export function poczatekObowiazywania(uchwalaNrlAt: string | null | undefined, informacjaAt: string | null | undefined): string | null {
+  if (!DATA_RE.test(uchwalaNrlAt ?? "") || !DATA_RE.test(informacjaAt ?? "")) return null;
+  return uchwalaNrlAt! > informacjaAt! ? uchwalaNrlAt! : informacjaAt!;
+}
+
+/**
+ * Całe szkolenie uczestnika (od zapisu do zaliczenia testu, daty z dziennika) musi mieścić się w okresie
+ * obowiązywania reguły. Zwraca powód braku punktów albo null, gdy mieści się.
+ */
+export function pozaObowiazywaniem(r: Pick<RegulaPunktow, "obowiazujeOd" | "obowiazujeDo">, start: Date, koniec: Date): string | null {
+  const od = r.obowiazujeOd ?? null;
+  const doDnia = r.obowiazujeDo ?? null;
+  if (!od || !DATA_RE.test(od)) return "Reguła punktów nie ma jeszcze daty obowiązywania, więc to zaświadczenie nie daje punktów edukacyjnych.";
+  if (dzienPL(start) < od) {
+    return `Szkolenie rozpoczęło się ${dataPL(start)}, przed dniem, od którego obowiązuje akceptacja punktów (${dataZDnia(od)}). Punkty nie działają wstecz, więc to zaświadczenie nie daje punktów edukacyjnych.`;
+  }
+  if (doDnia && DATA_RE.test(doDnia) && dzienPL(koniec) > doDnia) {
+    return `Test zaliczony ${dataPL(koniec)}, po dniu, do którego obowiązywała akceptacja punktów (${dataZDnia(doDnia)}), więc to zaświadczenie nie daje punktów edukacyjnych.`;
+  }
+  return null;
 }
 
 export type Punkty = { punkty: number; powod: null } | { punkty: null; powod: string };
@@ -362,14 +417,187 @@ export function dataGodzinaPL(d: Date): string {
   return new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
-/** Widok publicznej weryfikacji: tylko numer, ważność, tytuł, data i inicjały (bez PWZ, zawodu, pełnego nazwiska) */
-export function widokWeryfikacji(c: { number: string; valid: boolean; issuedAt: Date; snapshot: Record<string, unknown> }, inicjalyFn: (i: string, n: string) => string) {
-  const s = c.snapshot as { imie?: string; nazwisko?: string; tytul?: string };
+/** Etykieta godzin na zaświadczeniu: godzina dydaktyczna (45 min) jest zdefiniowana tylko dla ratowników */
+export const etykietaGodzin = (zawod: string): string =>
+  zawod === "ratownik" ? "Liczba godzin dydaktycznych (45 min)" : "Liczba godzin programu";
+
+/**
+ * Zawód na zaświadczeniu jest sprawdzony, gdy to zaświadczenie z punktami (wymaga sprawdzenia PWZ albo
+ * świadomie wyłączonej weryfikacji ręcznej) albo PWZ sprawdzono w rejestrze przed wydaniem.
+ * Zaświadczenie ukończenia bez sprawdzonego PWZ: bez numeru PWZ, zawód tylko „deklarowany”.
+ */
+export function zawodZweryfikowany(kind: string, snapshot: Record<string, unknown>): boolean {
+  return kind === "punkty" || !!snapshot.pwzSprawdzonyAt;
+}
+
+export interface CertyfikatDoWeryfikacji {
+  number: string;
+  valid: boolean;
+  issuedAt: Date;
+  invalidatedAt?: Date | null;
+  kind?: string;
+  points?: string | number | null;
+  hours?: string | number;
+  profession?: string;
+  snapshot: Record<string, unknown>;
+}
+
+/**
+ * Widok publicznej weryfikacji: numer, ważność (unieważnione z datą), rodzaj (z punktami / bez punktów),
+ * punkty, zawód (z oznaczeniem „deklarowany”, gdy niesprawdzony), godziny, tytuł, data wydania i inicjały.
+ * Bez PWZ i pełnego nazwiska. Rodzaj i punkty są tu po to, żeby dopisanie punktów w PDF nie przeszło weryfikacji.
+ */
+export function widokWeryfikacji(c: CertyfikatDoWeryfikacji, inicjalyFn: (i: string, n: string) => string) {
+  const s = c.snapshot as { imie?: string; nazwisko?: string; tytul?: string; zawodNazwa?: string; zawod?: string; godziny?: number };
+  const kind = c.kind ?? "punkty";
+  const punkty = c.points === null || c.points === undefined ? null : Number(c.points);
+  const zawod = String(s.zawod ?? c.profession ?? "");
+  const godziny = Number(c.hours ?? s.godziny ?? 0);
   return {
     numer: c.number,
     wazne: c.valid,
+    uniewaznione: c.valid ? null : (c.invalidatedAt ? dataPL(c.invalidatedAt) : "tak"),
+    rodzaj: kind === "punkty" && punkty !== null ? "punkty" as const : "ukonczenie" as const,
+    rodzajNazwa: kind === "punkty" && punkty !== null ? "z punktami edukacyjnymi" : "ukończenie szkolenia bez punktów edukacyjnych",
+    punkty: kind === "punkty" ? punkty : null,
+    zawod: String(s.zawodNazwa ?? zawod),
+    zawodDeklarowany: !zawodZweryfikowany(kind, c.snapshot),
+    godziny,
+    etykietaGodzin: etykietaGodzin(zawod),
     tytul: String(s.tytul ?? ""),
     dataWydania: dataPL(c.issuedAt),
     inicjaly: inicjalyFn(String(s.imie ?? ""), String(s.nazwisko ?? "")),
   };
+}
+
+// ── Zespół: podgląd tak, test i zaświadczenie z punktami nie ────────────────
+
+/** Konta zespołu widzą klucz (pytania puli testu w panelu), więc nie zdają testu i nie dostają punktów */
+export const ROLE_ZESPOLU = ["owner", "admin", "reviewer", "support"] as const;
+export const czyRolaZespolu = (role: string | null | undefined): boolean => !!role && (ROLE_ZESPOLU as readonly string[]).includes(role);
+
+// ── Wgląd w oceniony test ────────────────────────────────────────────────────
+
+/**
+ * Zakres wglądu w oddane podejście. Pełny wgląd (pytania, własne odpowiedzi, klucz, uzasadnienia; przy
+ * ustawieniu "bledne" tylko błędne) dopiero, gdy podejścia są zakończone: test zaliczony albo wykorzystane
+ * wszystkie podejścia. Wcześniej (niezaliczone, zostały podejścia) tylko wynik i udział poprawnych w modułach:
+ * kolejne podejście losuje z tej samej puli, więc klucz nie może wyjść przed nim.
+ */
+export type ZakresWgladu = "pelny" | "bledne" | "podsumowanie";
+export function zakresWgladu(ustawienie: "pelny" | "bledne", stan: StanPodejsc["stan"]): ZakresWgladu {
+  return stan === "zaliczony" || stan === "wyczerpane" ? ustawienie : "podsumowanie";
+}
+
+/** Pula testu powinna mieć co najmniej 2 × liczba pytań (inaczej kolejne podejścia mają prawie ten sam zestaw) */
+export const pulaZaMala = (pula: number, liczbaPytan: number): boolean => pula < 2 * liczbaPytan;
+
+// ── Kopia pytań w podejściu (ocena i wgląd nie zależą od późniejszych zmian treści) ──
+
+export interface KopiaPytania {
+  externalId: string | null;
+  sectionId: string | null;
+  moduleId: string | null;
+  modul: string | null;
+  modulTytul: string | null;
+  modulKolejnosc: number | null;
+  title: string | null;
+  bodyMd: string;
+  imageUrl: string | null;
+  answers: Array<{ text: string; isCorrect: boolean }>;
+  explanationMd: string;
+}
+export type KopiaPytan = Record<string, KopiaPytania>;
+
+/**
+ * Pytania do oceny: z kopii z chwili losowania, gdy jest (podejścia od 11.11 wieczór); starsze podejścia
+ * bez kopii: bieżąca treść. Pytanie, którego nie ma ani w kopii, ani w bazie, liczy się jako błędne.
+ */
+export function pytaniaDoOceny(
+  questionIds: readonly string[],
+  kopia: KopiaPytan | null | undefined,
+  zywe: ReadonlyMap<string, { externalId: string | null; answers: Array<{ text: string; isCorrect: boolean }> }>,
+): PytanieDoOceny[] {
+  return questionIds.map((id) => {
+    const k = kopia?.[id];
+    if (k) return { id, externalId: k.externalId, answers: k.answers };
+    const z = zywe.get(id);
+    return { id, externalId: z?.externalId ?? null, answers: z?.answers ?? [] };
+  });
+}
+
+/** Udział poprawnych odpowiedzi w każdym module (wynik niezaliczonego podejścia bez klucza) */
+export function udzialModulow(
+  oceny: ReadonlyArray<{ questionId: string; ok: boolean }>,
+  kopia: KopiaPytan | null | undefined,
+): Array<{ modul: string | null; tytul: string; dobrze: number; wszystkie: number }> {
+  const grupy = new Map<string, { modul: string | null; tytul: string; kolejnosc: number; dobrze: number; wszystkie: number }>();
+  for (const o of oceny) {
+    const k = kopia?.[o.questionId];
+    const klucz = k?.moduleId ?? k?.modul ?? "?";
+    const g = grupy.get(klucz) ?? { modul: k?.modul ?? null, tytul: k?.modulTytul ?? "Inne", kolejnosc: k?.modulKolejnosc ?? 9999, dobrze: 0, wszystkie: 0 };
+    g.wszystkie++;
+    if (o.ok) g.dobrze++;
+    grupy.set(klucz, g);
+  }
+  return Array.from(grupy.values()).sort((a, b) => a.kolejnosc - b.kolejnosc).map(({ kolejnosc: _k, ...g }) => g);
+}
+
+// ── Wykład ukończony: każdy rozdział otwarty ─────────────────────────────────
+
+/** Numery rozdziałów 1…n, których uczestnik jeszcze nie otworzył (pusta lista = wykład ukończony) */
+export function brakujaceRozdzialy(otwarte: Iterable<number>, n: number): number[] {
+  const juz = new Set(otwarte);
+  const braki: number[] = [];
+  for (let i = 1; i <= n; i++) if (!juz.has(i)) braki.push(i);
+  return braki;
+}
+
+// ── Dane organizatora (warunek zaświadczenia z punktami) ─────────────────────
+
+export function brakiOrganizatora(d: {
+  organizator: { nazwa?: string; adres?: string } | null | undefined;
+  kierownikNaukowy: string; kierownikNaukowyTytul: string; podpisujacy: string;
+}): string[] {
+  const braki: string[] = [];
+  if (!jest(d.organizator?.nazwa)) braki.push("nazwa organizatora");
+  if (!jest(d.organizator?.adres)) braki.push("adres organizatora");
+  if (!jest(d.kierownikNaukowy)) braki.push("kierownik naukowy (imię i nazwisko)");
+  if (!jest(d.kierownikNaukowyTytul)) braki.push("tytuł kierownika naukowego");
+  if (!jest(d.podpisujacy)) braki.push("osoba podpisująca za organizatora");
+  return braki;
+}
+
+// ── Sprawdzenie PWZ: zatwierdzamy tylko dane, które admin widział ────────────
+
+const norm = (v: string | null | undefined) => (v ?? "").trim();
+export function daneZgodne(z: { pwz: string | null; firstName: string; lastName: string }, o: { pwz: string | null; imie: string; nazwisko: string }): boolean {
+  return norm(z.pwz).toUpperCase() === norm(o.pwz).toUpperCase() && norm(z.firstName) === norm(o.imie) && norm(z.lastName) === norm(o.nazwisko);
+}
+
+// ── Raport ankiety: teksty dopiero od 5 odpowiedzi ───────────────────────────
+
+export const MIN_ODPOWIEDZI_DLA_TEKSTOW = 5;
+
+export function raportAnkietyZ(
+  ankieta: { pytania: Array<{ id: string; typ: "skala" | "tak_nie" | "tekst"; tresc: string; wymagane: boolean }> },
+  rows: ReadonlyArray<{ answers: Record<string, unknown>; surveyVersion: string }>,
+  los: Losowe = Math.random,
+) {
+  const tekstyWidoczne = rows.length >= MIN_ODPOWIEDZI_DLA_TEKSTOW;
+  const pytania = ankieta.pytania.map((p) => {
+    const odp = rows.map((r) => r.answers[p.id]).filter((v) => v !== null && v !== undefined);
+    if (p.typ === "skala") {
+      const liczby = odp.filter((v): v is number => typeof v === "number");
+      const rozklad = [1, 2, 3, 4, 5].map((o) => liczby.filter((v) => v === o).length);
+      return { ...p, n: liczby.length, srednia: liczby.length ? Math.round((liczby.reduce((a, b) => a + b, 0) / liczby.length) * 100) / 100 : null, rozklad };
+    }
+    if (p.typ === "tak_nie") {
+      const b = odp.filter((v): v is boolean => typeof v === "boolean");
+      return { ...p, n: b.length, tak: b.filter(Boolean).length, nie: b.filter((v) => !v).length };
+    }
+    const teksty = odp.map(String).filter((t) => t.trim());
+    return { ...p, n: teksty.length, teksty: tekstyWidoczne ? tasuj(teksty, los) : [], tekstyUkryte: !tekstyWidoczne && teksty.length > 0 };
+  });
+  return { odpowiedzi: rows.length, tekstyWidoczne, minOdpowiedzi: MIN_ODPOWIEDZI_DLA_TEKSTOW, wersje: Array.from(new Set(rows.map((r) => r.surveyVersion))), pytania };
 }

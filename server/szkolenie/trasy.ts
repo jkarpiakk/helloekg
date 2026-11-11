@@ -9,7 +9,7 @@ import { z } from "zod";
 import { and, count, eq, gte, inArray, sql } from "drizzle-orm";
 import { db, pool } from "../db";
 import { attempts, modules, questions, sections, supportTickets } from "@shared/schema";
-import { zapisSchema, czescNazwiska, ZAWODY } from "@shared/szkolenie";
+import { zapisSchema, czescNazwiska, tekstZaswiadczenia, ZAWODY } from "@shared/szkolenie";
 import { requireActiveSubscription, requireAdmin, requireKonto, requireOwner } from "../middleware/auth";
 import { weryfikacjaRateLimit } from "../middleware/rateLimit";
 import { emailService, esc } from "../services/emailService";
@@ -17,16 +17,25 @@ import { quizService } from "../services/quizService";
 import { ustawienie } from "../ustawienia";
 import * as s from "./serwis";
 import { pdfZaswiadczenia } from "./pdf";
-import { NUMER_WPISU_RE } from "./logika";
+import { czyRolaZespolu, DATA_RE, NUMER_WPISU_RE } from "./logika";
 
-const ZESPOL = ["owner", "admin", "reviewer"];
-const czyZespol = (req: Request) => !!req.user && ZESPOL.includes(req.user.role);
+/** Zespół (owner, admin, reviewer, support): podgląd szkolenia przy wyłączonym przełączniku */
+const czyZespol = (req: Request) => !!req.user && czyRolaZespolu(req.user.role);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Szkolenie wyłączone: dla kursanta trasy nie istnieją (404), zespół widzi podgląd */
 async function szkolenieDostepne(req: Request, res: Response, next: NextFunction) {
   if (czyZespol(req) || (await ustawienie("szkolenie_wlaczone"))) return next();
   res.status(404).json({ error: "Nie znaleziono" });
+}
+
+/** Moduł dostępny jak treść kursu: widoczny i nie zablokowany w becie (zespół widzi wszystko) */
+async function modulDostepny(req: Request) {
+  if (!UUID_RE.test(req.params.id)) return null;
+  const m = await s.modulDoPodsumowania(req.params.id);
+  if (!m) return null;
+  if (!czyZespol(req) && (!m.isVisible || m.isLocked)) return null;
+  return m;
 }
 
 function blad(res: Response, e: unknown, domyslny: string) {
@@ -54,13 +63,24 @@ const edycjaZapisuSchema = z.object({
   imie: czescNazwiska("imię").optional(),
   nazwisko: czescNazwiska("nazwisko").optional(),
   pwz: z.string().max(40).nullable().optional(),
-  specjalizacja: z.string().max(200).nullable().optional(),
-  izba: z.string().max(100).nullable().optional(),
+  specjalizacja: tekstZaswiadczenia(200).nullable().optional(),
+  izba: tekstZaswiadczenia(100).nullable().optional(),
   /** Wyjątek od walidacji formatu PWZ (np. PWZ warunkowe): zapis w dzienniku */
   pominWalidacje: z.boolean().optional(),
   powod: z.string().trim().min(3, "Podaj powód zmiany (trafia do dziennika).").max(500),
 });
 const liczbaLubNull = z.number().min(0).max(1000).nullable();
+const dataLubNull = z.string().regex(DATA_RE, "Data w formacie RRRR-MM-DD")
+  .refine((v) => !Number.isNaN(Date.parse(v + "T00:00:00Z")) && new Date(v + "T00:00:00Z").toISOString().startsWith(v), "Nieprawidłowa data").nullable();
+const sprawdzeniePwzSchema = z.object({
+  sprawdzony: z.boolean().optional(),
+  uwaga: z.string().max(500).optional(),
+  /** Dane, które admin porównał z rejestrem (z listy w panelu): zapis musi je mieć w chwili zatwierdzenia */
+  pwz: z.string().max(40).nullable().optional(),
+  imie: z.string().max(100).optional(),
+  nazwisko: z.string().max(100).optional(),
+});
+const MIESIAC_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const regulaSchema = z.object({
   active: z.boolean().optional(),
   legalBasis: z.string().max(1000).nullable().optional(),
@@ -70,6 +90,9 @@ const regulaSchema = z.object({
   pointsGranted: liczbaLubNull.optional(),
   nrlResolution: z.string().max(200).nullable().optional(),
   formInfoAcceptedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data w formacie RRRR-MM-DD").nullable().optional(),
+  nrlResolutionAt: dataLubNull.optional(),
+  obowiazujeOd: dataLubNull.optional(),
+  obowiazujeDo: dataLubNull.optional(),
   decisionNumber: z.string().max(200).nullable().optional(),
   formText: z.string().max(500).nullable().optional(),
   maxPoints: liczbaLubNull.optional(),
@@ -103,10 +126,9 @@ export function registerSzkolenieRoutes(app: Express) {
   });
 
   // ── Strona modułu: podsumowanie, bibliografia, napisz do prowadzącego ─────
-  app.get("/api/szkolenie/moduly/:id", requireKonto, requireActiveSubscription, async (req, res) => {
-    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Nie znaleziono" });
-    const m = await s.modulDoPodsumowania(req.params.id);
-    if (!m || (!m.isVisible && !czyZespol(req))) return res.status(404).json({ error: "Nie znaleziono" });
+  app.get("/api/szkolenie/moduly/:id", requireKonto, szkolenieDostepne, requireActiveSubscription, async (req, res) => {
+    const m = await modulDostepny(req);
+    if (!m) return res.status(404).json({ error: "Nie znaleziono" });
     res.json({
       id: m.id, tytul: m.title, kolejnosc: m.order, szkolenie: m.cme,
       podsumowanieMd: m.summaryMd?.trim() ? m.summaryMd : null,
@@ -114,9 +136,9 @@ export function registerSzkolenieRoutes(app: Express) {
     });
   });
 
-  app.post("/api/szkolenie/moduly/:id/podsumowanie", requireKonto, requireActiveSubscription, async (req, res) => {
-    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Nie znaleziono" });
+  app.post("/api/szkolenie/moduly/:id/podsumowanie", requireKonto, szkolenieDostepne, requireActiveSubscription, async (req, res) => {
     try {
+      if (!(await modulDostepny(req))) return res.status(404).json({ error: "Nie znaleziono" });
       const ok = await s.otworzPodsumowanie(req.user!.id, req.params.id);
       if (!ok) return res.status(404).json({ error: "Ten moduł nie ma podsumowania" });
       res.json({ ok: true });
@@ -125,13 +147,14 @@ export function registerSzkolenieRoutes(app: Express) {
     }
   });
 
-  app.post("/api/szkolenie/moduly/:id/do-prowadzacego", requireKonto, async (req, res) => {
+  // Ten sam dostęp co treść kursu: subskrypcja, moduł widoczny i niezablokowany
+  app.post("/api/szkolenie/moduly/:id/do-prowadzacego", requireKonto, szkolenieDostepne, requireActiveSubscription, async (req, res) => {
     if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Nie znaleziono" });
     const p = doProwadzacegoSchema.safeParse(req.body);
     if (!p.success) return res.status(400).json({ error: p.error.issues[0]?.message ?? "Sprawdź wiadomość" });
     try {
-      const m = await s.modulDoPodsumowania(req.params.id);
-      if (!m || (!m.isVisible && !czyZespol(req))) return res.status(404).json({ error: "Nie znaleziono" });
+      const m = await modulDostepny(req);
+      if (!m) return res.status(404).json({ error: "Nie znaleziono" });
       const user = req.user!;
       const [{ n }] = await db.select({ n: count() }).from(supportTickets)
         .where(and(eq(supportTickets.userId, user.id), eq(supportTickets.kind, "prowadzacy"), gte(supportTickets.createdAt, new Date(Date.now() - 86_400_000))));
@@ -155,7 +178,7 @@ export function registerSzkolenieRoutes(app: Express) {
   });
 
   // ── Program i regulamin szkolenia ──────────────────────────────────────────
-  app.get("/api/szkolenie/program", requireKonto, async (_req, res) => {
+  app.get("/api/szkolenie/program", requireKonto, szkolenieDostepne, async (_req, res) => {
     res.json({ tresc: await s.programSzkolenia() });
   });
 
@@ -298,7 +321,7 @@ export function registerSzkolenieRoutes(app: Express) {
     if (!p.success) return res.status(400).json({ error: p.error.issues[0]?.message ?? "Sprawdź dane" });
     try {
       const { powod, ...d } = p.data;
-      res.json(await s.edytujZapis(req.user!.id, req.params.id, d, powod));
+      res.json(await s.edytujZapis(req.user!, req.params.id, d, powod));
     } catch (e) {
       blad(res, e, "Nie udało się zmienić danych");
     }
@@ -307,10 +330,15 @@ export function registerSzkolenieRoutes(app: Express) {
   // PWZ sprawdzony ręcznie w publicznym rejestrze NIL / NIPiP (warunek zaświadczenia z punktami)
   app.post("/api/admin/szkolenie/zapisy/:id/pwz-sprawdzony", requireKonto, requireAdmin, async (req, res) => {
     if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: "Nie znaleziono" });
-    const sprawdzony = req.body?.sprawdzony !== false;
-    const uwaga = typeof req.body?.uwaga === "string" ? req.body.uwaga.trim().slice(0, 500) : undefined;
+    const p = sprawdzeniePwzSchema.safeParse(req.body ?? {});
+    if (!p.success) return res.status(400).json({ error: "Nieprawidłowe dane" });
+    const sprawdzony = p.data.sprawdzony !== false;
+    if (sprawdzony && (p.data.imie === undefined || p.data.nazwisko === undefined || p.data.pwz === undefined)) {
+      return res.status(400).json({ error: "Wyślij PWZ, imię i nazwisko, które porównano z rejestrem." });
+    }
+    const oczekiwane = sprawdzony ? { pwz: p.data.pwz ?? null, imie: p.data.imie!, nazwisko: p.data.nazwisko! } : null;
     try {
-      res.json(await s.oznaczPwzSprawdzony(req.user!.id, req.params.id, sprawdzony, uwaga));
+      res.json(await s.oznaczPwzSprawdzony(req.user!, req.params.id, sprawdzony, oczekiwane, p.data.uwaga?.trim() || undefined));
     } catch (e) {
       blad(res, e, "Nie udało się zapisać sprawdzenia PWZ");
     }
@@ -370,6 +398,15 @@ export function registerSzkolenieRoutes(app: Express) {
     }
   });
 
+  // Co blokuje zaświadczenia z punktami (dane organizatora)
+  app.get("/api/admin/szkolenie/braki", requireKonto, requireAdmin, async (_req, res) => {
+    try {
+      res.json(await s.brakiSzkolenia());
+    } catch (e) {
+      blad(res, e, "Nie udało się sprawdzić danych organizatora");
+    }
+  });
+
   app.get("/api/admin/szkolenie/reguly", requireKonto, requireAdmin, async (_req, res) => {
     res.json(await s.reguly());
   });
@@ -379,15 +416,18 @@ export function registerSzkolenieRoutes(app: Express) {
     const p = regulaSchema.safeParse(req.body);
     if (!p.success) return res.status(400).json({ error: p.error.issues[0]?.message ?? "Sprawdź regułę" });
     try {
-      res.json(await s.zapiszRegule(req.user!.id, req.params.zawod, p.data));
+      res.json(await s.zapiszRegule(req.user!, req.params.zawod, p.data));
     } catch (e) {
       blad(res, e, "Nie udało się zapisać reguły");
     }
   });
 
-  app.get("/api/admin/szkolenie/ankieta", requireKonto, requireAdmin, async (_req, res) => {
+  // Raport ankiety, opcjonalnie ?od=RRRR-MM&do=RRRR-MM (teksty od 5 odpowiedzi w okresie)
+  app.get("/api/admin/szkolenie/ankieta", requireKonto, requireAdmin, async (req, res) => {
+    const od = typeof req.query.od === "string" && MIESIAC_RE.test(req.query.od) ? req.query.od : undefined;
+    const doM = typeof req.query.do === "string" && MIESIAC_RE.test(req.query.do) ? req.query.do : undefined;
     try {
-      res.json(await s.raportAnkiety());
+      res.json(await s.raportAnkiety({ od, do: doM }));
     } catch (e) {
       blad(res, e, "Nie udało się przygotować raportu ankiety");
     }
@@ -397,7 +437,7 @@ export function registerSzkolenieRoutes(app: Express) {
     const powod = typeof req.body?.powod === "string" ? req.body.powod.trim().slice(0, 500) : "";
     if (powod.length < 3) return res.status(400).json({ error: "Podaj powód unieważnienia" });
     try {
-      const c = await s.uniewaznijZaswiadczenie(req.user!.id, req.params.numer, powod);
+      const c = await s.uniewaznijZaswiadczenie(req.user!, req.params.numer, powod);
       res.json(s.widokZaswiadczenia(c));
     } catch (e) {
       blad(res, e, "Nie udało się unieważnić zaświadczenia");
@@ -411,12 +451,13 @@ export function registerSzkolenieRoutes(app: Express) {
     app.post("/api/szkolenie/_test/ukoncz-moduly", requireKonto, async (req, res) => {
       try {
         const userId = req.user!.id;
-        const { rows: secs } = await pool.query<{ id: string; module_id: string }>(
-          `SELECT s.id, s.module_id FROM sections s JOIN modules m ON m.id = s.module_id
+        const { rows: secs } = await pool.query<{ id: string; module_id: string; n: number }>(
+          `SELECT s.id, s.module_id, (SELECT count(*)::int FROM lecture_chapters c WHERE c.section_id = s.id AND c.is_published) AS n
+             FROM sections s JOIN modules m ON m.id = s.module_id
             WHERE m.cme AND m.is_visible AND s.is_visible
               AND EXISTS (SELECT 1 FROM lecture_chapters c WHERE c.section_id = s.id AND c.is_published)`);
-        // te same ścieżki co w kursie: dziennik dostaje „wykład otwarty/ukończony” i „podsumowanie otwarte”
-        for (const sec of secs) await s.zapiszCzytanie(userId, sec.id, 100_000);
+        // te same ścieżki co w kursie: każdy rozdział po kolei, potem „wykład ukończony” i „podsumowanie otwarte”
+        for (const sec of secs) for (let r = 1; r <= sec.n; r++) await s.zapiszCzytanie(userId, sec.id, r);
         const mods = await db.select({ id: modules.id }).from(modules).where(and(eq(modules.cme, true), eq(modules.isVisible, true)));
         for (const m of mods) await s.otworzPodsumowanie(userId, m.id);
         // ćwiczenia: poprawna odpowiedź na każde pytanie puli ćwiczeń w modułach szkolenia

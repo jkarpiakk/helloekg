@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, json, jsonb, decimal, uuid, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, json, jsonb, decimal, uuid, index, primaryKey, uniqueIndex, check, date } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -265,7 +265,11 @@ export const questions = pgTable("questions", {
   noShuffle: boolean("no_shuffle").notNull().default(false),
   /** Pytania (externalId studia), z którymi to pytanie nie może wystąpić w jednym losowaniu testu */
   excludes: jsonb("excludes").$type<string[]>().notNull().default([]),
-});
+}, (t) => [
+  // migracja 2026-11-11-punkty.sql (tu, żeby drizzle-kit push ich nie usuwał)
+  check("questions_pool_check", sql`${t.pool} IN ('practice', 'test')`),
+  index("questions_pool_status_idx").on(t.pool, t.status),
+]);
 
 // Answer data types for different question types
 export interface MultipleChoiceAnswer {
@@ -901,9 +905,23 @@ export const cmeRules = pgTable("cme_rules", {
   formText: text("form_text"),
   /** Komunikat na zaświadczeniu bez punktów: dlaczego reguła nie działa */
   inactiveReason: text("inactive_reason"),
+  /** Data uchwały NRL (lekarze): razem z datą przyjęcia informacji o formie wyznacza domyślny początek obowiązywania */
+  nrlResolutionAt: date("nrl_resolution_at", { mode: "string" }),
+  /**
+   * Okres obowiązywania reguły (włącznie, dni w strefie Polski). Punkty tylko wtedy, gdy całe szkolenie
+   * (zapis i zaliczenie testu z dziennika) mieści się w tym okresie; bez daty „od” reguła nie daje punktów.
+   */
+  obowiazujeOd: date("obowiazuje_od", { mode: "string" }),
+  obowiazujeDo: date("obowiazuje_do", { mode: "string" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`now()`),
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
-});
+}, (t) => [
+  check("cme_rules_obowiazuje_check", sql`${t.obowiazujeDo} IS NULL OR ${t.obowiazujeOd} IS NULL OR ${t.obowiazujeDo} >= ${t.obowiazujeOd}`),
+  check("cme_rules_points_mode_check", sql`${t.pointsMode} IN ('godziny', 'decyzja')`),
+]);
+
+/** Kto wykonał czynność (kopia z chwili zdarzenia: konto admina może później zniknąć) */
+export type KopiaWykonawcy = { id: string; email: string; imie: string | null; rola: string };
 
 /** Zapis na szkolenie: jeden wiersz na osobę i zawód (kilka zawodów naraz = kilka wierszy) */
 export const cmeEnrollments = pgTable("cme_enrollments", {
@@ -922,6 +940,8 @@ export const cmeEnrollments = pgTable("cme_enrollments", {
   /** PWZ sprawdzony ręcznie w publicznym rejestrze NIL / NIPiP (kto i kiedy): warunek zaświadczenia z punktami */
   pwzVerifiedAt: timestamp("pwz_verified_at", { withTimezone: true }),
   pwzVerifiedBy: uuid("pwz_verified_by").references(() => users.id, { onDelete: "set null" }),
+  /** Kopia danych sprawdzającego (e-mail, imię, rola): zostaje po usunięciu jego konta */
+  pwzVerifiedBySnapshot: jsonb("pwz_verified_by_snapshot").$type<KopiaWykonawcy>(),
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
   /** Treść oświadczenia o prawdziwości danych w brzmieniu z chwili zapisu */
@@ -936,6 +956,7 @@ export const cmeEnrollments = pgTable("cme_enrollments", {
 }, (t) => [
   index("cme_enrollments_participant_idx").on(t.participantId),
   index("cme_enrollments_user_idx").on(t.userId),
+  uniqueIndex("cme_enrollments_participant_profession_uq").on(t.participantId, t.profession),
 ]);
 
 /** Dziennik szkolenia (UTC): zapis, wykłady, moduły, test, ankieta, zaświadczenia, zmiany admina */
@@ -947,24 +968,46 @@ export const cmeLog = pgTable("cme_log", {
   enrollmentId: uuid("enrollment_id").references(() => cmeEnrollments.id),
   /** Kto wykonał zmianę, gdy to nie uczestnik (admin) */
   actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+  /** Kopia danych wykonawcy (e-mail, imię, rola) z chwili zdarzenia */
+  actorSnapshot: jsonb("actor_snapshot").$type<KopiaWykonawcy>(),
   at: timestamp("at", { withTimezone: true }).notNull().default(sql`now()`),
   details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
 }, (t) => [index("cme_log_participant_idx").on(t.participantId, t.at), index("cme_log_type_idx").on(t.type, t.at)]);
 
-/** Wykład w szkoleniu: pierwsze otwarcie i ukończenie (dojście do ostatniego rozdziału) */
+/**
+ * Wykład w szkoleniu: pierwsze otwarcie i ukończenie (każdy rozdział otwarty). Bez klucza obcego do sekcji
+ * (usunięcie albo ponowny import treści nie kasuje rejestru); kopia identyfikatora i tytułu wykładu oraz modułu.
+ */
 export const cmeLectureProgress = pgTable("cme_lecture_progress", {
   participantId: uuid("participant_id").notNull(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
-  sectionId: uuid("section_id").notNull().references(() => sections.id, { onDelete: "cascade" }),
+  sectionId: uuid("section_id").notNull(),
+  lectureExternalId: varchar("lecture_external_id", { length: 64 }),
+  lectureTitle: varchar("lecture_title", { length: 200 }),
+  moduleId: uuid("module_id"),
+  moduleExternalId: varchar("module_external_id", { length: 64 }),
   firstOpenedAt: timestamp("first_opened_at", { withTimezone: true }).notNull().default(sql`now()`),
   completedAt: timestamp("completed_at", { withTimezone: true }),
 }, (t) => [primaryKey({ columns: [t.participantId, t.sectionId] })]);
 
-/** Moduł w szkoleniu: otwarcie podsumowania i ukończenie (raz ukończony zostaje ukończony) */
+/** Rozdział wykładu otwarty pierwszy raz (dowód przejścia przez wykład; bez pomiaru czasu) */
+export const cmeChapterProgress = pgTable("cme_chapter_progress", {
+  participantId: uuid("participant_id").notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  sectionId: uuid("section_id").notNull(),
+  lectureExternalId: varchar("lecture_external_id", { length: 64 }),
+  /** Numer rozdziału od 1 (kolejność opublikowanych rozdziałów, jak #rozdzial-N) */
+  chapterOrder: integer("chapter_order").notNull(),
+  firstOpenedAt: timestamp("first_opened_at", { withTimezone: true }).notNull().default(sql`now()`),
+}, (t) => [primaryKey({ columns: [t.participantId, t.sectionId, t.chapterOrder] })]);
+
+/** Moduł w szkoleniu: otwarcie podsumowania i ukończenie (raz ukończony zostaje ukończony). Bez klucza obcego do modułu. */
 export const cmeModuleProgress = pgTable("cme_module_progress", {
   participantId: uuid("participant_id").notNull(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
-  moduleId: uuid("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
+  moduleId: uuid("module_id").notNull(),
+  moduleExternalId: varchar("module_external_id", { length: 64 }),
+  moduleTitle: varchar("module_title", { length: 200 }),
   summaryOpenedAt: timestamp("summary_opened_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
 }, (t) => [primaryKey({ columns: [t.participantId, t.moduleId] })]);
@@ -997,7 +1040,19 @@ export const cmeTestAttempts = pgTable("cme_test_attempts", {
   passed: boolean("passed"),
   /** Próg i liczby z konfiguracji w chwili rozpoczęcia */
   rules: jsonb("rules").$type<Record<string, unknown>>().notNull().default({}),
-}, (t) => [index("cme_test_attempts_participant_idx").on(t.participantId, t.startedAt)]);
+  /**
+   * Kopia wylosowanych pytań z chwili startu (treść, odpowiedzi, klucz, uzasadnienie, moduł): ocena i wgląd
+   * liczą się z niej, więc późniejsza edycja albo usunięcie pytania nie zmienia wyniku ani dowodu.
+   */
+  questionSnapshot: jsonb("question_snapshot").$type<Record<string, {
+    externalId: string | null; sectionId: string | null; moduleId: string | null; modul: string | null; modulTytul: string | null; modulKolejnosc: number | null;
+    title: string | null; bodyMd: string; imageUrl: string | null; answers: Array<{ text: string; isCorrect: boolean }>; explanationMd: string;
+  }>>(),
+}, (t) => [
+  index("cme_test_attempts_participant_idx").on(t.participantId, t.startedAt),
+  // najwyżej jedno niedokończone podejście na osobę
+  uniqueIndex("cme_test_attempts_open_uq").on(t.participantId).where(sql`submitted_at IS NULL`),
+]);
 
 /**
  * Ankieta ewaluacyjna: ANONIMOWA. Celowo bez user_id/participant_id i bez dokładnej godziny
@@ -1034,7 +1089,12 @@ export const cmeCertificates = pgTable("cme_certificates", {
   valid: boolean("valid").notNull().default(true),
   invalidatedAt: timestamp("invalidated_at", { withTimezone: true }),
   invalidatedReason: text("invalidated_reason"),
-}, (t) => [index("cme_certificates_participant_idx").on(t.participantId)]);
+}, (t) => [
+  index("cme_certificates_participant_idx").on(t.participantId),
+  // najwyżej jedno ważne zaświadczenie każdego rodzaju na osobę i zawód
+  uniqueIndex("cme_certificates_valid_kind_uq").on(t.participantId, t.profession, t.kind).where(sql`valid`),
+  check("cme_certificates_kind_check", sql`${t.kind} IN ('punkty', 'ukonczenie')`),
+]);
 
 /** Licznik numerów zaświadczeń per rok (bez dziur, w transakcji wydania) */
 export const cmeCertificateCounters = pgTable("cme_certificate_counters", {

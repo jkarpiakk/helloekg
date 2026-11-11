@@ -82,10 +82,29 @@ export const IZBY_LEKARSKIE = [
 export const OSWIADCZENIE =
   "Oświadczam, że podane dane są prawdziwe i zgodne z moim prawem wykonywania zawodu. Wiem, że na ich podstawie helloEKG wystawi zaświadczenie o ukończeniu szkolenia.";
 
-/** Imię i nazwisko jak w PWZ: litery (także polskie), spacja, łącznik, apostrof */
+/**
+ * Tekst na zaświadczenie (specjalizacja, izba): bez znaków sterujących, formatujących (U+202E i inne
+ * znaki kierunku pisma, znaki zerowej szerokości), separatorów wierszy i prywatnych; spacje zwinięte, NFC.
+ */
+export const oczyscTekst = (v: string): string =>
+  v.normalize("NFC").replace(/[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Zl}\p{Zp}]/gu, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * Imię i nazwisko jak w PWZ: litery alfabetu łacińskiego (także polskie i inne diakrytyki), spacja, łącznik,
+ * apostrof, kropka. Najwyżej 2 znaki łączące z rzędu. Bez innych pism (font zaświadczenia ich nie ma)
+ * i bez znaków sterujących.
+ */
+export const NAZWISKO_RE = /^\p{Script=Latin}[\p{Script=Latin}\p{M} '’.-]*$/u;
 export const czescNazwiska = (label: string) =>
-  z.string().trim().min(1, `Podaj ${label}`).max(60, `${label[0].toUpperCase()}${label.slice(1)} jest za długie`)
-    .regex(/^[\p{L}][\p{L}\p{M} '’.-]*$/u, `Sprawdź ${label}: tylko litery, spacja albo łącznik`);
+  z.string().transform((v) => v.normalize("NFC").trim()).pipe(
+    z.string().min(1, `Podaj ${label}`).max(60, `${label[0].toUpperCase()}${label.slice(1)} jest za długie`)
+      .regex(NAZWISKO_RE, `Sprawdź ${label}: tylko litery alfabetu łacińskiego, spacja albo łącznik`)
+      .refine((v) => !/\p{M}{3,}/u.test(v), `Sprawdź ${label}: za dużo znaków łączących`),
+  );
+
+/** Krótki tekst z formularza (specjalizacja, izba): czyszczenie i limit długości po czyszczeniu */
+export const tekstZaswiadczenia = (max: number) =>
+  z.string().max(max * 2).transform(oczyscTekst).pipe(z.string().max(max, `Najwyżej ${max} znaków`));
 
 export const zapisSchema = z.object({
   imie: czescNazwiska("imię"),
@@ -97,9 +116,9 @@ export const zapisSchema = z.object({
     pwz: z.string().max(40).optional().nullable(),
     /** Ratownik medyczny: „nie mam jeszcze numeru PWZ” */
     brakPwz: z.boolean().optional(),
-    specjalizacja: z.string().trim().max(200).optional().nullable(),
+    specjalizacja: tekstZaswiadczenia(200).optional().nullable(),
     /** Lekarze (opcjonalnie): okręgowa izba lekarska, do raportu dla izby */
-    izba: z.string().trim().max(100).optional().nullable(),
+    izba: tekstZaswiadczenia(100).optional().nullable(),
   })).min(1, "Wybierz co najmniej jeden zawód").max(ZAWODY.length),
 });
 export type ZapisInput = z.infer<typeof zapisSchema>;

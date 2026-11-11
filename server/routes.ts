@@ -1101,7 +1101,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/lecture-reads/:sectionId", requireKonto, async (req, res) => {
+  // Ten sam dostęp co rozdziały (subskrypcja): bez niego nie ma czego czytać, a ślad rozdziałów liczy się do szkolenia
+  app.put("/api/lecture-reads/:sectionId", requireKonto, requireActiveSubscription, async (req, res) => {
     const { sectionId } = req.params;
     if (!UUID_RE.test(sectionId)) {
       return res.status(400).json({ error: "Nieprawidłowy identyfikator sekcji" });
@@ -1112,7 +1113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     try {
       const row = await storage.upsertLectureRead(req.user!.id, sectionId, parsed.data.chapterOrder, parsed.data.chaptersTotal);
-      // Szkolenie z punktami: pierwsze otwarcie i ukończenie wykładu (liczba rozdziałów z bazy)
+      // Szkolenie z punktami: otwarcie wykładu i rozdziału; ukończenie, gdy otwarto każdy rozdział (liczba z bazy)
       zapiszCzytanie(req.user!.id, sectionId, parsed.data.chapterOrder)
         .catch((e) => console.error("[szkolenie] zapis czytania:", e?.message));
       res.json({ sectionId: row.sectionId, chapterOrder: row.chapterOrder, chaptersTotal: row.chaptersTotal, updatedAt: row.updatedAt });

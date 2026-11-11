@@ -22,7 +22,7 @@
 
 1. Tytuł, cel, adresaci, moduły, efekty kształcenia, liczba godzin i warunki zaliczenia są opisane w Programie szkolenia (strona „Program szkolenia” w serwisie).
 2. Szkolenie ma formę [forma, np. szkolenia online (e-learning) zakończonego testem].
-3. Liczba godzin dydaktycznych (45 minut) szkolenia: [liczba godzin, zgodnie z programem].
+3. Liczba godzin programu szkolenia: [liczba godzin, zgodnie z programem]. Dla ratowników medycznych są to godziny dydaktyczne (45 minut).
 4. Miejsce: online (platforma kurs.helloekg.pl, dostęp po zalogowaniu).
 5. Materiały szkolenia: wykłady, podsumowania modułów (repetytorium), literatura obowiązkowa i uzupełniająca, ćwiczenia, kontakt z prowadzącym, test końcowy.
 6. Szkolenie nie zawiera treści reklamowych ani promocyjnych sponsorów. Moduł dodatkowy „EKG na LEK” nie wchodzi do szkolenia z punktami, a zaświadczenie nie zależy od jego zakupu.
@@ -37,11 +37,14 @@
 
 ## 4. Warunki ukończenia
 
-1. Moduł jest ukończony, gdy uczestnik przeczyta wszystkie wykłady modułu do ostatniego rozdziału, otworzy podsumowanie modułu i [jeśli ćwiczenia są wymagane: opanuje wszystkie tematy z pytaniami, czyli ostatnia odpowiedź na każde pytanie ćwiczeniowe jest poprawna].
+1. Moduł jest ukończony, gdy uczestnik otworzy każdy rozdział każdego wykładu modułu (serwis zapisuje datę i godzinę pierwszego otwarcia każdego rozdziału), otworzy podsumowanie modułu i [jeśli ćwiczenia są wymagane: opanuje wszystkie tematy z pytaniami, czyli ostatnia odpowiedź na każde pytanie ćwiczeniowe jest poprawna].
 2. Test końcowy otwiera się po ukończeniu wszystkich modułów szkolenia. Test składa się z [liczba] pytań jednokrotnego wyboru (co najmniej 5 odpowiedzi, jedna poprawna) losowanych z puli testu, z co najmniej jednym pytaniem z każdego wykładu. Zalicza wynik co najmniej [próg] %.
 3. **Czas na rozwiązanie testu: [liczba, domyślnie 90] minut.** Po tym czasie test oddaje się sam; liczą się odpowiedzi zapisane przed końcem czasu.
 4. Uczestnik ma [liczba] podejścia do testu. Po [numer] niezaliczonym podejściu obowiązuje przerwa [liczba] godzin. Każde podejście to nowy zestaw pytań.
-5. **Wgląd w oceniony test.** Po oddaniu każdego podejścia uczestnik widzi wynik oraz całe ocenione podejście: pytania, swoje odpowiedzi, poprawne odpowiedzi i uzasadnienia. Wgląd jest dostępny w serwisie przez cały okres dostępu do konta.
+5. **Warunki udostępniania do wglądu ocenionych testów.**
+   1. Po oddaniu podejścia, które nie zaliczyło testu, gdy uczestnikowi zostały kolejne podejścia, serwis pokazuje wynik (liczbę i odsetek poprawnych odpowiedzi), informację o zaliczeniu albo niezaliczeniu oraz odsetek poprawnych odpowiedzi w każdym module. Pytania, poprawne odpowiedzi i uzasadnienia nie są wtedy udostępniane, bo kolejne podejście losuje pytania z tej samej puli.
+   2. Po zaliczeniu testu albo po wykorzystaniu wszystkich podejść uczestnik ma wgląd w każde swoje ocenione podejście: pytania, swoje odpowiedzi, poprawne odpowiedzi i uzasadnienia, w brzmieniu z chwili rozwiązywania testu.
+   3. Wgląd jest dostępny w serwisie (Szkolenie → Test końcowy → „Wgląd”) przez cały okres dostępu do konta. Pytania o ocenę testu uczestnik kieruje do konsultanta (§ 1a).
 6. Po zaliczeniu testu uczestnik wypełnia anonimową ankietę ewaluacyjną.
 
 ## 5. Zaświadczenie i punkty edukacyjne
@@ -52,7 +55,9 @@
    - ratownicy medyczni: [podstawa prawna, zasady naliczania],
    - pielęgniarki i położne: [decyzja Naczelnej Rady Pielęgniarek i Położnych]; do czasu decyzji zaświadczenie nie daje punktów,
    - inne zawody i studenci: zaświadczenie ukończenia bez punktów.
-3. Ważność zaświadczenia można sprawdzić przez link albo kod QR z zaświadczenia. Strona weryfikacji pokazuje numer, ważność, tytuł szkolenia, datę wydania i inicjały uczestnika.
+3. Zaświadczenie z punktami wydawane jest tylko wtedy, gdy całe szkolenie uczestnika (od zapisu do zaliczenia testu) odbyło się w okresie, w którym dla danego zawodu obowiązuje akceptacja szkolenia (np. od dnia uchwały Naczelnej Rady Lekarskiej i przyjęcia informacji o formie kształcenia). Za szkolenie rozpoczęte wcześniej Organizator wydaje zaświadczenie ukończenia bez punktów. Zaświadczenie z punktami wymaga także kompletnych danych Organizatora i kierownika naukowego.
+4. Zaświadczenie ukończenia wydane przed sprawdzeniem numeru prawa wykonywania zawodu nie zawiera tego numeru, a zawód jest na nim oznaczony jako deklarowany przez uczestnika.
+5. Ważność zaświadczenia można sprawdzić przez link albo kod QR z zaświadczenia. Strona weryfikacji pokazuje numer, ważność (także datę unieważnienia), rodzaj zaświadczenia (z punktami albo bez), liczbę punktów, zawód, liczbę godzin, tytuł szkolenia, datę wydania i inicjały uczestnika. Unieważnione zaświadczenie ma na wydruku oznaczenie „UNIEWAŻNIONE”.
 
 ## 6. Odpłatność
 
@@ -68,7 +73,7 @@
 
 1. Zasady przetwarzania danych opisuje Polityka prywatności serwisu helloEKG.
 2. Dane uczestnika, który otrzymał zaświadczenie (imię i nazwisko, zawód, numer prawa wykonywania zawodu, dziennik szkolenia jako lista obecności, wynik testu bez treści odpowiedzi, dane zaświadczenia, wynik sprawdzenia PWZ), Organizator przechowuje przez **5 lat od końca roku kalendarzowego wydania zaświadczenia**, także po usunięciu konta w serwisie. Dane osoby bez zaświadczenia są usuwane razem z kontem.
-3. Ankieta ewaluacyjna jest anonimowa: odpowiedzi nie są łączone z kontem uczestnika.
+3. Ankieta ewaluacyjna jest anonimowa: odpowiedzi nie są łączone z kontem uczestnika, a zapisujemy przy nich tylko miesiąc. Odpowiedzi tekstowe zespół widzi w raporcie zbiorczym dopiero, gdy w danym okresie jest co najmniej 5 ankiet.
 
 ## 9. Postanowienia końcowe
 

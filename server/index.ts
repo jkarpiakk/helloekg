@@ -113,8 +113,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     if (!req.path.startsWith("/api")) return;
     const duration = Date.now() - start;
     const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+    // klucz publicznej weryfikacji zaświadczenia nie trafia do logów
+    const sciezka = req.path.replace(/^(\/api\/zaswiadczenia\/)[^/]+/, "$1REDACTED");
     log(
-      `[${correlationId}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`,
+      `[${correlationId}] ${req.method} ${sciezka} ${res.statusCode} ${duration}ms`,
       level
     );
   });
