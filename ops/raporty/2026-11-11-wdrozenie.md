@@ -23,3 +23,9 @@ dokumenty szkolenia do akceptacji przy starcie pełnej wersji, płatności: racz
 ## Wycofanie
 - Kurs: `dist`, `package*.json` z kopii, `sudo -u kurs npm ci --omit=dev`, `kurs.caddy` z `/root`, restart; migracje są dodające (zostają). Treść: `pg_restore` z `kurs-przed-import-1111-*.dump` tylko w razie potrzeby.
 - Studio: baza z kopii `studio.przed-paczka-1111-*` (zatrzymać usługę), kod z poprzedniego znacznika deploy.
+
+## Poprawka po zgłoszeniu JK (11.11, 16:00): ramki w wyjaśnieniach pytań
+- Objaw: w wyjaśnieniach nowych pytań (S8, Q-INT, IC) `:::zasada` i `:::rada` widoczne jako surowy tekst. Przyczyna: eksport tłumaczył dyrektywy studia tylko w wykładach i podsumowaniach, nie w wyjaśnieniach pytań.
+- Studio (deploy-20261111-1552): pole `explanationMdApp` (ramki i „przypomnij” przetłumaczone; `::wstawka`, `::ekg`, `::grafika` zostają, bo kurs obsługuje je sam). Kurs: importer go używa, sanitizer przepuszcza `details`/`summary`.
+- Przy okazji: 13 bliźniaków S8 wskazywało w wyjaśnieniu literę odpowiedzi („(odpowiedź A)”) przy tasowaniu odpowiedzi (wzorzec w paczka-1111-b nie łapał „ź”); migracja `litery-1111` ustawiła im „nie tasuj”.
+- Ponowny import: 214 wyjaśnień z ramkami; w kursie 0 surowych `:::`, 0 zaślepek; kopia bazy `kurs-przed-import-1111b-*.dump`.
