@@ -14,7 +14,9 @@ const SANITIZE_CONFIG = {
     'blockquote', 'pre', 'code',
     'a', 'img',
     'table', 'thead', 'tbody', 'tr', 'th', 'td',
-    'div', 'span'
+    'div', 'span',
+    // „Dla dociekliwych” i „Przypomnij sobie” ze studia (zwijane bloki w wyjaśnieniach pytań)
+    'details', 'summary'
   ],
   ALLOWED_ATTR: [
     'href', 'title', 'alt', 'src', 'class', 'id',

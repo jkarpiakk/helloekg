@@ -227,7 +227,8 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
           bodyMd: fixAssets(q.bodyMd),
           imageUrl,
           answers: q.answers ?? [],
-          explanationMd: wyjasnienieKursu(q.explanationMd ?? ""),
+          // explanationMdApp (studio-v0.2): ramki :::zasada/:::rada przetłumaczone, ::wstawka bez zmian
+          explanationMd: wyjasnienieKursu(q.explanationMdApp ?? q.explanationMd ?? ""),
           tags: [...(q.tags ?? []), `studio:${q.externalId}`],
           difficulty: q.difficulty ?? "medium",
           status: published ? "published" : "draft",
