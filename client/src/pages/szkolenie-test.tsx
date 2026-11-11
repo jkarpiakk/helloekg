@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Wyjasnienie } from "@/components/quiz/Wyjasnienie";
@@ -24,6 +24,9 @@ interface PytanieTestu {
 interface Podejscie {
   id: string;
   startedAt: string;
+  /** Termin oddania (null = bez limitu) i czas serwera w chwili odpowiedzi */
+  termin: string | null;
+  teraz: string;
   pytania: PytanieTestu[];
   odpowiedzi: Record<string, number>;
 }
@@ -43,14 +46,22 @@ interface Wynik {
   procent: number;
   zaliczony: boolean;
   prog: number;
-  bledne: Array<{ nr: number; title: string; bodyMd: string; imageUrl: string | null; answers: Array<{ index: number; text: string }>; wybrana: number | null; poprawne: number[]; wyjasnienie: string }>;
+  automatycznie: boolean;
+  wglad: "pelny" | "bledne";
+  pytania: Array<{ nr: number; ok: boolean; title: string; bodyMd: string; imageUrl: string | null; answers: Array<{ index: number; text: string }>; wybrana: number | null; poprawne: number[]; wyjasnienie: string }>;
 }
+
+const mmss = (ms: number) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
 
 const litera = (i: number) => String.fromCharCode(65 + i);
 
 /**
  * Test końcowy szkolenia. Bez informacji zwrotnej w trakcie (odpowiedzi zapisują się na serwerze
- * bez oceny); ocena po oddaniu, uzasadnienia tylko do błędnych odpowiedzi. Bez treści sprzedażowych.
+ * bez oceny), limit czasu pilnuje serwer (tu tylko odliczanie i oddanie po czasie). Po oddaniu wgląd
+ * w całe ocenione podejście (test_wglad = pelny) albo w błędne odpowiedzi. Bez treści sprzedażowych.
  */
 export default function SzkolenieTest() {
   const { isAuthenticated } = useAuth();
@@ -72,6 +83,23 @@ export default function SzkolenieTest() {
   const [i, setI] = useState(0);
   const [wynik, setWynik] = useState<Wynik | null>(null);
   const [potwierdz, setPotwierdz] = useState(false);
+  // Wgląd w wcześniejsze oddane podejście: /szkolenie/test?wglad=<id>
+  const wgladId = new URLSearchParams(useSearch()).get("wglad");
+  useEffect(() => {
+    if (!wgladId || !isAuthenticated) return;
+    apiRequest("GET", `/api/szkolenie/test/${wgladId}/wynik`).then((r) => r.json()).then(setWynik).catch(() => {});
+  }, [wgladId, isAuthenticated]);
+  // Odliczanie: termin z serwera przesunięty o różnicę zegarów
+  const [pozostalo, setPozostalo] = useState<number | null>(null);
+  useEffect(() => {
+    if (!podejscie?.termin) return setPozostalo(null);
+    const przesuniecie = Date.now() - new Date(podejscie.teraz).getTime();
+    const koniec = new Date(podejscie.termin).getTime() + przesuniecie;
+    const tik = () => setPozostalo(koniec - Date.now());
+    tik();
+    const t = setInterval(tik, 1000);
+    return () => clearInterval(t);
+  }, [podejscie]);
 
   useEffect(() => {
     if (stan?.otwarte && !podejscie) {
@@ -110,6 +138,15 @@ export default function SzkolenieTest() {
     onError: (e) => toast({ title: "Nie udało się oddać testu", description: bladSerwera(e), variant: "destructive" }),
   });
 
+  // Koniec czasu: oddajemy to, co jest (serwer i tak oceni tylko odpowiedzi zapisane przed terminem)
+  const oddanoPoCzasie = useRef(false);
+  useEffect(() => {
+    if (pozostalo !== null && pozostalo <= 0 && podejscie && !oddaj.isPending && !oddanoPoCzasie.current) {
+      oddanoPoCzasie.current = true;
+      oddaj.mutate();
+    }
+  }, [pozostalo, podejscie, oddaj]);
+
   const pytania = podejscie?.pytania ?? [];
   const q = pytania[Math.min(i, Math.max(0, pytania.length - 1))];
   const odpowiedziane = useMemo(() => pytania.filter((p) => odpowiedzi[p.id] !== undefined).length, [pytania, odpowiedzi]);
@@ -133,6 +170,7 @@ export default function SzkolenieTest() {
           <h1 className="h1" data-testid="test-wynik-procent">{liczbaPL(wynik.procent)}%</h1>
           <p className="lead">
             {wynik.wynik} z {wynik.maks} poprawnych odpowiedzi, próg {liczbaPL(wynik.prog)}%.{" "}
+            {wynik.automatycznie && "Czas minął: liczą się odpowiedzi zapisane przed końcem czasu. "}
             {wynik.zaliczony ? "Teraz krótka anonimowa ankieta, a po niej zaświadczenie." : "Przejrzyj uzasadnienia poniżej. Kolejne podejście to nowy zestaw pytań."}
           </p>
           <div className="flex flex-wrap gap-3">
@@ -143,12 +181,14 @@ export default function SzkolenieTest() {
             )}
           </div>
         </header>
-        {wynik.bledne.length > 0 && (
+        {wynik.pytania.length > 0 && (
           <section className="grid gap-6" aria-labelledby="bledne">
-            <h2 id="bledne" className="h3">Błędne odpowiedzi ({wynik.bledne.length})</h2>
-            {wynik.bledne.map((b) => (
-              <article key={b.nr} className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(18px,3vw,32px)] grid gap-4" data-testid="test-bledna">
-                <p className="label">Pytanie {b.nr}</p>
+            <h2 id="bledne" className="h3">
+              {wynik.wglad === "pelny" ? `Wgląd w ocenione podejście (${wynik.pytania.length} pytań, błędne: ${wynik.pytania.filter((p) => !p.ok).length})` : `Błędne odpowiedzi (${wynik.pytania.length})`}
+            </h2>
+            {wynik.pytania.map((b) => (
+              <article key={b.nr} className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(18px,3vw,32px)] grid gap-4" data-testid={b.ok ? "test-dobra" : "test-bledna"}>
+                <p className={cn("label", b.ok && "label--g")}>Pytanie {b.nr}: {b.ok ? "dobrze" : "źle"}</p>
                 {b.title && <h3 className="h3">{b.title}</h3>}
                 <div className="prose-hk max-w-none" dangerouslySetInnerHTML={sanitizeHtml(b.bodyMd)} />
                 {b.imageUrl && <img src={b.imageUrl} alt="" className="max-w-full rounded-lg" />}
@@ -192,9 +232,10 @@ export default function SzkolenieTest() {
         <ul className="grid gap-2 text-body text-[var(--txt2)] list-disc pl-5">
           <li>{z.liczbaPytan} {plural(z.liczbaPytan, "pytanie", "pytania", "pytań")} jednokrotnego wyboru, losowanych z puli testu.</li>
           <li>Zaliczenie od {liczbaPL(z.prog)}% poprawnych odpowiedzi.</li>
+          {z.limitMinut > 0 && <li>Na rozwiązanie masz {z.limitMinut} min. Po tym czasie test odda się sam z zapisanymi odpowiedziami.</li>}
           <li>Najwyżej {z.limit} {plural(z.limit, "podejście", "podejścia", "podejść")}; po {z.przerwaPo}. niezaliczonym {liczbaPL(z.przerwaGodziny)} h przerwy.</li>
           <li>W trakcie nie zobaczysz, czy odpowiedź jest dobra. Odpowiedzi zapisują się od razu, możesz wrócić do testu później.</li>
-          <li>Wynik i uzasadnienia błędnych odpowiedzi zobaczysz po oddaniu testu.</li>
+          <li>{z.wglad === "pelny" ? "Po oddaniu zobaczysz wynik i całe ocenione podejście: pytania, swoje odpowiedzi, klucz i uzasadnienia." : "Wynik i uzasadnienia błędnych odpowiedzi zobaczysz po oddaniu testu."}</li>
         </ul>
         {!stan.zapisany ? (
           <p className="text-body">Najpierw <Link href="/szkolenie" className="underline">zapisz się na szkolenie</Link>.</p>
@@ -229,9 +270,14 @@ export default function SzkolenieTest() {
   };
   return (
     <div className="wrap wrap--narrow pt-6 pb-24 sm:pt-10 grid gap-6" data-testid="test-pytanie">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <p className="label" data-testid="test-licznik">Pytanie {i + 1} z {pytania.length}</p>
         <p className="label">Odpowiedzi: {odpowiedziane}/{pytania.length}</p>
+        {pozostalo !== null && (
+          <p className={cn("label inline-flex items-center gap-1 num", pozostalo < 5 * 60_000 && "text-[var(--alarm)]")} role="timer" aria-live="off" data-testid="test-czas">
+            <Clock className="h-3.5 w-3.5" aria-hidden />{mmss(pozostalo)}
+          </p>
+        )}
       </div>
       {q && (
         <article className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)] grid gap-6" aria-labelledby="test-tresc">

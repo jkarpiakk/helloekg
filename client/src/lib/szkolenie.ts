@@ -7,14 +7,18 @@ export interface ZapisSzkolenia {
   zawod: string;
   zawodNazwa: string;
   pwz: string | null;
-  pwzOstrzezenie: string | null;
+  pwzUwaga: string | null;
+  pwzSprawdzonyAt: string | null;
   specjalizacja: string | null;
+  izba: string | null;
   imie: string;
   nazwisko: string;
   oswiadczenieAt: string;
   zablokowany: boolean;
   punkty: number | null;
   powodBezPunktow: string | null;
+  /** Reguła daje punkty, ale zespół jeszcze nie sprawdził PWZ w publicznym rejestrze */
+  czekaNaWeryfikacje: boolean;
 }
 
 export interface StanModuluSzkolenia {
@@ -43,6 +47,7 @@ export interface PodejscieTestu {
   maks: number | null;
   procent: number | null;
   zaliczony: boolean | null;
+  automatycznie: boolean;
 }
 
 export interface ZasadyTestu {
@@ -51,12 +56,15 @@ export interface ZasadyTestu {
   limit: number;
   przerwaPo: number;
   przerwaGodziny: number;
+  limitMinut: number;
+  wglad: "pelny" | "bledne";
 }
 
 export interface ZaswiadczenieSzkolenia {
   numer: string;
   /** Klucz linku weryfikacji /zaswiadczenie/<klucz> */
   klucz: string;
+  rodzaj: "punkty" | "ukonczenie";
   zawod: string;
   zawodNazwa: string;
   punkty: number | null;
@@ -72,7 +80,7 @@ export interface StanSzkolenia {
   tytul: string;
   cwiczeniaWymagane: boolean;
   regulaminOpublikowany: boolean;
-  pwzTryb: "ostrzezenie" | "blokada" | "wylaczona";
+  weryfikacjaDni: number;
   zapisy: ZapisSzkolenia[];
   moduly: StanModuluSzkolenia[];
   test: { odblokowany: boolean; stan: StanPodejsc; zasady: ZasadyTestu; pulaPusta: boolean; podejscia: PodejscieTestu[] };

@@ -14,7 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { bladSerwera, dataGodzinaPL, liczbaPL } from "@/lib/szkolenie";
-import { NAZWA_ZAWODU, czyZawod } from "@shared/szkolenie";
+import { IZBY_LEKARSKIE, NAZWA_ZAWODU, czyZawod } from "@shared/szkolenie";
 
 interface Uczestnik {
   id: string;
@@ -24,8 +24,12 @@ interface Uczestnik {
   zawod: string;
   zawodNazwa: string;
   pwz: string | null;
-  pwzOstrzezenie: string | null;
+  pwzUwaga: string | null;
+  pwzOverride: boolean;
+  pwzSprawdzonyAt: string | null;
+  pwzSprawdzil: string | null;
   specjalizacja: string | null;
+  izba: string | null;
   imie: string;
   nazwisko: string;
   zapisAt: string;
@@ -33,7 +37,7 @@ interface Uczestnik {
   modulyUkonczone: number;
   test: { procent: string; zaliczony: boolean; at: string } | null;
   podejscia: number;
-  zaswiadczenie: string | null;
+  zaswiadczenia: Array<{ numer: string; rodzaj: "punkty" | "ukonczenie" }>;
 }
 
 interface Regula {
@@ -47,6 +51,13 @@ interface Regula {
   testRequired: boolean;
   registryRequired: boolean;
   registryNumber: string | null;
+  nrlResolution: string | null;
+  formInfoAcceptedAt: string | null;
+  decisionNumber: string | null;
+  pointsMode: "godziny" | "decyzja";
+  pointsGranted: string | null;
+  formText: string | null;
+  dziala: boolean;
   inactiveReason: string | null;
   updatedAt: string;
 }
@@ -68,7 +79,7 @@ export default function SzkolenieAdmin() {
           <TabsTrigger value="ankieta">Ankieta</TabsTrigger>
           {wlasciciel && <TabsTrigger value="ustawienia">Ustawienia szkolenia</TabsTrigger>}
         </TabsList>
-        <TabsContent value="uczestnicy"><Uczestnicy /></TabsContent>
+        <TabsContent value="uczestnicy"><div className="space-y-6"><Uczestnicy /><RaportIzby /><PulaTestu /></div></TabsContent>
         <TabsContent value="reguly"><Reguly edycja={wlasciciel} /></TabsContent>
         <TabsContent value="ankieta"><RaportAnkiety /></TabsContent>
         {wlasciciel && <TabsContent value="ustawienia"><UstawieniaSzkolenia /></TabsContent>}
@@ -85,6 +96,17 @@ function Uczestnicy() {
   });
   const [edytowany, setEdytowany] = useState<Uczestnik | null>(null);
   const [dziennik, setDziennik] = useState<Uczestnik | null>(null);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const sprawdz = useMutation({
+    mutationFn: async ({ id, sprawdzony }: { id: string; sprawdzony: boolean }) =>
+      (await apiRequest("POST", `/api/admin/szkolenie/zapisy/${id}/pwz-sprawdzony`, { sprawdzony })).json(),
+    onSuccess: () => {
+      toast({ title: "Zapisane w dzienniku" });
+      qc.invalidateQueries({ queryKey: ["/api/admin/szkolenie/uczestnicy"] });
+    },
+    onError: (e) => toast({ title: "Nie udało się", description: bladSerwera(e), variant: "destructive" }),
+  });
   if (isLoading || !data) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
   return (
     <Card>
@@ -116,7 +138,11 @@ function Uczestnicy() {
                   <td className="py-2 pr-4">
                     <div>{u.zawodNazwa}</div>
                     <div>{u.pwz ?? "brak PWZ"}{u.specjalizacja ? ` · ${u.specjalizacja}` : ""}</div>
-                    {u.pwzOstrzezenie && <Badge variant="destructive" title={u.pwzOstrzezenie}>PWZ do sprawdzenia</Badge>}
+                    {u.izba && <div className="text-muted-foreground">{u.izba}</div>}
+                    <div className="text-muted-foreground" data-testid={`pwz-stan-${u.id}`}>
+                      {u.pwzSprawdzonyAt ? `PWZ sprawdzony ${dataGodzinaPL(u.pwzSprawdzonyAt)}${u.pwzSprawdzil ? ` (${u.pwzSprawdzil})` : ""}` : "PWZ niesprawdzony w rejestrze"}
+                    </div>
+                    {u.pwzOverride && <Badge variant="destructive" title={u.pwzUwaga ?? ""}>PWZ bez walidacji</Badge>}
                     {u.zablokowany && <Badge variant="secondary">zablokowane</Badge>}
                   </td>
                   <td className="py-2 pr-4">{u.modulyUkonczone}/{data.modulyWszystkie}</td>
@@ -124,8 +150,17 @@ function Uczestnicy() {
                     {u.test ? `${liczbaPL(Number(u.test.procent))}% ${u.test.zaliczony ? "zaliczony" : "niezaliczony"}` : "brak"}
                     <div className="text-muted-foreground">podejścia: {u.podejscia}</div>
                   </td>
-                  <td className="py-2 pr-4">{u.zaswiadczenie ? <a className="underline" href={`/api/szkolenie/zaswiadczenia/${u.zaswiadczenie}/pdf`}>{u.zaswiadczenie}</a> : "brak"}</td>
-                  <td className="py-2 space-x-2 whitespace-nowrap">
+                  <td className="py-2 pr-4">
+                    {u.zaswiadczenia.length ? u.zaswiadczenia.map((c) => (
+                      <div key={c.numer}><a className="underline" href={`/api/szkolenie/zaswiadczenia/${c.numer}/pdf`}>{c.numer}</a> {c.rodzaj === "punkty" ? "z punktami" : "bez punktów"}</div>
+                    )) : "brak"}
+                  </td>
+                  <td className="py-2 space-x-2 space-y-1 whitespace-nowrap">
+                    <Button size="sm" variant={u.pwzSprawdzonyAt ? "ghost" : "default"} disabled={sprawdz.isPending}
+                      onClick={() => sprawdz.mutate({ id: u.id, sprawdzony: !u.pwzSprawdzonyAt })} data-testid={`pwz-sprawdzony-${u.id}`}
+                      title="Porównaj imię, nazwisko i numer z publicznym rejestrem NIL albo NIPiP">
+                      {u.pwzSprawdzonyAt ? "Cofnij sprawdzenie PWZ" : "PWZ sprawdzony w publicznym rejestrze"}
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => setEdytowany(u)} data-testid={`edytuj-${u.id}`}>Edytuj dane</Button>
                     <Button size="sm" variant="ghost" onClick={() => setDziennik(u)}>Dziennik</Button>
                   </td>
@@ -148,10 +183,12 @@ function EdycjaZapisu({ u, onClose }: { u: Uczestnik; onClose: () => void }) {
   const [nazwisko, setNazwisko] = useState(u.nazwisko);
   const [pwz, setPwz] = useState(u.pwz ?? "");
   const [spec, setSpec] = useState(u.specjalizacja ?? "");
+  const [izba, setIzba] = useState(u.izba ?? "");
+  const [pomin, setPomin] = useState(u.pwzOverride);
   const [powod, setPowod] = useState("");
   const zapis = useMutation({
     mutationFn: async () => (await apiRequest("PUT", `/api/admin/szkolenie/zapisy/${u.id}`, {
-      imie, nazwisko, pwz: pwz || null, specjalizacja: spec || null, powod,
+      imie, nazwisko, pwz: pwz || null, specjalizacja: spec || null, izba: izba || null, pominWalidacje: pomin, powod,
     })).json(),
     onSuccess: () => {
       toast({ title: "Zapisane, zmiana jest w dzienniku" });
@@ -168,9 +205,15 @@ function EdycjaZapisu({ u, onClose }: { u: Uczestnik; onClose: () => void }) {
           <label className="grid gap-1 text-sm">Imię<Input value={imie} onChange={(e) => setImie(e.target.value)} /></label>
           <label className="grid gap-1 text-sm">Nazwisko<Input value={nazwisko} onChange={(e) => setNazwisko(e.target.value)} /></label>
           <label className="grid gap-1 text-sm">Numer PWZ<Input value={pwz} onChange={(e) => setPwz(e.target.value)} /></label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pomin} onChange={(e) => setPomin(e.target.checked)} />Pomiń walidację formatu PWZ (wyjątek, np. PWZ warunkowe; trafia do dziennika)</label>
           <label className="grid gap-1 text-sm">Specjalizacja<Input value={spec} onChange={(e) => setSpec(e.target.value)} /></label>
+          <label className="grid gap-1 text-sm">Okręgowa izba lekarska
+            <select className="rounded-md border border-border bg-background px-2 py-2 text-sm" value={izba} onChange={(e) => setIzba(e.target.value)}>
+              <option value="">nie wybrano</option>{IZBY_LEKARSKIE.map((i) => <option key={i} value={i}>{i}</option>)}
+            </select>
+          </label>
           <label className="grid gap-1 text-sm">Powód zmiany (do dziennika)<Textarea rows={2} value={powod} onChange={(e) => setPowod(e.target.value)} data-testid="edycja-powod" /></label>
-          <p className="text-xs text-muted-foreground">Wydane zaświadczenia to kopie z chwili wydania; po zmianie danych unieważnij stare zaświadczenie, a uczestnik odbierze nowe.</p>
+          <p className="text-xs text-muted-foreground">Wydane zaświadczenia to kopie z chwili wydania; po zmianie danych unieważnij stare zaświadczenie, a uczestnik odbierze nowe. Zmiana imienia, nazwiska albo PWZ cofa sprawdzenie w rejestrze.</p>
           <Button onClick={() => zapis.mutate()} disabled={zapis.isPending}>Zapisz</Button>
         </div>
       </DialogContent>
@@ -233,6 +276,8 @@ function RegulaKarta({ r, edycja }: { r: Regula; edycja: boolean }) {
     mutationFn: async () => (await apiRequest("PUT", `/api/admin/szkolenie/reguly/${r.profession}`, {
       active: d.active, legalBasis: d.legalBasis || null, pointsFormula: d.pointsFormula || null,
       pointsPerHour: Number(d.pointsPerHour) || 0, maxPoints: num(d.maxPoints), minHours: num(d.minHours),
+      pointsMode: d.pointsMode, pointsGranted: num(d.pointsGranted), nrlResolution: d.nrlResolution || null,
+      formInfoAcceptedAt: d.formInfoAcceptedAt || null, decisionNumber: d.decisionNumber || null, formText: d.formText || null,
       testRequired: d.testRequired, registryRequired: d.registryRequired, registryNumber: d.registryNumber || null, inactiveReason: d.inactiveReason || null,
     })).json(),
     onSuccess: () => {
@@ -250,13 +295,26 @@ function RegulaKarta({ r, edycja }: { r: Regula; edycja: boolean }) {
     <Card data-testid={`regula-${r.profession}`}>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle className="first-letter:uppercase">{czyZawod(r.profession) ? NAZWA_ZAWODU[r.profession] : r.profession}</CardTitle>
-        <label className="flex items-center gap-2 text-sm">Aktywna<Switch checked={d.active} disabled={!edycja} onCheckedChange={(v) => setD({ ...d, active: v })} /></label>
+        <div className="flex items-center gap-3">
+          <Badge variant={r.dziala ? "default" : "secondary"} data-testid={`regula-dziala-${r.profession}`}>{r.dziala ? "daje punkty" : "nie daje punktów"}</Badge>
+          <label className="flex items-center gap-2 text-sm">Aktywna<Switch checked={d.active} disabled={!edycja} onCheckedChange={(v) => setD({ ...d, active: v })} /></label>
+        </div>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
-        {pole("pointsPerHour", "Punkty za godzinę", "number")}
+        <label className="grid gap-1 text-sm">Sposób przyznania punktów
+          <select className="rounded-md border border-border bg-background px-2 py-2 text-sm" disabled={!edycja} value={d.pointsMode} onChange={(e) => setD({ ...d, pointsMode: e.target.value as Regula["pointsMode"] })}>
+            <option value="godziny">z godzin (punkty za godzinę dydaktyczną)</option>
+            <option value="decyzja">z uchwały / decyzji (przyznana liczba)</option>
+          </select>
+        </label>
+        {d.pointsMode === "decyzja" ? pole("pointsGranted", "Punkty przyznane w uchwale / decyzji", "number") : pole("pointsPerHour", "Punkty za godzinę dydaktyczną (45 min)", "number")}
         {pole("maxPoints", "Maks. punktów (puste = bez limitu)", "number")}
         {pole("minHours", "Min. godzin (puste = bez minimum)", "number")}
-        {pole("registryNumber", "Numer wpisu do rejestru / decyzji")}
+        {d.registryRequired && pole("nrlResolution", "Uchwała Naczelnej Rady Lekarskiej (numer)")}
+        {d.registryRequired && pole("registryNumber", "Numer wpisu do rejestru (RR-NNNNNN-00X-ZZZZ)")}
+        {d.registryRequired && pole("formInfoAcceptedAt", "Data przyjęcia informacji o formie (RRRR-MM-DD)")}
+        {!d.registryRequired && d.pointsMode === "decyzja" && pole("decisionNumber", "Numer decyzji (np. NRPiP)")}
+        <div className="sm:col-span-2">{pole("formText", "Forma kształcenia na zaświadczeniu (słowami przepisu)")}</div>
         <div className="sm:col-span-2">{pole("legalBasis", "Podstawa prawna")}</div>
         <div className="sm:col-span-2">{pole("pointsFormula", "Sposób liczenia (na zaświadczeniu)")}</div>
         <div className="sm:col-span-2">{pole("inactiveReason", "Komunikat, gdy reguła nie działa")}</div>
@@ -296,7 +354,15 @@ function RaportAnkiety() {
 type UstawieniaCme = {
   szkolenie_wlaczone: boolean;
   cwiczenia_wymagane: boolean;
-  pwz_kontrola_lekarz: string;
+  weryfikacja_pwz_reczna: boolean;
+  weryfikacja_pwz_dni: number;
+  test_limit_minut: number;
+  test_wglad: string;
+  cme_miejsce: string;
+  cme_kierownik_naukowy_tytul: string;
+  cme_organizator_podpisujacy: string;
+  cme_podpis_organizator: string;
+  cme_podpis_kierownik: string;
   regulamin_szkolenia_opublikowany: boolean;
   cme_godziny: number;
   cme_test_liczba_pytan: number;
@@ -328,6 +394,8 @@ function UstawieniaSzkolenia() {
     setAnkieta(JSON.stringify(data.cme_ankieta, null, 2));
     setTeksty({
       cme_tytul: data.cme_tytul, cme_forma: data.cme_forma, cme_kierownik_naukowy: data.cme_kierownik_naukowy,
+      cme_kierownik_naukowy_tytul: data.cme_kierownik_naukowy_tytul, cme_organizator_podpisujacy: data.cme_organizator_podpisujacy, cme_miejsce: data.cme_miejsce,
+      test_limit_minut: String(data.test_limit_minut), weryfikacja_pwz_dni: String(data.weryfikacja_pwz_dni),
       cme_godziny: String(data.cme_godziny), cme_test_liczba_pytan: String(data.cme_test_liczba_pytan), cme_test_prog_procent: String(data.cme_test_prog_procent),
       cme_test_limit_podejsc: String(data.cme_test_limit_podejsc), cme_test_przerwa_po: String(data.cme_test_przerwa_po), cme_test_przerwa_godziny: String(data.cme_test_przerwa_godziny),
     });
@@ -372,10 +440,11 @@ function UstawieniaSzkolenia() {
           {przelacznik("szkolenie_wlaczone", "Szkolenie widoczne dla kursantów", "Zapis, test, ankieta i zaświadczenia. Wyłączone widzi tylko zespół (podgląd).")}
           {przelacznik("cwiczenia_wymagane", "Ćwiczenia wymagane do ukończenia modułu", "Każdy temat z pytaniami opanowany (wariant B).")}
           {przelacznik("regulamin_szkolenia_opublikowany", "Regulamin szkolenia opublikowany", "Po publikacji zapis wymaga akceptacji regulaminu.")}
+          {przelacznik("weryfikacja_pwz_reczna", "Ręczne sprawdzenie PWZ przed zaświadczeniem z punktami", "Zespół porównuje dane z publicznym rejestrem NIL albo NIPiP (Uczestnicy → „PWZ sprawdzony”). Do tego czasu uczestnik może pobrać zaświadczenie ukończenia bez punktów.")}
           <div className="flex items-start justify-between gap-6 py-3">
-            <div><p className="font-medium">Cyfra kontrolna PWZ lekarza</p><p className="text-sm text-muted-foreground">Ostrzeżenie, dopóki algorytm nie jest potwierdzony na prawdziwych numerach.</p></div>
-            <select className="rounded-md border border-border bg-background px-2 py-1 text-sm" value={data.pwz_kontrola_lekarz} onChange={(e) => ustaw("pwz_kontrola_lekarz", e.target.value)}>
-              <option value="ostrzezenie">ostrzeżenie</option><option value="blokada">blokada</option><option value="wylaczona">bez sprawdzania</option>
+            <div><p className="font-medium">Wgląd w oceniony test</p><p className="text-sm text-muted-foreground">Całe podejście (pytania, odpowiedzi, klucz, uzasadnienia) albo tylko błędne odpowiedzi.</p></div>
+            <select className="rounded-md border border-border bg-background px-2 py-1 text-sm" value={data.test_wglad} onChange={(e) => ustaw("test_wglad", e.target.value)}>
+              <option value="pelny">całe podejście</option><option value="bledne">tylko błędne</option>
             </select>
           </div>
         </CardContent>
@@ -389,6 +458,8 @@ function UstawieniaSzkolenia() {
           {liczba("cme_test_limit_podejsc", "Limit podejść")}
           {liczba("cme_test_przerwa_po", "Przerwa po którym niezaliczonym")}
           {liczba("cme_test_przerwa_godziny", "Przerwa (godziny)")}
+          {liczba("test_limit_minut", "Limit czasu testu (minuty, 0 = bez limitu)")}
+          {liczba("weryfikacja_pwz_dni", "Sprawdzenie PWZ: zwykle do (dni roboczych)")}
         </CardContent>
       </Card>
       <Card>
@@ -396,7 +467,14 @@ function UstawieniaSzkolenia() {
         <CardContent className="grid gap-3">
           {tekst("cme_tytul", "Tytuł szkolenia")}
           {tekst("cme_forma", "Forma szkolenia")}
-          {tekst("cme_kierownik_naukowy", "Kierownik naukowy")}
+          {tekst("cme_kierownik_naukowy", "Kierownik naukowy (lekarz): imię i nazwisko")}
+          {tekst("cme_kierownik_naukowy_tytul", "Kierownik naukowy: tytuł i specjalizacja")}
+          {tekst("cme_organizator_podpisujacy", "Podpis za organizatora: imię, nazwisko, funkcja")}
+          {tekst("cme_miejsce", "Miejsce szkolenia")}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Podpis klucz="cme_podpis_organizator" tytul="Skan podpisu organizatora" obecny={data.cme_podpis_organizator} onZapisz={ustaw} />
+            <Podpis klucz="cme_podpis_kierownik" tytul="Skan podpisu kierownika naukowego" obecny={data.cme_podpis_kierownik} onZapisz={ustaw} />
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {(["nazwa", "adres", "krs", "nip", "email", "reklamacje"] as const).map((k) => (
               <label key={k} className="grid gap-1 text-sm">Organizator: {k}
@@ -407,6 +485,7 @@ function UstawieniaSzkolenia() {
           <div><Button variant="outline" onClick={() => ustaw("cme_organizator", org)}>Zapisz dane organizatora</Button></div>
         </CardContent>
       </Card>
+      <Retencja />
       <Card>
         <CardHeader><CardTitle>Pytania ankiety (JSON)</CardTitle></CardHeader>
         <CardContent className="grid gap-3">
@@ -420,5 +499,98 @@ function UstawieniaSzkolenia() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** Skan podpisu: PNG albo JPEG do 200 KB, zapis jako base64 w ustawieniach (kopia trafia do zaświadczenia) */
+function Podpis({ klucz, tytul, obecny, onZapisz }: { klucz: string; tytul: string; obecny: string; onZapisz: (k: string, v: unknown) => void }) {
+  const { toast } = useToast();
+  const wczytaj = (f: File | undefined) => {
+    if (!f) return;
+    if (f.size > 200_000) return toast({ title: "Plik ma więcej niż 200 KB", variant: "destructive" });
+    const r = new FileReader();
+    r.onload = () => onZapisz(klucz, String(r.result).replace(/^data:[^,]+,/, ""));
+    r.readAsDataURL(f);
+  };
+  return (
+    <div className="grid gap-2 text-sm">
+      <p>{tytul}</p>
+      {obecny ? <img src={`data:image/png;base64,${obecny}`} alt="" className="h-12 w-auto self-start bg-white p-1 rounded" /> : <p className="text-muted-foreground">brak (na zaświadczeniu sam podpis drukowany)</p>}
+      <div className="flex gap-2">
+        <Input type="file" accept="image/png,image/jpeg" onChange={(e) => wczytaj(e.target.files?.[0])} />
+        {obecny && <Button variant="outline" size="sm" onClick={() => onZapisz(klucz, "")}>Usuń</Button>}
+      </div>
+    </div>
+  );
+}
+
+/** Raport dla okręgowej izby lekarskiej (lekarze z zaświadczeniem), opcjonalnie jedna izba */
+function RaportIzby() {
+  const [izba, setIzba] = useState("");
+  return (
+    <Card>
+      <CardHeader><CardTitle>Raport dla okręgowej izby lekarskiej</CardTitle></CardHeader>
+      <CardContent className="flex flex-wrap items-end gap-3 text-sm">
+        <p className="w-full text-muted-foreground">Lekarze i lekarze dentyści z ważnym zaświadczeniem: imię, nazwisko, PWZ, data ukończenia, punkty, numer zaświadczenia.</p>
+        <select className="rounded-md border border-border bg-background px-2 py-2 text-sm" value={izba} onChange={(e) => setIzba(e.target.value)}>
+          <option value="">wszystkie izby</option>{IZBY_LEKARSKIE.map((i) => <option key={i} value={i}>{i}</option>)}
+        </select>
+        <Button asChild variant="outline" size="sm">
+          <a href={`/api/admin/szkolenie/raport-orl.csv${izba ? `?izba=${encodeURIComponent(izba)}` : ""}`} download data-testid="raport-orl-csv"><Download className="h-4 w-4" />Pobierz CSV</a>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Pula testu: pytania, które nie spełniają warunku (≥ 5 odpowiedzi, dokładnie 1 poprawna), są pomijane */
+function PulaTestu() {
+  const { data } = useQuery<{ kwalifikuje: number; odrzucone: Array<{ id: string; externalId: string | null; tytul: string | null; powod: string }> }>({
+    queryKey: ["/api/admin/szkolenie/pula-testu"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/szkolenie/pula-testu")).json(),
+    staleTime: 0,
+  });
+  if (!data) return null;
+  return (
+    <Card data-testid="pula-testu">
+      <CardHeader><CardTitle>Pula testu: {data.kwalifikuje} pytań w losowaniu</CardTitle></CardHeader>
+      <CardContent className="text-sm">
+        {data.odrzucone.length === 0 ? (
+          <p className="text-muted-foreground">Wszystkie opublikowane pytania puli testu spełniają warunek: co najmniej 5 odpowiedzi i dokładnie 1 poprawna.</p>
+        ) : (
+          <>
+            <p className="text-muted-foreground mb-2">Pominięte w losowaniu ({data.odrzucone.length}): każde pytanie testu musi mieć co najmniej 5 odpowiedzi i dokładnie 1 poprawną.</p>
+            <ul className="list-disc pl-5">{data.odrzucone.map((o) => <li key={o.id}>{o.externalId ?? o.tytul ?? o.id}: {o.powod}</li>)}</ul>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Przechowywanie 5 lat od końca roku wydania zaświadczenia: przegląd i usunięcie (to samo co server/scripts/szkolenieRetencja.ts) */
+function Retencja() {
+  const { toast } = useToast();
+  const [wynik, setWynik] = useState<{ sprawdzone: number; doUsuniecia: number; usunieto: number } | null>(null);
+  const run = useMutation({
+    mutationFn: async (usun: boolean) => (await apiRequest("POST", "/api/admin/szkolenie/retencja", { usun })).json(),
+    onSuccess: (w) => setWynik(w),
+    onError: (e) => toast({ title: "Nie udało się", description: bladSerwera(e), variant: "destructive" }),
+  });
+  return (
+    <Card>
+      <CardHeader><CardTitle>Przechowywanie danych szkolenia</CardTitle></CardHeader>
+      <CardContent className="grid gap-3 text-sm">
+        <p className="text-muted-foreground">
+          Osoby z zaświadczeniem: rejestr zostaje 5 lat od końca roku wydania, także po usunięciu konta. Osoby bez zaświadczenia znikają razem z kontem.
+          Tu usuniesz rejestr osób bez konta, którym minął okres przechowywania. Uruchamiaj raz w roku, w styczniu, po kopii bazy.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" disabled={run.isPending} onClick={() => run.mutate(false)}>Sprawdź (nic nie usuwa)</Button>
+          <Button variant="destructive" size="sm" disabled={run.isPending || !wynik?.doUsuniecia} onClick={() => run.mutate(true)}>Usuń przeterminowane</Button>
+        </div>
+        {wynik && <p>Osób bez konta w rejestrze: {wynik.sprawdzone}, po okresie przechowywania: {wynik.doUsuniecia}{wynik.usunieto ? `, usunięto: ${wynik.usunieto}` : ""}.</p>}
+      </CardContent>
+    </Card>
   );
 }

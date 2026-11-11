@@ -97,7 +97,8 @@ export default function SzkoleniePage() {
                     <span className="!text-ui">
                       {z.punkty !== null ? `Punkty edukacyjne: ${liczbaPL(z.punkty)}` : `Bez punktów: ${z.powodBezPunktow}`}
                     </span>
-                    {z.pwzOstrzezenie && <span className="!text-ui text-[var(--alarm)]">Sprawdź numer PWZ: {z.pwzOstrzezenie}</span>}
+                    {z.zawod === "ratownik" && !z.pwz && <span className="!text-ui">Bez numeru PWZ: na zaświadczeniu „nie podano”.</span>}
+                    {z.izba && <span className="!text-ui">Okręgowa izba lekarska: {z.izba}</span>}
                     {z.zablokowany && <span className="!text-ui inline-flex items-center gap-1"><Lock className="h-3.5 w-3.5" aria-hidden />Dane są na zaświadczeniu</span>}
                   </span>
                 </li>
@@ -180,7 +181,8 @@ function WierszModulu({ m, nr }: { m: StanModuluSzkolenia; nr: number }) {
 function OpisTestu({ stan, zapisany }: { stan: StanSzkolenia; zapisany: boolean }) {
   const t = stan.test;
   const z = t.zasady;
-  const zasady = `${z.liczbaPytan} ${plural(z.liczbaPytan, "pytanie", "pytania", "pytań")} jednokrotnego wyboru, próg ${liczbaPL(z.prog)}%, najwyżej ${z.limit} ${plural(z.limit, "podejście", "podejścia", "podejść")}. Po ${z.przerwaPo}. niezaliczonym podejściu ${liczbaPL(z.przerwaGodziny)} h przerwy. Każde podejście to nowy zestaw pytań.`;
+  const zasady = `${z.liczbaPytan} ${plural(z.liczbaPytan, "pytanie", "pytania", "pytań")} jednokrotnego wyboru${z.limitMinut ? `, ${z.limitMinut} min na rozwiązanie` : ""}, próg ${liczbaPL(z.prog)}%, najwyżej ${z.limit} ${plural(z.limit, "podejście", "podejścia", "podejść")}. Po ${z.przerwaPo}. niezaliczonym podejściu ${liczbaPL(z.przerwaGodziny)} h przerwy. Każde podejście to nowy zestaw pytań. Po oddaniu zobaczysz ${z.wglad === "pelny" ? "całe ocenione podejście z kluczem i uzasadnieniami" : "uzasadnienia błędnych odpowiedzi"}.`;
+  const oddane = t.podejscia.filter((p) => p.submittedAt);
   const ostatnie = t.podejscia.filter((p) => p.submittedAt).at(-1);
   return (
     <div className="grid gap-4 justify-items-start" data-testid="test-opis">
@@ -188,6 +190,15 @@ function OpisTestu({ stan, zapisany }: { stan: StanSzkolenia; zapisany: boolean 
       {ostatnie && (
         <p className="text-body" data-testid="test-ostatni-wynik">
           Ostatni wynik: {liczbaPL(ostatnie.procent ?? 0)}% ({ostatnie.wynik} z {ostatnie.maks}), {ostatnie.zaliczony ? "zaliczony" : "niezaliczony"}.
+        </p>
+      )}
+      {oddane.length > 0 && (
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-ui" data-testid="test-wglad-linki">
+          {oddane.map((p) => (
+            <Link key={p.id} href={`/szkolenie/test?wglad=${p.id}`} className="underline">
+              Wgląd: podejście {p.nr} ({liczbaPL(p.procent ?? 0)}%{p.automatycznie ? ", oddane po czasie" : ""})
+            </Link>
+          ))}
         </p>
       )}
       {!zapisany ? (
@@ -215,7 +226,8 @@ function Zaswiadczenia({ stan }: { stan: StanSzkolenia }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const wydaj = useMutation({
-    mutationFn: async (zapisId: string) => (await apiRequest("POST", "/api/szkolenie/zaswiadczenia", { zapisId })).json(),
+    mutationFn: async ({ zapisId, rodzaj }: { zapisId: string; rodzaj: "punkty" | "ukonczenie" }) =>
+      (await apiRequest("POST", "/api/szkolenie/zaswiadczenia", { zapisId, rodzaj })).json(),
     onSuccess: () => {
       toast({ title: "Zaświadczenie gotowe" });
       qc.invalidateQueries({ queryKey: SZKOLENIE_KEY });
@@ -227,33 +239,48 @@ function Zaswiadczenia({ stan }: { stan: StanSzkolenia }) {
   return (
     <ul className="rows [&>li:last-child]:border-b-0">
       {stan.zapisy.map((z) => {
-        const c = stan.zaswiadczenia.find((x) => x.zawod === z.zawod && x.wazne);
+        const wazneC = stan.zaswiadczenia.filter((x) => x.zawod === z.zawod && x.wazne);
+        const zPunktami = wazneC.find((x) => x.rodzaj === "punkty");
+        const ukonczenie = wazneC.find((x) => x.rodzaj === "ukonczenie");
+        const dajePunkty = z.punkty !== null;
         return (
-          <li key={z.id} className="row py-4 grid-cols-[minmax(0,1fr)] sm:grid-cols-[minmax(0,1fr)_auto] gap-3" data-testid={`zaswiadczenie-${z.zawod}`}>
-            <span className="row__t gap-1">
+          <li key={z.id} className="row py-4 grid-cols-[minmax(0,1fr)] gap-3" data-testid={`zaswiadczenie-${z.zawod}`}>
+            <span className="row__t gap-2">
               <b className="first-letter:uppercase">{z.zawodNazwa}</b>
-              {c ? (
-                <span className="!text-ui">
-                  Nr {c.numer} z {dataPL(c.wydano)} · {c.punkty !== null ? `${liczbaPL(c.punkty)} pkt` : "bez punktów"}
-                  {" · "}<Link href={`/zaswiadczenie/${c.klucz}`} className="underline" data-testid={`weryfikacja-link-${z.zawod}`}>sprawdź ważność</Link>
+              {!gotowe && <span className="!text-ui">Po teście i ankiecie.</span>}
+              {gotowe && !dajePunkty && !ukonczenie && <span className="!text-ui">Bez punktów: {z.powodBezPunktow}</span>}
+              {gotowe && dajePunkty && !zPunktami && z.czekaNaWeryfikacje && (
+                <span className="!text-ui" data-testid={`czeka-${z.zawod}`}>
+                  Zaświadczenie z punktami ({liczbaPL(z.punkty!)} pkt) czeka na weryfikację danych (zwykle do {stan.weryfikacjaDni} dni roboczych).
+                  {!ukonczenie && " Już teraz możesz pobrać zaświadczenie ukończenia bez punktów."}
                 </span>
-              ) : (
-                <span className="!text-ui">{gotowe ? (z.punkty !== null ? `${liczbaPL(z.punkty)} pkt` : z.powodBezPunktow) : "Po teście i ankiecie."}</span>
               )}
-            </span>
-            <span className="relative z-10">
-              {c ? (
-                <Button asChild variant="outline" size="sm">
-                  <a href={`/api/szkolenie/zaswiadczenia/${c.numer}/pdf`} download data-testid={`pdf-${z.zawod}`}>
-                    <Download className="h-4 w-4" aria-hidden />Pobierz PDF
-                  </a>
-                </Button>
-              ) : (
-                gotowe && (
-                  <Button size="sm" disabled={wydaj.isPending} onClick={() => wydaj.mutate(z.id)} data-testid={`odbierz-${z.zawod}`}>
-                    Odbierz zaświadczenie
+              {[zPunktami, ukonczenie].filter(Boolean).map((c) => (
+                <span key={c!.numer} className="!text-ui flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span>
+                    {c!.rodzaj === "punkty" ? `Z punktami (${liczbaPL(c!.punkty ?? 0)} pkt)` : "Ukończenie bez punktów"}: nr {c!.numer} z {dataPL(c!.wydano)}
+                  </span>
+                  <Link href={`/zaswiadczenie/${c!.klucz}`} className="underline" data-testid={`weryfikacja-link-${z.zawod}-${c!.rodzaj}`}>sprawdź ważność</Link>
+                  <Button asChild variant="outline" size="sm">
+                    <a href={`/api/szkolenie/zaswiadczenia/${c!.numer}/pdf`} download data-testid={`pdf-${z.zawod}-${c!.rodzaj}`}>
+                      <Download className="h-4 w-4" aria-hidden />Pobierz PDF
+                    </a>
                   </Button>
-                )
+                </span>
+              ))}
+              {gotowe && (
+                <span className="flex flex-wrap gap-3">
+                  {dajePunkty && !zPunktami && !z.czekaNaWeryfikacje && (
+                    <Button size="sm" disabled={wydaj.isPending} onClick={() => wydaj.mutate({ zapisId: z.id, rodzaj: "punkty" })} data-testid={`odbierz-${z.zawod}-punkty`}>
+                      Odbierz zaświadczenie z punktami
+                    </Button>
+                  )}
+                  {!ukonczenie && (!dajePunkty || (z.czekaNaWeryfikacje && !zPunktami)) && (
+                    <Button size="sm" variant={dajePunkty ? "outline" : "default"} disabled={wydaj.isPending} onClick={() => wydaj.mutate({ zapisId: z.id, rodzaj: "ukonczenie" })} data-testid={`odbierz-${z.zawod}-ukonczenie`}>
+                      {dajePunkty ? "Pobierz zaświadczenie ukończenia bez punktów" : "Odbierz zaświadczenie ukończenia"}
+                    </Button>
+                  )}
+                </span>
               )}
             </span>
           </li>

@@ -8,6 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { bladSerwera, SZKOLENIE_KEY, type StanSzkolenia } from "@/lib/szkolenie";
 import {
+  IZBY_LEKARSKIE,
   NAZWA_ZAWODU,
   OSWIADCZENIE,
   ZAWODY,
@@ -17,12 +18,14 @@ import {
   type Zawod,
 } from "@shared/szkolenie";
 
-type DaneZawodu = { pwz: string; specjalizacja: string };
+type DaneZawodu = { pwz: string; specjalizacja: string; izba: string; brakPwz: boolean };
+const PUSTE: DaneZawodu = { pwz: "", specjalizacja: "", izba: "", brakPwz: false };
+const LEKARSKIE: readonly Zawod[] = ["lekarz", "lekarz_dentysta"];
 
 /**
  * „Chcę zaświadczenie z punktami”: zawód (kilka naraz), PWZ, specjalizacja (lekarze), imię i nazwisko
- * zgodne z PWZ, oświadczenie o prawdziwości danych. Format PWZ sprawdzamy od razu, ale to tylko
- * podpowiedź: o tym, co blokuje zapis, decyduje serwer.
+ * zgodne z PWZ, oświadczenie o prawdziwości danych. Format PWZ sprawdzamy od razu (ta sama walidacja
+ * co na serwerze: lekarz z cyfrą kontrolną NIL, pielęgniarka P, położna A); ratownik może nie mieć numeru.
  */
 export default function FormularzZapisu({ stan, onGotowe }: { stan: StanSzkolenia; onGotowe?: () => void }) {
   const { toast } = useToast();
@@ -33,7 +36,7 @@ export default function FormularzZapisu({ stan, onGotowe }: { stan: StanSzkoleni
   const [nazwisko, setNazwisko] = useState(pierwszy?.nazwisko ?? "");
   const [wybrane, setWybrane] = useState<Set<Zawod>>(() => new Set(stan.zapisy.map((z) => z.zawod as Zawod)));
   const [dane, setDane] = useState<Record<string, DaneZawodu>>(() =>
-    Object.fromEntries(stan.zapisy.map((z) => [z.zawod, { pwz: z.pwz ?? "", specjalizacja: z.specjalizacja ?? "" }])),
+    Object.fromEntries(stan.zapisy.map((z) => [z.zawod, { pwz: z.pwz ?? "", specjalizacja: z.specjalizacja ?? "", izba: z.izba ?? "", brakPwz: z.zawod === "ratownik" && !z.pwz }])),
   );
   const [oswiadczenie, setOswiadczenie] = useState(false);
   const [regulamin, setRegulamin] = useState(false);
@@ -43,13 +46,13 @@ export default function FormularzZapisu({ stan, onGotowe }: { stan: StanSzkoleni
   const ostrzezenia = useMemo(() => {
     const w: Partial<Record<Zawod, string>> = {};
     for (const z of Array.from(wybrane)) {
-      const d = dane[z]?.pwz ?? "";
-      if (!d.trim()) continue;
-      const r = sprawdzPwz(z, d, stan.pwzTryb);
-      if (r.blad || r.ostrzezenie) w[z] = (r.blad ?? r.ostrzezenie)!;
+      const d = dane[z] ?? PUSTE;
+      if (!d.pwz.trim() || d.brakPwz) continue;
+      const r = sprawdzPwz(z, d.pwz);
+      if (r.blad) w[z] = r.blad;
     }
     return w;
-  }, [wybrane, dane, stan.pwzTryb]);
+  }, [wybrane, dane]);
 
   const zapis = useMutation({
     mutationFn: async () =>
@@ -60,8 +63,10 @@ export default function FormularzZapisu({ stan, onGotowe }: { stan: StanSzkoleni
         regulamin: stan.regulaminOpublikowany ? regulamin : undefined,
         zawody: Array.from(wybrane).map((zawod) => ({
           zawod,
-          pwz: ZAWODY_Z_PWZ.includes(zawod) ? dane[zawod]?.pwz ?? "" : null,
+          pwz: ZAWODY_Z_PWZ.includes(zawod) && !(zawod === "ratownik" && dane[zawod]?.brakPwz) ? dane[zawod]?.pwz ?? "" : null,
+          brakPwz: zawod === "ratownik" ? !!dane[zawod]?.brakPwz : undefined,
           specjalizacja: ZAWODY_ZE_SPECJALIZACJA.includes(zawod) ? dane[zawod]?.specjalizacja ?? "" : null,
+          izba: LEKARSKIE.includes(zawod) ? dane[zawod]?.izba ?? "" : null,
         })),
       })).json(),
     onSuccess: () => {
@@ -79,8 +84,8 @@ export default function FormularzZapisu({ stan, onGotowe }: { stan: StanSzkoleni
       else n.delete(z);
       return n;
     });
-  const ustaw = (z: Zawod, pole: keyof DaneZawodu, v: string) =>
-    setDane((prev) => ({ ...prev, [z]: { pwz: prev[z]?.pwz ?? "", specjalizacja: prev[z]?.specjalizacja ?? "", [pole]: v } }));
+  const ustaw = <K extends keyof DaneZawodu>(z: Zawod, pole: K, v: DaneZawodu[K]) =>
+    setDane((prev) => ({ ...prev, [z]: { ...PUSTE, ...prev[z], [pole]: v } }));
 
   const wyslij = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,11 +126,12 @@ export default function FormularzZapisu({ stan, onGotowe }: { stan: StanSzkoleni
               <label htmlFor={`pwz-${z}`} className="font-medium">Numer prawa wykonywania zawodu</label>
               <Input
                 id={`pwz-${z}`}
-                inputMode={z === "pielegniarka" || z === "polozna" ? "text" : "numeric"}
+                inputMode={z === "lekarz" || z === "lekarz_dentysta" ? "numeric" : "text"}
                 autoComplete="off"
                 maxLength={20}
+                placeholder={z === "pielegniarka" ? "1234567P" : z === "polozna" ? "1234567A" : undefined}
                 value={dane[z]?.pwz ?? ""}
-                disabled={zablokowanyZawod(z)}
+                disabled={zablokowanyZawod(z) || (z === "ratownik" && !!dane[z]?.brakPwz)}
                 onChange={(e) => ustaw(z, "pwz", e.target.value)}
                 aria-describedby={ostrzezenia[z] ? `pwz-${z}-uwaga` : undefined}
                 data-testid={`pwz-${z}`}
@@ -135,6 +141,19 @@ export default function FormularzZapisu({ stan, onGotowe }: { stan: StanSzkoleni
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--alarm)]" aria-hidden />
                   {ostrzezenia[z]}
                 </p>
+              )}
+              {z === "ratownik" && (
+                <label className="flex items-center gap-3 min-h-[44px] cursor-pointer text-ui">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[var(--puls)]"
+                    checked={!!dane[z]?.brakPwz}
+                    disabled={zablokowanyZawod(z)}
+                    onChange={(e) => ustaw(z, "brakPwz", e.target.checked)}
+                    data-testid="pwz-ratownik-brak"
+                  />
+                  Nie mam jeszcze numeru prawa wykonywania zawodu
+                </label>
               )}
             </div>
           )}
@@ -149,6 +168,21 @@ export default function FormularzZapisu({ stan, onGotowe }: { stan: StanSzkoleni
                 onChange={(e) => ustaw(z, "specjalizacja", e.target.value)}
                 data-testid={`spec-${z}`}
               />
+            </div>
+          )}
+          {LEKARSKIE.includes(z) && (
+            <div className="grid gap-2">
+              <label htmlFor={`izba-${z}`} className="font-medium">Okręgowa izba lekarska <span className="text-[var(--txt2)] font-normal">(opcjonalnie)</span></label>
+              <select
+                id={`izba-${z}`}
+                className="min-h-[44px] rounded-md border border-[var(--line2)] bg-transparent px-3 text-body"
+                value={dane[z]?.izba ?? ""}
+                onChange={(e) => ustaw(z, "izba", e.target.value)}
+                data-testid={`izba-${z}`}
+              >
+                <option value="">nie wybrano</option>
+                {IZBY_LEKARSKIE.map((i) => <option key={i} value={i}>{i}</option>)}
+              </select>
             </div>
           )}
         </fieldset>
