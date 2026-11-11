@@ -255,10 +255,10 @@ function Zaswiadczenia({ stan }: { stan: StanSzkolenia }) {
               {gotowe && dajePunkty && !zPunktami && z.czekaNaOrganizatora && (
                 <span className="!text-ui" data-testid={`czeka-organizator-${z.zawod}`}>
                   Zaświadczenie z punktami czeka na uzupełnienie danych organizatora.
-                  {!ukonczenie && " Już teraz możesz pobrać zaświadczenie ukończenia bez punktów."}
+                  {!ukonczenie && !z.czekaNaWeryfikacje && " Już teraz możesz pobrać zaświadczenie ukończenia bez punktów."}
                 </span>
               )}
-              {gotowe && dajePunkty && !zPunktami && !z.czekaNaOrganizatora && z.czekaNaWeryfikacje && (
+              {gotowe && dajePunkty && !zPunktami && z.czekaNaWeryfikacje && (
                 <span className="!text-ui" data-testid={`czeka-${z.zawod}`}>
                   Zaświadczenie z punktami ({liczbaPL(z.punkty!)} pkt) czeka na weryfikację danych (zwykle do {stan.weryfikacjaDni} dni roboczych).
                   {!ukonczenie && " Już teraz możesz pobrać zaświadczenie ukończenia bez punktów."}
