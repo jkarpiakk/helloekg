@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ANKIETA_DOMYSLNA, ankietaSchema, TRYBY_PWZ_LEKARZ, type Ankieta, type TrybPwzLekarz } from "@shared/szkolenie";
 
 /**
  * Przełączniki aplikacji.
@@ -22,7 +23,42 @@ export const USTAWIENIA = {
   /** Wyjątki od limitów prób dla adresów IP firmy testującej (pentest); domyślnie wyłączone */
   limit_wyjatki_wlaczone: { domyslnie: false as boolean, schemat: z.boolean() },
   limit_wyjatki_ip: { domyslnie: [] as string[], schemat: z.array(z.string().trim().regex(IP_RE, "Nieprawidłowy adres IP")).max(20) },
+
+  // ── Szkolenie z punktami edukacyjnymi (plan 11.11.2026, decyzje JK z sekcji 3) ──
+  /** Szkolenie widoczne dla kursantów (zapis, test, ankieta, zaświadczenia); wyłączone widzi tylko zespół */
+  szkolenie_wlaczone: { domyslnie: false as boolean, schemat: z.boolean() },
+  /** Moduł ukończony wymaga też opanowania wszystkich tematów z ćwiczeniami (wariant B) */
+  cwiczenia_wymagane: { domyslnie: true as boolean, schemat: z.boolean() },
+  /** Cyfra kontrolna PWZ lekarza: ostrzeżenie (domyślnie, do potwierdzenia algorytmu), blokada albo bez sprawdzania */
+  pwz_kontrola_lekarz: { domyslnie: "ostrzezenie" as TrybPwzLekarz, schemat: z.enum(TRYBY_PWZ_LEKARZ) },
+  /** Regulamin szkolenia opublikowany (po akceptacji JK): wtedy zapis wymaga jego akceptacji */
+  regulamin_szkolenia_opublikowany: { domyslnie: false as boolean, schemat: z.boolean() },
+  /** Liczba godzin szkolenia (zaświadczenie, punkty, opis). Obowiązuje wartość z panelu (app_settings); 53 to tylko wartość startowa wariantu B, zmiana programu nie wymaga zmiany kodu */
+  cme_godziny: { domyslnie: 53 as number, schemat: z.number().positive().max(1000) },
+  cme_test_liczba_pytan: { domyslnie: 40 as number, schemat: z.number().int().min(1).max(200) },
+  cme_test_prog_procent: { domyslnie: 70 as number, schemat: z.number().min(1).max(100) },
+  cme_test_limit_podejsc: { domyslnie: 3 as number, schemat: z.number().int().min(1).max(20) },
+  /** Po którym niezaliczonym podejściu (i każdym kolejnym) obowiązuje przerwa */
+  cme_test_przerwa_po: { domyslnie: 2 as number, schemat: z.number().int().min(1).max(20) },
+  cme_test_przerwa_godziny: { domyslnie: 24 as number, schemat: z.number().min(0).max(24 * 30) },
+  cme_tytul: { domyslnie: "Interpretacja EKG: kurs helloEKG" as string, schemat: z.string().trim().min(3).max(200) },
+  cme_forma: { domyslnie: "szkolenie online (e-learning) zakończone testem" as string, schemat: z.string().trim().min(3).max(200) },
+  cme_organizator: {
+    domyslnie: { nazwa: "Cardiomind sp. z o.o.", adres: "", krs: "", nip: "", email: "kontakt@helloekg.pl", reklamacje: "kontakt@helloekg.pl" } as Organizator,
+    schemat: z.object({
+      nazwa: z.string().trim().min(1).max(200),
+      adres: z.string().trim().max(300),
+      krs: z.string().trim().max(30),
+      nip: z.string().trim().max(30),
+      email: z.string().trim().max(200),
+      reklamacje: z.string().trim().max(300),
+    }),
+  },
+  cme_kierownik_naukowy: { domyslnie: "" as string, schemat: z.string().trim().max(200) },
+  cme_ankieta: { domyslnie: ANKIETA_DOMYSLNA as Ankieta, schemat: ankietaSchema },
 } as const;
+
+export type Organizator = { nazwa: string; adres: string; krs: string; nip: string; email: string; reklamacje: string };
 
 export type KluczUstawienia = keyof typeof USTAWIENIA;
 type Wartosc<K extends KluczUstawienia> = (typeof USTAWIENIA)[K]["domyslnie"];

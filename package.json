@@ -5,10 +5,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && mkdir -p dist/dokumenty && cp docs/dokumenty/*.md dist/dokumenty/ && esbuild scripts/test-maile.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/test-maile.js && esbuild scripts/stripe-przygotuj.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/stripe-przygotuj.js",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && mkdir -p dist/dokumenty && cp docs/dokumenty/*.md docs/regulamin-szkolenia.md dist/dokumenty/ && esbuild scripts/test-maile.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/test-maile.js && esbuild scripts/stripe-przygotuj.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/stripe-przygotuj.js",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test": "vitest run"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -61,6 +62,7 @@
     "compression": "^1.8.1",
     "connect-pg-simple": "^10.0.0",
     "date-fns": "^3.6.0",
+    "dejavu-fonts-ttf": "^2.37.3",
     "dompurify": "^3.4.17",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
@@ -74,7 +76,9 @@
     "marked": "^16.2.1",
     "next-themes": "^0.4.6",
     "nodemailer": "^10.1.7",
+    "pdfkit": "^0.20.2",
     "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
     "quill": "^2.0.3",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -102,7 +106,9 @@
     "@types/express": "4.17.21",
     "@types/express-session": "^1.18.0",
     "@types/node": "20.16.11",
+    "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.7.0",
@@ -113,7 +119,8 @@
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
-    "vite": "^6.4.6"
+    "vite": "^6.4.6",
+    "vitest": "^4.1.12"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"

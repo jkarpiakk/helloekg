@@ -160,6 +160,15 @@ export const apiRateLimit = createRateLimit({
   naSciezke: false,
 });
 
+// Publiczna weryfikacja zaświadczeń: jeden licznik na adres dla wszystkich kluczy (bez zgadywania seriami)
+export const weryfikacjaRateLimit = createRateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: "Zbyt wiele sprawdzeń. Spróbuj ponownie za 10 minut.",
+  keyPrefix: "zasw",
+  naSciezke: false,
+});
+
 export const paymentRateLimit = createRateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10,

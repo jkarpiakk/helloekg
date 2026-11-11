@@ -65,6 +65,7 @@ import { getUncachableStripeClient, getStripePublishableKey, stripeSource } from
 import { linkZMaila } from "./mailLinks";
 import { config } from "./config";
 import { aktywujPlatnosc, anulujSubskrypcjeKonta, anulujWStripe } from "./platnosci";
+import { usunSladyBezZapisu, zapiszCzytanie, poOdpowiedzi } from "./szkolenie/serwis";
 
 /** Imię i nazwisko na certyfikat: litery (także polskie), spacja, łącznik, apostrof */
 const namePart = (label: string) =>
@@ -184,6 +185,7 @@ function plikDokumentu(id: DokumentId): string | null {
  * Usunięcie konta z danymi (RODO): samodzielnie z hasłem albo przez admina na prośbę użytkownika.
  * Wszystko albo nic: subskrypcje anulowane, zgłoszenia zanonimizowane, sesje i konto usunięte
  * (postęp, odpowiedzi, zgody, certyfikaty kasują się kaskadowo), wpis audytu bez danych osobowych.
+ * Wyjątek: zapis na szkolenie z punktami, dziennik szkolenia i zaświadczenia CME zostają 5 lat (bez kaskady).
  */
 async function usunKontoZDanymi(cel: User, kto: { actorId: string; akcja: string; ip?: string; ua?: string }) {
   // id subskrypcji Stripe znikają razem z kontem: odczyt przed transakcją, anulowanie dopiero po udanym usunięciu
@@ -207,6 +209,9 @@ async function usunKontoZDanymi(cel: User, kto: { actorId: string; akcja: string
       ipAddress: kto.ip,
       userAgent: kto.ua,
     });
+
+    // Szkolenie z punktami: uczestnik zostaje w rejestrze 5 lat (user_id = NULL), reszta kont bez śladu
+    await usunSladyBezZapisu(tx, cel.id);
 
     await tx.execute(sql`DELETE FROM session WHERE sess::jsonb->>'userId' = ${cel.id}`);
     await tx.delete(users).where(eq(users.id, cel.id));
@@ -1007,7 +1012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // co naprawdę jest w sekcji (wykład, pytania albo jedno i drugie)
       const [questionCounts, chapterCounts] = await Promise.all([
         db.select({ sectionId: questions.sectionId, n: count() }).from(questions)
-          .where(eq(questions.status, "published")).groupBy(questions.sectionId),
+          .where(and(eq(questions.status, "published"), eq(questions.pool, "practice"))).groupBy(questions.sectionId),
         db.select({ sectionId: lectureChapters.sectionId, n: count() }).from(lectureChapters)
           .where(eq(lectureChapters.isPublished, true)).groupBy(lectureChapters.sectionId),
       ]);
@@ -1053,8 +1058,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? gradable.reduce((acc, section) => acc + (section.completionPercentage || 0), 0) / gradable.length
             : 0;
           
+          // Treść podsumowania i bibliografii ma własną trasę (/api/szkolenie/moduly/:id); tu tylko, czy są
+          const { summaryMd, bibliographyMd, ...bezTresci } = module;
           return {
-            ...module,
+            ...bezTresci,
+            hasSummary: !!summaryMd?.trim(),
+            hasBibliography: !!bibliographyMd?.trim(),
             sections: sectionsWithProgress,
             completionPercentage: moduleCompletion
           };
@@ -1101,6 +1110,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     try {
       const row = await storage.upsertLectureRead(req.user!.id, sectionId, parsed.data.chapterOrder, parsed.data.chaptersTotal);
+      // Szkolenie z punktami: pierwsze otwarcie i ukończenie wykładu (liczba rozdziałów z bazy)
+      zapiszCzytanie(req.user!.id, sectionId, parsed.data.chapterOrder)
+        .catch((e) => console.error("[szkolenie] zapis czytania:", e?.message));
       res.json({ sectionId: row.sectionId, chapterOrder: row.chapterOrder, chaptersTotal: row.chaptersTotal, updatedAt: row.updatedAt });
     } catch (error: any) {
       // Klucz obcy: nie ma takiej sekcji
@@ -1293,7 +1305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [dostepne] = await db.select({ id: questions.id }).from(questions)
           .innerJoin(sections, eq(sections.id, questions.sectionId))
           .innerJoin(modules, eq(modules.id, sections.moduleId))
-          .where(and(eq(questions.id, questionId), eq(questions.status, "published"), eq(sections.isVisible, true), eq(modules.isVisible, true)));
+          .where(and(eq(questions.id, questionId), eq(questions.status, "published"), eq(questions.pool, "practice"), eq(sections.isVisible, true), eq(modules.isVisible, true)));
         if (!dostepne) return res.status(404).json({ error: "Nie znaleziono pytania" });
       }
 
@@ -1312,6 +1324,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result.isCorrect,
         timeMs
       );
+
+      // Szkolenie z punktami: opanowany temat mógł właśnie ukończyć moduł (gdy ćwiczenia są wymagane)
+      poOdpowiedzi(req.user!.id).catch((e) => console.error("[szkolenie] po odpowiedzi:", e?.message));
 
       res.json({
         ...result,
@@ -1465,13 +1480,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let questions;
       if (sectionId) {
-        questions = await storage.getQuestionsBySection(sectionId as string, status as string);
+        questions = await storage.getQuestionsBySection(sectionId as string, status as string, { pula: "wszystkie" });
       } else {
         // Get all questions across all sections
         const sections = await storage.getSections();
         const allQuestions = [];
         for (const section of sections) {
-          const sectionQuestions = await storage.getQuestionsBySection(section.id, status as string);
+          const sectionQuestions = await storage.getQuestionsBySection(section.id, status as string, { pula: "wszystkie" });
           allQuestions.push(...sectionQuestions);
         }
         questions = allQuestions;
@@ -2382,7 +2397,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let query = db.select().from(supportTickets);
 
       // Zgłoszenia z bety i błędy w pytaniach mają własną zakładkę „Zgłoszenia” — tu tylko wiadomości do supportu
-      const ticketConditions: any[] = [eq(supportTickets.kind, "support"), sql`${supportTickets.questionId} IS NULL`];
+      // „Do prowadzącego” (moduły szkolenia) też tu: to wiadomości, na które ktoś odpowiada
+      const ticketConditions: any[] = [or(eq(supportTickets.kind, "support"), eq(supportTickets.kind, "prowadzacy")), sql`${supportTickets.questionId} IS NULL`];
       
       // Apply status filter
       if (status && status !== 'all') {
@@ -2846,6 +2862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   (await import("./feedbackRoutes")).registerFeedbackRoutes(app); // zgłoszenia testerów (beta)
   (await import("./learningAnalyticsRoutes")).registerLearningAnalyticsRoutes(app); // panel nauki (admin → Statystyki)
+  (await import("./szkolenie/trasy")).registerSzkolenieRoutes(app); // szkolenie z punktami edukacyjnymi
 
   // Nieznany adres API: 404 w JSON (nie strona aplikacji z kodem 200)
   app.use("/api", (_req, res) => {
