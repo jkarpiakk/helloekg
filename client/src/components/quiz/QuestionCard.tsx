@@ -9,6 +9,7 @@ import type { QuizQuestion, QuizResult, AnswerData } from "@/types";
 import { QuestionRenderer } from "./questions";
 import { caseKicker } from "./questions/ClinicalCaseQuestion";
 import type { AnyQuestionConfig } from "@shared/clinicalCase";
+import { BrakObrazu, PytanieObrazow, useBladObrazu } from "./BrakObrazu";
 
 /**
  * Stan odpowiedzi na bieżące pytanie:
@@ -48,6 +49,8 @@ const titleStyle: React.CSSProperties = {
 };
 
 function QuestionImage({ url, onOpen }: { url: string; onOpen: (url: string, origin?: HTMLElement) => void }) {
+  const { zepsuty, onError } = useBladObrazu(url);
+  if (zepsuty) return <BrakObrazu stan="blad-ladowania" miejsce="pytanie" url={url} className="mb-6" />;
   return (
     <button
       type="button"
@@ -56,7 +59,7 @@ function QuestionImage({ url, onOpen }: { url: string; onOpen: (url: string, ori
       aria-label="Powiększ zapis EKG"
       data-testid="question-image"
     >
-      <img src={url} alt="Zapis EKG" className="block max-h-[60vh] w-full object-contain" />
+      <img src={url} alt="Zapis EKG" className="block max-h-[60vh] w-full object-contain" onError={onError} />
       <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-meta text-[var(--txt2)] transition-colors duration-200 group-hover:text-[var(--txt)]">
         <Maximize2 className="h-3.5 w-3.5" aria-hidden />
         Powiększ
@@ -94,6 +97,7 @@ export default function QuestionCard({
   const correctAnswer = answered && !isInteractiveType && correctPosition >= 0 ? question.answers[correctPosition] : undefined;
 
   return (
+    <PytanieObrazow.Provider value={question.id}>
     <article
       className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)]"
       aria-labelledby="question-title"
@@ -272,5 +276,6 @@ export default function QuestionCard({
         </motion.section>
       )}
     </article>
+    </PytanieObrazow.Provider>
   );
 }

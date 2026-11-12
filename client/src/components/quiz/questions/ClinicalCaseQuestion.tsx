@@ -14,6 +14,7 @@ import {
   type ClinicalCaseStepAnswer,
 } from "@shared/clinicalCase";
 import HotspotQuestion from "./HotspotQuestion";
+import { BrakObrazu, useBladObrazu } from "../BrakObrazu";
 import PartialScore from "./PartialScore";
 
 interface ClinicalCaseQuestionProps {
@@ -70,7 +71,20 @@ export default function ClinicalCaseQuestion({
   onImageClick,
 }: ClinicalCaseQuestionProps) {
   const steps = config.steps ?? [];
-  const imageUrl = config.imageUrl || fallbackImageUrl;
+  const adresZapisu = config.imageUrl || fallbackImageUrl;
+  const { zepsuty, onError: bladZapisu } = useBladObrazu(adresZapisu);
+  const imageUrl = zepsuty ? undefined : adresZapisu;
+  // Zapis przypisany (kod grafiki albo krok „wskaż”), a nie da się go pokazać: ramka i zgłoszenie
+  const kodZapisu = (config as { imageGfx?: string }).imageGfx;
+  const brakZapisu = !imageUrl && (!!kodZapisu || zepsuty || steps.some((s) => s.kind === "hotspot"));
+  const ramkaBraku = (
+    <BrakObrazu
+      stan={zepsuty ? "blad-ladowania" : "brak-adresu"}
+      miejsce="przypadek"
+      kod={kodZapisu}
+      url={zepsuty ? adresZapisu : undefined}
+    />
+  );
   const [answers, setAnswers] = useState<Record<string, ClinicalCaseStepAnswer>>({});
   /** Ile kroków widać (aktywny = ostatni widoczny) */
   const [revealed, setRevealed] = useState(1);
@@ -156,13 +170,15 @@ export default function ClinicalCaseQuestion({
           aria-label="Powiększ zapis EKG przypadku"
           data-testid="case-image"
         >
-          <img src={imageUrl} alt="Zapis EKG przypadku" className="block max-h-[60vh] w-full object-contain" />
+          <img src={imageUrl} alt="Zapis EKG przypadku" className="block max-h-[60vh] w-full object-contain" onError={bladZapisu} />
           <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-meta text-[var(--txt2)]">
             <Maximize2 className="h-3.5 w-3.5" aria-hidden />
             Powiększ
           </span>
         </button>
       )}
+
+      {brakZapisu && !steps.some((s, i) => s.kind === "hotspot" && i === revealed - 1 && !answers[s.id]) && ramkaBraku}
 
       {/* Oś kroków */}
       <ol className="grid" aria-label="Kroki przypadku" data-testid="case-steps">
@@ -279,7 +295,7 @@ export default function ClinicalCaseQuestion({
                         )}
                       </div>
                     ) : (
-                      <p className="text-ui text-[var(--txt2)]">Ten krok wymaga zapisu EKG, którego jeszcze nie ma.</p>
+                      ramkaBraku
                     )}
 
                     {/* Wyjaśnienie kroku — wyrasta pod odpowiedziami */}

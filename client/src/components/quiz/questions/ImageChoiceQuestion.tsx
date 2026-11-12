@@ -3,6 +3,7 @@ import type { AnswerData, QuizResult } from "@/types";
 import type { ImageChoiceConfig } from "@shared/wyborZapisu";
 import { sanitizeMarkdown } from "@/lib/sanitize";
 import { WyborZapisu } from "../wybor-zapisu/WyborZapisu";
+import { BrakObrazu } from "../BrakObrazu";
 
 interface ImageChoiceQuestionProps {
   /** Opcje już w kolejności tego podejścia (losuje serwer przy podaniu pytania) */
@@ -37,6 +38,15 @@ export default function ImageChoiceQuestion({ config, onChange, disabled, showRe
         src={(o) => o.imageUrl}
         md={(t) => sanitizeMarkdown(t).__html}
         onPowieksz={(src, alt, el) => onImageClick?.(src, el, alt)}
+        brakObrazu={(o, stan) => (
+          <BrakObrazu
+            stan={stan}
+            miejsce="zapis"
+            kod={(o as { imageGfx?: string }).imageGfx}
+            url={stan === "blad-ladowania" ? o.imageUrl : undefined}
+            kompakt
+          />
+        )}
       />
     </div>
   );

@@ -63,6 +63,7 @@ import { users, modules, sections, questions, attempts, progress, subscriptions,
 import { eq, or, and, gte, desc, count, ilike, avg, sql, isNull, isNotNull } from "drizzle-orm";
 import { getUncachableStripeClient, getStripePublishableKey, stripeSource } from "./stripeClient";
 import { linkZMaila } from "./mailLinks";
+import { TEMAT_BRAK_OBRAZU, opisBrakuObrazu } from "@shared/brakObrazu";
 import { config } from "./config";
 import { aktywujPlatnosc, anulujSubskrypcjeKonta, anulujWStripe } from "./platnosci";
 import { przyUsunieciuKonta, zapiszCzytanie, poOdpowiedzi } from "./szkolenie/serwis";
@@ -2820,18 +2821,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // treść kursu przychodzi ze studia.)
 
   // Report error/bug endpoint
+  // Zgłoszenie błędu w pytaniu. Dwa rodzaje:
+  //  • ręczne („Zgłoś błąd”): { questionId, message };
+  //  • automatyczne z odtwarzacza, gdy obraz pytania się nie wyświetla:
+  //    { questionId, automatyczne: { powod: "brak-obrazu", kod?, url?, miejsce? } }.
+  //    Treść składa serwer (z externalId pytania), a jedno otwarte zgłoszenie na pytanie i kod
+  //    wystarczy: kolejne w ciągu 7 dni nie tworzą nowego wiersza.
   app.post("/api/report-error", requireKonto, async (req, res) => {
     try {
-      const { questionId, message } = req.body;
-      
-      if (typeof questionId !== "string" || typeof message !== "string" || !questionId || !message.trim()) {
+      const { questionId, automatyczne } = req.body ?? {};
+      let { message } = req.body ?? {};
+      const auto = automatyczne && typeof automatyczne === "object" ? automatyczne as Record<string, unknown> : null;
+
+      if (typeof questionId !== "string" || !/^[0-9a-f-]{36}$/i.test(questionId)) {
         return res.status(400).json({ error: "Pytanie i wiadomość są wymagane" });
       }
-      if (!/^[0-9a-f-]{36}$/i.test(questionId) || message.length > 5000) {
-        return res.status(400).json({ error: "Wiadomość może mieć najwyżej 5000 znaków" });
-      }
-      if (!(await storage.getQuestionById(questionId))) {
+      const question = await storage.getQuestionById(questionId);
+      if (!question) {
         return res.status(404).json({ error: "Nie znaleziono pytania" });
+      }
+
+      const subject = auto ? TEMAT_BRAK_OBRAZU : "Zgłoszenie błędu w pytaniu";
+      if (auto) {
+        const opis = opisBrakuObrazu(question, auto);
+        if (!opis) return res.status(400).json({ error: "Nieprawidłowe zgłoszenie automatyczne" });
+        message = opis;
+        // To samo pytanie i ten sam obraz: jedno otwarte zgłoszenie wystarczy
+        const [{ n: juz }] = await db.select({ n: count() }).from(supportTickets)
+          .where(and(eq(supportTickets.questionId, questionId), eq(supportTickets.subject, subject), eq(supportTickets.status, "open"),
+            sql`${supportTickets.message} = ${message}`, sql`${supportTickets.createdAt} > now() - interval '7 days'`));
+        if (Number(juz) > 0) return res.status(200).json({ success: true, duplikat: true });
+      } else if (typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({ error: "Pytanie i wiadomość są wymagane" });
+      } else if (message.length > 5000) {
+        return res.status(400).json({ error: "Wiadomość może mieć najwyżej 5000 znaków" });
       }
       // najwyżej 20 zgłoszeń błędów na dobę z jednego konta
       const [{ n: dzis }] = await db.select({ n: count() }).from(supportTickets)
@@ -2845,11 +2868,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.user!.id,
         userEmail: req.user!.email,
         userName: `${req.user!.firstName} ${req.user!.lastName}`,
-        subject: `Zgłoszenie błędu w pytaniu`,
+        subject,
         message: message,
         questionId: questionId,
         status: "open",
-        priority: "medium"
+        priority: auto ? "high" : "medium"
       });
 
       res.status(201).json({ 

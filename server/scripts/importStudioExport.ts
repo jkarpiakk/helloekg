@@ -34,6 +34,7 @@ import crypto from "node:crypto";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, pool } from "../db";
 import { users, modules, sections, lectureChapters, questions, courseDocuments } from "@shared/schema";
+import { obrazyPytania, kodStudia } from "@shared/brakObrazu";
 
 const dir = process.argv[2];
 const allPublished = process.argv.includes("--all-published");
@@ -362,10 +363,44 @@ async function sync(authorId: string) {
   }
   const { konflikty, ...liczby } = st;
   console.log("Synchronizacja:", JSON.stringify(liczby));
+  // Studio zatrzymało pytania, które kurs pokazałby bez obrazu (studio-v0.2, od 12.11): zostają w kursie wycofane
+  const pominiete: Array<{ externalId: string; typ: string; powody: string[] }> = manifest.pominiete ?? [];
+  if (pominiete.length) {
+    console.log(`ZATRZYMANE W STUDIU, bez obrazu (${pominiete.length}): nie wchodzą do kursu`);
+    for (const p of pominiete) console.log(`  ${p.externalId} (${p.typ}): ${p.powody.join("; ")}`);
+  }
   if (konflikty.length) {
     console.log(`KONFLIKTY puli (${konflikty.length}): pytanie z odpowiedziami w ćwiczeniach nie przechodzi do testu`);
     for (const k of konflikty) console.log(`  ${k}`);
   }
+}
+
+/**
+ * Kontrola po imporcie (zgłoszenie JK 11.11, Q-0040 bez paska): każde opublikowane pytanie, które ma
+ * obraz przypisany, ma adres pliku, a plik leży w CONTENT_ASSETS_DIR i nie jest pusty. Zwraca listę
+ * problemów; main kończy się wtedy kodem 3, więc synchronizacja zgłasza błąd.
+ */
+async function kontrolaObrazow(): Promise<string[]> {
+  const katalog = process.env.CONTENT_ASSETS_DIR;
+  const rows = await db.select({ tags: questions.tags, questionType: questions.questionType, imageUrl: questions.imageUrl, questionConfig: questions.questionConfig })
+    .from(questions).where(eq(questions.status, "published"));
+  const problemy: string[] = [];
+  let obrazow = 0;
+  for (const q of rows) {
+    for (const m of obrazyPytania(q)) {
+      obrazow++;
+      const kto = `${kodStudia(q.tags) ?? "(bez kodu)"} (${q.questionType ?? "multiple_choice"}, ${m.miejsce}${m.kod ? ` ${m.kod}` : ""})`;
+      if (!m.url) { problemy.push(`${kto}: brak imageUrl`); continue; }
+      if (!m.url.startsWith("/content-assets/")) { problemy.push(`${kto}: adres spoza /content-assets/: ${m.url}`); continue; }
+      if (!katalog) continue;
+      const plik = path.join(katalog, path.basename(m.url));
+      const st = fs.existsSync(plik) ? fs.statSync(plik) : null;
+      if (!st || st.size === 0) problemy.push(`${kto}: brak pliku ${m.url} w ${katalog}`);
+    }
+  }
+  console.log(`Kontrola obrazów: ${rows.length} opublikowanych pytań, ${obrazow} obrazów, problemów: ${problemy.length}${katalog ? "" : " (bez CONTENT_ASSETS_DIR: pliki niesprawdzone)"}`);
+  for (const p of problemy) console.log(`  BRAK OBRAZU ${p}`);
+  return problemy;
 }
 
 async function main() {
@@ -389,6 +424,7 @@ async function main() {
 
   if (!replaceAll) {
     await sync(author.id);
+    if (!dryRun && (await kontrolaObrazow()).length) process.exitCode = 3;
     await pool.end();
     return;
   }
@@ -450,6 +486,7 @@ async function main() {
 
   if (program) await db.transaction(async (tx) => zapiszProgram(tx));
   console.log("Import zakończony:", stats);
+  if ((await kontrolaObrazow()).length) process.exitCode = 3;
   await pool.end();
 }
 

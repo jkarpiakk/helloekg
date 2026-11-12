@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { HotspotConfig, AnswerData, QuizResult } from "@/types";
 import { DRAG_THRESHOLD } from "./gesture";
 import PartialScore from "./PartialScore";
+import { BrakObrazu, useBladObrazu } from "../BrakObrazu";
 
 interface HotspotQuestionProps {
   config: HotspotConfig;
@@ -65,6 +66,7 @@ export default function HotspotQuestion({
   // Celownik z klawiatury (strzałki przesuwają, Enter wskazuje); widoczny tylko przy fokusie z klawiatury
   const [aim, setAim] = useState<{ x: number; y: number } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const { zepsuty, onError: bladPlanszy } = useBladObrazu(config.imageUrl);
 
   const toPercent = (clientX: number, clientY: number) => {
     const rect = imageRef.current!.getBoundingClientRect();
@@ -235,6 +237,18 @@ export default function HotspotQuestion({
   const markerFor = (coord: { x: number; y: number }) =>
     config.hotspots.some((h) => h.isCorrect && isPointInHotspot(coord.x, coord.y, h));
 
+  // Plansza bez pliku albo plik nie wczytał się: bez niej nie da się odpowiedzieć
+  if (!config.imageUrl || zepsuty) {
+    return (
+      <BrakObrazu
+        stan={zepsuty ? "blad-ladowania" : "brak-adresu"}
+        miejsce="plansza"
+        kod={(config as { imageGfx?: string }).imageGfx}
+        url={zepsuty ? config.imageUrl : undefined}
+      />
+    );
+  }
+
   return (
     <div className="grid gap-4">
       <p className="text-[.9375rem] text-[var(--txt2)]">
@@ -272,6 +286,7 @@ export default function HotspotQuestion({
           alt="Zapis EKG do wskazania właściwego miejsca"
           draggable={false}
           className="block h-auto w-full"
+          onError={bladPlanszy}
           data-testid="hotspot-image"
         />
 

@@ -10,7 +10,7 @@
  * Kolory bierze ze zmiennych `--wz-*`, które ustawia host. Powiększenie też należy do hosta
  * (w kursie lightbox z przybliżaniem palcami).
  */
-import { useId } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import './wybor-zapisu.css';
 import { altZapisu, literaZapisu, type OpcjaZapisu } from './zrodlo';
 
@@ -30,12 +30,19 @@ export interface WyborZapisuProps {
   md: (tekst: string) => string;
   /** Pełny ekran z przybliżaniem. Nie zmienia zaznaczenia. */
   onPowieksz: (src: string, alt: string, zrodlo: HTMLElement) => void;
+  /**
+   * Zapis, który się nie wyświetla: brak adresu albo plik nie wczytał się. Domyślnie „Brak pliku
+   * zapisu” (studio); kurs podaje własną ramkę, która zgłasza brak automatycznie.
+   */
+  brakObrazu?: (o: OpcjaZapisu, stan: 'brak-adresu' | 'blad-ladowania') => ReactNode;
 }
 
 export function WyborZapisu({
-  opcje, wybrane, onZmiana, wielokrotny, zablokowane, pokazWynik, src, md, onPowieksz,
+  opcje, wybrane, onZmiana, wielokrotny, zablokowane, pokazWynik, src, md, onPowieksz, brakObrazu,
 }: WyborZapisuProps) {
   const idPodpowiedzi = useId();
+  /** id opcji → adres, który nie wczytał się (inny adres tej opcji próbuje od nowa) */
+  const [zepsute, setZepsute] = useState<Record<string, string>>({});
   const wybierz = (id: string) => {
     if (zablokowane) return;
     if (!wielokrotny) {
@@ -60,7 +67,9 @@ export function WyborZapisu({
           const bledny = pokazWynik && wybrany && !o.isCorrect;
           const przygaszony = pokazWynik && !poprawny && !bledny;
           const alt = altZapisu(o, i, pokazWynik);
-          const adres = src(o);
+          const zrodlo = src(o);
+          const zepsuty = !!zrodlo && zepsute[o.id] === zrodlo;
+          const adres = zepsuty ? undefined : zrodlo;
           return (
             <li
               key={o.id}
@@ -85,7 +94,12 @@ export function WyborZapisu({
               >
                 <span className="wz-litera" aria-hidden>{litera}</span>
                 {adres ? (
-                  <img className="wz-obraz" src={adres} alt={alt} loading="lazy" decoding="async" draggable={false} />
+                  <img
+                    className="wz-obraz" src={adres} alt={alt} loading="lazy" decoding="async" draggable={false}
+                    onError={() => setZepsute((z) => ({ ...z, [o.id]: adres }))}
+                  />
+                ) : brakObrazu ? (
+                  brakObrazu(o, zepsuty ? 'blad-ladowania' : 'brak-adresu')
                 ) : (
                   <span className="wz-brak" role="img" aria-label={alt}>Brak pliku zapisu</span>
                 )}
