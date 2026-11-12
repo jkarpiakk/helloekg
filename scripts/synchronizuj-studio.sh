@@ -29,7 +29,9 @@ URUCHOM="sudo systemd-run --quiet --uid=kurs --gid=kurs -p EnvironmentFile=/etc/
 if [ "$PROBA" = 1 ]; then
   $URUCHOM dist/import-studio.js "$K" --all-published --dry-run; KOD=$?
 else
-  sudo -u postgres pg_dump -Fc helloekg_kurs -f "/var/backups/helloekg-kurs/kurs-przed-sync-$CZAS.dump" || { echo "BŁĄD: kopia bazy"; exit 2; }
+  # katalog kopii należy do roota: zapis przez sudo tee (pipefail łapie błąd pg_dump)
+  sudo -u postgres pg_dump -Fc helloekg_kurs | sudo tee "/var/backups/helloekg-kurs/kurs-przed-sync-$CZAS.dump" >/dev/null \
+    && sudo test -s "/var/backups/helloekg-kurs/kurs-przed-sync-$CZAS.dump" || { echo "BŁĄD: kopia bazy"; exit 2; }
   echo "kopia: /var/backups/helloekg-kurs/kurs-przed-sync-$CZAS.dump"
   sudo rsync -a --ignore-existing "$K/assets/" /var/lib/helloekg-kurs/assets/ && sudo chown -R kurs:kurs /var/lib/helloekg-kurs/assets
   echo "== Import"
