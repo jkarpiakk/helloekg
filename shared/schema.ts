@@ -166,8 +166,14 @@ export const lectureChapters = pgTable("lecture_chapters", {
 // Drag & Drop configuration
 export interface DragDropConfig {
   sources: Array<{ id: string; content: string; label?: string; imageUrl?: string }>;
-  targets: Array<{ id: string; label: string; acceptsSourceId: string; imageUrl?: string }>;
+  /**
+   * acceptsSourceIds (studio, flaga dd_many): pole jest GRUPĄ, przyjmuje kilka kart naraz.
+   * Wtedy każda karta należy do dokładnie jednej grupy (shared/dragDropGrupy.ts).
+   */
+  targets: Array<{ id: string; label: string; acceptsSourceId: string; acceptsSourceIds?: string[]; imageUrl?: string }>;
   backgroundImageUrl?: string;
+  /** Tylko w konfiguracji wysłanej kursantowi: pytanie „do grup” (odpowiedzi usunięte) */
+  grupy?: boolean;
 }
 
 // Fill-in-the-blank configuration

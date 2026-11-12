@@ -86,6 +86,12 @@ function filledCount(question: QuizQuestion | undefined, answer: AnswerData | nu
   const a = answer as any;
   switch (cfg.type) {
     case "drag_drop": {
+      // „Do grup”: liczą się rozmieszczone karty, nie zajęte pola
+      if (cfg.config.grupy) {
+        const total = cfg.config.sources?.length ?? 0;
+        const filled = new Set((a?.placements ?? []).map((p: { sourceId: string }) => p.sourceId)).size;
+        return total > 1 ? { filled: Math.min(filled, total), total, noun: "elementów rozmieszczonych" } : null;
+      }
       const total = cfg.config.targets?.length ?? 0;
       const filled = new Set((a?.placements ?? []).map((p: { targetId: string }) => p.targetId)).size;
       return total > 1 ? { filled: Math.min(filled, total), total, noun: "miejsc wypełnionych" } : null;

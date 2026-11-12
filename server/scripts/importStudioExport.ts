@@ -77,8 +77,8 @@ const studioLectures: any[] = read("lectures.json");
 const studioQuestions: any[] = read("questions.json");
 const manifest = read("manifest.json");
 
-/** Rozszerzenia studia, które kurs już obsługuje — reszta zostaje szkicem */
-const SUPPORTED_EXTENSIONS = new Set(["clinical_case", "image_choice"]);
+/** Rozszerzenia studia, które kurs już obsługuje — reszta zostaje szkicem. dd_many = przeciąganie „do grup” (12.11) */
+const SUPPORTED_EXTENSIONS = new Set(["clinical_case", "image_choice", "dd_many"]);
 const unsupported = new Set<string>(
   (manifest.extensionsUsed ?? [])
     .filter((e: any) => !SUPPORTED_EXTENSIONS.has(e.ext))
@@ -87,14 +87,10 @@ const unsupported = new Set<string>(
 
 /**
  * Pytania wstrzymane do decyzji JK: w kursie szkic także przy --all-published.
- * Q-INT-03-HS-01 (D11): plik GFX-0408 już jest, ale strefy nie pasują do trzepotania 2:1 na obrazie.
- * Q-0197…Q-0213: szkice hotspot z pakietu „braki 74 + wybierz EKG” (8.11, plansze GFX-0531…0546).
- * Publikuje je dopiero akceptacja JK po weryfikatorze; wtedy usunąć wpis.
+ * Q-INT-03-HS-01 (D11): plik GFX-0408 już jest, ale strefy nie pasują do trzepotania 2:1 na obrazie
+ * (kursant dostałby złą ocenę). Q-0197…Q-0213 opublikowane w becie decyzją JK 12.11.
  */
-const WSTRZYMANE = new Set([
-  "Q-INT-03-HS-01",
-  ...Array.from({ length: 17 }, (_, i) => `Q-${String(197 + i).padStart(4, "0")}`),
-]);
+const WSTRZYMANE = new Set(["Q-INT-03-HS-01"]);
 
 const ASSET_RE = /(^|[("'\s])assets\/([0-9a-f]{64}\.[a-z0-9]+)/g;
 /**
@@ -186,9 +182,8 @@ function questionRow(q: any, i: number, sectionId: string | undefined, authorId:
         let ok = !unsupported.has(q.externalId);
         // Pytania z interaktywną wstawką studia (::wstawka → bodyMdApp z data-widget) zostają szkicem,
         // dopóki kurs nie umie jej narysować — inaczej kursant zobaczyłby pytanie bez kardiomonitora
-        // Monitor w treści (::wstawka) kurs rysuje od 27.10 (WstawkaOtwarta). Szkicem zostają pytania
-        // z tagiem kardiomonitor (bank drugiej sesji, Q-0001…Q-0028) — czekają na decyzję JK.
-        if ((q.tags ?? []).includes("kardiomonitor")) ok = false;
+        // Monitor w treści (::wstawka) kurs rysuje od 27.10 (WstawkaOtwarta). Pytania z tagiem
+        // kardiomonitor (bank drugiej sesji, Q-0001…Q-0028) w becie od decyzji JK 12.11.
         // Archiwum (bank Q-N, decyzja JK 22.10): w kursie szkic, odpowiedzi testerów zostają
         if ((q.tags ?? []).includes("ARCHIWUM")) ok = false;
         if (WSTRZYMANE.has(q.externalId)) ok = false;

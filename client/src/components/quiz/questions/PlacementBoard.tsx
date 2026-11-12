@@ -10,6 +10,10 @@
  * - puszczenie nad miejscem: element „wpada” do niego sprężyną z prędkością gestu (FLIP z bieżącej pozycji),
  * - puszczenie poza miejscem: wraca tą samą prostą, którą przyszedł, niosąc składową prędkości.
  * Alternatywa bez gestu (dotyk / klawiatura): wybierz element, potem miejsce — lub odwrotnie.
+ *
+ * Tryb „grupy” (`grupy`): miejsce jest grupą i przyjmuje kilka elementów (przeciąganie „do grup”,
+ * studio: acceptsSourceIds). Wtedy `placements` to elementId -> miejsceId, a wynik pokazuje się
+ * przy każdym elemencie (`pieceResults`), nie przy miejscu.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
@@ -48,7 +52,14 @@ export interface BoardSlot {
   correctText?: string;
 }
 
-type Placements = Record<string, string>; // slotId -> pieceId
+/** Tryb „grupy”: wynik jednego elementu po sprawdzeniu */
+export interface PieceResult {
+  result: "right" | "wrong";
+  /** Przy błędzie: nazwa właściwej grupy */
+  correctText?: string;
+}
+
+type Placements = Record<string, string>; // slotId -> pieceId (w trybie „grupy”: pieceId -> slotId)
 type Selection = { kind: "piece" | "slot"; id: string } | null;
 type Flip = { cx: number; cy: number; vx: number; vy: number; lifted: boolean; thrown: boolean };
 
@@ -68,6 +79,10 @@ interface PlacementBoardProps {
   slotsTestId?: string;
   /** Na szerokim ekranie pula po prawej (np. kolumna B przy dopasowaniu) */
   poolLast?: boolean;
+  /** Miejsce przyjmuje kilka elementów; placements = pieceId -> slotId */
+  grupy?: boolean;
+  /** Tryb „grupy”, po sprawdzeniu: wynik każdego elementu */
+  pieceResults?: Record<string, PieceResult>;
 }
 
 const POOL = "__pool__";
@@ -86,6 +101,8 @@ export default function PlacementBoard({
   poolTestId,
   slotsTestId,
   poolLast = false,
+  grupy = false,
+  pieceResults,
 }: PlacementBoardProps) {
   const [selection, setSelection] = useState<Selection>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -116,10 +133,12 @@ export default function PlacementBoard({
     }
   }, [disabled]);
 
-  const placedIn = useCallback(
-    (pieceId: string) => Object.keys(placements).find((k) => placements[k] === pieceId) ?? null,
-    [placements],
-  );
+  // Jeden widok na oba tryby: element -> miejsce
+  const where: Record<string, string> = grupy
+    ? placements
+    : Object.fromEntries(Object.entries(placements).map(([slotId, pieceId]) => [pieceId, slotId]));
+  const placedIn = (pieceId: string): string | null => where[pieceId] ?? null;
+  const inSlot = (slotId: string) => pieces.filter((p) => where[p.id] === slotId);
 
   /** Zapamiętaj, gdzie każdy element jest teraz na ekranie — po zmianie układu poleci stąd */
   const snapshot = (moved?: { id: string; vx: number; vy: number; lifted: boolean }) => {
@@ -143,18 +162,25 @@ export default function PlacementBoard({
     dest: string,
     gesture?: { vx: number; vy: number; lifted: boolean },
   ): boolean => {
-    const next: Placements = { ...placements };
     const from = placedIn(pieceId);
-    if (dest === POOL) {
-      if (!from) return false;
-      delete next[from];
+    if (dest === POOL ? !from : from === dest) return false;
+    let next: Placements;
+    if (grupy) {
+      // Grupa przyjmuje każdy element; nikt nie wraca do puli
+      next = { ...placements };
+      if (dest === POOL) delete next[pieceId];
+      else next[pieceId] = dest;
     } else {
-      if (from === dest) return false;
-      const occupant = next[dest];
-      if (from) delete next[from];
-      // Zamiana miejscami, gdy element przyszedł z innego miejsca; inaczej poprzedni wraca do puli
-      if (occupant && occupant !== pieceId && from) next[from] = occupant;
-      next[dest] = pieceId;
+      next = { ...placements };
+      if (dest === POOL) {
+        delete next[from!];
+      } else {
+        const occupant = next[dest];
+        if (from) delete next[from];
+        // Zamiana miejscami, gdy element przyszedł z innego miejsca; inaczej poprzedni wraca do puli
+        if (occupant && occupant !== pieceId && from) next[from] = occupant;
+        next[dest] = pieceId;
+      }
     }
     snapshot(gesture ? { id: pieceId, ...gesture } : undefined);
     onPlacementsChange(next);
@@ -228,7 +254,8 @@ export default function PlacementBoard({
     <Piece
       key={piece.id}
       piece={piece}
-      state={state}
+      state={state ?? pieceResults?.[piece.id]?.result}
+      correctText={pieceResults?.[piece.id]?.result === "wrong" ? pieceResults[piece.id].correctText : undefined}
       disabled={disabled}
       selected={selection?.kind === "piece" && selection.id === piece.id}
       testId={pieceTestId?.(piece.id)}
@@ -293,11 +320,11 @@ export default function PlacementBoard({
           <p className="label mb-3">{slotsLabel}</p>
           <ul className="grid gap-4">
             {slots.map((slot) => {
-              const occupantId = placements[slot.id];
-              const occupant = occupantId ? pieceById(occupantId) : undefined;
+              const occupants = inSlot(slot.id);
+              const occupant = grupy ? undefined : occupants[0];
               const isHover = hover === slot.id;
               const isSelected = selection?.kind === "slot" && selection.id === slot.id;
-              const awaiting = !disabled && (selection?.kind === "piece" || draggingId) && !occupant;
+              const awaiting = !disabled && (selection?.kind === "piece" || draggingId) && (grupy || !occupant);
               return (
                 <li key={slot.id} className="grid gap-2">
                   <div className="flex items-center gap-3 text-sub leading-snug text-[var(--txt)]">
@@ -327,6 +354,7 @@ export default function PlacementBoard({
                     data-testid={slotTestId?.(slot.id)}
                     className={cn(
                       "relative flex min-h-[60px] items-stretch gap-2 rounded-lg border p-1.5 transition-[border-color,background-color] duration-200",
+                      grupy && "flex-col",
                       slot.result === "right" && "border-[var(--puls-deep)] bg-[var(--tint)]",
                       slot.result === "wrong" && "border-[color-mix(in_srgb,var(--alarm)_55%,transparent)]",
                       !slot.result && (isHover || isSelected)
@@ -335,7 +363,47 @@ export default function PlacementBoard({
                       !slot.result && awaiting && !isHover && "border-[var(--txt4)]",
                     )}
                   >
-                    {occupant ? (
+                    {grupy ? (
+                      <>
+                        {occupants.map((p) => (
+                          <div key={p.id} className="flex items-stretch gap-2">
+                            <div className="min-w-0 flex-1">{renderPiece(p)}</div>
+                            {!disabled && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  move(p.id, POOL);
+                                  setSelection(null);
+                                }}
+                                className="grid w-11 shrink-0 place-items-center rounded-sm text-[var(--label)] transition-[color,transform] duration-150 hover:text-[var(--txt)] active:scale-[.94]"
+                                aria-label={`Odłóż „${p.content}” z powrotem`}
+                                data-testid={`remove-btn-${p.id}`}
+                              >
+                                <Undo2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        {!disabled ? (
+                          <button
+                            type="button"
+                            onClick={() => onSlotTap(slot.id)}
+                            aria-pressed={isSelected}
+                            aria-label={`Grupa: ${slot.label}. ${selectedPiece ? `Wstaw „${selectedPiece.content}”.` : `${occupants.length} w grupie.`}`}
+                            className={cn(
+                              "flex min-h-[44px] items-center justify-center rounded-sm px-3 text-ui text-[var(--txt2)] transition-colors duration-200 hover:text-[var(--txt)]",
+                              occupants.length > 0 && "border border-dashed border-[var(--line)]",
+                            )}
+                          >
+                            {selectedPiece ? "Wstaw tutaj" : occupants.length ? "Upuść tu kolejny" : "Upuść tutaj"}
+                          </button>
+                        ) : (
+                          occupants.length === 0 && (
+                            <p className="flex min-h-[44px] items-center justify-center px-3 text-ui text-[var(--txt2)]">Puste</p>
+                          )
+                        )}
+                      </>
+                    ) : occupant ? (
                       <>
                         <div className="min-w-0 flex-1">{renderPiece(occupant, slot.result)}</div>
                         {!disabled && (
@@ -385,7 +453,9 @@ export default function PlacementBoard({
             ? `Wybrano „${selectedPiece.content}”. Wskaż miejsce${placedIn(selectedPiece.id) ? " albo dotknij pulę, aby odłożyć" : ""}.`
             : selectedSlot
               ? `Wybrano miejsce „${selectedSlot.label}”. Wskaż element.`
-              : "Przeciągnij element (za uchwyt albo po przytrzymaniu) lub dotknij go, a potem miejsce."}
+              : grupy
+                ? "Przeciągnij każdy element do jego grupy (za uchwyt albo po przytrzymaniu) lub dotknij go, a potem grupę. Grupa mieści kilka elementów."
+                : "Przeciągnij element (za uchwyt albo po przytrzymaniu) lub dotknij go, a potem miejsce."}
         </p>
       )}
     </div>
@@ -397,6 +467,8 @@ export default function PlacementBoard({
 interface PieceProps {
   piece: BoardPiece;
   state?: "right" | "wrong";
+  /** Tryb „grupy”, przy błędzie: właściwa grupa */
+  correctText?: string;
   disabled: boolean;
   selected: boolean;
   testId?: string;
@@ -412,6 +484,7 @@ interface PieceProps {
 function Piece({
   piece,
   state,
+  correctText,
   disabled,
   selected,
   testId,
@@ -666,7 +739,15 @@ function Piece({
           className="h-10 w-10 shrink-0 rounded-sm border border-[var(--line)] object-cover"
         />
       )}
-      <span className="min-w-0 flex-1">{piece.content}</span>
+      <span className="min-w-0 flex-1">
+        {piece.content}
+        {correctText && (
+          <span className="mt-1 block text-ui text-[var(--txt2)]">
+            <span className="label mr-2">Poprawnie</span>
+            {correctText}
+          </span>
+        )}
+      </span>
       {state === "right" && <Check className="h-4 w-4 shrink-0 text-[var(--puls)]" aria-label="Poprawnie" />}
       {state === "wrong" && <X className="h-4 w-4 shrink-0 text-[var(--alarm)]" aria-label="Błędnie" />}
     </motion.button>

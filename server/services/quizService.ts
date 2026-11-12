@@ -16,6 +16,7 @@ import type {
   QuestionMediaAssets
 } from "@shared/schema";
 import { gradeImageChoice, kolejnoscOpcji, poprawnaOdpowiedzZapisow } from "@shared/wyborZapisu";
+import { czyGrupy, grupaKarty, ocenGrupy } from "@shared/dragDropGrupy";
 import {
   gradeClinicalCase,
   buildClinicalCaseCorrectAnswer,
@@ -140,6 +141,8 @@ export class QuizService {
   // correctItems/incorrectItems = identyfikatory CELÓW (tak oznacza je DragDropQuestion).
   // Cel bez elementu też jest błędny; poprawne = każdy cel ma właściwy element.
   validateDragDropAnswer(config: DragDropConfig, answer: { type: 'drag_drop'; placements: Array<{ sourceId: string; targetId: string }> }): { isCorrect: boolean; partialScore: number; correctItems: string[]; incorrectItems: string[] } {
+    // Pytanie „do grup” (pole przyjmuje kilka kart): ocena po kartach, shared/dragDropGrupy.ts
+    if (czyGrupy(config)) return ocenGrupy(config, answer.placements);
     const correctItems: string[] = [];
     const incorrectItems: string[] = [];
     const placements = Array.isArray(answer.placements) ? answer.placements : [];
@@ -721,7 +724,9 @@ export class QuizService {
             ...c.config,
             // Kolejność źródeł bywa zgodna z kolejnością celów
             sources: this.shuffleArray(c.config.sources),
-            targets: c.config.targets.map(t => ({ ...t, acceptsSourceId: "" })),
+            // acceptsSourceIds zdradza grupy — zostaje tylko znacznik trybu
+            targets: c.config.targets.map(({ acceptsSourceIds: _grupa, ...t }) => ({ ...t, acceptsSourceId: "" })),
+            ...(czyGrupy(c.config) ? { grupy: true } : {}),
           },
         };
       case 'fill_blank':
@@ -872,10 +877,12 @@ export class QuizService {
       case 'drag_drop':
         return {
           type: 'drag_drop',
-          placements: config.config.targets.map(t => ({
-            sourceId: t.acceptsSourceId,
-            targetId: t.id
-          }))
+          placements: czyGrupy(config.config)
+            ? Array.from(grupaKarty(config.config), ([sourceId, targetId]) => ({ sourceId, targetId }))
+            : config.config.targets.map(t => ({
+                sourceId: t.acceptsSourceId,
+                targetId: t.id
+              }))
         };
       case 'fill_blank':
         return {
