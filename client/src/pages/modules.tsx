@@ -96,9 +96,11 @@ export default function Modules() {
     // Postęp zmienia się po każdym quizie — przy wejściu na ekran zawsze dociągnij świeży
     refetchOnMount: "always",
   });
-  // Szkolenie z punktami: link na górze, gdy zapisy działają (albo podgląd zespołu)
+  // Szkolenie z punktami: link na górze, etykiety modułów i strony modułów tylko przy włączonym
+  // szkoleniu. Zespół przy wyłączonym też go tu nie widzi (decyzja JK 12.11: „schowaj na razie”);
+  // podgląd zostaje pod /szkolenie i w panelu admina.
   const { data: szkolenie } = useSzkolenie(isAuthenticated);
-  const pokazSzkolenie = czyStan(szkolenie);
+  const pokazSzkolenie = czyStan(szkolenie) && szkolenie.wlaczone;
   // Miękka kolejność kursu: ten sam „Następny krok” co na Postępie
   const nextId = nextStep(courseItems(modules as unknown as OrderModule[] | undefined))?.section.id;
 
