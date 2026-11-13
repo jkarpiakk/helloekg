@@ -169,6 +169,7 @@ export default function ClinicalCaseQuestion({
           className="group relative block w-full overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--ink)] transition-[transform,border-color] duration-200 ease-out hover:border-[var(--line2)] active:scale-[.99]"
           aria-label="Powiększ zapis EKG przypadku"
           data-testid="case-image"
+          data-scena="przypadek"
         >
           <img src={imageUrl} alt="Zapis EKG przypadku" className="block max-h-[60vh] w-full object-contain" onError={bladZapisu} />
           <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-meta text-[var(--txt2)]">

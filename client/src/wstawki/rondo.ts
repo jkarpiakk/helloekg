@@ -4,7 +4,7 @@
  *
  * Opcje: etap=fala|warunki|zapalnik, tryb=cwiczenie.
  */
-import { C, TRYB_SPRAWDZ, TRYB_UCZ, button, chips, exercise, h, loop, options, reducedMotion, s, setA, shell, shuffle, spring, type Spring, type WstawkaOpts } from './core/ui.js';
+import { C, TRYB_SPRAWDZ, TRYB_UCZ, button, chips, exercise, h, loop, options, reducedMotion, s, setA, shell, shuffle, spring, uklad, type Spring, type WstawkaOpts } from './core/ui.js';
 import { svgNaRastrze } from './core/obrazy.js';
 import { kardiomonitor, type Kardiomonitor, type Scenariusz } from './core/kardiomonitor.js';
 import { pComps, vBeat } from './core/rytm.js';
@@ -372,12 +372,12 @@ export function mountRondo(host: HTMLElement, opts: WstawkaOpts): () => void {
   const powrotCh = chips([{ v: 'wolny', label: 'Powrót po 300 ms' }, { v: 'szybki', label: 'Powrót po 200 ms' }] as const, powrot, (v) => { powrot = v; restart(true); live(`${v === 'wolny' ? 'Powrót po 300 ms' : 'Powrót po 200 ms'}.`); }, { label: 'Czas powrotu fali', small: true });
   const warCh = chips((Object.keys(WARUNKI) as Warunek[]).map((k) => ({ v: k, label: WARUNKI[k].label })), warunek, (v) => { warunek = v; restart(true); live(`Warunki: ${WARUNKI[v].label}.`); }, { label: 'Które warunki są spełnione', small: true });
   const przyciski = h('div', { class: 'hw-row', style: 'gap:8px;align-items:center;flex-wrap:wrap' }, glowny, odNowa, pauza);
-  const panelUcz = h('div', { class: 'hw-grid', style: 'gap:12px' }, etapCh.el, powrotCh.el, warCh.el, status, przyciski);
+  const panelUcz = h('div', { class: 'hw-grid', style: 'gap:12px' }, powrotCh.el, warCh.el, status, przyciski);
   const modeCh = chips([{ v: 'ucz', label: TRYB_UCZ }, { v: 'task', label: TRYB_SPRAWDZ }] as const, task ? 'task' : 'ucz', (v) => { task = v === 'task'; ustaw(); }, { label: 'Tryb wstawki' });
 
   function ustaw() {
     const zap = etap === 'zapalnik' && !task;
-    panelUcz.hidden = task; ex.el.hidden = !task; glowny.hidden = false;
+    panelUcz.hidden = task; etapCh.el.hidden = task; ex.el.hidden = !task; glowny.hidden = false;
     powrotCh.el.hidden = etap !== 'fala'; warCh.el.hidden = etap !== 'warunki';
     monBox.hidden = !zap; notaMon.hidden = !zap;
     pauza.hidden = zap; odNowa.hidden = !zap;
@@ -406,12 +406,20 @@ export function mountRondo(host: HTMLElement, opts: WstawkaOpts): () => void {
   });
   cleanups.push(() => lp.stop());
 
-  body.append(
-    h('div', { class: 'hw-bar' }, modeCh.el),
-    h('div', { class: 'hw-2col hw-2col--wide-l', style: 'align-items:start' },
-      h('div', { class: 'hw-grid', style: 'gap:10px' }, scena, monBox, notaMon, os),
-      h('div', { class: 'hw-grid' }, panelUcz, ex.el)),
-  );
+  // scena: rondo, a pod nim kardiomonitor i oś czasu; na telefonie na pełnym ekranie przypięte zostaje samo rondo
+  const podRondem = h('div', { class: 'hw-grid', style: 'gap:10px' }, monBox, notaMon, os);
+  const podRondemSlot = h('div', { hidden: true });
+  body.append(uklad({
+    gora: [h('div', { class: 'hw-bar' }, modeCh.el), etapCh.el],
+    scena: [scena, podRondem],
+    ster: [podRondemSlot, panelUcz, ex.el],
+    dwieKolumny: true,
+    naWaskim: (waski) => {
+      // puste gniazdo ukryte, żeby nie dokładało odstępu w siatce
+      podRondemSlot.hidden = !waski;
+      if (waski) podRondemSlot.append(podRondem); else scena.after(podRondem);
+    },
+  }));
   ustaw();
   return () => {
     cleanups.forEach((f) => f());

@@ -6,7 +6,7 @@
  *
  * Opcje: tryb=vvi | aai | ddd | usterki | icd | cwiczenie (domyślnie konsola VVI 60/min, własny rytm 50/min).
  */
-import { C, TRYB_SPRAWDZ, TRYB_UCZ, button, chips, exercise, fmtNum, h, options, reducedMotion, shell, shuffle, slider, trace, type WstawkaOpts } from './core/ui.js';
+import { C, TRYB_SPRAWDZ, TRYB_UCZ, button, chips, exercise, fmtNum, h, options, reducedMotion, shell, shuffle, slider, trace, uklad, type WstawkaOpts } from './core/ui.js';
 import { Strip, monitor, pComps, playToggle, vBeat, type Background, type MonitorMap } from './core/rytm.js';
 import type { Beat, V3 } from './core/model.js';
 import {
@@ -22,7 +22,8 @@ type Tryby = 'konsola' | 'usterki' | 'icd' | 'cwiczenie';
 type Temat = Exclude<Tryby, 'cwiczenie'>;
 
 /** Styl lokalny: małe chipy też mają cel dotyku 44 px, długie etykiety się łamią zamiast wychodzić poza ekran. */
-const CSS = `.stym .hw-chip--sm{min-height:44px}.stym .hw-chip{white-space:normal;line-height:1.2;text-align:center}`;
+const CSS = `.stym .hw-chip--sm{min-height:44px}.stym .hw-chip{white-space:normal;line-height:1.2;text-align:center}
+.stym .stym-panele{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}`;
 let styled = false;
 function ensureLocalStyle(): void {
   if (styled || typeof document === 'undefined') return;
@@ -483,14 +484,17 @@ export function mountStymulator(host: HTMLElement, opts: WstawkaOpts): () => voi
   const tematCh = chips([{ v: 'konsola', label: 'Konsola' }, { v: 'usterki', label: 'Usterki' }, { v: 'icd', label: 'ICD: strażak' }] as const,
     temat, (v) => setMode(v), { label: 'Temat' });
 
-  body.append(
-    h('div', { class: 'hw-bar' }, modeCh.el, play),
-    tematCh.el,
-    icdScena, screen, legend, tags,
-    exPanel, ustPanel, icdPanel,
-    h('div', { class: 'hw-2col', style: 'align-items:start' }, prog, pacPanel),
-    whyP,
-  );
+  // Scena (zapis i odczyty) zostaje na widoku, gdy zmieniasz programator (prośba JK 13.11)
+  const legendSlot = h('div', {});
+  body.append(uklad({
+    gora: [h('div', { class: 'hw-bar' }, modeCh.el, play), tematCh.el, icdScena],
+    scena: [screen, tags, legend],
+    ster: [legendSlot, exPanel, ustPanel, icdPanel,
+      h('div', { class: 'hw-grid stym-panele', style: 'align-items:start;gap:16px' }, prog, pacPanel),
+      whyP],
+    // telefon na pełnym ekranie: legenda (sześć wierszy) pod scenę, żeby zapis z odczytami zmieścił się u góry
+    naWaskim: (waski) => { if (waski) legendSlot.append(legend); else screen.parentElement?.append(legend); },
+  }));
 
   function syncControls() {
     trybCh.set(ust.tryb); dolnaSl.set(ust.dolna); ampSl.set(ust.amplituda); czulCh.set(String(ust.czulosc) as '1' | '2');

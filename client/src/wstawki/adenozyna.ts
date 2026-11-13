@@ -8,7 +8,7 @@
  *
  * Pokazujemy zjawisko diagnostyczne, nie instrukcję leczenia: bez dawek, bez algorytmu.
  */
-import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, exercise, h, loop, options, paper, reducedMotion, s, setA, shell, shuffle, surface, trace, type Surface, type WstawkaOpts } from './core/ui.js';
+import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, exercise, h, loop, options, paper, reducedMotion, s, setA, shell, shuffle, surface, trace, uklad, type Surface, type WstawkaOpts } from './core/ui.js';
 import { scenaPrzenikana } from './core/obrazy.js';
 import { tor } from './core/dzwiek.js';
 import { Strip, bgFlutter, monitor, pComps, playToggle, vBeat, type Monitor, type StripEvent } from './core/rytm.js';
@@ -221,15 +221,25 @@ export function mountAdenozyna(host: HTMLElement, opts: WstawkaOpts): () => void
   });
   ex.miejsce.append(opt.el);
 
-  const left = h('div', { class: 'hw-stack' }, scr, h('div', { class: 'ade-ctrl' }, leadChips.el, playBtn), actions, actNote);
-  const right = h('div', { class: 'hw-stack' }, schBox, info);
-  body.append(
-    h('div', { class: 'hw-bar' }, modeChips.el),
-    h('div', { class: 'hw-bar' }, rytmChips.el),
-    h('div', { class: 'hw-2col hw-2col--wide-l', style: 'align-items:start' }, left, right),
-    printWrap,
-    ex.el,
-  );
+  // scena: monitor (i wydruk przy dwóch kolumnach) zostaje na widoku, gdy wybierasz próbę
+  const ctrlRow = h('div', { class: 'ade-ctrl' }, leadChips.el, playBtn);
+  const pe = uklad({
+    gora: [h('div', { class: 'hw-bar' }, modeChips.el), h('div', { class: 'hw-bar' }, rytmChips.el)],
+    scena: [scr, ctrlRow],
+    ster: [actions, actNote, printWrap, schBox, info, ex.el],
+    dwieKolumny: true,
+    naWaskim: () => ustawWydruk(),
+  });
+  body.append(pe);
+  /** Wydruk: przy dwóch kolumnach pod monitorem (szerzej), w jednej kolumnie pod przyciskami prób. */
+  function ustawWydruk() {
+    const dwie = getComputedStyle(pe).gridTemplateColumns.trim().split(/\s+/).length > 1;
+    const po = dwie ? ctrlRow : actNote;
+    if (printWrap.previousElementSibling !== po) po.after(printWrap);
+  }
+  const roPe = typeof ResizeObserver === 'function' ? new ResizeObserver(() => ustawWydruk()) : null;
+  roPe?.observe(pe);
+  cleanups.push(() => roPe?.disconnect());
 
   /* ─────────── logika ─────────── */
   function paintLead() { leadOut.textContent = `Odprowadzenie ${lead} · 25 mm/s`; printLabel.textContent = `Wydruk z chwili zwolnienia · ${lead}`; }

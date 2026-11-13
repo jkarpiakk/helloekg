@@ -7,7 +7,7 @@
  * Opcje: rytm=vf | vf-grube | vf-drobne | vt | vt-wielo | asystolia | pea | pea-waskie | pea-szerokie | artefakt | odlaczona,
  *        tryb=cwiczenie.
  */
-import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, exercise, h, options, reducedMotion, shell, trace, type WstawkaOpts } from './core/ui.js';
+import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, exercise, h, options, reducedMotion, shell, trace, uklad, type WstawkaOpts } from './core/ui.js';
 import { Strip, monitor, pComps, playToggle, vBeat, type MonitorMap } from './core/rytm.js';
 import { type Beat, type Comp, type LeadName, type V3 } from './core/model.js';
 import { tor } from './core/dzwiek.js';
@@ -138,7 +138,7 @@ export function mountNzk(host: HTMLElement, opts: WstawkaOpts): () => void {
   const feed = (now: number) => {
     const until = now + 0.6;
     for (const u of uderzenia(rytm, gen, until)) {
-      const beat = u.kind === 'vt' ? BEAT_VT : u.kind === 'vent' ? BEAT_V : u.kind === 'poly' ? POLY[u.k % POLY.length]! : BEAT_N;
+      const beat = u.kind === 'vt' ? BEAT_VT : u.kind === 'vent' ? BEAT_V : u.kind === 'poly' ? POLY[((u.k % POLY.length) + POLY.length) % POLY.length]! : BEAT_N;
       if (u.kind === 'n') strip.add({ kind: 'P', at: u.at - 0.16, comps: P_N });
       strip.add({ kind: 'QRS', at: u.at, beat });
       beatsAt.push(u.at);
@@ -276,14 +276,17 @@ export function mountNzk(host: HTMLElement, opts: WstawkaOpts): () => void {
   metBtn.addEventListener('click', () => { const on = !metIv; metronom(on); live(on ? 'Metronom włączony, 110 na minutę.' : 'Metronom wyłączony.'); });
 
   const modeCh = chips([{ v: 'zobacz', label: TRYB_UCZ }, { v: 'zadanie', label: TRYB_SPRAWDZ }] as const, mode, (v) => setMode(v), { label: 'Tryb wstawki' });
-  body.append(
-    h('div', { class: 'hw-bar' }, modeCh.el, h('div', { class: 'hw-row', style: 'gap:8px' }, metBtn, play)),
-    rytmCh.el,
-    h('div', { class: 'hw-2col hw-2col--wide-l', style: 'align-items:start' },
-      h('div', { class: 'hw-grid' }, screen, tools, h('p', { class: 'hw-note', text: 'Częstość i wysokość fal są poglądowe. Patrz na kształt, powtarzalność i pacjenta.' })),
-      patient),
-    read, exPanel,
-  );
+  // scena: monitor z narzędziami pod nim zostaje na widoku przy zmianie rytmu i w ćwiczeniu
+  const nota = h('p', { class: 'hw-note', text: 'Częstość i wysokość fal są poglądowe. Patrz na kształt, powtarzalność i pacjenta.' });
+  const notaSlot = h('div', {});
+  body.append(uklad({
+    gora: [h('div', { class: 'hw-bar' }, modeCh.el, h('div', { class: 'hw-row', style: 'gap:8px' }, metBtn, play)), rytmCh.el],
+    scena: [screen, tools, nota],
+    ster: [notaSlot, patient, read, exPanel],
+    dwieKolumny: true,
+    // telefon na pełnym ekranie: nota pod scenę, żeby monitor z narzędziami był niski
+    naWaskim: (waski) => { if (waski) notaSlot.append(nota); else tools.after(nota); },
+  }));
 
   function paint() {
     const r = RYTMY[rytm];

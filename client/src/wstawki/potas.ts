@@ -8,7 +8,7 @@
  *
  * Stężenie potasu nie ma wzoru na kształt EKG: suwak skacze między obrazami (przenikanie 0,4 s), bez morfingu.
  */
-import { C, TRYB_SPRAWDZ, TRYB_UCZ, button, chips, clamp, exercise, h, options, paper, reducedMotion, shell, shuffle, slider, surface, trace, type Surface, type WstawkaOpts } from './core/ui.js';
+import { C, TRYB_SPRAWDZ, TRYB_UCZ, button, chips, clamp, exercise, h, options, paper, reducedMotion, shell, shuffle, slider, surface, trace, uklad, type Surface, type WstawkaOpts } from './core/ui.js';
 import { volt, type Beat, type LeadName } from './core/model.js';
 import { twelve } from './core/dwunastka.js';
 import { CECHY, KOLEJNOSC, KOLEJNOSC_CWICZENIA, ODPROWADZENIA, STANY, miejscaCech, ocenKolejnosc, pobudzenie, werdyktKolejnosci, werdyktRozpoznania, type StanK } from './potas.dane.js';
@@ -126,7 +126,7 @@ export function mountPotas(host: HTMLElement, opts: WstawkaOpts): () => void {
   const widokChips = chips([{ v: '1', label: 'Jedno odprowadzenie' }, { v: '12', label: '12 odprowadzeń' }] as const, st.widok, (v) => {
     st.widok = v; syncWidok(); redraw(false); pojaw(st.widok === '1' ? strip : box12);
   }, { label: 'Widok', small: true });
-  body.append(h('div', { class: 'hw-bar' }, trybChips.el, widokChips.el));
+  const bar = h('div', { class: 'hw-bar' }, trybChips.el, widokChips.el);
 
   const sl = slider({
     label: 'Potas', min: 0, max: KOLEJNOSC.length - 1, step: 1, value: KOLEJNOSC.indexOf(st.stan),
@@ -136,7 +136,6 @@ export function mountPotas(host: HTMLElement, opts: WstawkaOpts): () => void {
   const ends = h('div', { class: 'hw-ka-ends', 'aria-hidden': 'true' }, h('span', { text: '← niższy potas' }), h('span', { text: 'wyższy potas →' }));
   const leadChips = chips(ODPROWADZENIA.map((l) => ({ v: l, label: l })), st.lead, (v) => { st.lead = v; redraw(true); live(`Odprowadzenie ${v}.`); }, { label: 'Odprowadzenie', small: true });
   const ctl = h('div', { class: 'hw-grid' }, h('div', {}, sl.el, ends), leadChips.el);
-  body.append(ctl);
 
   /* ─────────── pasek ─────────── */
   const mLead = h('span', {}), mState = h('b', {});
@@ -144,9 +143,8 @@ export function mountPotas(host: HTMLElement, opts: WstawkaOpts): () => void {
   const stripWrap = h('div', { class: 'hw-ka-wrap' });
   strip.append(stripWrap);
   const box12 = h('div', { class: 'hw-ka-wrap' });
-  // scena: pasek, 12 odprowadzeń i opis; w „Sprawdź się” idzie pod polecenie (ex.miejsce)
+  // scena: pasek albo 12 odprowadzeń; zostaje na miejscu w obu trybach
   const stage = h('div', { class: 'hw-stack' }, strip, box12);
-  body.append(stage);
 
   let S: Surface | null = null;
   let geo = { mm: 5, yBase: 100, top: 40, H: 200 };
@@ -222,7 +220,6 @@ export function mountPotas(host: HTMLElement, opts: WstawkaOpts): () => void {
   const why = h('p', { class: 'hw-why' });
   const pearl = h('p', { class: 'hw-pearl', html: '<span class="hw-label">Zastrzeżenie</span>Zmiany nie zawsze pojawiają się w tej kolejności, a prawidłowy zapis może towarzyszyć nawet ciężkiej hiperkaliemii. Z wysokości T nie odczytasz stężenia potasu: oznacz potas.' });
   const read = h('div', { class: 'hw-read' }, big, list, why, pearl);
-  stage.append(read);
 
   function texts() {
     const s0 = STANY[st.stan];
@@ -336,7 +333,8 @@ export function mountPotas(host: HTMLElement, opts: WstawkaOpts): () => void {
     },
     live,
   });
-  body.append(ex.el);
+  // opis pod ćwiczeniem, żeby po „Sprawdź” przyciski nie uciekały w dół
+  body.append(uklad({ gora: [bar], scena: [stage], ster: [ctl, ex.el, read] }));
 
   function drawThumb(x: Surface, s0: StanK) {
     const { ctx, w, h: H } = x;
@@ -369,12 +367,11 @@ export function mountPotas(host: HTMLElement, opts: WstawkaOpts): () => void {
     widokChips.disable(m === 'task');
     ex.el.hidden = m !== 'task';
     if (m === 'task') {
-      ex.miejsce.replaceChildren(stage, exBox);
+      ex.miejsce.replaceChildren(exBox);
       ex.start();
       if (anim) pojaw(ex.el);
     } else {
       clearThumbs(); exBox.replaceChildren(); st.cechy = true; read.hidden = false;
-      ctl.after(stage);
       st.stan = KOLEJNOSC[sl.value] ?? 'norma';
       st.widok = widokChips.value; syncWidok(); redraw(false);
       if (anim) pojaw(stage);

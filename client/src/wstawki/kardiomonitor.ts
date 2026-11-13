@@ -6,7 +6,7 @@
  * żeby nie zdradzać odpowiedzi), pytanie=odkryte (po sprawdzeniu odpowiedzi: ten sam monitor z nazwą i alarmem).
  * Bez scenariusza pokazuje wszystkie scenariusze w grupach (galeria).
  */
-import { chips, h, shell, type WstawkaOpts } from './core/ui.js';
+import { chips, h, shell, uklad, type WstawkaOpts } from './core/ui.js';
 import { graj, kardiomonitor, type Scenariusz } from './core/kardiomonitor.js';
 import { WSZYSTKIE, scenariusz } from './kardiomonitor.scenariusze.js';
 
@@ -63,6 +63,7 @@ export function mountKardiomonitor(host: HTMLElement, opts: WstawkaOpts): () => 
   const m = kardiomonitor(box, sc0, { przyciskDzwieku: false });
   const opis = h('p', { class: 'hw-why', text: sc0.opis });
   const sterowanie = h('div', { class: 'hw-row' }, graj(m));
+  let lista: HTMLElement | null = null;
   if (!wybrany) {
     // chipy w grupach: wybór działa jak jedna grupa przełączników na całej liście
     const grupy = wGrupach();
@@ -73,14 +74,31 @@ export function mountKardiomonitor(host: HTMLElement, opts: WstawkaOpts): () => 
       zestawy.forEach((z) => z.set(v));
       m.ustaw(s); opis.textContent = s.opis; live(`${s.nazwa}. ${s.opis}`);
     };
-    const lista = h('div', { class: 'hw-grid', style: 'gap:12px' });
+    const l = h('div', { class: 'hw-grid', style: 'gap:12px' });
     for (const g of grupy) {
       const z = chips(g.sc.map((s) => ({ v: s.id, label: s.nazwa })), sc0.id, wybierz, { label: g.grupa, small: true });
       zestawy.push(z);
-      lista.append(h('div', { class: 'hw-grid', style: 'gap:6px' }, h('p', { class: 'hw-label', text: `${g.grupa} · ${g.sc.length}` }), z.el));
+      l.append(h('div', { class: 'hw-grid', style: 'gap:6px' }, h('p', { class: 'hw-label', text: `${g.grupa} · ${g.sc.length}` }), z.el));
     }
-    body.append(lista);
+    lista = l;
   }
-  body.append(box, sterowanie, wybrany ? h('span', {}) : opis);
+  // telefon na pełnym ekranie: przypięty zostaje sam monitor, przycisk i lista scenariuszy idą pod niego
+  // (puste gniazda ukryte, żeby nie dokładały odstępu w siatce)
+  const listaGora = h('div', {});
+  const sterSlot = h('div', { hidden: true });
+  const listaSlot = h('div', { hidden: true });
+  if (lista) listaGora.append(lista);
+  body.append(uklad({
+    gora: lista ? [listaGora] : [],
+    scena: [box, sterowanie],
+    ster: [sterSlot, listaSlot, wybrany ? h('span', {}) : opis],
+    naWaskim: (waski) => {
+      sterSlot.hidden = !waski;
+      if (waski) sterSlot.append(sterowanie); else box.after(sterowanie);
+      if (!lista) return;
+      listaSlot.hidden = !waski; listaGora.hidden = waski;
+      if (waski) listaSlot.append(lista); else listaGora.append(lista);
+    },
+  }));
   return () => { m.destroy(); host.replaceChildren(); };
 }

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Check, Flag, RotateCcw, X } from "lucide-react";
+import { ArrowRight, Check, Flag, Maximize2, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProgressLine } from "@/components/ui/progress-line";
 import {
@@ -19,7 +19,9 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { sanitizeMarkdown } from "@/lib/sanitize";
 import { spring, springSnappy } from "@/lib/motion";
-import QuestionCard, { type AnswerStatus } from "./QuestionCard";
+import QuestionCard, { PelnyEkranPytania, type AnswerStatus } from "./QuestionCard";
+import { PasekPelnegoEkranu } from "./PelnyEkranWstawki";
+import { usePelnyEkran } from "@/lib/pelnyEkran";
 import ImageLightbox from "./ImageLightbox";
 import ReportErrorDialog from "./ReportErrorDialog";
 import { isTypingTarget } from "./questions/gesture";
@@ -127,6 +129,26 @@ const stage = {
   animate: { opacity: 1, x: 0, transition: spring },
   exit: { opacity: 0, x: -20, transition: { duration: 0.14, ease: "easeOut" } },
 };
+
+/** Na pełnym ekranie pytania zmiana pytania to samo przenikanie: przesunięcie „x” przodka psułoby position: fixed */
+const stagePelny = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.2, ease: "easeOut" } },
+  exit: { opacity: 0, transition: { duration: 0.12, ease: "easeOut" } },
+};
+
+/**
+ * Scena pytania: to, na co kursant patrzy, odpowiadając (monitor w treści, zapis przypadku, plansza
+ * do wskazania). Tylko takie pytania mają pełny ekran (prośba JK 13.11).
+ */
+function scenaPytania(q: QuizQuestion | undefined | null): "wstawka" | "przypadek" | "plansza" | null {
+  if (!q) return null;
+  if (/^::wstawka[ \t]+\S+/m.test(q.bodyMd ?? "")) return "wstawka";
+  const cfg = q.questionConfig as { type?: string; config?: { imageUrl?: string } } | undefined;
+  if (cfg?.type === "clinical_case" && cfg.config?.imageUrl) return "przypadek";
+  if (cfg?.type === "hotspot") return "plansza";
+  return null;
+}
 
 /** Przewiń na górę natychmiast — płynne przewijanie po skosie w trakcie wejścia nowej karty męczy wzrok */
 function jumpToTop() {
@@ -407,6 +429,39 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const shownQuestion = useMemo(
     () => (question ? withRevealedConfig(question, status === "result" ? quizResult : null) : undefined),
     [question, quizResult, status],
+  );
+
+  /* ───────── Pełny ekran pytania: scena (monitor, zapis) i odpowiedzi naraz, bez przewijania tam i z powrotem ───────── */
+  const peMiejsce = useRef<HTMLDivElement>(null);
+  const peKontener = useRef<HTMLDivElement | null>(null);
+  // Przy zmianie pytania stara karta wychodzi, gdy nowa już jest: ref trzyma zawsze tę podłączoną
+  const peRef = useCallback((el: HTMLDivElement | null) => {
+    if (el) peKontener.current = el;
+    else if (peKontener.current && !peKontener.current.isConnected) peKontener.current = null;
+  }, []);
+  const scena = scenaPytania(shownQuestion);
+  const pe = usePelnyEkran({
+    kontener: peKontener,
+    miejsce: peMiejsce,
+    scena: () => peKontener.current?.querySelector<HTMLElement>("[data-scena]") ?? null,
+  });
+  const peOstatnie = useRef(shownQuestion?.id);
+  useEffect(() => {
+    const id = shownQuestion?.id;
+    if (!id || peOstatnie.current === id) return;
+    peOstatnie.current = id;
+    if (!pe.pelny) return;
+    // Następne pytanie też ma scenę: zostajemy na pełnym ekranie; bez sceny: wracamy na stronę
+    if (scena) pe.odswiez();
+    else pe.zamknijOdRazu();
+  }, [shownQuestion?.id, scena, pe]);
+  // Koniec sesji (podsumowanie): pełny ekran znika bez lotu
+  useEffect(() => {
+    if ((examFinished || showSummary) && pe.pelny) pe.zamknijOdRazu();
+  }, [examFinished, showSummary, pe]);
+  const peKontekst = useMemo(
+    () => (scena ? { pelny: pe.pelny, przelacz: pe.przelacz } : null),
+    [scena, pe.pelny, pe.przelacz],
   );
 
   /* ───────── Wysłanie odpowiedzi ───────── */
@@ -838,18 +893,47 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
             {total > 0 ? `Pytanie ${currentQuestionIndex + 1} z ${total}` : `Pytanie ${currentQuestionIndex + 1}`}
             {typeLabel && <span className="hidden sm:inline"> · {typeLabel}</span>}
           </p>
+          {scena && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => pe.otworz(e.currentTarget)}
+              className="-mr-3 gap-1.5 px-3"
+              aria-label="Pełny ekran: monitor i odpowiedzi naraz"
+              data-testid="pelny-ekran-pytania"
+            >
+              <Maximize2 aria-hidden />
+              <span className="hidden sm:inline">Pełny ekran</span>
+            </Button>
+          )}
         </div>
         <div className="wrap wrap--narrow pb-3">
           <ProgressLine value={done} max={total} label="Postęp sesji" />
         </div>
       </div>
 
-      <div className="wrap wrap--narrow safe-bottom relative py-7 sm:py-10">
+      <div ref={peMiejsce} className="wrap wrap--narrow safe-bottom relative py-7 sm:py-10">
         {/* popLayout: nowa karta wchodzi od razu, stara wychodzi nad nią (bez czekania na koniec wyjścia) */}
         <AnimatePresence mode="popLayout" initial={false}>
-          <motion.div key={stageKey} variants={stage} initial="initial" animate="animate" exit="exit">
+          <motion.div key={stageKey} variants={pe.pelny ? stagePelny : stage} initial="initial" animate="animate" exit="exit">
+           <PelnyEkranPytania.Provider value={peKontekst}>
+           <div
+             ref={peRef}
+             className={pe.pelny ? `pelny-ekran pelny-ekran--pytanie${scena === "wstawka" ? " pelny-ekran--split" : ""}` : undefined}
+             role={pe.pelny ? "dialog" : undefined}
+             aria-modal={pe.pelny || undefined}
+             aria-label={pe.pelny ? "Pytanie na pełnym ekranie" : undefined}
+             data-testid={pe.pelny ? "pelny-ekran" : undefined}
+           >
+            {pe.pelny && (
+              <PasekPelnegoEkranu
+                tytul={`${total > 0 ? `Pytanie ${currentQuestionIndex + 1} z ${total}` : `Pytanie ${currentQuestionIndex + 1}`}${typeLabel ? ` · ${typeLabel}` : ""}`}
+                onZamknij={pe.zamknij}
+              />
+            )}
+            <div className={pe.pelny ? "pelny-ekran__tresc" : undefined}>
             {shownQuestion && !questionQuery.isFetching ? (
-              <motion.div key={shownQuestion.id} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: springSnappy }}>
+              <motion.div key={shownQuestion.id} className="q-ramka" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: springSnappy }}>
                 <QuestionCard
                   question={shownQuestion}
                   selectedAnswer={selectedAnswer}
@@ -867,13 +951,13 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
                 {/* Telefon: licznik wypełnionych miejsc nad przyciskami — w jednym wierszu się nie mieści */}
                 {filled && (
-                  <p className="mt-4 text-right text-ui text-[var(--txt2)] sm:hidden" aria-live="polite">
+                  <p className="q-filled mt-4 text-right text-ui text-[var(--txt2)] sm:hidden" aria-live="polite">
                     <FilledText {...filled} />
                   </p>
                 )}
 
                 {/* Nawigacja: jedno główne działanie na ekranie */}
-                <nav className={`${filled ? "mt-3 sm:mt-5" : "mt-5"} flex items-center justify-between gap-3`} aria-label="Nawigacja quizu">
+                <nav className={`q-nav ${filled ? "mt-3 sm:mt-5" : "mt-5"} flex items-center justify-between gap-3`} aria-label="Nawigacja quizu">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -929,6 +1013,9 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
             ) : (
               <QuestionSkeleton />
             )}
+            </div>
+           </div>
+           </PelnyEkranPytania.Provider>
           </motion.div>
         </AnimatePresence>
       </div>

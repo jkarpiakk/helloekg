@@ -96,6 +96,8 @@ const CSS = `
 .km--kompakt .km__hr dd{font-size:32px}
 .km__pauza{appearance:none;font:500 12px/1 var(--hw-f-m,monospace);letter-spacing:.06em;text-transform:uppercase;color:#A3AFB7;background:transparent;border:1px solid #223040;border-radius:999px;min-height:32px;padding:0 12px;cursor:pointer;transition:transform .1s}
 .km__pauza:active{transform:scale(.96)}
+@container hw (max-width:479px){.km__bar{padding:7px 10px;gap:4px 10px}.km__bar>span:nth-child(3){display:none}.km__bar .hw-snd--maly{margin-left:auto}
+.km__v{padding:7px 12px}.km__hr dd{font-size:34px}}
 `;
 let styled = false;
 function ensureKmStyle(): void {

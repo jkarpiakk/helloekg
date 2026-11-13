@@ -13,7 +13,7 @@
  */
 import {
   C, TRYB_SPRAWDZ, TRYB_UCZ, chips, clamp, drag, exercise, fmtNum, guma, h, loop, options, paper, projekcja, reducedMotion, s, setA, shell, shuffle, slider,
-  spring, surface, trace, type Spring, type Surface, type WstawkaOpts,
+  spring, surface, trace, uklad, type Spring, type Surface, type WstawkaOpts,
 } from './core/ui.js';
 import {
   DO_AV, HV, OKNO, postojAV, P_DUR, PROG, W, faza, granice, hrZCyklu, kratki, plany, potencjal, pqBlokI, pqWNormie, scenAutomatyzm,
@@ -138,9 +138,8 @@ function localStyle(): void {
   const st = document.createElement('style');
   st.setAttribute('data-hw-droga', '');
   st.textContent = `
-.hw-di-grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
-@container hw (min-width:760px){.hw-di-grid{grid-template-columns:minmax(345px,.95fr) minmax(0,1.15fr);align-items:start}}
 .hw-di-col{display:grid;gap:12px;min-width:0}
+@container hw (min-width:720px){.hw-di-pe:not([data-hw-pe] *){grid-template-columns:minmax(345px,.95fr) minmax(0,1.15fr)}}
 .hw-di-svg{display:block;width:100%;height:auto;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .hw-di-svg text{font-family:var(--hw-f-t)}
 .hw-di-hit{cursor:pointer;outline:none}
@@ -194,7 +193,7 @@ export function mountDrogaImpulsu(host: HTMLElement, opts: WstawkaOpts): () => v
     (v) => setWidok(v === 'sprawdz' ? 'cwiczenie' : temat), { label: 'Tryb wstawki' });
   const tematChips = chips(TEMATY, temat, (v) => setWidok(v), { label: 'Temat', small: true });
   tematChips.el.hidden = start === 'cwiczenie';
-  body.append(h('div', { class: 'hw-di-modes' }, trybChips.el, tematChips.el));
+  const modes = h('div', { class: 'hw-di-modes' }, trybChips.el, tematChips.el);
 
   /* ─────────── schemat: raster serca + nakładka (prześwietlenie układu przewodzącego) ─────────── */
   const rs = svgNaRastrze('sercePrzod', { label: 'Serce od przodu z układem bodźcoprzewodzącym', crop: KADR });
@@ -487,7 +486,21 @@ export function mountDrogaImpulsu(host: HTMLElement, opts: WstawkaOpts): () => v
 
   const panel = h('div', { class: 'hw-grid', style: 'gap:12px' });
   const right = h('div', { class: 'hw-di-col' }, screen, cursor.el, transport, now, panel);
-  body.append(h('div', { class: 'hw-di-grid' }, left, right));
+  const serceSlot = h('div', {});
+  const pe = uklad({
+    gora: [modes],
+    scena: [left],
+    ster: [serceSlot, right],
+    dwieKolumny: true,
+    naWaskim: (waski) => {
+      // telefon na pełnym ekranie: przypięty zostaje zapis (nim przesuwasz kursor), serce idzie tuż pod niego
+      const scena = pe.querySelector('[data-hw-scena]');
+      if (!scena) return;
+      if (waski) { serceSlot.append(left); scena.append(screen); } else { right.prepend(screen); scena.append(left); }
+    },
+  });
+  pe.classList.add('hw-di-pe'); // na stronie proporcje kolumn jak dawniej
+  body.append(pe);
 
   /* ─────────── rysowanie schematu ─────────── */
   function drawSchematic(st: Stan) {

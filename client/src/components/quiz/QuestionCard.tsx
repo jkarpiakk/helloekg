@@ -10,6 +10,13 @@ import { QuestionRenderer } from "./questions";
 import { caseKicker } from "./questions/ClinicalCaseQuestion";
 import type { AnyQuestionConfig } from "@shared/clinicalCase";
 import { BrakObrazu, PytanieObrazow, useBladObrazu } from "./BrakObrazu";
+import { createContext, useContext } from "react";
+
+/**
+ * Pełny ekran pytania (QuizInterface): przycisk we wstawce i dotknięcie zapisu monitora go przełączają.
+ * null = pytanie bez sceny albo tryb niedostępny.
+ */
+export const PelnyEkranPytania = createContext<{ pelny: boolean; przelacz: (zrodlo?: HTMLElement | null) => void } | null>(null);
 
 /**
  * Stan odpowiedzi na bieżące pytanie:
@@ -95,6 +102,7 @@ export default function QuestionCard({
   // correctIndex to indeks w bazie; odpowiedzi na ekranie są potasowane
   const correctPosition = answered ? question.answers.findIndex((a) => a.index === quizResult!.correctIndex) : -1;
   const correctAnswer = answered && !isInteractiveType && correctPosition >= 0 ? question.answers[correctPosition] : undefined;
+  const pe = useContext(PelnyEkranPytania);
 
   return (
     <PytanieObrazow.Provider value={question.id}>
@@ -102,6 +110,8 @@ export default function QuestionCard({
       className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-[clamp(22px,3vw,40px)]"
       aria-labelledby="question-title"
     >
+      {/* Układ: nagłówek i treść · scena (monitor) · odpowiedzi. Na pełnym ekranie scena się przypina. */}
+      <div className="q-head">
       {caseConfig && (
         <p className="label label--g mb-4" data-testid="case-kicker">
           {caseKicker(caseConfig)}
@@ -126,11 +136,17 @@ export default function QuestionCard({
           data-testid="question-body"
         />
       )}
+      </div>
       {/* Monitor w treści pytania (::wstawka kardiomonitor … pytanie=tak) — otwarty, bez rozpoznania */}
-      {tresc.wstawki.map((w, i) => (
-        <div key={i} className="mb-6"><WstawkaOtwarta id={w.id} opts={w.opts} wPytaniu /></div>
-      ))}
+      {tresc.wstawki.length > 0 && (
+        <div className="q-scena mb-6" data-scena="wstawka">
+          {tresc.wstawki.map((w, i) => (
+            <WstawkaOtwarta key={i} id={w.id} opts={w.opts} wPytaniu onPelnyEkran={pe ? (el) => pe.przelacz(el) : undefined} />
+          ))}
+        </div>
+      )}
 
+      <div className="q-rest">
       {showImage && imagePosition === "below" && <QuestionImage url={question.imageUrl!} onOpen={onImageClick} />}
 
       {/* Pytania interaktywne */}
@@ -275,6 +291,7 @@ export default function QuestionCard({
           <p className="label">Czas · {Math.max(1, Math.round(quizResult!.timeMs / 1000))} s</p>
         </motion.section>
       )}
+      </div>
     </article>
     </PytanieObrazow.Provider>
   );

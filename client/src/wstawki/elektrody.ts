@@ -5,7 +5,7 @@
  *
  * Opcje: zamiana=brak|rece|lr-ln|pr-ln|pr-pn|lr-pn|ln-pn, tryb=cwiczenie.
  */
-import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, drag, exercise, h, options, rng, s, setA, shell, spring, type Spring, type WstawkaOpts } from './core/ui.js';
+import { C, TRYB_SPRAWDZ, TRYB_UCZ, chips, drag, exercise, h, options, rng, s, setA, shell, spring, uklad, type Spring, type WstawkaOpts } from './core/ui.js';
 import type { Beat, LeadName } from './core/model.js';
 import { svgNaRastrze } from './core/obrazy.js';
 import { dzwiekDla } from './core/dzwiek.js';
@@ -47,7 +47,7 @@ export function mountElektrody(host: HTMLElement, opts: WstawkaOpts): () => void
 
   const modeChips = chips([{ v: 'play', label: TRYB_UCZ }, { v: 'task', label: TRYB_SPRAWDZ }] as const, mode, (m) => setMode(m), { label: 'Tryb' });
   const swapChips = chips(ZAMIANY.map((z) => ({ v: z.id, label: z.label })), (jakaZamiana(p) ?? 'brak') as ZamianaId, (id) => { p = podlaczenieZ(id); moveClips(true); update(true, true); }, { label: 'Gotowe zamiany przewodów', small: true });
-  body.append(h('div', { class: 'hw-bar' }, modeChips.el));
+  const modeBar = h('div', { class: 'hw-bar' }, modeChips.el);
 
   /* ─────────── sylwetka ─────────── */
 
@@ -72,7 +72,11 @@ export function mountElektrody(host: HTMLElement, opts: WstawkaOpts): () => void
     + 'font:600 13px/1 var(--hw-f-m);letter-spacing:.02em;transform:translate(-50%,-50%) scale(var(--hw-s,1));transition:transform .14s var(--hw-ease),border-color .2s;'
     + '-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}'
     + '.hw-el-clip.is-wrong{border-color:var(--hw-warn);border-style:dashed}.hw-el-clip.is-held{--hw-s:1.08;cursor:grabbing;z-index:2}'
-    + '.hw-el-clip:active:not([disabled]){--hw-s:1.08}.hw-el-clip[disabled]{cursor:default}' });
+    + '.hw-el-clip:active:not([disabled]){--hw-s:1.08}.hw-el-clip[disabled]{cursor:default}'
+    // pełny ekran: sylwetka mieści się w wysokości okna, żeby klipsy na nogach nie wymagały przewijania sceny
+    // na stronie proporcje kolumn jak dawniej (sylwetka węższa); na pełnym ekranie układ z rdzenia
+    + '@container hw (min-width:720px){.hw-el-pe:not([data-hw-pe] *){grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr)}}'
+    + '[data-hw-pe] .hw-el-stage{width:min(100%,max(280px,calc((100dvh - var(--hw-pe-top,0px) - 200px) * .8)));margin-inline:auto}' });
   const clipLayer = h('div', { class: 'hw-el-clips' });
   const stage = h('div', { class: 'hw-el-stage' }, clipCss, svg, clipLayer);
   /** Bieżące (wyświetlane) położenie klipsów w układzie kadru; cel to zawsze POS[p[k]]. */
@@ -332,7 +336,21 @@ export function mountElektrody(host: HTMLElement, opts: WstawkaOpts): () => void
 
   const left = h('div', { class: 'hw-grid' }, figure, swapChips.el);
   const right = h('div', { class: 'hw-grid' }, style, grid, vCap, vGrid, gridCap, read, ex.el);
-  body.append(h('div', { class: 'hw-2col hw-2col--wide-r', style: 'align-items:start' }, left, right));
+  const sylwetkaSlot = h('div', {});
+  const pe = uklad({
+    gora: [modeBar],
+    scena: [left],
+    ster: [sylwetkaSlot, right],
+    dwieKolumny: true,
+    naWaskim: (waski) => {
+      // telefon na pełnym ekranie: przypięte zostają odprowadzenia kończynowe, sylwetka z klipsami tuż pod nimi
+      const scena = pe.querySelector('[data-hw-scena]');
+      if (!scena) return;
+      if (waski) { sylwetkaSlot.append(left); scena.append(grid); } else { style.after(grid); scena.append(left); }
+    },
+  });
+  pe.classList.add('hw-el-pe');
+  body.append(pe);
 
   function setMode(m: 'play' | 'task') {
     mode = m; modeChips.set(m);

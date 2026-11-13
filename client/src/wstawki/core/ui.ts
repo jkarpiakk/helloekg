@@ -110,6 +110,26 @@ border:1px solid var(--hw-line2);border-radius:12px;padding:12px 14px;cursor:poi
 .hw-opt.is-right .hw-mark{color:var(--hw-puls)}.hw-opt.is-wrong .hw-mark{color:var(--hw-alarm)}
 .hw-opt .hw-k{font:500 12px/1.6 var(--hw-f-m);color:var(--hw-txt3);min-width:1.2em}
 @media (prefers-reduced-motion:reduce){.hw *{transition:none!important}}
+.hw-fig2{display:grid;gap:14px;align-items:start;grid-template-columns:minmax(0,1fr)}
+@container hw (min-width:520px){.hw-fig2{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}}
+.hw-fig2.hw-fig2--jedna{grid-template-columns:minmax(0,1fr)}
+.hw-pe{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);grid-template-areas:"gora" "scena" "ster"}
+.hw-pe__gora{grid-area:gora;display:grid;gap:12px;min-width:0}
+.hw-pe__gora:empty{display:none}
+.hw-pe__scena{grid-area:scena;display:grid;gap:10px;min-width:0;align-content:start}
+.hw-pe__ster{grid-area:ster;display:grid;gap:16px;min-width:0;align-content:start}
+@container hw (min-width:720px){.hw-pe--2col{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-template-areas:"gora gora" "scena ster";column-gap:22px;align-items:start}}
+[data-hw-pe] .hw{margin:0;border:0;border-radius:0;padding:clamp(14px,2.4cqi,24px) 0 40px;background:transparent}
+[data-hw-pe] .hw-pe__scena{position:sticky;top:var(--hw-pe-top,0px);z-index:4;background:var(--hw-ink);padding-block:8px 10px;margin-block:-8px -10px}
+[data-hw-pe] .hw-pe__scena::after{content:"";position:absolute;left:0;right:0;bottom:-14px;height:14px;background:linear-gradient(var(--hw-ink),transparent);pointer-events:none}
+[data-hw-pe] .hw-pe--wolna .hw-pe__scena{position:relative;top:auto}
+[data-hw-pe] .hw-pe--wolna .hw-pe__scena::after{display:none}
+@container hw (min-width:720px){[data-hw-pe] .hw-pe--2col .hw-pe__scena{max-height:calc(100dvh - var(--hw-pe-top,0px) - 12px);overflow:auto;overscroll-behavior:contain}[data-hw-pe] .hw-pe--2col .hw-pe__scena::after{display:none}}
+@container hw (min-width:900px){[data-hw-pe] .hw-pe{grid-template-columns:minmax(0,1.35fr) minmax(320px,1fr);grid-template-areas:"scena gora" "scena ster";column-gap:28px;align-items:start}
+[data-hw-pe] .hw-pe__scena{max-height:calc(100dvh - var(--hw-pe-top,0px) - 12px);overflow:auto;overscroll-behavior:contain}[data-hw-pe] .hw-pe__scena::after{display:none}}
+@media (orientation:landscape){@container hw (min-width:640px){[data-hw-pe] .hw-pe{grid-template-columns:minmax(0,1.1fr) minmax(280px,1fr);grid-template-areas:"scena gora" "scena ster";column-gap:20px;align-items:start}
+[data-hw-pe] .hw-pe__scena{max-height:calc(100dvh - var(--hw-pe-top,0px) - 12px);overflow:auto;overscroll-behavior:contain}[data-hw-pe] .hw-pe__scena::after{display:none}}}
+@media (max-height:520px) and (orientation:landscape){[data-hw-pe] .hw-intro{display:none}[data-hw-pe] .hw{padding-top:10px}}
 `;
 
 let styled = false;
@@ -167,6 +187,43 @@ export function setA(e: Element, attrs: Attrs): void {
     if (v === undefined || v === null || v === false) e.removeAttribute(k);
     else e.setAttribute(k, String(v));
   }
+}
+
+/**
+ * Układ wstawki na stronie i na pełnym ekranie (prośba JK 13.11: obraz i to, czym się nim steruje,
+ * mają być widoczne naraz, bez przewijania tam i z powrotem).
+ * - gora: tryb i zakładki, scena: obraz albo zapis, który się zmienia, ster: przyciski, suwaki i opis.
+ * - Na stronie: kolejno gora, scena, ster; z `dwieKolumny` od 720 px scena obok sterowania (jak hw-2col).
+ * - Na pełnym ekranie (host ma atrybut `data-hw-pe`, a w `--hw-pe-top` wysokość swojego paska):
+ *   szeroko scena przypięta po lewej, zakładki i sterowanie po prawej; wąsko scena przypięta u góry,
+ *   o ile zajmuje najwyżej 55% wysokości ekranu (inaczej przewija się razem z resztą: `hw-pe--wolna`).
+ */
+export function uklad(o: {
+  gora?: Child[]; scena: Child[]; ster: Child[]; dwieKolumny?: boolean;
+  /** Pełny ekran w jednej kolumnie (telefon) albo z powrotem: wstawka może przełożyć część sceny do sterowania */
+  naWaskim?: (waski: boolean) => void;
+}): HTMLElement {
+  const scena = h('div', { class: 'hw-pe__scena', 'data-hw-scena': '' }, ...o.scena);
+  const el = h('div', { class: 'hw-pe' + (o.dwieKolumny ? ' hw-pe--2col' : '') },
+    h('div', { class: 'hw-pe__gora' }, ...(o.gora ?? [])), scena, h('div', { class: 'hw-pe__ster' }, ...o.ster));
+  if (typeof ResizeObserver !== 'undefined' && typeof MutationObserver !== 'undefined') {
+    let byl = false, waski = false;
+    const sprawdz = () => {
+      if (!el.isConnected) { if (byl) { ro.disconnect(); mo.disconnect(); } return; }
+      byl = true;
+      const pe = el.closest('[data-hw-pe]');
+      const jednaKolumna = getComputedStyle(el).gridTemplateColumns.trim().split(/\s+/).length < 2;
+      if (o.naWaskim && (!!pe && jednaKolumna) !== waski) { waski = !waski; o.naWaskim(waski); }
+      const wysoka = scena.offsetHeight > window.innerHeight * 0.55;
+      el.classList.toggle('hw-pe--wolna', !!pe && jednaKolumna && wysoka);
+    };
+    const ro = new ResizeObserver(sprawdz);
+    ro.observe(el); ro.observe(scena);
+    // host włącza pełny ekran atrybutem `data-hw-pe` (rozmiar sceny może się wtedy nie zmienić)
+    const mo = new MutationObserver(sprawdz);
+    mo.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['data-hw-pe'] });
+  }
+  return el;
 }
 
 /** Korzeń wstawki z nagłówkiem. Zwraca korzeń i kontener na treść. */

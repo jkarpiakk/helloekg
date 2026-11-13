@@ -279,6 +279,7 @@ export default function HotspotQuestion({
         onBlur={() => setAim(null)}
         onKeyDown={onKeyDown}
         data-testid="hotspot-container"
+        data-scena="plansza"
       >
         <img
           ref={imageRef}

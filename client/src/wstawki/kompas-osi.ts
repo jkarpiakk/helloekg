@@ -5,7 +5,7 @@
  * Opcje: start=<stopnie> (np. -60), tryb=cwiczenie.
  */
 import {
-  C, TRYB_SPRAWDZ, TRYB_UCZ, chips, deg, drag, exercise, fmtDeg, h, normDeg, rad, reducedMotion, s, setA, shell, spring,
+  C, TRYB_SPRAWDZ, TRYB_UCZ, chips, deg, drag, exercise, fmtDeg, h, normDeg, rad, reducedMotion, s, setA, shell, spring, uklad,
   type Spring, type WstawkaOpts,
 } from './core/ui.js';
 import { LEADS, LIMB, axisCategory, beat, frontalAxis, qrsNet, volt, type Beat, type LeadName, type V3 } from './core/model.js';
@@ -30,6 +30,7 @@ function localStyle(): void {
 .hw-ko-grab .hw-ko-knob{transform:scale(1.15)}
 .hw-ko-grab{cursor:grabbing}
 .hw .hw-ko-presets .hw-chip--sm{min-height:44px}
+[data-hw-pe] .hw-ko-wheel{width:min(100%,max(280px,calc(100dvh - var(--hw-pe-top,0px) - 60px)));margin-inline:auto}
 `;
   document.head.appendChild(st);
 }
@@ -89,7 +90,7 @@ export function mountKompasOsi(host: HTMLElement, opts: WstawkaOpts): () => void
   }, { label: 'Przykłady', small: true });
   presets.el.classList.add('hw-ko-presets');
   presets.set('' as never);
-  body.append(h('div', { class: 'hw-bar' }, modeChips.el, presets.el));
+  const bar = h('div', { class: 'hw-bar' }, modeChips.el, presets.el);
 
   /* koło */
   const svg = s('svg', { viewBox: '-192 -192 384 384', class: 'hw-svg', style: 'touch-action:none', role: 'group', 'aria-label': 'Układ heksaksjalny z wektorem osi elektrycznej serca' });
@@ -143,7 +144,8 @@ export function mountKompasOsi(host: HTMLElement, opts: WstawkaOpts): () => void
   s('circle', { r: 20, fill: 'rgba(62,230,168,.10)', stroke: C.puls, 'stroke-width': 1.5 }, knob);
   s('circle', { r: 6, fill: C.puls }, knob);
 
-  const wheel = h('div', {}, svg, h('p', { class: 'hw-note', style: 'text-align:center;margin-top:4px', text: 'Widok od przodu: prawa strona pacjenta jest po lewej' }));
+  // na pełnym ekranie koło mieści się w wysokości okna
+  const wheel = h('div', { class: 'hw-ko-wheel' }, svg, h('p', { class: 'hw-note', style: 'text-align:center;margin-top:4px', text: 'Widok od przodu: prawa strona pacjenta jest po lewej' }));
 
   /* panele odprowadzeń */
   const grid = h('div', { style: 'display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px' });
@@ -309,7 +311,20 @@ export function mountKompasOsi(host: HTMLElement, opts: WstawkaOpts): () => void
   const zmienil = () => { if (mode === 'task' && !ruszony) { ruszony = true; ex.odswiez(); } };
 
   const right = h('div', {}, grid, cap, read, ex.el);
-  body.append(h('div', { class: 'hw-2col hw-2col--wide-l', style: 'align-items:start' }, wheel, right));
+  const koloSlot = h('div', {});
+  const pe = uklad({
+    gora: [bar],
+    scena: [wheel],
+    ster: [koloSlot, right],
+    dwieKolumny: true,
+    naWaskim: (waski) => {
+      // telefon na pełnym ekranie: przypięte zostaje sześć zespołów QRS, koło ze strzałką tuż pod nimi
+      const scena = pe.querySelector('[data-hw-scena]');
+      if (!scena) return;
+      if (waski) { koloSlot.append(wheel); scena.append(grid); } else { right.prepend(grid); scena.append(wheel); }
+    },
+  });
+  body.append(pe);
 
   function drawNow() {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }

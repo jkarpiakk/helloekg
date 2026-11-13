@@ -9,7 +9,7 @@
  *   tryb=cwiczenie  — start w ćwiczeniu odwrotnym (dostajesz zapis, wskazujesz miejsce zamknięcia)
  * Nieznane opcje są ignorowane.
  */
-import { C, TRYB_SPRAWDZ, TRYB_UCZ, button, chips, exercise, h, reducedMotion, s, setA, shell, werdykt, type WstawkaOpts } from './core/ui.js';
+import { C, TRYB_SPRAWDZ, TRYB_UCZ, button, chips, exercise, h, reducedMotion, s, setA, shell, uklad, werdykt, type WstawkaOpts } from './core/ui.js';
 import { LEADS_12, type Beat, type LeadName } from './core/model.js';
 import { twelve } from './core/dwunastka.js';
 import { svgNaRastrze } from './core/obrazy.js';
@@ -229,7 +229,7 @@ export function mountMapaZawalu(host: HTMLElement, opts: WstawkaOpts): () => voi
   const modeChips = chips([{ v: 'play', label: TRYB_UCZ }, { v: 'task', label: TRYB_SPRAWDZ }] as const, mode, (v) => setMode(v), { label: 'Tryb' });
   const siteChips = chips(SITES.map((x) => ({ v: x.id, label: x.chip, title: x.nazwa })), siteId, (v) => pickSite(v), { label: 'Miejsce zamknięcia' });
   const sitesBox = h('div', { class: 'hw-grid', style: 'gap:6px' }, h('p', { class: 'hw-label', text: 'Miejsce zamknięcia' }), siteChips.el);
-  body.append(h('div', { class: 'hw-bar' }, modeChips.el));
+  const modeBar = h('div', { class: 'hw-bar' }, modeChips.el);
 
   /* lewa kolumna: schemat i opis miejsca */
   const hv = heart(uid, (id) => pickSite(id));
@@ -238,7 +238,6 @@ export function mountMapaZawalu(host: HTMLElement, opts: WstawkaOpts): () => voi
   const pearl = h('p', { class: 'hw-pearl' }, h('span', { class: 'hw-label', text: 'Ograniczenie' }),
     'Mapa „ściana → tętnica” jest orientacyjna: przebieg naczyń różni się między ludźmi, a miejsce przeszkody ustala dopiero koronarografia.');
   const siteBox = h('div', { class: 'hw-grid' }, siteName, siteOpis, pearl);
-  const left = h('div', { class: 'hw-grid', style: 'align-content:start' }, hv.el, siteBox);
 
   /* prawa kolumna: 12 odprowadzeń, dodatkowe, odczyt */
   const face = () => kameryObszaru(site(siteId));
@@ -267,12 +266,13 @@ export function mountMapaZawalu(host: HTMLElement, opts: WstawkaOpts): () => voi
   const readWhy = h('p', { class: 'hw-why' });
   const progi = h('p', { class: 'hw-note', text: 'Pacjent: mężczyzna, 58 lat. Uniesienie ST w punkcie J: ≥ 1 mm, w V2-V3 ≥ 2 mm, w V7-V9 i V3R-V4R ≥ 0,5 mm. Obniżenie ST oznaczone od 0,5 mm. 25 mm/s, 10 mm/mV.' });
   const read = h('div', { class: 'hw-read' }, tags, readWhy);
-  const right = h('div', { class: 'hw-grid', style: 'align-content:start' }, t12.el, legend, h('div', { class: 'hw-row' }, extrasBtn), extrasHost, progi, read);
-
-  const scena = h('div', { class: 'hw-2col', style: 'align-items:start' }, left, right);
-  // w „Ucz się” lista miejsc jest nad schematem; w „Sprawdź się” schemat, zapis i lista idą pod polecenie (ex.miejsce)
-  const main = h('div', { class: 'hw-stack' }, sitesBox, scena);
-  body.append(main);
+  const extrasRow = h('div', { class: 'hw-row' }, extrasBtn);
+  /* scena: schemat serca i zapis obok siebie (od 520 px), na telefonie na pełnym ekranie sam zapis */
+  const ecgBox = h('div', { class: 'hw-grid', style: 'align-content:start' }, t12.el, extrasHost, legend);
+  const fig = h('div', { class: 'hw-fig2' }, hv.el, ecgBox);
+  // „Ucz się”: lista miejsc nad sceną; „Sprawdź się”: lista i dołączanie odprowadzeń idą pod polecenie (ex.miejsce)
+  const main = h('div', { class: 'hw-grid', style: 'gap:16px' }, extrasRow, siteBox, progi, read);
+  const serceSlot = h('div', {});
 
   /* oś ewolucji: stany dyskretne */
   const phaseBtns = PHASES.map((p) => {
@@ -295,7 +295,6 @@ export function mountMapaZawalu(host: HTMLElement, opts: WstawkaOpts): () => voi
     h('p', { class: 'hw-pearl' }, h('span', { class: 'hw-label', text: 'Uwaga' }),
       'To klasyczny ciąg, nie stała kolejność każdego zawału. Szybkie udrożnienie tętnicy potrafi zmienić ten przebieg i zapobiec powstaniu Q, a sekwencja nie pozwala precyzyjnie oszacować „wieku” zawału.'),
   );
-  body.append(timeline);
 
   /* ćwiczenie odwrotne */
   let plan: Runda[] = [];
@@ -326,7 +325,17 @@ export function mountMapaZawalu(host: HTMLElement, opts: WstawkaOpts): () => voi
     },
     live,
   });
-  body.append(ex.el);
+  const gora = h('div', { class: 'hw-grid', style: 'gap:14px' }, modeBar, sitesBox);
+  body.append(uklad({
+    gora: [gora],
+    scena: [fig],
+    ster: [serceSlot, main, timeline, ex.el],
+    naWaskim: (waski) => {
+      // telefon na pełnym ekranie: przypięty zostaje sam zapis, schemat serca idzie pod niego
+      if (waski) { fig.classList.add('hw-fig2--jedna'); serceSlot.append(hv.el); }
+      else { fig.classList.remove('hw-fig2--jedna'); fig.prepend(hv.el); }
+    },
+  }));
 
   /* ─────────── stan ─────────── */
 
@@ -458,11 +467,11 @@ export function mountMapaZawalu(host: HTMLElement, opts: WstawkaOpts): () => voi
     ex.el.hidden = m !== 'task';
     main.hidden = m === 'task';
     if (m === 'task') {
-      ex.miejsce.replaceChildren(scena, sitesBox);
+      ex.miejsce.replaceChildren(sitesBox, extrasRow);
       ex.start();
       if (anim) pojaw(ex.el);
     } else {
-      main.replaceChildren(sitesBox, scena);
+      gora.append(sitesBox); main.prepend(extrasRow);
       revealed = true; answer = null;
       siteChips.disable(false); siteChips.set(siteId);
       render(false);

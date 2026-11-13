@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { sanitizeMarkdown } from "@/lib/sanitize";
-import { isWstawka, rozbierzOpcjeWstawki, WSTAWKA_ZAPROSZENIA, type WstawkaId } from "@helloekg/shared";
+import { isWstawka, rozbierzOpcjeWstawki, WSTAWKA_LABELS, WSTAWKA_ZAPROSZENIA, type WstawkaId } from "@helloekg/shared";
+import { RamaPelnegoEkranu, dolozPrzyciskPelnegoEkranu } from "./PelnyEkranWstawki";
+import type { PelnyEkran } from "@/lib/pelnyEkran";
 
 /**
  * Wyjaśnienie pytania (Markdown) z wstawkami interaktywnymi.
@@ -63,6 +65,7 @@ export function ZwinietaWstawka({ id, opts, zaproszenie }: { id: WstawkaId; opts
   const panel = useRef<HTMLDivElement>(null);
   const sprzatanie = useRef<(() => void) | null>(null);
   const panelId = useId();
+  const pe = useRef<PelnyEkran | null>(null);
 
   useEffect(() => {
     if (!otwarta || wczytana || !host.current) return;
@@ -72,7 +75,9 @@ export function ZwinietaWstawka({ id, opts, zaproszenie }: { id: WstawkaId; opts
       .then(({ LOADERS }) => LOADERS[id]())
       .then((mount) => {
         if (!zywa || !host.current) return;
-        sprzatanie.current = mount(host.current, opts);
+        const zdejmij = mount(host.current, opts);
+        const przycisk = dolozPrzyciskPelnegoEkranu(host.current, (b) => pe.current?.przelacz(b));
+        sprzatanie.current = () => { przycisk(); zdejmij(); };
       })
       .catch((e: unknown) => {
         console.error(`Wstawka „${id}” nie wczytała się`, e);
@@ -105,7 +110,12 @@ export function ZwinietaWstawka({ id, opts, zaproszenie }: { id: WstawkaId; opts
       </button>
       <div className="hk-live__panel" ref={panel} id={panelId} role="region" aria-label="Wstawka interaktywna" hidden={!otwarta && !wczytana}>
         <div className="hk-live__inner">
-          <div className="hk-live__host" ref={host} data-testid="wstawka-host" />
+          <RamaPelnegoEkranu tytul={WSTAWKA_LABELS[id]}>
+            {(p) => {
+              pe.current = p;
+              return <div className="hk-live__host" ref={host} data-testid="wstawka-host" />;
+            }}
+          </RamaPelnegoEkranu>
         </div>
       </div>
     </div>

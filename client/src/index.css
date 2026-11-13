@@ -431,3 +431,98 @@
   .material-bar { background: var(--ink); -webkit-backdrop-filter: none; backdrop-filter: none; border-bottom: 1px solid var(--line2) !important; }
   :focus-visible { outline-width: 3px; outline-offset: 2px; }
 }
+
+/* ───────── Pełny ekran elementów interaktywnych (prośba JK 13.11) ─────────
+   Ten sam element przechodzi w „fixed” z własnym przewijaniem (src/lib/pelnyEkran.ts).
+   Pasek u góry: gdzie jestem i „Zamknij” zawsze w tym samym miejscu; materiał z rozmyciem,
+   treść przewija się pod nim. Wstawki zawsze ciemne („ekran urządzenia”). */
+.pelny-ekran {
+  --pe-bar: calc(56px + env(safe-area-inset-top, 0px));
+  position: fixed; inset: 0; z-index: 50;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  background: var(--ink);
+  scroll-padding-top: calc(var(--pe-bar) + var(--pe-scena, 0px) + 12px); scroll-padding-bottom: 96px;
+}
+.pelny-ekran--wstawka { background: #0B0F14; color-scheme: dark; }
+.pelny-ekran__bar {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--pe-bar); padding-top: env(safe-area-inset-top, 0px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; align-items: center; gap: 12px;
+  background: color-mix(in srgb, var(--ink) 84%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1px solid var(--line);
+}
+.pelny-ekran--wstawka .pelny-ekran__bar { background: rgba(11, 15, 20, .86); border-bottom-color: #1A222B; }
+.pelny-ekran--wstawka .pelny-ekran__bar .label { color: #7E8B94; }
+.pelny-ekran__zamknij {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; flex: none;
+  border-radius: 999px; border: 1px solid var(--line2); background: transparent; color: var(--txt);
+  font: 500 .875rem/1 var(--font-body, inherit); cursor: pointer;
+  transition: transform .1s ease-out, border-color .2s;
+}
+.pelny-ekran__zamknij:hover { border-color: var(--txt3); }
+.pelny-ekran__zamknij:active { transform: scale(.96); }
+.pelny-ekran--wstawka .pelny-ekran__zamknij { color: #F2F6F4; border-color: #223040; }
+.pelny-ekran__tresc {
+  max-width: 1360px; margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pelny-ekran--wstawka [data-hw-pe], .pelny-ekran--wstawka { --hw-pe-top: var(--pe-bar); }
+.pelny-ekran .hk-live__host, .pelny-ekran .hk-wstawka__host { padding: 0; }
+/* przycisk „Pełny ekran” we wstawce: na pełnym ekranie zamyka pasek, więc go nie ma */
+.pelny-ekran [data-pe-przelacz] { display: none; }
+.hk-pe-btn { display: inline-flex; align-items: center; gap: 7px; }
+.hk-pe-btn--rog { position: absolute; top: 10px; right: 10px; z-index: 5; background: #0B0F14 !important; }
+@container hw (max-width: 520px) { .hk-pe-btn > span { display: none; } .hk-pe-btn { padding: 0 13px; } }
+@media (prefers-reduced-transparency: reduce) {
+  .pelny-ekran__bar { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--ink); }
+  .pelny-ekran--wstawka .pelny-ekran__bar { background: #0B0F14; }
+}
+.pelny-ekran:focus, .pelny-ekran:focus-visible { outline: none; }
+
+/* ───────── Pytanie na pełnym ekranie (QuizInterface) ─────────
+   Telefon: treść pytania → scena przypięta pod paskiem → odpowiedzi; „Sprawdź” / „Dalej” przyklejone do dołu
+   (strefa kciuka). Szeroko i telefon w poziomie (monitor w treści): monitor po lewej, odpowiedzi po prawej. */
+.pelny-ekran--pytanie .pelny-ekran__tresc { max-width: 760px; }
+.pelny-ekran--pytanie article { border: 0; border-radius: 0; background: transparent; padding: 14px 0 0; }
+.pelny-ekran--pytanie [data-testid="question-body"]#question-title,
+.pelny-ekran--pytanie #question-title { font-size: clamp(1.0625rem, 1rem + .3vw, 1.25rem) !important; line-height: 1.45 !important; letter-spacing: -.005em !important; }
+.pelny-ekran--pytanie .q-scena {
+  position: sticky; top: var(--pe-bar); z-index: 12;
+  background: var(--ink); margin-inline: -16px; padding: 2px 16px 10px; margin-bottom: 14px !important;
+}
+.pelny-ekran--pytanie .q-scena::after { content: ""; position: absolute; left: 0; right: 0; bottom: -12px; height: 12px; background: linear-gradient(var(--ink), transparent); pointer-events: none; }
+.pelny-ekran--pytanie .q-scena .hw { margin: 8px 0 0 !important; }
+.pelny-ekran--pytanie [data-scena="przypadek"] { position: sticky; top: calc(var(--pe-bar) + 8px); z-index: 12; }
+.pelny-ekran--pytanie .q-nav {
+  position: sticky; bottom: 0; z-index: 14;
+  margin-inline: -16px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--ink) 86%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+  border-top: 1px solid var(--line);
+}
+.pelny-ekran--pytanie .pelny-ekran__tresc { padding-bottom: 0; min-height: calc(100dvh - var(--pe-bar)); display: flex; flex-direction: column; }
+.pelny-ekran--pytanie .q-ramka { flex: 1; display: flex; flex-direction: column; }
+.pelny-ekran--pytanie .q-nav { margin-top: auto; }
+.pelny-ekran--pytanie .q-ramka > article { margin-bottom: 20px; }
+@media (min-width: 1024px), (orientation: landscape) and (max-height: 560px) {
+  .pelny-ekran--split .pelny-ekran__tresc {
+    max-width: 1360px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr);
+    column-gap: 32px; row-gap: 0; align-items: start;
+  }
+  .pelny-ekran--split .q-ramka, .pelny-ekran--split article { display: contents; }
+  .pelny-ekran--split .q-head, .pelny-ekran--split .q-rest, .pelny-ekran--split .q-filled, .pelny-ekran--split .q-nav { grid-column: 2; }
+  .pelny-ekran--split .q-head { padding-top: 14px; }
+  .pelny-ekran--split .q-scena {
+    grid-column: 1; grid-row: 1 / span 6; margin: 0 !important; padding: 14px 0 16px;
+    max-height: calc(100dvh - var(--pe-bar)); overflow: auto; overscroll-behavior: contain;
+  }
+  .pelny-ekran--split .q-scena::after { display: none; }
+  .pelny-ekran--split .q-nav { margin-inline: 0; padding-inline: 0; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .pelny-ekran--split .pelny-ekran__tresc { grid-template-columns: minmax(0, 1.1fr) minmax(280px, 1fr); column-gap: 20px; }
+}
+@media (prefers-reduced-transparency: reduce) { .pelny-ekran--pytanie .q-nav { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--ink); } }

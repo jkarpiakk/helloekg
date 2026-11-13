@@ -13,7 +13,7 @@
  * lokalne: jedna warstwa na płótno, start od bieżącego widoku, ten sam czas i krzywa co scena.
  */
 import {
-  C, chips, clamp, drag, exercise, fmtNum, guma, h, options, projekcja, reducedMotion, s, shell, shuffle, spring, surface,
+  C, chips, clamp, drag, exercise, fmtNum, guma, h, options, projekcja, reducedMotion, s, shell, shuffle, spring, surface, uklad,
   TRYB_SPRAWDZ, TRYB_UCZ, type Spring, type WstawkaOpts,
 } from './core/ui.js';
 import { scena, type ObrazId } from './core/obrazy.js';
@@ -540,13 +540,20 @@ export function mountWezelAv(host: HTMLElement, opts: WstawkaOpts): () => void {
   });
   ex.miejsce.append(opt.el);
 
-  body.append(
-    h('div', { class: 'hw-bar' }, modeChips.el),
-    h('div', { class: 'hw-bar' }, scenChips.el),
-    sub21, subIII,
-    sceneWrap, scr, legend, ctrl, calOut,
-    info, ex.el,
-  );
+  // scena: odźwierny, pasek z diagramem i przyciski cykli; na telefonie na pełnym ekranie odźwierny i legenda idą pod scenę
+  // puste gniazda ukryte, żeby nie dokładały odstępu w siatce
+  const legendSlot = h('div', { hidden: true });
+  const sceneSlot = h('div', { hidden: true });
+  body.append(uklad({
+    gora: [h('div', { class: 'hw-bar' }, modeChips.el), h('div', { class: 'hw-bar' }, scenChips.el)],
+    scena: [sceneWrap, scr, legend, ctrl, calOut],
+    ster: [legendSlot, sub21, subIII, sceneSlot, info, ex.el],
+    naWaskim: (waski) => {
+      legendSlot.hidden = !waski; sceneSlot.hidden = !waski;
+      if (waski) { legendSlot.append(legend); sceneSlot.append(sceneWrap); }
+      else { scr.after(legend); scr.before(sceneWrap); }
+    },
+  }));
 
   /* ─────────── logika ─────────── */
   function paintInfo() {

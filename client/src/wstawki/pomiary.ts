@@ -12,7 +12,7 @@
  * całego cyrkla (okno 6 s / 10 s). Przenikanie zmiany stanu: jedna migawka, start od bieżącego widoku.
  */
 import {
-  C, button, chips, clamp, drag, exercise, fmtNum, guma, h, paper, projekcja, reducedMotion, rng, s, shell, slider, spring, surface, trace,
+  C, button, chips, clamp, drag, exercise, fmtNum, guma, h, paper, projekcja, reducedMotion, rng, s, shell, slider, spring, surface, trace, uklad,
   TRYB_SPRAWDZ, TRYB_UCZ, type Spring, type WstawkaOpts,
 } from './core/ui.js';
 import { beat, volt, type Beat, type LeadName } from './core/model.js';
@@ -167,7 +167,6 @@ export function mountPomiary(host: HTMLElement, opts: WstawkaOpts): () => void {
   const tematChips = chips([
     { v: 'czestosc', label: 'Częstość' }, { v: 'pq-qrs', label: 'PQ i QRS' }, { v: 'qtc', label: 'QTc' }, { v: 'cecha', label: 'Cecha i woltaż' },
   ] as const, temat, (v) => setTryb(v), { label: 'Temat pomiaru' });
-  body.append(h('div', { class: 'hw-bar' }, trybChips.el), h('div', { class: 'hw-bar' }, tematChips.el));
 
   // częstość
   const rytmChips = chips([{ v: 'miarowy', label: 'Rytm miarowy' }, { v: 'niemiarowy', label: 'Rytm niemiarowy' }] as const, st.rytm, (v) => {
@@ -244,7 +243,6 @@ export function mountPomiary(host: HTMLElement, opts: WstawkaOpts): () => void {
   const miaraChips = chips(MIARY.map((m) => ({ v: m, label: m === 'RR' ? 'RR (częstość)' : m })), st.miara, (v) => { st.miara = v; refresh(false); }, { label: 'Mierzony odstęp', small: true });
   const ctlEx = h('div', { class: 'hw-pm-ctl' }, miaraChips.el);
 
-  body.append(ctlCz, ctlPq, ctlQt, ctlV, ctlEx);
 
   /* ─────────── papier ─────────── */
   const mLead = h('span', {}), mScale = h('span', {}), mRead = h('b', {});
@@ -256,9 +254,8 @@ export function mountPomiary(host: HTMLElement, opts: WstawkaOpts): () => void {
   const legend = h('p', { class: 'hw-note' });
   /** Ostrzeżenie w ćwiczeniu: które odstępy nie są jeszcze zmierzone (bez blokady). */
   const uwaga = h('p', { class: 'hw-note hw-warn', hidden: true });
-  /** Miejsce papieru w trybie „Ucz się”; w ćwiczeniu papier przechodzi pod polecenie (`ex.miejsce`). */
-  const kotwica = h('div', { hidden: true });
-  body.append(kotwica, screen, legend);
+  /** Legenda na telefonie na pełnym ekranie (pod sceną, żeby papier zmieścił się u góry). */
+  const legendSlot = h('div', {});
 
   const so: { height: number; label: string } = { height: 200, label: 'Papier EKG z cyrklem' };
   let S: { ctx: CanvasRenderingContext2D; w: number; h: number } | null = null;
@@ -284,7 +281,6 @@ export function mountPomiary(host: HTMLElement, opts: WstawkaOpts): () => void {
   const pearl = h('p', { class: 'hw-pearl' });
   const scaleSvg = s('svg', { viewBox: '0 0 340 58', class: 'hw-svg', style: 'touch-action:auto', role: 'img', 'aria-label': 'Skala QTc z progami z wykładu' });
   const read = h('div', { class: 'hw-read' }, tags, h('div', { class: 'hw-row', style: 'align-items:baseline;gap:6px 16px' }, big, cat), scaleSvg, list, why, pearl);
-  body.append(read);
 
   /* ─────────── ćwiczenie ─────────── */
   let seed0 = Math.floor(Math.random() * 1e6);
@@ -329,7 +325,16 @@ export function mountPomiary(host: HTMLElement, opts: WstawkaOpts): () => void {
     },
     live,
   });
-  body.append(ex.el);
+  // ostrzeżenie o brakujących pomiarach stoi pod poleceniem, nad „Sprawdź”
+  ex.miejsce.append(uwaga);
+
+  // papier zostaje w scenie w obu trybach; wybór odstępu w ćwiczeniu nad papierem (tak mówi polecenie)
+  body.append(uklad({
+    gora: [h('div', { class: 'hw-bar' }, trybChips.el), h('div', { class: 'hw-bar' }, tematChips.el)],
+    scena: [ctlEx, screen, legend],
+    ster: [legendSlot, ctlCz, ctlPq, ctlQt, ctlV, read, ex.el],
+    naWaskim: (waski) => { if (waski) legendSlot.append(legend); else screen.after(legend); },
+  }));
 
   /* ─────────── geometria ─────────── */
 
@@ -902,9 +907,7 @@ export function mountPomiary(host: HTMLElement, opts: WstawkaOpts): () => void {
     tematChips.el.hidden = t === 'cwiczenie';
     ctlCz.hidden = t !== 'czestosc'; ctlPq.hidden = t !== 'pq-qrs'; ctlQt.hidden = t !== 'qtc'; ctlV.hidden = t !== 'cecha'; ctlEx.hidden = t !== 'cwiczenie';
     ex.el.hidden = t !== 'cwiczenie';
-    // w ćwiczeniu papier i wybór odstępu stoją pod poleceniem, nad werdyktem
-    if (t === 'cwiczenie') ex.miejsce.append(ctlEx, screen, legend, uwaga);
-    else { kotwica.after(screen, legend); uwaga.hidden = true; }
+    if (t !== 'cwiczenie') uwaga.hidden = true;
     syncCtl();
     scroller.scrollLeft = 0;
     if (t === 'cwiczenie') ex.start();

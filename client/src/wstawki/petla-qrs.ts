@@ -7,7 +7,7 @@
  * Opcje: wariant=normal|rbbb|lbbb|lvh|rvh|posterior, tryb=progresja|cwiczenie, kamera=V1…V6.
  */
 import {
-  C, TRYB_SPRAWDZ, TRYB_UCZ, chips, clamp, drag, exercise, guma, h, options, projekcja, reducedMotion, loop, rng, s, setA, shell, slider, spring, surface, trace,
+  C, TRYB_SPRAWDZ, TRYB_UCZ, chips, clamp, drag, exercise, guma, h, options, projekcja, reducedMotion, loop, rng, s, setA, shell, slider, spring, surface, trace, uklad,
   type Spring, type Surface, type WstawkaOpts,
 } from './core/ui.js';
 import { LEADS } from './core/model.js';
@@ -108,7 +108,6 @@ export function mountPetlaQrs(host: HTMLElement, opts: WstawkaOpts): () => void 
 
   const camLabel = h('span', { class: 'hw-note', text: 'Trzecia kamera:' });
   const camRow = h('div', { class: 'hw-row', style: 'gap:6px 12px' }, camLabel, camChips.el);
-  body.append(h('div', { class: 'hw-bar' }, modeChips.el), varChips.el);
 
   /* ─────────── przekrój (raster GPT, widok od stóp) ─────────── */
 
@@ -499,10 +498,13 @@ export function mountPetlaQrs(host: HTMLElement, opts: WstawkaOpts): () => void 
   /* ─────────── układ ─────────── */
 
   const ctrl = h('div', { class: 'hw-row', style: 'gap:10px 14px;align-items:end' }, playBtn, h('div', { style: 'flex:1 1 220px;min-width:0' }, tSlider.el));
-  const left = h('div', { class: 'hw-grid' }, secBox, secCap);
-  const right = h('div', { class: 'hw-grid' }, ctrl, trBox, trCap, progBox, camRow, read, exBox);
-  // przekrój jest głównym obrazem, więc dostaje szerszą kolumnę
-  body.append(h('div', { class: 'hw-2col hw-2col--wide-l', style: 'align-items:start' }, left, right));
+  // przekrój jest głównym obrazem: scena (szersza kolumna, na pełnym ekranie przypięta), zapisy i sterowanie obok
+  body.append(uklad({
+    gora: [h('div', { class: 'hw-bar' }, modeChips.el), varChips.el],
+    scena: [secBox, secCap],
+    ster: [ctrl, trBox, trCap, progBox, camRow, read, exBox],
+    dwieKolumny: true,
+  }));
 
   function draw() { if (!ready) return; drawSection(); drawTraces(); drawProg(); }
 
