@@ -189,10 +189,9 @@ const LOGIN_FAIL_MAX_EMAIL = 50;
 
 /** Sieć klienta: IPv4 w całości, IPv6 do prefiksu /64 (klient łatwo zmienia adres w obrębie swojej sieci). */
 function siecKlienta(ip: string | undefined): string {
-  if (!ip) return "brak";
-  const v4 = ip.replace(/^::ffff:/i, "");
-  if (!v4.includes(":")) return v4;
-  return v4.toLowerCase().split(":").slice(0, 4).join(":");
+  // ta sama normalizacja co w limitach na adres: skrócony zapis IPv6 („2a01:110::5”) też daje prefiks /64,
+  // inaczej każdy adres z takiej sieci miałby własny licznik nieudanych logowań
+  return kluczAdresu(ip);
 }
 const loginFailKeys = (email: string, ip?: string) => {
   const e = hashEmail(email);
