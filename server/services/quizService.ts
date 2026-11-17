@@ -21,6 +21,7 @@ import { BEZ_WYMIAROW, ocenHotspot } from "@shared/hotspot";
 import { zaciemnijScenariusze } from "@shared/zaciemnienieScenariusza";
 import { randomBytes } from "crypto";
 import { wymiaryOdKlienta, wymiaryPlanszy } from "../lib/wymiaryPlanszy";
+import { ukladPozaWzorcem } from "@shared/kolejnosc";
 import {
   gradeClinicalCase,
   buildClinicalCaseCorrectAnswer,
@@ -747,7 +748,7 @@ export class QuizService {
       case 'sorting':
         return {
           type: 'sorting',
-          config: { ...c.config, items: this.shuffleArray(c.config.items), correctOrder: [] },
+          config: { ...c.config, items: ukladPozaWzorcem(c.config.items, c.config.correctOrder), correctOrder: [] },
         };
       case 'hotspot':
         return {

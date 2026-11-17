@@ -404,7 +404,7 @@ export default function HotspotQuestion({
         </ul>
       )}
 
-      {showResult && result?.partialScore !== undefined && result.partialScore < 1 && (
+      {showResult && result?.partialScore !== undefined && result.partialScore > 0 && result.partialScore < 1 && (
         <PartialScore score={result.partialScore} />
       )}
     </div>

@@ -56,14 +56,9 @@ export default function SortingQuestion({
   result,
 }: SortingQuestionProps) {
   const reduce = useReducedMotion();
-  const [items, setItems] = useState<string[]>(() => {
-    const shuffled = [...config.items.map((i) => i.id)];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  });
+  // Układ startowy losuje serwer (quizService.shuffleOffPattern: żaden element nie stoi na pozycji ze wzorca).
+  // Drugie tasowanie tutaj zdejmowałoby tę gwarancję, bo klient nie zna wzorca przed odpowiedzią.
+  const [items, setItems] = useState<string[]>(() => config.items.map((i) => i.id));
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeIdRef = useRef<string | null>(null);
   activeIdRef.current = activeId;
@@ -118,10 +113,10 @@ export default function SortingQuestion({
     }
   }, [items, dragY]);
 
-  // Kolejność startowa też jest odpowiedzią — „Sprawdź” aktywny od razu, nawet jeśli losowanie
-  // dało już dobry układ (inaczej nie dałoby się go wysłać bez ruszania czegokolwiek)
+  // Układ startowy nigdy nie jest poprawny, więc „Sprawdź” włącza dopiero pierwsze przestawienie (commit).
+  // Wyjątek: jeden element, którego nie da się przestawić.
   useEffect(() => {
-    if (!disabled) onChange({ type: "sorting", order: items });
+    if (!disabled && items.length < 2) onChange({ type: "sorting", order: items });
     // tylko przy pierwszym wyświetleniu pytania
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

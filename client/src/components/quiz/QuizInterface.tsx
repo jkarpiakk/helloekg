@@ -113,6 +113,28 @@ function filledCount(question: QuizQuestion | undefined, answer: AnswerData | nu
   }
 }
 
+/**
+ * Ile miejsc zostało pustych tam, gdzie puste miejsce zawsze liczy się jako błąd: dopasowanie i przeciąganie
+ * na miejsca. 0 = komplet albo typ bez tej kontroli („do grup”: karta może zostać poza grupami; kolejność
+ * i wskazanie są kompletne z definicji; luki mają własne komunikaty).
+ */
+function missingCount(question: QuizQuestion | undefined, answer: AnswerData | null): number {
+  const cfg = question?.questionConfig as any;
+  if (!cfg?.config) return 0;
+  const a = answer as any;
+  if (cfg.type === "drag_drop" && !cfg.config.grupy) {
+    const need = Math.min(cfg.config.targets?.length ?? 0, cfg.config.sources?.length ?? 0);
+    const filled = new Set((a?.placements ?? []).map((p: { targetId: string }) => p.targetId)).size;
+    return Math.max(0, need - filled);
+  }
+  if (cfg.type === "matching") {
+    const need = Math.min(cfg.config.leftColumn?.length ?? 0, cfg.config.rightColumn?.length ?? 0);
+    const filled = new Set((a?.pairs ?? []).map((p: { leftId: string }) => p.leftId)).size;
+    return Math.max(0, need - filled);
+  }
+  return 0;
+}
+
 function formatTime(ms: number) {
   const s = Math.max(0, Math.round(ms / 1000));
   const m = Math.floor(s / 60);
@@ -253,7 +275,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   /** Długość sesji nauki/powtórki — ustalana raz, na początku sesji */
   const [sessionTotal, setSessionTotal] = useState<number | null>(isExam ? null : reviewIds ? Math.min(SESSION_LENGTH, reviewIds.length) : null);
   // Wyniki tej sesji (z odpowiedzi serwera) — do podsumowania
-  const [tally, setTally] = useState<Record<number, { questionId: string; isCorrect: boolean; timeMs: number }>>({});
+  const [tally, setTally] = useState<Record<number, { questionId: string; isCorrect: boolean; timeMs: number; partial?: number }>>({});
   /** Pierwsze pytanie nauki/powtórki: podpowiedź, że dotknięcie od razu zatwierdza odpowiedź */
   const [instantHint, setInstantHint] = useState(() => !isExam && !readHintSeen());
   /** Pytania pokazane w tej sesji — serwer ich nie powtórzy */
@@ -553,7 +575,13 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
         setStatus("result");
         setTally((prev) => ({
           ...prev,
-          [index]: { questionId: payload.questionId, isCorrect: result.isCorrect, timeMs: result.timeMs },
+          [index]: {
+            questionId: payload.questionId,
+            isCorrect: result.isCorrect,
+            timeMs: result.timeMs,
+            // wynik częściowy (np. 2 z 4 par): w podsumowaniu osobno, nie jako „błędne”
+            partial: result.isCorrect ? undefined : result.partialScore,
+          },
         }));
         queryClient.invalidateQueries({ queryKey: ["/api/progress"] });
         queryClient.invalidateQueries({ queryKey: ["/api/review-queue"], exact: true });
@@ -617,6 +645,8 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
 
   const handleSubmitInteractiveAnswer = () => {
     if (!question || !currentAnswerData || !canAnswer) return;
+    // Nauka/powtórka: puste miejsca to pewny błąd, więc najpierw komplet (także dla Entera)
+    if (!isExam && missingCount(question, currentAnswerData) > 0) return;
     submit({ questionId: question.id, selectedIndex: -1, timeMs: Date.now() - startTime, answerData: currentAnswerData });
   };
 
@@ -765,6 +795,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
     const correct = results.filter((r) => r.isCorrect).length;
     const wrongIds = results.filter((r) => !r.isCorrect).map((r) => r.questionId);
     const wrong = wrongIds.length;
+    const partial = results.filter((r) => !r.isCorrect && (r.partial ?? 0) > 0).length;
 
     const message =
       results.length === 0
@@ -806,6 +837,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
       <Summary
         modeLabel={modeLabel}
         correct={correct}
+        partial={partial}
         total={results.length}
         timeMs={results.reduce((s, r) => s + r.timeMs, 0)}
         message={message}
@@ -879,6 +911,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   // Klucz = pozycja w sesji: ładowanie i treść dzielą jedno wejście, bez podwójnego przesunięcia
   const stageKey = `stage-${sessionNo}-${currentQuestionIndex}`;
   const filled = isInteractive && canAnswer ? filledCount(question, currentAnswerData) : null;
+  const incomplete = !isExam && isInteractive && missingCount(question, currentAnswerData) > 0;
 
   return (
     <div className="min-h-screen bg-[var(--ink)]">
@@ -997,7 +1030,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
                       )}
                       <Button
                         onClick={handleSubmitInteractiveAnswer}
-                        disabled={!currentAnswerData || status === "pending"}
+                        disabled={!currentAnswerData || incomplete || status === "pending"}
                         data-testid="submit-interactive-answer"
                       >
                         {status === "pending" && slow ? (isExam ? "Zapisuję…" : "Sprawdzam…") : isExam ? "Zapisz odpowiedź" : "Sprawdź"}
@@ -1121,6 +1154,7 @@ function StateCard({
 function Summary({
   modeLabel,
   correct,
+  partial = 0,
   total,
   timeMs,
   message,
@@ -1131,6 +1165,8 @@ function Summary({
 }: {
   modeLabel: string;
   correct: number;
+  /** Odpowiedzi częściowo dobre (pytania interaktywne): osobne pole, nie „błędne” */
+  partial?: number;
   total: number;
   timeMs: number;
   message: string;
@@ -1139,7 +1175,15 @@ function Summary({
   secondary: SummaryAction;
   children?: React.ReactNode;
 }) {
-  const wrong = Math.max(0, total - correct);
+  const wrong = Math.max(0, total - correct - partial);
+  const four = partial > 0;
+  // 4 pola: na telefonie 2 x 2 (trzecie pole zaczyna drugi wiersz, więc linię z lewej ma dopiero od sm)
+  const cell = (i: number) =>
+    i === 0
+      ? "pr-4 pt-4"
+      : four && i === 2
+        ? "pr-4 pt-4 sm:border-l sm:border-[var(--line)] sm:pl-6 sm:pr-0"
+        : "border-l border-[var(--line)] pl-4 pt-4 sm:pl-6";
   return (
     <div className="wrap wrap--narrow py-12 sm:py-16">
       <motion.section
@@ -1161,13 +1205,14 @@ function Summary({
           {message}
         </p>
 
-        <dl className="grid grid-cols-3 border-t border-[var(--line)]">
+        <dl className={`grid ${four ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"} border-t border-[var(--line)]`}>
           {[
             ["Poprawne", String(correct)],
+            ...(four ? [["Częściowo", String(partial)]] : []),
             ["Błędne", String(wrong)],
             ["Czas", formatTime(timeMs)],
           ].map(([k, v], i) => (
-            <div key={k} className={i > 0 ? "border-l border-[var(--line)] pl-4 pt-4 sm:pl-6" : "pr-4 pt-4"}>
+            <div key={k} className={cell(i)}>
               <dt className="label">{k}</dt>
               <dd className="num mt-1.5 text-[clamp(1.25rem,1.1rem+.6vw,1.625rem)] text-[var(--txt)]">{v}</dd>
             </div>

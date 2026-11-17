@@ -32,11 +32,14 @@ export default function MatchingQuestion({
 
   const slots: BoardSlot[] = config.leftColumn.map((left) => {
     const isCorrect = showResult && result?.feedback?.correctItems?.includes(left.id);
-    const isIncorrect = showResult && result?.feedback?.incorrectItems?.includes(left.id);
     const correctRightId =
       result?.correctAnswer?.type === "matching"
         ? result.correctAnswer.pairs.find((p) => p.leftId === left.id)?.rightId
         : config.correctPairs.find((p) => p.leftId === left.id)?.rightId;
+    // Serwer ocenia tylko połączone pary: pusty wiersz, który ma parę we wzorcu, to też błąd (z linią „Poprawnie”)
+    const isIncorrect =
+      showResult &&
+      (result?.feedback?.incorrectItems?.includes(left.id) || (!!result && !isCorrect && !!correctRightId && !pairs[left.id]));
     return {
       id: left.id,
       label: left.text,
