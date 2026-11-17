@@ -22,6 +22,7 @@ import { zaciemnijScenariusze } from "@shared/zaciemnienieScenariusza";
 import { randomBytes } from "crypto";
 import { wymiaryOdKlienta, wymiaryPlanszy } from "../lib/wymiaryPlanszy";
 import { ukladPozaWzorcem } from "@shared/kolejnosc";
+import { ocenLuki } from "@shared/luki";
 import {
   gradeClinicalCase,
   buildClinicalCaseCorrectAnswer,
@@ -168,57 +169,9 @@ export class QuizService {
     return { isCorrect, partialScore, correctItems, incorrectItems };
   }
 
+  /** Luki oceniane tak samo jak w studiu (Z-117, shared/luki.ts) */
   validateFillBlankAnswer(config: FillBlankConfig, answer: { type: 'fill_blank'; filledBlanks: Array<{ blankId: string; value: string }> }): { isCorrect: boolean; partialScore: number; correctItems: string[]; incorrectItems: string[] } {
-    const correctItems: string[] = [];
-    const incorrectItems: string[] = [];
-    
-    for (const filled of answer.filledBlanks) {
-      const blank = config.blanks.find(b => b.id === filled.blankId);
-      if (!blank) {
-        incorrectItems.push(filled.blankId);
-        continue;
-      }
-      
-      let isMatch = false;
-      const normalizedValue = filled.value.trim().toLowerCase();
-      
-      switch (blank.validationType) {
-        case 'exact':
-          isMatch = blank.correctAnswers.some(correct => 
-            correct.toLowerCase() === normalizedValue
-          );
-          break;
-        case 'regex':
-          if (blank.regex) {
-            try {
-              const regex = new RegExp(blank.regex, 'i');
-              isMatch = regex.test(filled.value.trim());
-            } catch {
-              isMatch = false;
-            }
-          }
-          break;
-        case 'numeric_range':
-          if (blank.numericRange) {
-            const numValue = parseFloat(filled.value.replace(',', '.'));
-            isMatch = !isNaN(numValue) && 
-              numValue >= blank.numericRange.min && 
-              numValue <= blank.numericRange.max;
-          }
-          break;
-      }
-      
-      if (isMatch) {
-        correctItems.push(filled.blankId);
-      } else {
-        incorrectItems.push(filled.blankId);
-      }
-    }
-    
-    const partialScore = correctItems.length / config.blanks.length;
-    const isCorrect = incorrectItems.length === 0 && correctItems.length === config.blanks.length;
-    
-    return { isCorrect, partialScore, correctItems, incorrectItems };
+    return ocenLuki(config.blanks, answer.filledBlanks);
   }
 
   validateMatchingAnswer(config: MatchingConfig, answer: { type: 'matching'; pairs: Array<{ leftId: string; rightId: string }> }): { isCorrect: boolean; partialScore: number; correctItems: string[]; incorrectItems: string[] } {
