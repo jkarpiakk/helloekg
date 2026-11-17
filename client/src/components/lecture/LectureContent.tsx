@@ -1,6 +1,6 @@
 import { createElement, Fragment, useCallback, useMemo, useState, type ReactNode } from "react";
 import ImageLightbox from "@/components/quiz/ImageLightbox";
-import { EkgCanvas, isRhythm } from "@/components/ekg/EkgCanvas";
+import { isRhythm } from "@/components/ekg/EkgCanvas";
 import OrchestraMethod from "@/components/course/OrchestraMethod";
 import { WstawkaOtwarta } from "@/components/quiz/WstawkaOtwarta";
 import { isWstawka, parsujOpcjeWstawki } from "@helloekg/shared";
@@ -71,9 +71,14 @@ function renderNode(n: ChildNode, ctx: Ctx, key: string, dropBlank: boolean): Re
 
   if (tag === "div" && el.hasAttribute("data-ekg")) {
     const r = (el.getAttribute("data-ekg") ?? "").trim();
-    const h = parseInt(el.getAttribute("data-height") ?? "", 10);
-    const height = Number.isFinite(h) ? Math.min(240, Math.max(48, h)) : 90;
-    if (isRhythm(r)) return <EkgCanvas key={key} rhythm={r} height={height} />;
+    // Ten sam kompaktowy kardiomonitor co w podglądzie studia (siatka, HR, Pauza), zamiast gołego paska
+    if (isRhythm(r)) {
+      return (
+        <div key={key} className="not-prose my-6 [text-align:left]">
+          <WstawkaOtwarta id="kardiomonitor" opts={{ scenariusz: r, wariant: "kompakt" }} />
+        </div>
+      );
+    }
     return ctx.canSeeGaps ? <GapNote key={key} text={`Nieznany rytm EKG: „${r || "—"}”`} /> : null;
   }
 
@@ -90,7 +95,7 @@ function renderNode(n: ChildNode, ctx: Ctx, key: string, dropBlank: boolean): Re
     // Wstawki ze studia (etap 5a): ten sam kod co w studiu, ładowany przy zbliżeniu do ekranu
     if (isWstawka(w)) {
       return (
-        <div key={key} className="not-prose my-8 [text-align:left]">
+        <div key={key} className="hk-wstawka-szeroka not-prose my-8 [text-align:left]">
           <WstawkaOtwarta id={w} opts={parsujOpcjeWstawki(el.getAttribute("data-opts") ?? "")} />
         </div>
       );
