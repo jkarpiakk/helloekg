@@ -1,0 +1,63 @@
+{
+  "scenariusz_w_bazie": "mobitz-2-szerokie-qrs",
+  "powtorka": "Pacjentka z zawrotami głowy leży na obserwacji. Pielęgniarka prosi cię o ocenę monitora.\n\n::wstawka kardiomonitor scenariusz=mobitz-2-szerokie-qrs pytanie=tak\n\nZatrzymaj zapis przyciskiem Pauza i zmierz PQ w kolejnych pobudzeniach, także przed przerwą i po niej. Jakie zaburzenie przewodzenia pokazuje monitor?",
+  "nauka": "(nauka podała inne pytanie: 0616f707-7f25-478b-9ca4-84e3798165de)",
+  "egzamin": "Pacjentka z zawrotami głowy leży na obserwacji. Pielęgniarka prosi cię o ocenę monitora.\n\n::wstawka kardiomonitor scenariusz=mobitz-2-szerokie-qrs pytanie=tak\n\nZatrzymaj zapis przyciskiem Pauza i zmierz PQ w kolejnych pobudzeniach, także przed przerwą i po niej. Jakie zaburzenie przewodzenia pokazuje monitor?",
+  "hotspot_konfiguracja": {
+    "type": "hotspot",
+    "config": {
+      "imageUrl": "/content-assets/fd1a3e0d48f99b0fb7653d4968778394e82ce48f8c7c96aa3b7a38e7faa9485a.png",
+      "hotspots": [
+        {
+          "id": "ST",
+          "label": "uniesiony odcinek ST za punktem J",
+          "shape": "rect",
+          "coords": [
+            38,
+            37.5,
+            50,
+            52.5
+          ],
+          "isCorrect": false
+        },
+        {
+          "id": "QRS",
+          "label": "zespół QRS: depolaryzacja komór",
+          "shape": "rect",
+          "coords": [
+            26,
+            22.5,
+            37,
+            82.5
+          ],
+          "isCorrect": false
+        },
+        {
+          "id": "T",
+          "label": "załamek T po odcinku ST",
+          "shape": "rect",
+          "coords": [
+            52,
+            37.5,
+            64,
+            62.5
+          ],
+          "isCorrect": false
+        },
+        {
+          "id": "PQ",
+          "label": "odcinek PQ między końcem P a początkiem QRS",
+          "shape": "rect",
+          "coords": [
+            15,
+            51.25,
+            25,
+            62.5
+          ],
+          "isCorrect": false
+        }
+      ],
+      "allowMultiple": false
+    }
+  }
+}

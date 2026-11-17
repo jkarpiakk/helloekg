@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { isWstawka, rozbierzOpcjeWstawki, WSTAWKA_LABELS, type WstawkaId } from "@helloekg/shared";
 import { RamaPelnegoEkranu, dolozPrzyciskPelnegoEkranu } from "./PelnyEkranWstawki";
+import { odkryjScenariusz } from "@shared/zaciemnienieScenariusza";
+
+/**
+ * Z-009: w treści pytania serwer wysyła skrót id scenariusza z solą (`scenariusz=<skrót> sol=<sól>`).
+ * Prawdziwe id odnajdujemy dopiero tutaj, z listy scenariuszy w kodzie wstawki; nie trafia do DOM.
+ */
+async function jawneOpcje(id: WstawkaId, opts: Record<string, string>): Promise<Record<string, string>> {
+  if (id !== "kardiomonitor" || !opts.sol || !opts.scenariusz) return opts;
+  const { WSZYSTKIE } = await import("@/wstawki/kardiomonitor.scenariusze");
+  return odkryjScenariusz(opts, WSZYSTKIE.map((s) => s.id));
+}
 
 /**
  * Wstawka interaktywna otwarta od razu: w wykładzie (etap 5a) i w treści pytania (monitor, etap 5c).
@@ -53,11 +64,11 @@ function Wstawka({ id, opts, wPytaniu = false, onPelnyEkran }: { id: WstawkaId; 
     let sprzatanie: (() => void) | null = null;
     let przycisk: (() => void) | null = null;
     import("@/wstawki/index")
-      .then(({ LOADERS }) => LOADERS[id]())
-      .then((mount) => {
+      .then(({ LOADERS }) => Promise.all([LOADERS[id](), jawneOpcje(id, opts)]))
+      .then(([mount, jawne]) => {
         if (!zywa || !host.current) return;
         const h = host.current;
-        sprzatanie = mount(h, opts);
+        sprzatanie = mount(h, jawne);
         if (naPelny.current) przycisk = dolozPrzyciskPelnegoEkranu(h, (b) => naPelny.current?.(b));
       })
       .catch((e: unknown) => { console.error(`Wstawka „${id}” nie wczytała się`, e); if (zywa) setBlad(true); });

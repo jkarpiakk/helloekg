@@ -18,6 +18,8 @@ import type {
 import { gradeImageChoice, kolejnoscOpcji, poprawnaOdpowiedzZapisow } from "@shared/wyborZapisu";
 import { czyGrupy, grupaKarty, ocenGrupy } from "@shared/dragDropGrupy";
 import { BEZ_WYMIAROW, ocenHotspot } from "@shared/hotspot";
+import { zaciemnijScenariusze } from "@shared/zaciemnienieScenariusza";
+import { randomBytes } from "crypto";
 import { wymiaryOdKlienta, wymiaryPlanszy } from "../lib/wymiaryPlanszy";
 import {
   gradeClinicalCase,
@@ -815,7 +817,8 @@ export class QuizService {
     return {
       id: question.id,
       title: question.title || "",
-      bodyMd: question.bodyMd,
+      // Z-102: id scenariusza kardiomonitora (nazywa rozpoznanie) idzie do przeglądarki jako skrót z losową solą
+      bodyMd: zaciemnijScenariusze(question.bodyMd, randomBytes(4).toString("hex")),
       imageUrl: question.imageUrl || undefined,
       answers,
       sectionId: question.sectionId,

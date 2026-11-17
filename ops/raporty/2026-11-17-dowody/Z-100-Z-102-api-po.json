@@ -1,0 +1,14 @@
+{
+  "scenariusz_w_bazie": "mobitz-2-szerokie-qrs",
+  "powtorka": "Pacjentka z zawrotami głowy leży na obserwacji. Pielęgniarka prosi cię o ocenę monitora.\n\n::wstawka kardiomonitor scenariusz=ccpk07h7h6 sol=006fd46b pytanie=tak\n\nZatrzymaj zapis przyciskiem Pauza i zmierz PQ w kolejnych pobudzeniach, także przed przerwą i po niej. Jakie zaburzenie przewodzenia pokazuje monitor?",
+  "nauka": "(nauka podała inne pytanie: 0616f707-7f25-478b-9ca4-84e3798165de)",
+  "egzamin": "Pacjentka z zawrotami głowy leży na obserwacji. Pielęgniarka prosi cię o ocenę monitora.\n\n::wstawka kardiomonitor scenariusz=ly4sfu6i3u sol=028cf7ad pytanie=tak\n\nZatrzymaj zapis przyciskiem Pauza i zmierz PQ w kolejnych pobudzeniach, także przed przerwą i po niej. Jakie zaburzenie przewodzenia pokazuje monitor?",
+  "hotspot_konfiguracja": {
+    "type": "hotspot",
+    "config": {
+      "imageUrl": "/content-assets/fd1a3e0d48f99b0fb7653d4968778394e82ce48f8c7c96aa3b7a38e7faa9485a.png",
+      "hotspots": [],
+      "allowMultiple": false
+    }
+  }
+}
