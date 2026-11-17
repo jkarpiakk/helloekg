@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -6,6 +6,7 @@ import type { HotspotConfig, AnswerData, QuizResult } from "@/types";
 import { DRAG_THRESHOLD } from "./gesture";
 import PartialScore from "./PartialScore";
 import { BrakObrazu, useBladObrazu } from "../BrakObrazu";
+import { BEZ_WYMIAROW, trafiaObszar, type WymiaryObrazu } from "@shared/hotspot";
 
 interface HotspotQuestionProps {
   config: HotspotConfig;
@@ -17,38 +18,9 @@ interface HotspotQuestionProps {
 
 type Hotspot = HotspotConfig["hotspots"][0];
 
-/** Trafienie w obszar — współrzędne w % obrazu (0–100); rect = [lewo, góra, prawo, dół] */
-function isPointInHotspot(x: number, y: number, hotspot: Hotspot): boolean {
-  switch (hotspot.shape) {
-    case "rect": {
-      const [x1, y1, x2, y2] = hotspot.coords;
-      return x >= x1 && x <= x2 && y >= y1 && y <= y2;
-    }
-    case "circle": {
-      const [cx, cy, r] = hotspot.coords;
-      const distance = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-      return distance <= r;
-    }
-    case "polygon": {
-      const points = [];
-      for (let i = 0; i < hotspot.coords.length; i += 2) {
-        points.push({ x: hotspot.coords[i], y: hotspot.coords[i + 1] });
-      }
-      let inside = false;
-      for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-        const xi = points[i].x,
-          yi = points[i].y;
-        const xj = points[j].x,
-          yj = points[j].y;
-        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-          inside = !inside;
-        }
-      }
-      return inside;
-    }
-    default:
-      return false;
-  }
+/** Trafienie liczone jak w studiu (shared/hotspot.ts): koło ma promień w % szerokości, więc zostaje kołem */
+function isPointInHotspot(x: number, y: number, hotspot: Hotspot, img: WymiaryObrazu): boolean {
+  return trafiaObszar(hotspot, { x, y }, img);
 }
 
 export default function HotspotQuestion({
@@ -67,6 +39,18 @@ export default function HotspotQuestion({
   const [aim, setAim] = useState<{ x: number; y: number } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const { zepsuty, onError: bladPlanszy } = useBladObrazu(config.imageUrl);
+  // Wymiary pliku planszy: bez nich koło z konfiguracji liczyłoby się (i rysowało) jako elipsa
+  const [wymiary, setWymiary] = useState<WymiaryObrazu>(BEZ_WYMIAROW);
+  const naWczytanie = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const im = e.currentTarget;
+    if (im.naturalWidth > 0 && im.naturalHeight > 0) setWymiary({ width: im.naturalWidth, height: im.naturalHeight });
+  };
+  useEffect(() => {
+    const im = imageRef.current;
+    if (im?.complete && im.naturalWidth > 0) setWymiary({ width: im.naturalWidth, height: im.naturalHeight });
+  }, [config.imageUrl]);
+  /** Pionowy promień koła w % wysokości (promień w konfiguracji to % szerokości) */
+  const ry = (r: number) => (r * wymiary.width) / wymiary.height;
 
   const toPercent = (clientX: number, clientY: number) => {
     const rect = imageRef.current!.getBoundingClientRect();
@@ -85,7 +69,7 @@ export default function HotspotQuestion({
       let foundHotspot = false;
 
       for (const hotspot of config.hotspots) {
-        if (isPointInHotspot(x, y, hotspot)) {
+        if (isPointInHotspot(x, y, hotspot, wymiary)) {
           foundHotspot = true;
           if (config.allowMultiple) {
             if (newClickedHotspots.has(hotspot.id)) {
@@ -220,7 +204,7 @@ export default function HotspotQuestion({
       }
       case "circle": {
         const [cx, cy, r] = hotspot.coords;
-        return <ellipse key={hotspot.id} cx={cx} cy={cy} rx={r} ry={r} {...common} />;
+        return <ellipse key={hotspot.id} cx={cx} cy={cy} rx={r} ry={ry(r)} {...common} />;
       }
       case "polygon": {
         const points = [];
@@ -235,7 +219,7 @@ export default function HotspotQuestion({
   };
 
   const markerFor = (coord: { x: number; y: number }) =>
-    config.hotspots.some((h) => h.isCorrect && isPointInHotspot(coord.x, coord.y, h));
+    config.hotspots.some((h) => h.isCorrect && isPointInHotspot(coord.x, coord.y, h, wymiary));
 
   // Plansza bez pliku albo plik nie wczytał się: bez niej nie da się odpowiedzieć
   if (!config.imageUrl || zepsuty) {
@@ -288,6 +272,7 @@ export default function HotspotQuestion({
           draggable={false}
           className="block h-auto w-full"
           onError={bladPlanszy}
+          onLoad={naWczytanie}
           data-testid="hotspot-image"
         />
 
@@ -356,7 +341,7 @@ export default function HotspotQuestion({
                 case "circle": {
                   const [cx, cy, r] = hotspot.coords;
                   labelX = cx;
-                  labelY = cy + r + 3;
+                  labelY = cy + ry(r) + 3;
                   break;
                 }
               }
