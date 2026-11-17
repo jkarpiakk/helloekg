@@ -508,7 +508,10 @@ async function pulaTestuZRaportem() {
   const dobre: PytanieTestu[] = [];
   const odrzucone: Array<{ id: string; externalId: string | null; tytul: string | null; powod: string }> = [];
   for (const r of rows) {
-    const powod = powodOdrzuceniaPytaniaTestu({ questionType: r.question_type, answers: r.answers });
+    // Wstawka w treści (np. kardiomonitor scenariusz=<rozpoznanie>): strona testu jej nie rysuje, a linia z nazwą
+    // scenariusza poszłaby do przeglądarki jako zwykły tekst, czyli podpowiedź do pytania zaliczeniowego
+    const powod = powodOdrzuceniaPytaniaTestu({ questionType: r.question_type, answers: r.answers })
+      ?? (/^[ \t]*::wstawka[ \t]/im.test(r.body_md ?? "") ? "treść zawiera wstawkę interaktywną (test jej nie rysuje, a nazwa scenariusza zdradza odpowiedź)" : null);
     if (powod) odrzucone.push({ id: r.id, externalId: externalIdZ(r.tags), tytul: r.title, powod });
     else dobre.push(r);
   }
