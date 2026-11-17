@@ -1181,6 +1181,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "sectionId jest wymagane" });
       }
 
+      // Nauka z tematu: kursant dostaje pytania tylko z widocznego i niezablokowanego tematu i modułu
+      // (jak rozdziały wykładu); zespół widzi wszystko
+      if (sectionId && !["owner", "admin", "reviewer"].includes(req.user!.role)) {
+        const [temat] = typeof sectionId === "string" && UUID_RE.test(sectionId)
+          ? await db.select({ id: sections.id }).from(sections)
+              .innerJoin(modules, eq(modules.id, sections.moduleId))
+              .where(and(eq(sections.id, sectionId), eq(sections.isVisible, true), eq(modules.isVisible, true), eq(sections.isLocked, false), eq(modules.isLocked, false)))
+          : [];
+        if (!temat) return res.status(404).json({ error: "Brak dostępnych pytań" });
+      }
+
       const question = await quizService.getQuestionForUser(
         req.user!.id,
         sectionId as string || null,
@@ -2777,6 +2788,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sectionId: sections.id,
             sectionVisible: sections.isVisible,
             moduleVisible: modules.isVisible,
+            sectionLocked: sections.isLocked,
+            moduleLocked: modules.isLocked,
           })
           .from(sections)
           .leftJoin(modules, eq(sections.moduleId, modules.id))
@@ -2787,8 +2800,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ error: "Sekcja nie znaleziona" });
         }
         
-        const { sectionVisible, moduleVisible } = sectionCheck[0];
-        if (sectionVisible === false || moduleVisible === false) {
+        // „Zablokowany” (moduł wyłączony w becie) dotąd pilnował tylko interfejs
+        const { sectionVisible, moduleVisible, sectionLocked, moduleLocked } = sectionCheck[0];
+        if (sectionVisible === false || moduleVisible === false || sectionLocked === true || moduleLocked === true) {
           return res.status(403).json({ error: "Ta treść jest obecnie niedostępna" });
         }
       }

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { storage } from "../storage";
 import { db } from "../db";
-import { examSessions, progress, attempts, questions } from "@shared/schema";
+import { examSessions, progress, attempts, questions, sections, modules } from "@shared/schema";
 import { and, eq, lt, sql } from "drizzle-orm";
 import type { 
   Question, 
@@ -404,7 +404,13 @@ export class QuizService {
     let allQuestions = await db
       .select({ id: questions.id, questionType: questions.questionType })
       .from(questions)
-      .where(and(eq(questions.status, "published"), eq(questions.pool, "practice")));
+      .innerJoin(sections, eq(sections.id, questions.sectionId))
+      .innerJoin(modules, eq(modules.id, sections.moduleId))
+      // tylko tematy i moduły widoczne i niezablokowane: egzamin nie odsłania treści wyłączonej w becie
+      .where(and(
+        eq(questions.status, "published"), eq(questions.pool, "practice"),
+        eq(sections.isVisible, true), eq(modules.isVisible, true), eq(sections.isLocked, false), eq(modules.isLocked, false),
+      ));
 
     // Przypadki kliniczne pokazują wynik krok po kroku (to ich sens dydaktyczny),
     // więc nie dałoby się ich zadać na egzaminie bez zdradzania odpowiedzi
