@@ -2463,10 +2463,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Z-119 (3): pola zmiany zgłoszenia sprawdzane schematem (dotąd zapisywało się to, co przyszło)
+  const zmianaZgloszenia = z.object({
+    status: z.enum(["open", "in_progress", "resolved", "closed", "nowe", "w_analizie", "wdrozone", "odrzucone"]),
+    adminResponse: z.string().trim().max(5000).optional(),
+  }).strict();
   app.put("/api/admin/support/tickets/:id", requireKonto, requireReviewer, async (req, res) => {
     try {
       const { id } = req.params;
-      const { status, adminResponse } = req.body;
+      if (!UUID_RE.test(id)) return res.status(404).json({ error: "Zgłoszenie nie znalezione" });
+      const dane = zmianaZgloszenia.safeParse(req.body);
+      if (!dane.success) return res.status(400).json({ error: "Nieprawidłowe dane zgłoszenia" });
+      const { status, adminResponse } = dane.data;
       
       const updateData: any = { status, updatedAt: new Date() };
       if (adminResponse) {
