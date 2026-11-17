@@ -133,7 +133,7 @@ const RULES: Array<{ match: RegExp; art: ModuleArt }> = [
         src: "/img/course/539d4e0fbd41.webp",
         width: 1200,
         height: 1392,
-        alt: "Lokalizacja zmian ST–T: mapa dwunastu odprowadzeń i ścian serca",
+        alt: "Lokalizacja zmian ST-T: mapa dwunastu odprowadzeń i ścian serca",
         focus: "62% 22%",
         thumbZoom: 2.4,
         thumbFocus: "86% 22%",

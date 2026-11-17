@@ -129,7 +129,7 @@ export default function DynamicLecture() {
     if (!chapters.length) return null;
     const n = chapters.length;
     const min = readingMinutes(countWords(chapters));
-    return `${n} ${plural(n, "rozdział", "rozdziały", "rozdziałów")} · ~${min} min czytania`;
+    return `${n} ${plural(n, "rozdział", "rozdziały", "rozdziałów")} · około ${min} min czytania`;
   }, [chapterData]);
   const topic = useMemo(() => (ctx ? pickRhythm(ctx.module.title, ctx.section.title) : null), [ctx]);
 

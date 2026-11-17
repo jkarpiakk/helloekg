@@ -113,7 +113,7 @@ export default function FillBlankQuestion({
           inputMode={blank.validationType === "numeric_range" ? "decimal" : undefined}
           autoComplete="off"
           spellCheck={false}
-          aria-label={`Luka ${blankIndex + 1}${blank.hint ? ` — ${blank.hint}` : ""}`}
+          aria-label={`Luka ${blankIndex + 1}${blank.hint ? `: ${blank.hint}` : ""}`}
           aria-invalid={problem ? true : undefined}
           aria-describedby={problem ? `blank-problem-${blank.id}` : undefined}
           className={cn(

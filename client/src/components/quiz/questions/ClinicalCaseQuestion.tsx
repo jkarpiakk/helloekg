@@ -217,7 +217,7 @@ export default function ClinicalCaseQuestion({
               <div className={cn("min-w-0", isLast ? "pb-0" : "pb-7")}>
                 <p className="label flex min-h-8 items-center">
                   Krok {pad(i + 1)} / {pad(steps.length)}
-                  {done && <span className="sr-only"> — {ok ? "dobrze" : "błędnie"}</span>}
+                  {done && <span className="sr-only"> ({ok ? "dobrze" : "błędnie"})</span>}
                 </p>
 
                 {!visible ? (
@@ -231,7 +231,7 @@ export default function ClinicalCaseQuestion({
                     />
 
                     {step.kind === "single" ? (
-                      <div className="grid gap-[10px]" role="group" aria-label={`Odpowiedzi — krok ${i + 1}`}>
+                      <div className="grid gap-[10px]" role="group" aria-label={`Odpowiedzi, krok ${i + 1}`}>
                         {(orders[i] ?? []).map((idx, pos) => {
                           const opt = step.answers[idx];
                           const picked = a?.selectedIndex === idx;
@@ -253,8 +253,8 @@ export default function ClinicalCaseQuestion({
                               <span>
                                 <span className="sr-only">{letter(pos)}. </span>
                                 {opt.text}
-                                {isRight && <span className="sr-only"> — poprawna odpowiedź</span>}
-                                {isWrong && <span className="sr-only"> — twoja odpowiedź, błędna</span>}
+                                {isRight && <span className="sr-only"> (poprawna odpowiedź)</span>}
+                                {isWrong && <span className="sr-only"> (twoja odpowiedź, błędna)</span>}
                               </span>
                               <span className="opt__mark" aria-hidden>
                                 {isRight && <Check className="h-[18px] w-[18px]" strokeWidth={2.25} />}

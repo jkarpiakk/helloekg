@@ -62,12 +62,13 @@ function QuestionImage({ url, onOpen }: { url: string; onOpen: (url: string, ori
     <button
       type="button"
       onClick={(e) => onOpen(url, e.currentTarget)}
-      className="group relative mb-6 block w-full overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--ink)] transition-[transform,border-color] duration-200 ease-out hover:border-[var(--line2)] active:scale-[.99]"
+      className="group mb-6 block w-full overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--ink)] transition-[transform,border-color] duration-200 ease-out hover:border-[var(--line2)] active:scale-[.99]"
       aria-label="Powiększ zapis EKG"
       data-testid="question-image"
     >
       <img src={url} alt="Zapis EKG" className="block max-h-[60vh] w-full object-contain" onError={onError} />
-      <span className="pointer-events-none absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-full border border-[var(--line2)] bg-[var(--panel)] px-3 py-1.5 text-meta text-[var(--txt2)] transition-colors duration-200 group-hover:text-[var(--txt)]">
+      {/* Pod obrazem, nie na nim: nakładka w rogu zasłaniała podpis skali zapisu (25 mm/s · 10 mm/mV) */}
+      <span className="flex items-center justify-end gap-1.5 border-t border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-meta text-[var(--txt2)] transition-colors duration-200 group-hover:text-[var(--txt)]">
         <Maximize2 className="h-3.5 w-3.5" aria-hidden />
         Powiększ
       </span>
@@ -199,9 +200,9 @@ export default function QuestionCard({
                 <span>
                   <span className="sr-only">{letter(index)}. </span>
                   {answer.text}
-                  {isRight && <span className="sr-only"> — poprawna odpowiedź</span>}
-                  {isWrong && <span className="sr-only"> — twoja odpowiedź, błędna</span>}
-                  {isExamPick && status !== "saved" && <span className="sr-only"> — zaznaczona</span>}
+                  {isRight && <span className="sr-only"> (poprawna odpowiedź)</span>}
+                  {isWrong && <span className="sr-only"> (twoja odpowiedź, błędna)</span>}
+                  {isExamPick && status !== "saved" && <span className="sr-only"> (zaznaczona)</span>}
                 </span>
                 <span className="opt__mark" aria-hidden>
                   {isRight && <Check className="h-[18px] w-[18px]" strokeWidth={2.25} />}

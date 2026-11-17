@@ -14,7 +14,7 @@ export function LectureHero({
   label: string;
   title: string;
   moduleName: string;
-  /** np. „5 rozdziałów · ~18 min czytania”; null, dopóki nie znamy rozdziałów */
+  /** np. „5 rozdziałów · około 18 min czytania”; null, dopóki nie znamy rozdziałów */
   meta: string | null;
   rhythm: Rhythm;
   /** Podpis rytmu tylko wtedy, gdy zapis odpowiada tematowi */

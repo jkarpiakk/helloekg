@@ -37,7 +37,7 @@ const STEPS: Step[] = [
   {
     id: "pr",
     chip: "PQ",
-    label: "02 · Odstęp PQ · 120–200 ms",
+    label: "02 · Odstęp PQ · 120-200 ms",
     title: "Węzeł AV pilnuje tempa.",
     body: "Tu impuls celowo zwalnia. Komórki węzła, których depolaryzację napędza prąd wapniowy, zatrzymują go na mniej więcej jedną dziesiątą sekundy, żeby przedsionki zdążyły dopełnić komory. Na EKG widać tylko płaską linię, a dla pracy serca ta chwila ma ogromne znaczenie.",
     clinic: "PQ powyżej 200 ms to blok AV I stopnia. Jeśli wydłuża się, aż jedno pobudzenie wypada, to Wenckebach.",
@@ -46,7 +46,7 @@ const STEPS: Step[] = [
     id: "qrs",
     chip: "QRS",
     label: "03 · Zespół QRS · < 120 ms",
-    title: "Układ Hisa–Purkinjego to autostrada.",
+    title: "Układ Hisa-Purkinjego to autostrada.",
     body: "Impuls biegnie przez pęczek Hisa, dalej obiema odnogami do sieci Purkinjego, z prędkością do 4 m/s. Cały mięsień komór pobudza się w około jedną dziesiątą sekundy i dlatego prawidłowy QRS jest wąski.",
     clinic: "QRS 120 ms lub szerszy to najczęściej blok odnogi albo pobudzenie, które powstało w samej komorze.",
   },
@@ -61,7 +61,7 @@ const STEPS: Step[] = [
   {
     id: "t",
     chip: "QT",
-    label: "05 · Załamek T · QTc < 450–460 ms",
+    label: "05 · Załamek T · QTc < 450-460 ms",
     title: "Repolaryzacja stroi instrumenty.",
     body: "Komory wracają do spoczynku od zewnątrz do środka, dlatego załamek T ma zwykle ten sam kierunek co QRS. QT obejmuje cały występ. Kiedy się przeciąga, kolejne pobudzenie może wejść za wcześnie.",
     clinic: "QTc powyżej 500 ms: odstaw leki wydłużające QT, sprawdź potas i magnez.",
