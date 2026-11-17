@@ -70,3 +70,32 @@ export function earlierUnpassed<T extends OrderItem>(items: T[], sectionId: stri
   if (i <= 0) return [];
   return items.slice(0, i).filter((x) => !isPassed(x.section));
 }
+
+/**
+ * Jedna etykieta jednostki kursu (Z-127, czeka na decyzję JK). Dziś są dwie nazwy i dwie numeracje:
+ * „Moduł 01 · Temat 04” liczy pozycję na liście modułu (QuizInterface, OrderHint), a „Moduł 1 · Wykład 3”
+ * liczy tylko tematy z wykładem (dynamic-lecture), więc ta sama jednostka bywa „Temat 04” i „Wykład 3”.
+ * JK wybiera słowo i numerację; potem wszystkie miejsca wołają tę funkcję.
+ *   numeracja „lista”: pozycja na liście modułu (jak w Kursie); „wyklady”: kolejny temat z wykładem.
+ *   Temat bez wykładu przy „wyklady”: „Pytania utrwalające” bez numeru (rekomendacja z weryfikacji).
+ */
+export type SlowoJednostki = "Temat" | "Wykład";
+export type NumeracjaJednostki = "lista" | "wyklady";
+export function etykietaJednostki(
+  modules: OrderModule[] | undefined,
+  sectionId: string,
+  o: { slowo: SlowoJednostki; numeracja: NumeracjaJednostki },
+): string | null {
+  const mods = (modules ?? []).slice().sort((a, b) => a.order - b.order);
+  for (let mi = 0; mi < mods.length; mi++) {
+    const sekcje = mods[mi].sections.slice().sort((a, b) => a.order - b.order);
+    const si = sekcje.findIndex((s) => s.id === sectionId);
+    if (si < 0) continue;
+    const modul = `Moduł ${String(mi + 1).padStart(2, "0")}`;
+    if (o.numeracja === "lista") return `${modul} · ${o.slowo} ${String(si + 1).padStart(2, "0")}`;
+    if (!hasLecture(sekcje[si])) return `${modul} · Pytania utrwalające`;
+    const nr = sekcje.slice(0, si + 1).filter(hasLecture).length;
+    return `${modul} · ${o.slowo} ${String(nr).padStart(2, "0")}`;
+  }
+  return null;
+}
