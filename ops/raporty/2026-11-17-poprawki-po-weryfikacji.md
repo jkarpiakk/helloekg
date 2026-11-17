@@ -73,3 +73,15 @@ Dowody leżą w `ops/raporty/2026-11-17-dowody/`:
   - **C2b:** losowanie przeniesione do `shared/kolejnosc.ts`, żeby dało się je przetestować.
 - W „wskaż na zapisie” przed odpowiedzią przeglądarka nie zna już obszarów, więc status mówi tylko „Wskazano miejsce.” albo „Wskazane miejsca: N”. Krok „wskaż” w przypadku klinicznym działa po staremu, bo przypadek w nauce dostaje pełną konfigurację (świadoma decyzja, Z-119 pkt 1).
 - Katalogu `client/src/wstawki/` nie ruszałem. Treści pytań i wykładów nie zmieniałem.
+
+## Wdrożenie (17.11, po „Lecisz” od JK)
+
+- **Scalone do `punkty-edukacyjne`:** C8 i C6 (6b0edc9). Po scaleniu przechodzą: tsc, 112 testów jednostkowych i `e2e:odswiezenie`. Sprawdzone także na lustrze: zrzuty C6/C8 przy 375, 935 i 1456 px oraz cztery pytania „wskaż na zapisie”.
+- **Kopia bazy:** `/var/backups/helloekg-kurs/kurs-przed-wdrozenie-20261117-192448.dump`.
+- **Produkcja:**
+  - `dist` wgrany, usługa `active`;
+  - strona zwraca 200, a API bez logowania 401;
+  - w dzienniku z ostatniej minuty nie ma błędów;
+  - w paczce na serwerze jest nowy kod.
+- **Gałęzie:** `deploy/kurs-beta` = `punkty-edukacyjne` = 6b0edc9, wypchnięte.
+- **Bez zmian:** C2c i etykieta „Temat/Wykład” (gałąź `decyzja-z127-etykieta`) czekają na wybór JK.
