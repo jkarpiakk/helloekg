@@ -1,0 +1,11 @@
+{
+  "questionType": "hotspot",
+  "questionConfig": {
+    "type": "hotspot",
+    "config": {
+      "imageUrl": "/content-assets/27b7051401663ee71e218d37d138a460bf9447d70f8d01f59b641190ea0c7d9c.png",
+      "hotspots": [],
+      "allowMultiple": false
+    }
+  }
+}

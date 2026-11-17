@@ -308,6 +308,8 @@ export interface HotspotAnswer {
   clickedHotspots: string[]; // IDs of clicked hotspots
   clickCoordinates?: { x: number; y: number }[]; // Actual click positions
   clickedOutside?: boolean; // Whether user clicked outside any hotspot area
+  /** Wymiary planszy w przeglądarce (naturalWidth, naturalHeight): zapas, gdy serwer nie odczyta pliku */
+  obraz?: { width: number; height: number };
 }
 
 export type AnswerData = 

@@ -60,42 +60,46 @@ export default function HotspotQuestion({
     };
   };
 
+  // Przed odpowiedzią serwer nie wysyła obszarów (Z-100): trafienie liczy on sam ze współrzędnych.
+  // Obszary są tylko w kroku przypadku klinicznego (tam ocenia przeglądarka).
+  const obszaryUkryte = config.hotspots.length === 0;
+
   const commitPoint = useCallback(
     (x: number, y: number) => {
-      const newCoordinates = config.allowMultiple ? [...clickCoordinates, { x, y }] : [{ x, y }];
+      // Wiele miejsc: dotknięcie tuż przy postawionym znaczniku zdejmuje go (zamiast stawiać drugi)
+      const rect = imageRef.current?.getBoundingClientRect();
+      const blisko = (p: { x: number; y: number }) =>
+        !!rect && Math.hypot(((p.x - x) / 100) * rect.width, ((p.y - y) / 100) * rect.height) <= 22;
+      const zdejmowany = config.allowMultiple ? clickCoordinates.findIndex(blisko) : -1;
+      const newCoordinates =
+        zdejmowany >= 0
+          ? clickCoordinates.filter((_, i) => i !== zdejmowany)
+          : config.allowMultiple
+            ? [...clickCoordinates, { x, y }]
+            : [{ x, y }];
       setClickCoordinates(newCoordinates);
 
-      const newClickedHotspots = new Set(config.allowMultiple ? clickedHotspots : []);
-      let foundHotspot = false;
-
-      for (const hotspot of config.hotspots) {
-        if (isPointInHotspot(x, y, hotspot, wymiary)) {
-          foundHotspot = true;
-          if (config.allowMultiple) {
-            if (newClickedHotspots.has(hotspot.id)) {
-              newClickedHotspots.delete(hotspot.id);
-            } else {
-              newClickedHotspots.add(hotspot.id);
-            }
-          } else {
-            newClickedHotspots.clear();
-            newClickedHotspots.add(hotspot.id);
-          }
-          break;
+      // Krok przypadku (obszary znane): identyfikatory trafionych obszarów jak dotąd
+      const newClickedHotspots = new Set<string>();
+      for (const p of newCoordinates) {
+        const h = config.hotspots.find((o) => isPointInHotspot(p.x, p.y, o, wymiary));
+        if (h) {
+          if (!config.allowMultiple) newClickedHotspots.clear();
+          newClickedHotspots.add(h.id);
         }
       }
-
       setClickedHotspots(newClickedHotspots);
 
       const answerData: AnswerData = {
         type: "hotspot",
         clickedHotspots: Array.from(newClickedHotspots),
         clickCoordinates: newCoordinates,
-        clickedOutside: !foundHotspot,
+        ...(obszaryUkryte ? {} : { clickedOutside: newClickedHotspots.size === 0 }),
+        obraz: wymiary === BEZ_WYMIAROW ? undefined : wymiary,
       };
       onChange(answerData);
     },
-    [config, clickedHotspots, clickCoordinates, onChange],
+    [config, clickCoordinates, onChange, wymiary, obszaryUkryte],
   );
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -364,9 +368,13 @@ export default function HotspotQuestion({
             ? aim
               ? "Strzałki przesuwają celownik, Enter wskazuje miejsce."
               : "Nic jeszcze nie wskazano."
-            : clickedHotspots.size > 0
-              ? `Wskazano obszar${config.allowMultiple ? ` (${clickedHotspots.size})` : ""}.`
-              : "Wskazano miejsce poza obszarami."}
+            : obszaryUkryte || disabled
+              ? config.allowMultiple
+                ? `Wskazane miejsca: ${clickCoordinates.length}.${disabled ? "" : " Dotknij znacznika, aby go zdjąć."}`
+                : "Wskazano miejsce."
+              : clickedHotspots.size > 0
+                ? `Wskazano obszar${config.allowMultiple ? ` (${clickedHotspots.size})` : ""}.`
+                : "Wskazano miejsce poza obszarami."}
         </p>
         {!disabled && clickCoordinates.length > 0 && (
           <Button variant="ghost" size="sm" onClick={handleClear} data-testid="clear-hotspots">

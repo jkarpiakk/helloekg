@@ -17,6 +17,8 @@ import type {
 } from "@shared/schema";
 import { gradeImageChoice, kolejnoscOpcji, poprawnaOdpowiedzZapisow } from "@shared/wyborZapisu";
 import { czyGrupy, grupaKarty, ocenGrupy } from "@shared/dragDropGrupy";
+import { BEZ_WYMIAROW, ocenHotspot } from "@shared/hotspot";
+import { wymiaryOdKlienta, wymiaryPlanszy } from "../lib/wymiaryPlanszy";
 import {
   gradeClinicalCase,
   buildClinicalCaseCorrectAnswer,
@@ -253,27 +255,18 @@ export class QuizService {
     return { isCorrect, partialScore, correctItems, incorrectItems };
   }
 
-  validateHotspotAnswer(config: HotspotConfig, answer: { type: 'hotspot'; clickedHotspots: string[]; clickCoordinates?: { x: number; y: number }[] }): { isCorrect: boolean; partialScore: number; correctItems: string[]; incorrectItems: string[] } {
-    const correctHotspots = config.hotspots.filter(h => h.isCorrect);
-    const correctItems: string[] = [];
-    const incorrectItems: string[] = [];
-    
-    for (const clickedId of answer.clickedHotspots) {
-      const hotspot = config.hotspots.find(h => h.id === clickedId);
-      if (hotspot && hotspot.isCorrect) {
-        correctItems.push(clickedId);
-      } else {
-        incorrectItems.push(clickedId);
-      }
-    }
-    
-    // Check if all correct hotspots were clicked (for multiple hotspot questions)
-    const allCorrectClicked = correctHotspots.every(h => answer.clickedHotspots.includes(h.id));
-    const noIncorrectClicked = incorrectItems.length === 0;
-    
-    const partialScore = correctItems.length / correctHotspots.length;
-    const isCorrect = allCorrectClicked && noIncorrectClicked;
-    
+  /**
+   * „Wskaż na zapisie” (Z-100, Z-101, Z-130): obszary nie idą do przeglądarki przed odpowiedzią, więc trafienie
+   * liczy serwer ze współrzędnych wskazań, tą samą geometrią i oceną co studio (shared/hotspot.ts).
+   * Proporcje planszy z pliku na serwerze; gdy pliku nie ma, z wymiarów podanych przez przeglądarkę (tylko do koła).
+   */
+  validateHotspotAnswer(config: HotspotConfig, answer: { type: 'hotspot'; clickedHotspots?: string[]; clickCoordinates?: { x: number; y: number }[]; obraz?: { width?: number; height?: number } }): { isCorrect: boolean; partialScore: number; correctItems: string[]; incorrectItems: string[] } {
+    const img = wymiaryPlanszy(config.imageUrl) ?? wymiaryOdKlienta(answer.obraz) ?? BEZ_WYMIAROW;
+    const { isCorrect, partialScore, correctItems, incorrectItems } = ocenHotspot(
+      { hotspots: config.hotspots, allowMultiple: (config as { allowMultiple?: boolean }).allowMultiple },
+      answer.clickCoordinates,
+      img,
+    );
     return { isCorrect, partialScore, correctItems, incorrectItems };
   }
 
@@ -757,7 +750,9 @@ export class QuizService {
       case 'hotspot':
         return {
           type: 'hotspot',
-          config: { ...c.config, hotspots: c.config.hotspots.map(h => ({ ...h, isCorrect: false })) },
+          // Bez obszarów (Z-100): ich położenie i etykiety zdradzały, gdzie kliknąć. Trafienie liczy serwer
+          // ze współrzędnych, pełne obszary wracają po odpowiedzi w QuizResult.questionConfig.
+          config: { ...c.config, hotspots: [] },
         };
       case 'image_choice':
         // Kolejność losowana przy każdym podaniu pytania (= podejściu), stabilna w jego obrębie:
