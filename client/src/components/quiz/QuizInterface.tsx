@@ -999,7 +999,13 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
               size="sm"
               onClick={(e) => pe.otworz(e.currentTarget)}
               className="-mr-3 gap-1.5 px-3"
-              aria-label="Pełny ekran: monitor i odpowiedzi naraz"
+              aria-label={
+                scena === "wstawka"
+                  ? "Pełny ekran: monitor i odpowiedzi naraz"
+                  : scena === "przypadek"
+                    ? "Pełny ekran: zapis i kroki przypadku naraz"
+                    : "Pełny ekran: zapis do wskazania"
+              }
               data-testid="pelny-ekran-pytania"
             >
               <Maximize2 aria-hidden />
