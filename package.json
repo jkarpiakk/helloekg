@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push",
     "test": "vitest run",
     "e2e:obrazy": "bash scripts/e2e-obrazy.sh",
+    "e2e:odswiezenie": "bash scripts/e2e-lustro.sh tests/e2e/odswiezenie.cjs",
     "sync:studio": "bash scripts/synchronizuj-studio.sh"
   },
   "dependencies": {

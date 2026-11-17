@@ -251,12 +251,50 @@ function withRevealedConfig(question: QuizQuestion, result: QuizResult | null): 
   return question;
 }
 
+/**
+ * Stan zestawu nauki/powtórki po odświeżeniu strony (Z-123): numer pytania, wynik, pokazane pytania
+ * i bieżące pytanie z serwera (bez klucza odpowiedzi, z tą samą kolejnością A-D). sessionStorage, 2 h.
+ * Egzamin ma sesję na serwerze, więc go to nie dotyczy.
+ */
+type Tally = Record<number, { questionId: string; isCorrect: boolean; timeMs: number; partial?: number }>;
+interface ZapisZestawu { at: number; index: number; shown: string[]; tally: Tally; total: number | null; question: QuizQuestion | null }
+const ZESTAW_WAZNY_MS = 2 * 60 * 60 * 1000;
+function czytajZestaw(klucz: string | null): ZapisZestawu | null {
+  if (!klucz) return null;
+  try {
+    const z = JSON.parse(sessionStorage.getItem(klucz) ?? "null") as ZapisZestawu | null;
+    if (!z || typeof z.index !== "number" || Date.now() - z.at > ZESTAW_WAZNY_MS) {
+      sessionStorage.removeItem(klucz);
+      return null;
+    }
+    return z;
+  } catch {
+    return null;
+  }
+}
+function zapomnijZestaw(klucz: string | null) {
+  if (!klucz) return;
+  try {
+    sessionStorage.removeItem(klucz);
+  } catch {
+    /* tryb prywatny: nic do sprzątania */
+  }
+}
+
 export default function QuizInterface({ sectionId, mode = "learn", examQuestionCount, reviewIds, onExit }: QuizInterfaceProps) {
   const [, setLocation] = useLocation();
   const isExam = mode === "exam";
 
+  const zestawKlucz = isExam ? null : `hk-quiz-v1:${mode}:${sectionId ?? ""}:${reviewIds?.join(",") ?? ""}`;
+  // Odświeżenie w połowie zestawu: to samo pytanie (z cache zapytań, bez nowego losowania) i ten sam wynik
+  const [przywrocony] = useState(() => {
+    const z = czytajZestaw(zestawKlucz);
+    if (z?.question) queryClient.setQueryData(["/api/quiz/question", mode, sectionId ?? null, reviewIds?.join(",") ?? null, 0, z.index], z.question);
+    return z;
+  });
+
   const [sessionNo, setSessionNo] = useState(0);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(przywrocony?.index ?? 0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [currentAnswerData, setCurrentAnswerData] = useState<AnswerData | null>(null);
   const [status, setStatus] = useState<AnswerStatus>("idle");
@@ -271,15 +309,19 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const [examInitError, setExamInitError] = useState<string | null>(null);
   const [examInitNonce, setExamInitNonce] = useState(0);
   const [examFinished, setExamFinished] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
+  const [showSummary, setShowSummary] = useState(
+    () => !!przywrocony && przywrocony.total !== null && przywrocony.total > 0 && przywrocony.index >= przywrocony.total,
+  );
   /** Długość sesji nauki/powtórki — ustalana raz, na początku sesji */
-  const [sessionTotal, setSessionTotal] = useState<number | null>(isExam ? null : reviewIds ? Math.min(SESSION_LENGTH, reviewIds.length) : null);
+  const [sessionTotal, setSessionTotal] = useState<number | null>(
+    isExam ? null : przywrocony?.total ?? (reviewIds ? Math.min(SESSION_LENGTH, reviewIds.length) : null),
+  );
   // Wyniki tej sesji (z odpowiedzi serwera) — do podsumowania
-  const [tally, setTally] = useState<Record<number, { questionId: string; isCorrect: boolean; timeMs: number; partial?: number }>>({});
+  const [tally, setTally] = useState<Tally>(przywrocony?.tally ?? {});
   /** Pierwsze pytanie nauki/powtórki: podpowiedź, że dotknięcie od razu zatwierdza odpowiedź */
   const [instantHint, setInstantHint] = useState(() => !isExam && !readHintSeen());
   /** Pytania pokazane w tej sesji — serwer ich nie powtórzy */
-  const shownRef = useRef<string[]>([]);
+  const shownRef = useRef<string[]>(przywrocony?.shown ?? []);
   /** Następne pytanie pobrane w tle, gdy widać wyjaśnienie / „Zapisano” — „Dalej” pokazuje je od razu */
   const prefetchRef = useRef<Prefetch | null>(null);
   const lastPayload = useRef<Payload | null>(null);
@@ -437,6 +479,29 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   useEffect(() => {
     if (question && !shownRef.current.includes(question.id)) shownRef.current.push(question.id);
   }, [question]);
+
+  // Zapis stanu zestawu (Z-123): po wyniku już następna pozycja, bez pytania (przyjdzie nowe z serwera)
+  useEffect(() => {
+    if (!zestawKlucz) return;
+    if (showSummary) {
+      zapomnijZestaw(zestawKlucz);
+      return;
+    }
+    const odpowiedziane = status === "result";
+    const zapis: ZapisZestawu = {
+      at: Date.now(),
+      index: odpowiedziane ? currentQuestionIndex + 1 : currentQuestionIndex,
+      shown: shownRef.current,
+      tally,
+      total: sessionTotal,
+      question: odpowiedziane ? null : (question ?? null),
+    };
+    try {
+      sessionStorage.setItem(zestawKlucz, JSON.stringify(zapis));
+    } catch {
+      /* brak miejsca albo tryb prywatny: bez zapisu, zestaw działa dalej */
+    }
+  }, [zestawKlucz, showSummary, status, currentQuestionIndex, tally, sessionTotal, question]);
 
   useEffect(() => {
     setStartTime(Date.now());
@@ -657,6 +722,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   const answeredCount = Object.keys(tally).length;
 
   const handleExit = () => {
+    zapomnijZestaw(zestawKlucz);
     if (isExam && !examFinished) {
       if (answeredCount === 0) onExit?.();
       else setConfirmLeave(true);
@@ -741,6 +807,7 @@ export default function QuizInterface({ sectionId, mode = "learn", examQuestionC
   );
 
   const restartSession = () => {
+    zapomnijZestaw(zestawKlucz);
     requestNo.current++;
     prefetchRef.current = null;
     shownRef.current = [];
