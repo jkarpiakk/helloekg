@@ -11,11 +11,14 @@ const crypto = require("crypto");
 
 const BASE = process.env.BASE || "http://localhost:5068";
 const DB = process.env.DB || "helloekg_kurs_lustro";
-if (DB === "helloekg_kurs" || /kurs\.helloekg\.pl/.test(BASE)) {
+if (DB === "helloekg_kurs" || /kurs\.helloekg\.pl/.test(BASE) || /\/helloekg_kurs(\?|$)/.test(process.env.E2E_PSQL || "")) {
   console.error("Ten test zakłada konto tymczasowe: tylko na lustrze (scripts/lustro-prod.sh), nigdy na produkcji.");
   process.exit(2);
 }
-const sql = (q) => execSync(`ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`, { input: q }).toString().trim();
+// Polecenie psql do bazy testowej: domyślnie lustro na VPS przez ssh; lokalnie np.
+// E2E_PSQL='psql postgres://uzytkownik:haslo@localhost:5432/helloekg_kurs_test -Atq'
+const PSQL = process.env.E2E_PSQL || `ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`;
+const sql = (q) => execSync(PSQL, { input: q }).toString().trim();
 const H = { "X-Forwarded-Proto": "https", Origin: BASE };
 
 (async () => {

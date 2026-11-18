@@ -8,7 +8,10 @@ const crypto = require("crypto");
 const B = process.env.BASE || "http://localhost:5065";
 const DB = process.env.DB || "helloekg_kurs_otwarcie";
 const wyn = []; const ok = (n, w, d = "") => wyn.push(`${w ? "OK  " : "FAIL"} ${n} ${d}`);
-const sql = (q) => execSync(`ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`, { input: q }).toString().trim();
+// Polecenie psql do bazy testowej: domyślnie lustro na VPS przez ssh; lokalnie np.
+// E2E_PSQL='psql postgres://uzytkownik:haslo@localhost:5432/helloekg_kurs_test -Atq'
+const PSQL = process.env.E2E_PSQL || `ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`;
+const sql = (q) => execSync(PSQL, { input: q }).toString().trim();
 const H = (xff, extra = {}) => ({ "Content-Type": "application/json", Origin: B, "X-Forwarded-For": xff, ...extra });
 const post = (path, body, xff = "10.9.0.1", extra = {}) => fetch(B + path, { method: "POST", headers: H(xff, extra), body: JSON.stringify(body) });
 

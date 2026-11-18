@@ -21,7 +21,10 @@ if (!OUTBOX || !ADMIN.password) {
 
 const wyn = [];
 const ok = (n, w, d = "") => wyn.push(`${w ? "OK  " : "FAIL"} ${n}${d ? `  (${d})` : ""}`);
-const sql = (q) => execSync(`ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`, { input: q }).toString().trim();
+// Polecenie psql do bazy testowej: domyślnie lustro na VPS przez ssh; lokalnie np.
+// E2E_PSQL='psql postgres://uzytkownik:haslo@localhost:5432/helloekg_kurs_test -Atq'
+const PSQL = process.env.E2E_PSQL || `ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`;
+const sql = (q) => execSync(PSQL, { input: q }).toString().trim();
 const esc = (s) => s.replace(/'/g, "''");
 let ipNr = 0;
 const noweIp = () => `10.77.${Math.floor(++ipNr / 250)}.${ipNr % 250 + 1}`;

@@ -9,7 +9,10 @@ const wyn = []; const ok = (n, w, d = "") => wyn.push(`${w ? "OK  " : "FAIL"} ${
 // Q-0044 i Q-0034 z polecenia + po jednym z każdej sekcji
 const KODY = ["Q-0044", "Q-0034", "Q-INT-00-FB-01", "Q-0100", "Q-0105", "Q-INT-03-FB-01", "Q-0130", "Q-0155", "Q-0175"];
 const ZRZUTY = new Set(["Q-0044", "Q-0034", "Q-INT-00-FB-01"]);
-const sql = (q) => execSync(`ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`, { input: q }).toString().trim();
+// Polecenie psql do bazy testowej: domyślnie lustro na VPS przez ssh; lokalnie np.
+// E2E_PSQL='psql postgres://uzytkownik:haslo@localhost:5432/helloekg_kurs_test -Atq'
+const PSQL = process.env.E2E_PSQL || `ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`;
+const sql = (q) => execSync(PSQL, { input: q }).toString().trim();
 
 const pytania = KODY.map((k) => {
   const [id, cfg] = sql(`SELECT id || '|' || (question_config->'config')::text FROM questions WHERE tags::text LIKE '%"studio:${k}"%' AND status='published'`).split(/\|(.*)/s);

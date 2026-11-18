@@ -16,7 +16,10 @@ if (!OUTBOX || !ADMIN.password) { console.error("Ustaw OUTBOX i ADMIN_HASLO"); p
 
 const wyn = [];
 const ok = (n, w, d = "") => wyn.push(`${w ? "OK  " : "FAIL"} ${n}${d ? `  (${d})` : ""}`);
-const sql = (q) => execSync(`ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`, { input: q }).toString().trim();
+// Polecenie psql do bazy testowej: domyślnie lustro na VPS przez ssh; lokalnie np.
+// E2E_PSQL='psql postgres://uzytkownik:haslo@localhost:5432/helloekg_kurs_test -Atq'
+const PSQL = process.env.E2E_PSQL || `ssh helloekg-studio "sudo -u postgres psql -d ${DB} -Atq"`;
+const sql = (q) => execSync(PSQL, { input: q }).toString().trim();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let n = 0;
 const noweIp = () => `198.51.100.${(n++ % 200) + 20}`;
