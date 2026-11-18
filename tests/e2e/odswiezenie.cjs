@@ -11,7 +11,7 @@ const crypto = require("crypto");
 
 const BASE = process.env.BASE || "http://localhost:5068";
 const DB = process.env.DB || "helloekg_kurs_lustro";
-if (DB === "helloekg_kurs" || /kurs\.helloekg\.pl/.test(BASE) || /\/helloekg_kurs(\?|$)/.test(process.env.E2E_PSQL || "")) {
+if (DB === "helloekg_kurs" || /kurs\.helloekg\.pl/.test(BASE) || /\/helloekg_kurs(\?|\s|$)/.test(process.env.E2E_PSQL || "")) {
   console.error("Ten test zakłada konto tymczasowe: tylko na lustrze (scripts/lustro-prod.sh), nigdy na produkcji.");
   process.exit(2);
 }

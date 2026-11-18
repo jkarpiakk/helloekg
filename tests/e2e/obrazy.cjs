@@ -26,7 +26,7 @@ const SHOTS = process.env.SHOTS || "";
 const KOREN = path.resolve(__dirname, "../..");
 const dzis = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Warsaw" });
 const RAPORT = process.env.RAPORT || path.join(KOREN, "ops/raporty", `${dzis}-e2e-obrazy.md`);
-if (DB === "helloekg_kurs" || /kurs\.helloekg\.pl/.test(BASE) || /\/helloekg_kurs(\?|$)/.test(process.env.E2E_PSQL || "")) {
+if (DB === "helloekg_kurs" || /kurs\.helloekg\.pl/.test(BASE) || /\/helloekg_kurs(\?|\s|$)/.test(process.env.E2E_PSQL || "")) {
   console.error("Ten test zakłada konto tymczasowe: tylko na lustrze (scripts/lustro-prod.sh), nigdy na produkcji.");
   process.exit(2);
 }
