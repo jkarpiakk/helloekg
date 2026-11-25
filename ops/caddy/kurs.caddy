@@ -43,4 +43,25 @@ kurs.helloekg.pl {
 	}
 
 	reverse_proxy 127.0.0.1:3100
+
+	# Aplikacja nie odpowiada (restart przy wdrożeniu, awaria): zamiast pustej strony 502 strona przerwy
+	# w motywie kursu (ops/bledy/przerwa.html, sama ponawia próbę). API dostaje krótki JSON z tym samym kodem.
+	# Plik na serwerze: /var/www/helloekg-bledy/przerwa.html (strony błędów 25.11).
+	handle_errors 502 503 504 {
+		header Retry-After 10
+		header Cache-Control "no-store"
+		@api path /api/*
+		handle @api {
+			header Content-Type "application/json; charset=utf-8"
+			respond `{"error":"Kurs chwilowo niedostępny. Spróbuj ponownie za kilka sekund."}` {err.status_code}
+		}
+		handle {
+			root * /var/www/helloekg-bledy
+			rewrite * /przerwa.html
+			templates
+			file_server {
+				status {err.status_code}
+			}
+		}
+	}
 }

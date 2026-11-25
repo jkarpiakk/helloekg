@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
+import { znanaTrasa } from "@shared/trasy";
 
 /** Produkcja: zbudowany klient z dist/public. Bez vite (to tylko zależność deweloperska). */
 export function log(message: string, source = "express") {
@@ -39,9 +40,11 @@ export function serveStatic(app: Express) {
     })
   );
 
-  // SPA fallback — always return index.html without caching
-  app.use("*", (_req, res) => {
+  // SPA fallback — always return index.html without caching. Adres spoza tras aplikacji: ta sama strona
+  // (pokaże „Ten adres nie przewodzi”), ale z kodem 404 dla przeglądarek, wyszukiwarek i monitoringu.
+  app.use("*", (req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    if (!znanaTrasa(req.originalUrl)) res.status(404);
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

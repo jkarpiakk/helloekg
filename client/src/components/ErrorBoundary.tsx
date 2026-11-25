@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle } from "lucide-react";
+import { StronaBledu } from "@/components/bledy/StronaBledu";
 
 interface Props {
   children: ReactNode;
@@ -35,36 +35,40 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback;
 
       return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <div className="max-w-md w-full text-center space-y-6">
-            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
-              <AlertTriangle className="w-8 h-8 text-destructive" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-2xl font-medium text-foreground">
-                Coś poszło nie tak
-              </h1>
-              <p className="text-muted-foreground">
-                Wystąpił nieoczekiwany błąd. Możesz spróbować ponownie lub odświeżyć stronę.
-              </p>
-              {process.env.NODE_ENV === "development" && this.state.error && (
-                <pre className="mt-4 p-3 bg-muted rounded-lg text-left text-xs text-muted-foreground overflow-auto max-h-40">
-                  {this.state.error.toString()}
-                </pre>
-              )}
-            </div>
-            <div className="flex gap-3 justify-center">
-              <Button onClick={this.handleReset} variant="default">
-                Spróbuj ponownie
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => { window.location.href = "/"; }}
-              >
-                Wróć do strony głównej
-              </Button>
-            </div>
-          </div>
+        <div className="min-h-screen bg-background">
+          <StronaBledu
+            kod="BŁĄD"
+            rodzaj="artefakt"
+            etykieta="Błąd aplikacji"
+            tytul="Artefakt na zapisie"
+            dzialania={
+              <>
+                <Button onClick={this.handleReset}>Spróbuj ponownie</Button>
+                <Button variant="outline" onClick={() => window.location.reload()}>
+                  Odśwież stronę
+                </Button>
+              </>
+            }
+            dopisek={
+              <>
+                Wraca przy tym samym kroku?{" "}
+                <a href="/zgloszenie" className="text-[var(--txt)] underline underline-offset-4">
+                  Napisz, co robisz
+                </a>
+                , a znajdziemy przyczynę.
+                {process.env.NODE_ENV === "development" && this.state.error && (
+                  <pre className="mt-4 max-h-40 overflow-auto rounded-lg bg-[var(--panel)] p-3 text-left text-xs text-[var(--txt2)]">
+                    {this.state.error.toString()}
+                  </pre>
+                )}
+              </>
+            }
+          >
+            <p>
+              Coś zakłóciło ten widok po naszej stronie, nie po twojej. Zatwierdzone odpowiedzi i postęp są zapisane.
+              Spróbuj jeszcze raz albo odśwież stronę.
+            </p>
+          </StronaBledu>
         </div>
       );
     }

@@ -529,3 +529,13 @@
   .pelny-ekran--split .pelny-ekran__tresc { grid-template-columns: minmax(0, 1.1fr) minmax(280px, 1fr); column-gap: 20px; }
 }
 @media (prefers-reduced-transparency: reduce) { .pelny-ekran--pytanie .q-nav { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--ink); } }
+
+/* Strony błędów: pasek EKG rysuje się w tempie papieru (StronaBledu, components/bledy) */
+.hk-pasek-bledu { stroke-dasharray: 1 1; animation: hk-pasek var(--hk-pasek-s, 5s) linear infinite; }
+@keyframes hk-pasek {
+  0% { stroke-dashoffset: 1; opacity: 1; }
+  78% { stroke-dashoffset: 0; opacity: 1; }
+  95% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .hk-pasek-bledu { animation: none; stroke-dasharray: none; } }
